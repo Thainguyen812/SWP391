@@ -1,6 +1,6 @@
 
 
-```markdown
+``markdown
 # AI Rules
 - No user interactions.
 - Do not ask questions.
