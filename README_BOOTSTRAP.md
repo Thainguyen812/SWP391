@@ -11,3 +11,4 @@ Next steps:
  - Build backend: mvn -f backend clean package
  - Start backend: java -jar backend/target/parking-system-0.1.0.jar
  - Install frontend: cd frontend && npm install && npm start
+ - PR: feature/auto-boilerplate (created automatically)
