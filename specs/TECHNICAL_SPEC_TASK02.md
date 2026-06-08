@@ -1,64 +1,62 @@
-﻿# TECHNICAL_SPEC_TASK02 — Flyway DB Migration & Baseline Setup
-Generated from V1__initial_schema.sql on 2026-06-08 23:32:49
+﻿# ĐẶC TẢ KỸ THUẬT: TASK 2 - FLYWAY DB MIGRATION & BASELINE SETUP
 
 ## 1. FUNCTIONAL & BUSINESS LOGIC ANALYSIS
 
-### 1.1 Database Entities Overview
+### 1.1. CRUD Matrix & Database Entities Overview
 
-The system uses 15 tables. Each table and its purpose are listed below.
-- **users**: System table for users.
-- **refresh_tokens**: System table for refresh_tokens.
-- **vehicles**: System table for vehicles.
-- **etc_devices**: System table for etc_devices.
-- **cards**: System table for cards.
-- **zones**: System table for zones.
-- **parking_slots**: System table for parking_slots.
-- **parking_sessions**: System table for parking_sessions.
-- **vip_subscriptions**: System table for vip_subscriptions.
-- **transactions**: System table for transactions.
-- **pricing_rules**: System table for pricing_rules.
-- **blacklisted_cards**: System table for blacklisted_cards.
-- **ai_scan_logs**: System table for ai_scan_logs.
-- **parking_violations**: System table for parking_violations.
-- **audit_logs**: System table for audit_logs.
+Hệ thống sử dụng các bảng sau (15 bảng) — mô tả mục đích ngắn gọn.
+- **users**: Quản lý dữ liệu liên quan đến users.
+- **refresh_tokens**: Quản lý dữ liệu liên quan đến refresh_tokens.
+- **vehicles**: Quản lý dữ liệu liên quan đến vehicles.
+- **etc_devices**: Quản lý dữ liệu liên quan đến etc_devices.
+- **cards**: Quản lý dữ liệu liên quan đến cards.
+- **zones**: Quản lý dữ liệu liên quan đến zones.
+- **parking_slots**: Quản lý dữ liệu liên quan đến parking_slots.
+- **parking_sessions**: Quản lý dữ liệu liên quan đến parking_sessions.
+- **vip_subscriptions**: Quản lý dữ liệu liên quan đến vip_subscriptions.
+- **transactions**: Quản lý dữ liệu liên quan đến transactions.
+- **pricing_rules**: Quản lý dữ liệu liên quan đến pricing_rules.
+- **blacklisted_cards**: Quản lý dữ liệu liên quan đến blacklisted_cards.
+- **ai_scan_logs**: Quản lý dữ liệu liên quan đến ai_scan_logs.
+- **parking_violations**: Quản lý dữ liệu liên quan đến parking_violations.
+- **audit_logs**: Quản lý dữ liệu liên quan đến audit_logs.
 
-### 1.2 Data Dictionary / Fields
+### 1.2. Data Dictionary / Fields
 
-For each table below, a markdown table lists Column, Type, Constraints, Description.
 #### users
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
 | username | VARCHAR(50) | NOT NULL UNIQUE |  |
-| password_hash | VARCHAR(255) | NOT NULL,           -- bcrypt cost >= 10 |  |
+| password_hash | VARCHAR(255) | NOT NULL,           -- bcrypt cost >= 10 | BCRYPT hash (bcrypt cost >=10) |
 | full_name | VARCHAR(100) | NOT NULL |  |
-| email | VARCHAR(100) | NOT NULL UNIQUE |  |
+| email | VARCHAR(100) | NOT NULL UNIQUE | Email người dùng, unique |
 | phone | VARCHAR(15) |  |  |
-| role | VARCHAR(10) | NOT NULL |  |
+| role | VARCHAR(10) | NOT NULL | Quyền: ADMIN/MANAGER/STAFF/DRIVER |
 | status | VARCHAR(10) | NOT NULL DEFAULT 'ACTIVE' |  |
 | fcm_token | VARCHAR(255) |  |  |
-| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp record created |
-| updated_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp record last updated |
+| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp tạo record |
+| updated_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp cập nhật cuối |
 | last_login_at | TIMESTAMP |  |  |
 
 #### refresh_tokens
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
-| user_id | UUID | NOT NULL | FK reference to users table |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
+| user_id | UUID | NOT NULL |  |
 | token | UUID | NOT NULL UNIQUE DEFAULT gen_random_uuid() |  |
 | expires_at | TIMESTAMP | NOT NULL,               -- NOW() + 7 days |  |
-| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp record created |
+| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp tạo record |
 
 #### vehicles
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
-| owner_id | UUID | NOT NULL | FK reference to users table |
-| license_plate | VARCHAR(20) | NOT NULL UNIQUE,   -- Format: 51A-12345 |  |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
+| owner_id | UUID | NOT NULL |  |
+| license_plate | VARCHAR(20) | NOT NULL UNIQUE,   -- Format: 51A-12345 | Biển số xe, unique hoặc phát hiện bởi AI |
 | vehicle_size | VARCHAR(15) | NOT NULL |  |
 | color | VARCHAR(30) | ,                   -- TÃªn mÃ u (VD: "Äen") |  |
 | color_rgb | VARCHAR(7) | ,                    -- Hex chÃ­nh xÃ¡c (VD: "#1C1C1C") |  |
@@ -68,14 +66,14 @@ For each table below, a markdown table lists Column, Type, Constraints, Descript
 | registration_photo_url | VARCHAR(255) | ,               -- áº¢nh xe thá»±c táº¿ gÃ³c trÆ°á»›c (Ä‘Äƒng kÃ½ VIP) |  |
 | violation_count | INT | NOT NULL DEFAULT 0, -- Sá»‘ láº§n vi pháº¡m EV zone (Flow 7) |  |
 | is_active | BOOLEAN | NOT NULL DEFAULT TRUE |  |
-| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp record created |
-| updated_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp record last updated |
+| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp tạo record |
+| updated_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp cập nhật cuối |
 
 #### etc_devices
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
 | vehicle_id | UUID | NOT NULL UNIQUE |  |
 | etc_device_id | VARCHAR(50) | NOT NULL UNIQUE,       -- ID chip ETC váº­t lÃ½ (tá»« nhÃ  cung cáº¥p) |  |
 | etc_provider | VARCHAR(30) | -- 'VETC', 'EPASS', 'PARKING_TAG' |  |
@@ -89,33 +87,33 @@ For each table below, a markdown table lists Column, Type, Constraints, Descript
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
 | card_code | VARCHAR(20) | NOT NULL UNIQUE,   -- MÃ£ in trÃªn tháº» RFID vÃ£ng lai |  |
 | status | VARCHAR(15) | NOT NULL DEFAULT 'AVAILABLE' |  |
-| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp record created |
-| updated_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp record last updated |
+| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp tạo record |
+| updated_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp cập nhật cuối |
 
 #### zones
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
-| zone_name | VARCHAR(80) | NOT NULL,       -- VD: "Táº§ng B1 - Xe Táº£i Nhá»" |  |
-| zone_code | VARCHAR(10) | NOT NULL UNIQUE, -- VD: "B1", "B2", "F1", "F2" |  |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
+| zone_name | VARCHAR(80) | NOT NULL,       -- VD: "Táº§ng B1 - Xe Táº£i Nhá»" | Tên/ mã khu vực đỗ |
+| zone_code | VARCHAR(10) | NOT NULL UNIQUE, -- VD: "B1", "B2", "F1", "F2" | Tên/ mã khu vực đỗ |
 | allowed_sizes | TEXT | NOT NULL,        -- JSON Array: ["FAMILY_CAR","MINIBUS_16"] |  |
 | total_slots | INT | NOT NULL CHECK (total_slots > 0) |  |
 | current_occupied | INT | NOT NULL DEFAULT 0 CHECK (current_occupied >= 0) |  |
 | has_ev_charger | BOOLEAN | NOT NULL DEFAULT FALSE, -- CÃ³ khu vá»±c sáº¡c Ä‘iá»‡n (Flow 7) |  |
 | is_active | BOOLEAN | NOT NULL DEFAULT TRUE |  |
-| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp record created |
-| updated_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp record last updated |
+| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp tạo record |
+| updated_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp cập nhật cuối |
 
 #### parking_slots
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
-| zone_id | UUID | NOT NULL | Reference to zones table |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
+| zone_id | UUID | NOT NULL |  |
 | slot_number | VARCHAR(10) | NOT NULL,           -- VD: "A01", "B15" |  |
 | slot_type | VARCHAR(10) | NOT NULL DEFAULT 'NORMAL' |  |
 | slot_status | VARCHAR(15) | NOT NULL DEFAULT 'AVAILABLE' |  |
@@ -127,14 +125,14 @@ For each table below, a markdown table lists Column, Type, Constraints, Descript
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
-| license_plate | VARCHAR(20) | NOT NULL |  |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
+| license_plate | VARCHAR(20) | NOT NULL | Biển số xe, unique hoặc phát hiện bởi AI |
 | is_vip | BOOLEAN | NOT NULL DEFAULT FALSE |  |
 | vehicle_id | UUID | ,       -- NULL náº¿u vÃ£ng lai chÆ°a cÃ³ tÃ i khoáº£n |  |
 | card_id | UUID | ,       -- NULL náº¿u VIP (khÃ´ng dÃ¹ng tháº») |  |
 | etc_device_id | VARCHAR(50) | ,                -- ETC device ID Ä‘Ã£ xÃ¡c thá»±c khi vÃ o |  |
 | etc_verified | BOOLEAN | NOT NULL DEFAULT FALSE, -- TRUE = ETC pass lÃºc check-in |  |
-| assigned_zone_id | UUID | NOT NULL | Reference to zones table |
+| assigned_zone_id | UUID | NOT NULL |  |
 | parked_slot_id | UUID | ,       -- Optional tracking Ã´ Ä‘á»— cá»¥ thá»ƒ |  |
 | check_in_time | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP |  |
 | check_out_time | TIMESTAMP | ,  -- NULL khi cÃ²n ACTIVE |  |
@@ -149,14 +147,14 @@ For each table below, a markdown table lists Column, Type, Constraints, Descript
 | mobile_checkout_at | TIMESTAMP |  |  |
 | mobile_checkout_photo | VARCHAR(255) | ,       -- áº¢nh minh chá»©ng thu tiá»n (S3) |  |
 | lost_card_proof_photos | JSON | ,                   -- ["url_cmnd","url_cavet","url_face"] |  |
-| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp record created |
-| updated_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp record last updated |
+| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp tạo record |
+| updated_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp cập nhật cuối |
 
 #### vip_subscriptions
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
 | vehicle_id | UUID | NOT NULL |  |
 | subscription_type | VARCHAR(10) | NOT NULL CHECK (subscription_type IN ('MONTHLY','QUARTERLY','YEARLY')) |  |
 | start_date | DATE | NOT NULL |  |
@@ -166,23 +164,23 @@ For each table below, a markdown table lists Column, Type, Constraints, Descript
 | approved_by | UUID | ,       -- Manager ID |  |
 | approved_at | TIMESTAMP |  |  |
 | rejection_reason | TEXT |  |  |
-| fee_amount | DECIMAL(10,2) | NOT NULL | Monetary amount |
+| fee_amount | DECIMAL(10,2) | NOT NULL |  |
 | payment_method | VARCHAR(20) | NOT NULL CHECK (payment_method IN ('VNPAY_SANDBOX','MOMO_SANDBOX','BANK_TRANSFER')) |  |
 | payment_reference | VARCHAR(100) | ,               -- Transaction ID tá»« Gateway |  |
 | payment_status | VARCHAR(10) | NOT NULL DEFAULT 'PENDING' |  |
-| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp record created |
-| updated_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp record last updated |
+| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp tạo record |
+| updated_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp cập nhật cuối |
 
 #### transactions
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
 | session_id | UUID | NOT NULL UNIQUE,   -- 1 session â†’ 1 transaction |  |
 | parking_fee | DECIMAL(10,2) | NOT NULL DEFAULT 0 |  |
 | lost_card_penalty | DECIMAL(10,2) | NOT NULL DEFAULT 0,   -- Flow 4 |  |
 | violation_penalty | DECIMAL(10,2) | NOT NULL DEFAULT 0,   -- Flow 7 EV zone |  |
-| total_amount | DECIMAL(10,2) | NOT NULL | Monetary amount |
+| total_amount | DECIMAL(10,2) | NOT NULL |  |
 | payment_method | VARCHAR(20) | NOT NULL CHECK (payment_method IN ('CASH','VNPAY_SANDBOX','MOMO_SANDBOX','QR_BANK')) |  |
 | payment_status | VARCHAR(10) | NOT NULL DEFAULT 'PENDING' |  |
 | payment_reference | VARCHAR(100) |  |  |
@@ -197,7 +195,7 @@ For each table below, a markdown table lists Column, Type, Constraints, Descript
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
 | vehicle_type | VARCHAR(15) | NOT NULL CHECK (vehicle_type IN ('VAN_TRUCK','MINIBUS_16','FAMILY_CAR')) |  |
 | first_hour_fee | DECIMAL(10,2) | NOT NULL |  |
 | additional_hour_fee | DECIMAL(10,2) | NOT NULL |  |
@@ -213,7 +211,7 @@ For each table below, a markdown table lists Column, Type, Constraints, Descript
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
 | card_id | UUID | NOT NULL UNIQUE,    -- 1 tháº» chá»‰ blacklist 1 láº§n |  |
 | session_id | UUID | ,                           -- Session phÃ¡t sinh máº¥t tháº» |  |
 | reason | VARCHAR(15) | NOT NULL CHECK (reason IN ('LOST','STOLEN','DAMAGED','FRAUDULENT')) |  |
@@ -225,13 +223,13 @@ For each table below, a markdown table lists Column, Type, Constraints, Descript
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
 | session_id | UUID |  |  |
 | scan_location | VARCHAR(25) | NOT NULL |  |
 | scan_type | VARCHAR(25) | NOT NULL DEFAULT 'STANDARD' |  |
 | camera_id | VARCHAR(50) | NOT NULL |  |
 | image_url | VARCHAR(255) | NOT NULL,      -- áº¢nh lÆ°u S3/MinIO (giá»¯ 30 ngÃ y) |  |
-| detected_plate | VARCHAR(20) | NOT NULL |  |
+| detected_plate | VARCHAR(20) | NOT NULL | Biển số xe, unique hoặc phát hiện bởi AI |
 | confidence_score | DECIMAL(5,2) | NOT NULL,      -- 0.00â€“100.00 (< 70% â†’ Staff kiá»ƒm tra) |  |
 | detected_vehicle_type | VARCHAR(15) |  |  |
 | detected_color | VARCHAR(30) | ,                -- MÃ u xe AI phÃ¡t hiá»‡n |  |
@@ -253,7 +251,7 @@ For each table below, a markdown table lists Column, Type, Constraints, Descript
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
 | session_id | UUID | NOT NULL |  |
 | slot_id | UUID | NOT NULL |  |
 | violation_type | VARCHAR(25) | NOT NULL CHECK (violation_type IN ('EV_ZONE_MISUSE','DISABLED_ZONE_MISUSE','DOUBLE_PARKING')) |  |
@@ -261,7 +259,7 @@ For each table below, a markdown table lists Column, Type, Constraints, Descript
 | detected_by | UUID | NOT NULL,           -- Staff ID |  |
 | is_first_violation | BOOLEAN | NOT NULL DEFAULT TRUE, -- TRUE: chá»‰ cáº£nh bÃ¡o; FALSE: pháº¡t tiá»n |  |
 | penalty_applied | BOOLEAN | NOT NULL DEFAULT FALSE |  |
-| penalty_amount | DECIMAL(10,2) | NOT NULL DEFAULT 0 | Monetary amount |
+| penalty_amount | DECIMAL(10,2) | NOT NULL DEFAULT 0 |  |
 | notes | TEXT |  |  |
 | detected_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP |  |
 
@@ -269,8 +267,8 @@ For each table below, a markdown table lists Column, Type, Constraints, Descript
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier |
-| user_id | UUID | ,                           -- NULL náº¿u system tá»± Ä‘á»™ng | FK reference to users table |
+| id | UUID | PRIMARY KEY DEFAULT gen_random_uuid() | Primary identifier (UUID) |
+| user_id | UUID | ,                           -- NULL náº¿u system tá»± Ä‘á»™ng |  |
 | action_type | VARCHAR(40) | NOT NULL CHECK (action_type IN ( |  |
 | entity_type | VARCHAR(50) | ,                    -- TÃªn báº£ng bá»‹ tÃ¡c Ä‘á»™ng |  |
 | entity_id | UUID |  |  |
@@ -278,18 +276,16 @@ For each table below, a markdown table lists Column, Type, Constraints, Descript
 | new_value | JSON |  |  |
 | ip_address | VARCHAR(45) |  |  |
 | user_agent | VARCHAR(255) |  |  |
-| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp record created |
+| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | Timestamp tạo record |
 
-### 1.3 Business Rules & Constraints
+### 1.3. Business Rules & Constraints
 
-- Flow 3 (Giải tỏa kẹt xe làn vãng lai Flow 3 revised): When temporary overload occurs, system will prioritize VIP and active subscription holders. Parking session allocation tries nearest available slot in same zone and uses soft-lock for 30s to prevent race conditions.
-- VIP ETC dual-auth: VIP entries require both valid ETC device signature and a matching VIP subscription record; fallback challenge is sent via QR code if ETC fails.
-- Vehicle Swap Prevention: vehicles table + transactions + cards are checked — when a vehicle plate is replaced on a card, system marks a 'swap_suspected' flag and requires manual review by MANAGER.
-- EV Zone Violation: if vehicle type = EV but parked outside an EV-designated zone or non-EV in EV zone, a parking_violation row is created and penalty pricing applied.
+- Flow 3 (Congestion relief — Revised): Staff mobile checkout sets transaction.is_mobile_checkout=TRUE and session_status=PASSED_CONFIRMED; vehicle proceeds in casual lane. System prevents moving vehicles into VIP lane to avoid congestion.
+- VIP dual-auth: Check both AI plate recognition and etc_devices match for VIP workflows; fallback to PARKING_TAG sticker and QR challenge on exception.
+- Vehicle Swap Prevention: At checkout, check fingerprint (color_rgb, body_shape), match_score & etc_match; if mismatch set parking_sessions.is_suspicious=TRUE and require MANAGER review.
+- EV Zone Violation: parking_violations records created; is_first_violation TRUE -> warning, subsequent violations apply ev_violation_penalty from pricing_rules and increase vehicles.violation_count.
 
-### 1.4 Role-Based Access Control (RBAC)
-
-Matrix (Table | ADMIN | MANAGER | STAFF | DRIVER) with CRUD allowances. ADMIN: full CRUD. MANAGER: CRU. STAFF: R/U for operational tables. DRIVER: R on own resources, create limited (e.g., create session via entry kiosk).
+### 1.4. Role-Based Access Control (RBAC)
 
 | Table | ADMIN | MANAGER | STAFF | DRIVER |
 |---|---:|---:|---:|---:|
@@ -309,40 +305,75 @@ Matrix (Table | ADMIN | MANAGER | STAFF | DRIVER) with CRUD allowances. ADMIN: f
 | parking_violations | CRUD | CRU | R/U | R (own) |
 | audit_logs | CRUD | CRU | R/U | R (own) |
 
-## 2. TECHNICAL SPECIFICATIONS & BACKEND CONFIGURATIONS
+## 2. FRONT-END SPECIFICATIONS (FE)
 
-### 2.1 Backend Data Source Configuration (application.properties example)
+### 2.1. UI/UX Layout & Wireframe Concept
+- Admin/Manager Dashboard: overview widgets (active sessions, daily revenue, occupied slots, expiring VIP).
+
+### 2.2. Components & Interactive Controls
+- Data tables for users, sessions, transactions with server-side pagination and filters.
+
+### 2.3. Client-Side Validation
+- Plate number regex, required fields, email format, numeric ranges for fees.
+
+### 2.4. UX States (Loading/Toast)
+- Loading skeleton on dashboard widgets, toasts for success/failure, confirmation modal for destructive actions.
+
+## 3. BACK-END SPECIFICATIONS (BE)
+
+### 3.1. Database Schema Design
+- See Section 1.2 for full field-level definitions. Use UUID PK, FK constraints and indexes as defined in migration script.
+
+### 3.2. Backend Data Source Configuration (application.properties example)
 
 ```properties
-spring.datasource.url=jdbc:postgresql://<DB_HOST>:5432/<DB_NAME>
-spring.datasource.username=<DB_USER>
-spring.datasource.password=<DB_PASSWORD>
+spring.datasource.url=jdbc:postgresql://${DB_HOST:localhost}:5432/${DB_NAME:parkingdb}
+spring.datasource.username=${DB_USER:parking_user}
+spring.datasource.password=${DB_PASS:change_me}
 spring.datasource.driver-class-name=org.postgresql.Driver
 spring.jpa.database-platform=org.hibernate.dialect.PostgreSQL95Dialect
+spring.jpa.hibernate.ddl-auto=none
+spring.flyway.enabled=true
 spring.flyway.locations=classpath:db/migration
+spring.flyway.baseline-on-migrate=true
 ```
 
-Note: use environment variables or Spring Boot externalized configuration for credentials and connection pooling (HikariCP).
+Notes: Store credentials in environment or externalized config. Use HikariCP defaults and tune pool size based on workload.
 
-### 2.2 Flyway Migration Strategy
+### 3.3. Flyway Migration Strategy
+- Place V1__initial_schema.sql under src/main/resources/db/migration. Flyway will insert migration entry into flyway_schema_history after successful migrate. Follow naming: V{version}__{description}.sql.
 
-- File naming: V<version>__<description>.sql (e.g., V1__initial_schema.sql). Flyway orders by version and records applied migrations in flyway_schema_history table.
-- Place migrations under src/main/resources/db/migration so Flyway scans them on application startup.
+### 3.4. Baseline Seed Data Verification
 
-### 2.3 Baseline Seed Data Verification
+- Default Admin: username `admin`, password_hash placeholder (change in production)
+- Zones: 4 default zones inserted (B2, B1, F1, F2)
+- Pricing rules: 3 vehicle types: FAMILY_CAR, MINIBUS_16, VAN_TRUCK
+- 50 temporary cards created via DO block (card_code padded 6 digits)
 
-Baseline seed data included in migration or separate repeatable scripts:
+Verification steps:
+1. Run `mvn -DskipTests spring-boot:run` (or start jar) with DB accessible; Flyway will auto-apply migrations.
+2. Confirm `flyway_schema_history` has V1 recorded.
+3. Run SQL queries: `SELECT COUNT(*) FROM users; SELECT COUNT(*) FROM zones; SELECT COUNT(*) FROM cards;`
 
-- Default admin account: email=admin@example.com, password hashed with bcrypt.
-- Zones: Zone A, Zone B, Zone C, Zone D (4 entries)
-- Pricing rules: CAR, MOTORBIKE, TRUCK with default hourly and daily caps.
-- 50 temporary cards: placeholders for entry kiosks with statuses initialized.
+### 3.5. Database Views & Stored Functions
 
-### 2.4 Database Views & Stored Functions
+Views implemented in migration:
+- v_active_sessions — purpose: see migration comments.
+- v_daily_revenue — purpose: see migration comments.
+- v_available_cards — purpose: see migration comments.
+- v_expiring_vip — purpose: see migration comments.
 
-Views included (names and purpose):
+Function calculate_parking_fee not found in migration; implement as PL/pgSQL function that accepts session_id and returns fee numeric.
 
-Function calculate_parking_fee not found in migration SQL. Implement as PL/pgSQL function that accepts session_id and returns fee numeric.
+## 4. ACCEPTANCE CRITERIA (AC)
+
+### 4.1. Happy Path Scenarios (Tối thiểu 2)
+- Given application starts with empty DB, when Flyway runs, then V1 migration applied and seed data exists (admin, zones, pricing rules, 50 cards).
+- Given a vehicle checks in and checks out after 2 hours, when calculate_parking_fee executed, then fee equals first_hour_fee + additional_hour_fee.
+
+### 4.2. Edge Cases & Error Handling (Tối thiểu 2)
+- Given no pricing rule exists for vehicle type, when calculate_parking_fee is called, then exception thrown with message indicating missing pricing rule.
+- Given AI detection confidence < 70%, when check-in occurs, then session marked for staff review and not auto-confirmed.
 
 ---
 ## Appendix: Full SQL migration (reference)
