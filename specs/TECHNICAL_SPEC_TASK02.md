@@ -1,266 +1,230 @@
-﻿# Technical Specification — Task 02\n
-This document describes the exact database schema (15 PostgreSQL tables), views and stored function for Flyway migration (V1__initial_schema.sql).
-\n---\n
-## Tables (exact definitions extracted from V1__initial_schema.sql)\n
-### Table: users\n
+﻿# Technical Specification — Task 02
+Generated from V1__initial_schema.sql on 2026-06-08 23:23:00
+This document mirrors the Flyway migration SQL (V1__initial_schema.sql).
+---
+## Tables (exact definitions)
+### Table: users
 Columns:
-- id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-- username        VARCHAR(50) NOT NULL UNIQUE,
+- id              UUID        PRIMARY KEY DEFAULT gen_random_uuid()
+- username        VARCHAR(50) NOT NULL UNIQUE
 - password_hash   VARCHAR(255) NOT NULL,           -- bcrypt cost >= 10
-- full_name       VARCHAR(100) NOT NULL,
-- email           VARCHAR(100) NOT NULL UNIQUE,
-- phone           VARCHAR(15),
+- full_name       VARCHAR(100) NOT NULL
+- email           VARCHAR(100) NOT NULL UNIQUE
+- phone           VARCHAR(15)
 - role            VARCHAR(10) NOT NULL
-- CHECK (role IN ('ADMIN','MANAGER','STAFF','DRIVER')),
+- CHECK (role IN ('ADMIN','MANAGER','STAFF','DRIVER'))
 - status          VARCHAR(10) NOT NULL DEFAULT 'ACTIVE'
-- CHECK (status IN ('ACTIVE','INACTIVE','SUSPENDED')),
-- -- FCM token cho Push Notification Anti-theft (Flow 6)
-- -- NOTE: ÄÃ¢y lÃ  fcm_token, KHÃ”NG pháº£i frm_token (typo cÅ© Ä‘Ã£ sá»­a)
-- fcm_token       VARCHAR(255),
-- created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-- updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+- CHECK (status IN ('ACTIVE','INACTIVE','SUSPENDED'))
+- fcm_token       VARCHAR(255)
+- created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+- updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 - last_login_at   TIMESTAMP
-\n
-### Table: refresh_tokens\n
+
+### Table: refresh_tokens
 Columns:
-- id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-- user_id     UUID        NOT NULL,
-- token       UUID        NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+- id          UUID        PRIMARY KEY DEFAULT gen_random_uuid()
+- user_id     UUID        NOT NULL
+- token       UUID        NOT NULL UNIQUE DEFAULT gen_random_uuid()
 - expires_at  TIMESTAMP   NOT NULL,               -- NOW() + 7 days
-- created_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+- created_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
 - CONSTRAINT fk_rt_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-\n
-### Table: vehicles\n
+
+### Table: vehicles
 Columns:
-- id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-- owner_id            UUID        NOT NULL,
+- id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid()
+- owner_id            UUID        NOT NULL
 - license_plate       VARCHAR(20) NOT NULL UNIQUE,   -- Format: 51A-12345
 - vehicle_size        VARCHAR(15) NOT NULL
-- CHECK (vehicle_size IN ('VAN_TRUCK','MINIBUS_16','FAMILY_CAR')),
-- -- ThÃ´ng tin mÃ´ táº£ (Vehicle Fingerprint â€” chá»‘ng Vehicle Swap Attack)
+- CHECK (vehicle_size IN ('VAN_TRUCK','MINIBUS_16','FAMILY_CAR'))
 - color               VARCHAR(30),                   -- TÃªn mÃ u (VD: "Äen")
 - color_rgb           VARCHAR(7),                    -- Hex chÃ­nh xÃ¡c (VD: "#1C1C1C")
 - body_shape          VARCHAR(20)
-- CHECK (body_shape IN ('SEDAN','SUV','VAN','TRUCK','MINIBUS','OTHER')),
-- brand               VARCHAR(50),
-- -- TÃ i liá»‡u
+- CHECK (body_shape IN ('SEDAN','SUV','VAN','TRUCK','MINIBUS','OTHER'))
+- brand               VARCHAR(50)
 - registration_doc_url VARCHAR(255),                 -- URL áº£nh CÃ  váº¹t (S3/MinIO)
 - registration_photo_url VARCHAR(255),               -- áº¢nh xe thá»±c táº¿ gÃ³c trÆ°á»›c (Ä‘Äƒng kÃ½ VIP)
-- -- Tracking
 - violation_count     INT         NOT NULL DEFAULT 0, -- Sá»‘ láº§n vi pháº¡m EV zone (Flow 7)
-- is_active           BOOLEAN     NOT NULL DEFAULT TRUE,
-- created_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-- updated_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+- is_active           BOOLEAN     NOT NULL DEFAULT TRUE
+- created_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+- updated_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
 - CONSTRAINT fk_vehicle_owner FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
-\n
-### Table: etc_devices\n
+
+### Table: etc_devices
 Columns:
-- id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-- vehicle_id      UUID        NOT NULL UNIQUE,
-- -- ETC device information
+- id              UUID        PRIMARY KEY DEFAULT gen_random_uuid()
+- vehicle_id      UUID        NOT NULL UNIQUE
 - etc_device_id   VARCHAR(50) NOT NULL UNIQUE,       -- ID chip ETC váº­t lÃ½ (tá»« nhÃ  cung cáº¥p)
 - etc_provider    VARCHAR(30)                        -- 'VETC', 'EPASS', 'PARKING_TAG'
-- CHECK (etc_provider IN ('VETC','EPASS','PARKING_TAG','OTHER')),
+- CHECK (etc_provider IN ('VETC','EPASS','PARKING_TAG','OTHER'))
 - device_type     VARCHAR(20) NOT NULL DEFAULT 'ORIGINAL'
-- CHECK (device_type IN ('ORIGINAL','PARKING_TAG')),
-- -- ORIGINAL: ETC tháº­t tá»« Ä‘Æ°á»ng cao tá»‘c
-- -- PARKING_TAG: Sticker mÃ£ bÃ£i xe dÃ¡n cho xe chÆ°a cÃ³ ETC
+- CHECK (device_type IN ('ORIGINAL','PARKING_TAG'))
 - tag_serial      VARCHAR(30),                       -- MÃ£ serial cá»§a sticker bÃ£i xe (náº¿u PARKING_TAG)
-- is_active       BOOLEAN     NOT NULL DEFAULT TRUE,
-- registered_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+- is_active       BOOLEAN     NOT NULL DEFAULT TRUE
+- registered_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
 - registered_by   UUID,                              -- Staff/Manager ID cáº¥p sticker
-- CONSTRAINT fk_etc_vehicle FOREIGN KEY (vehicle_id)     REFERENCES vehicles(id) ON DELETE CASCADE,
+- CONSTRAINT fk_etc_vehicle FOREIGN KEY (vehicle_id)     REFERENCES vehicles(id) ON DELETE CASCADE
 - CONSTRAINT fk_etc_staff   FOREIGN KEY (registered_by)  REFERENCES users(id) ON DELETE SET NULL
-\n
-### Table: cards\n
+
+### Table: cards
 Columns:
-- id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+- id              UUID        PRIMARY KEY DEFAULT gen_random_uuid()
 - card_code       VARCHAR(20) NOT NULL UNIQUE,   -- MÃ£ in trÃªn tháº» RFID vÃ£ng lai
 - status          VARCHAR(15) NOT NULL DEFAULT 'AVAILABLE'
-- CHECK (status IN ('AVAILABLE','IN_USE','LOST','BLACKLISTED')),
-- created_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+- CHECK (status IN ('AVAILABLE','IN_USE','LOST','BLACKLISTED'))
+- created_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
 - updated_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
-\n
-### Table: vip_qr_identifiers\n
+
+### Table: zones
 Columns:
-- --     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-- --     vehicle_id  UUID        NOT NULL,
-- --     qr_token    VARCHAR(255) NOT NULL UNIQUE,   -- JWT / UUID encoded, háº¿t háº¡n 5 phÃºt
-- --     expired_at  TIMESTAMP   NOT NULL,           -- Háº¿t háº¡n sau 5 phÃºt
-- --     is_used     BOOLEAN     NOT NULL DEFAULT FALSE, -- Single-use: TRUE sau khi quÃ©t
-- --     created_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-- --     CONSTRAINT fk_qr_vehicle FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE
-- --
-\n
-### Table: zones\n
-Columns:
-- id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+- id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid()
 - zone_name           VARCHAR(80) NOT NULL,       -- VD: "Táº§ng B1 - Xe Táº£i Nhá»"
 - zone_code           VARCHAR(10) NOT NULL UNIQUE, -- VD: "B1", "B2", "F1", "F2"
 - allowed_sizes       TEXT        NOT NULL,        -- JSON Array: ["FAMILY_CAR","MINIBUS_16"]
-- total_slots         INT         NOT NULL CHECK (total_slots > 0),
-- current_occupied    INT         NOT NULL DEFAULT 0 CHECK (current_occupied >= 0),
+- total_slots         INT         NOT NULL CHECK (total_slots > 0)
+- current_occupied    INT         NOT NULL DEFAULT 0 CHECK (current_occupied >= 0)
 - has_ev_charger      BOOLEAN     NOT NULL DEFAULT FALSE, -- CÃ³ khu vá»±c sáº¡c Ä‘iá»‡n (Flow 7)
-- is_active           BOOLEAN     NOT NULL DEFAULT TRUE,
-- created_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-- updated_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+- is_active           BOOLEAN     NOT NULL DEFAULT TRUE
+- created_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+- updated_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
 - CONSTRAINT chk_zone_occupied CHECK (current_occupied <= total_slots)
-\n
-### Table: parking_slots\n
+
+### Table: parking_slots
 Columns:
-- id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-- zone_id         UUID        NOT NULL,
+- id              UUID        PRIMARY KEY DEFAULT gen_random_uuid()
+- zone_id         UUID        NOT NULL
 - slot_number     VARCHAR(10) NOT NULL,           -- VD: "A01", "B15"
 - slot_type       VARCHAR(10) NOT NULL DEFAULT 'NORMAL'
-- CHECK (slot_type IN ('NORMAL','EV','DISABLED')),
+- CHECK (slot_type IN ('NORMAL','EV','DISABLED'))
 - slot_status     VARCHAR(15) NOT NULL DEFAULT 'AVAILABLE'
-- CHECK (slot_status IN ('AVAILABLE','OCCUPIED','MAINTENANCE')),
+- CHECK (slot_status IN ('AVAILABLE','OCCUPIED','MAINTENANCE'))
 - sensor_mock_id  VARCHAR(50),                    -- ID cáº£m biáº¿n giáº£ láº­p
 - ev_charger_id   VARCHAR(50),                    -- ID trá»¥ sáº¡c mock (náº¿u slot_type = 'EV')
-- last_updated    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-- CONSTRAINT fk_slot_zone    FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE,
+- last_updated    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+- CONSTRAINT fk_slot_zone    FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
 - CONSTRAINT uq_slot_number  UNIQUE (zone_id, slot_number)
-\n
-### Table: parking_sessions\n
+
+### Table: parking_sessions
 Columns:
-- id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-- -- ThÃ´ng tin phÆ°Æ¡ng tiá»‡n
-- license_plate       VARCHAR(20) NOT NULL,
-- is_vip              BOOLEAN     NOT NULL DEFAULT FALSE,
+- id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid()
+- license_plate       VARCHAR(20) NOT NULL
+- is_vip              BOOLEAN     NOT NULL DEFAULT FALSE
 - vehicle_id          UUID,       -- NULL náº¿u vÃ£ng lai chÆ°a cÃ³ tÃ i khoáº£n
 - card_id             UUID,       -- NULL náº¿u VIP (khÃ´ng dÃ¹ng tháº»)
-- -- ETC Authentication (Flow 1/2 VIP dual-auth)
 - etc_device_id       VARCHAR(50),                -- ETC device ID Ä‘Ã£ xÃ¡c thá»±c khi vÃ o
 - etc_verified        BOOLEAN     NOT NULL DEFAULT FALSE, -- TRUE = ETC pass lÃºc check-in
-- -- PhÃ¢n táº§ng
-- assigned_zone_id    UUID        NOT NULL,
+- assigned_zone_id    UUID        NOT NULL
 - parked_slot_id      UUID,       -- Optional tracking Ã´ Ä‘á»— cá»¥ thá»ƒ
-- -- Thá»i gian
-- check_in_time       TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+- check_in_time       TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
 - check_out_time      TIMESTAMP,  -- NULL khi cÃ²n ACTIVE
-- -- Tráº¡ng thÃ¡i
 - session_status      VARCHAR(25) NOT NULL DEFAULT 'ACTIVE'
 - CHECK (session_status IN (
 - 'ACTIVE',           -- Xe Ä‘ang trong bÃ£i
 - 'COMPLETED',        -- ÄÃ£ checkout bÃ¬nh thÆ°á»ng
 - 'PASSED_CONFIRMED', -- ÄÃ£ thu tiá»n di Ä‘á»™ng dÆ°á»›i háº§m
 - 'LOST_CARD'         -- Äang xá»­ lÃ½ máº¥t tháº»
-- )),
-- -- VIP Anti-theft (Flow 6)
+- ))
 - is_locked           BOOLEAN     NOT NULL DEFAULT FALSE, -- App Driver báº­t khÃ³a
-- -- Vehicle Fingerprint Security
-- is_suspicious       BOOLEAN     NOT NULL DEFAULT FALSE,
-- suspicious_reason   VARCHAR(100),
-- -- Staff Override (khi AI quÃ©t sai)
-- override_by_staff   UUID,
-- override_reason     TEXT,
-- -- Mobile Checkout â€” thu tiá»n di Ä‘á»™ng dÆ°á»›i háº§m
-- mobile_checkout_staff_id    UUID,
+- is_suspicious       BOOLEAN     NOT NULL DEFAULT FALSE
+- suspicious_reason   VARCHAR(100)
+- override_by_staff   UUID
+- override_reason     TEXT
+- mobile_checkout_staff_id    UUID
 - mobile_checkout_location    VARCHAR(100),       -- GPS "lat,lng"
-- mobile_checkout_at          TIMESTAMP,
+- mobile_checkout_at          TIMESTAMP
 - mobile_checkout_photo       VARCHAR(255),       -- áº¢nh minh chá»©ng thu tiá»n (S3)
-- -- Flow 4: Lost Card
 - lost_card_proof_photos  JSON,                   -- ["url_cmnd","url_cavet","url_face"]
-- created_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-- updated_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-- CONSTRAINT fk_ps_vehicle    FOREIGN KEY (vehicle_id)            REFERENCES vehicles(id) ON DELETE SET NULL,
-- CONSTRAINT fk_ps_card       FOREIGN KEY (card_id)               REFERENCES cards(id) ON DELETE SET NULL,
-- CONSTRAINT fk_ps_zone       FOREIGN KEY (assigned_zone_id)      REFERENCES zones(id),
-- CONSTRAINT fk_ps_slot       FOREIGN KEY (parked_slot_id)        REFERENCES parking_slots(id) ON DELETE SET NULL,
-- CONSTRAINT fk_ps_override   FOREIGN KEY (override_by_staff)     REFERENCES users(id) ON DELETE SET NULL,
+- created_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+- updated_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+- CONSTRAINT fk_ps_vehicle    FOREIGN KEY (vehicle_id)            REFERENCES vehicles(id) ON DELETE SET NULL
+- CONSTRAINT fk_ps_card       FOREIGN KEY (card_id)               REFERENCES cards(id) ON DELETE SET NULL
+- CONSTRAINT fk_ps_zone       FOREIGN KEY (assigned_zone_id)      REFERENCES zones(id)
+- CONSTRAINT fk_ps_slot       FOREIGN KEY (parked_slot_id)        REFERENCES parking_slots(id) ON DELETE SET NULL
+- CONSTRAINT fk_ps_override   FOREIGN KEY (override_by_staff)     REFERENCES users(id) ON DELETE SET NULL
 - CONSTRAINT fk_ps_mobile     FOREIGN KEY (mobile_checkout_staff_id) REFERENCES users(id) ON DELETE SET NULL
-\n
-### Table: vip_subscriptions\n
+
+### Table: vip_subscriptions
 Columns:
-- id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-- vehicle_id          UUID        NOT NULL,
-- subscription_type   VARCHAR(10) NOT NULL CHECK (subscription_type IN ('MONTHLY','QUARTERLY','YEARLY')),
-- start_date          DATE        NOT NULL,
-- end_date            DATE        NOT NULL,
+- id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid()
+- vehicle_id          UUID        NOT NULL
+- subscription_type   VARCHAR(10) NOT NULL CHECK (subscription_type IN ('MONTHLY','QUARTERLY','YEARLY'))
+- start_date          DATE        NOT NULL
+- end_date            DATE        NOT NULL
 - status              VARCHAR(25) NOT NULL DEFAULT 'PENDING_APPROVAL'
-- CHECK (status IN ('PENDING_APPROVAL','ACTIVE','EXPIRED','REJECTED','CANCELLED')),
-- -- TÃ i liá»‡u Ä‘Äƒng kÃ½ (JSON URL)
+- CHECK (status IN ('PENDING_APPROVAL','ACTIVE','EXPIRED','REJECTED','CANCELLED'))
 - document_photos     JSON,       -- {"ca_vet":"url","cmnd":"url","vehicle_front":"url"}
-- -- PhÃª duyá»‡t Manager
 - approved_by         UUID,       -- Manager ID
-- approved_at         TIMESTAMP,
-- rejection_reason    TEXT,
-- -- Thanh toÃ¡n VNPay Sandbox
-- fee_amount          DECIMAL(10,2) NOT NULL,
-- payment_method      VARCHAR(20) NOT NULL CHECK (payment_method IN ('VNPAY_SANDBOX','MOMO_SANDBOX','BANK_TRANSFER')),
+- approved_at         TIMESTAMP
+- rejection_reason    TEXT
+- fee_amount          DECIMAL(10,2) NOT NULL
+- payment_method      VARCHAR(20) NOT NULL CHECK (payment_method IN ('VNPAY_SANDBOX','MOMO_SANDBOX','BANK_TRANSFER'))
 - payment_reference   VARCHAR(100),               -- Transaction ID tá»« Gateway
 - payment_status      VARCHAR(10) NOT NULL DEFAULT 'PENDING'
-- CHECK (payment_status IN ('PENDING','SUCCESS','FAILED')),
-- created_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-- updated_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-- CONSTRAINT fk_sub_vehicle  FOREIGN KEY (vehicle_id)  REFERENCES vehicles(id) ON DELETE CASCADE,
+- CHECK (payment_status IN ('PENDING','SUCCESS','FAILED'))
+- created_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+- updated_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+- CONSTRAINT fk_sub_vehicle  FOREIGN KEY (vehicle_id)  REFERENCES vehicles(id) ON DELETE CASCADE
 - CONSTRAINT fk_sub_approved FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL
-\n
-### Table: transactions\n
+
+### Table: transactions
 Columns:
-- id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+- id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid()
 - session_id          UUID        NOT NULL UNIQUE,   -- 1 session â†’ 1 transaction
-- -- CÃ¡c khoáº£n phÃ­
-- parking_fee             DECIMAL(10,2) NOT NULL DEFAULT 0,
+- parking_fee             DECIMAL(10,2) NOT NULL DEFAULT 0
 - lost_card_penalty       DECIMAL(10,2) NOT NULL DEFAULT 0,   -- Flow 4
 - violation_penalty       DECIMAL(10,2) NOT NULL DEFAULT 0,   -- Flow 7 EV zone
-- total_amount            DECIMAL(10,2) NOT NULL,
-- -- Thanh toÃ¡n
-- payment_method      VARCHAR(20) NOT NULL CHECK (payment_method IN ('CASH','VNPAY_SANDBOX','MOMO_SANDBOX','QR_BANK')),
+- total_amount            DECIMAL(10,2) NOT NULL
+- payment_method      VARCHAR(20) NOT NULL CHECK (payment_method IN ('CASH','VNPAY_SANDBOX','MOMO_SANDBOX','QR_BANK'))
 - payment_status      VARCHAR(10) NOT NULL DEFAULT 'PENDING'
-- CHECK (payment_status IN ('PENDING','SUCCESS','FAILED','REFUNDED')),
-- payment_reference   VARCHAR(100),
-- -- NgÆ°á»i xá»­ lÃ½
+- CHECK (payment_status IN ('PENDING','SUCCESS','FAILED','REFUNDED'))
+- payment_reference   VARCHAR(100)
 - processed_by        UUID        NOT NULL,           -- Staff ID
-- -- [REVISED Flow 3] Mobile checkout: thu tiá»n di Ä‘á»™ng dÆ°á»›i háº§m
-- -- Sau Ä‘Ã³ xe ra ÄÃšNG LÃ€N VÃƒNG LAI, chá»‰ Ä‘Æ°a tháº» khÃ´ng tráº£ thÃªm táº¡i cá»•ng
-- is_mobile_checkout  BOOLEAN     NOT NULL DEFAULT FALSE,
+- is_mobile_checkout  BOOLEAN     NOT NULL DEFAULT FALSE
 - mobile_gps_location VARCHAR(100),                  -- GPS cá»§a Staff khi thu
 - mobile_photo_proof  VARCHAR(255),                  -- áº¢nh minh chá»©ng (báº¯t buá»™c)
 - receipt_url         VARCHAR(255),                  -- URL hÃ³a Ä‘Æ¡n Ä‘iá»‡n tá»­
-- processed_at        TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-- CONSTRAINT fk_txn_session   FOREIGN KEY (session_id)   REFERENCES parking_sessions(id) ON DELETE CASCADE,
+- processed_at        TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+- CONSTRAINT fk_txn_session   FOREIGN KEY (session_id)   REFERENCES parking_sessions(id) ON DELETE CASCADE
 - CONSTRAINT fk_txn_staff     FOREIGN KEY (processed_by) REFERENCES users(id)
-\n
-### Table: pricing_rules\n
+
+### Table: pricing_rules
 Columns:
-- id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-- vehicle_type            VARCHAR(15) NOT NULL CHECK (vehicle_type IN ('VAN_TRUCK','MINIBUS_16','FAMILY_CAR')),
-- first_hour_fee          DECIMAL(10,2) NOT NULL,
-- additional_hour_fee     DECIMAL(10,2) NOT NULL,
-- max_daily_fee           DECIMAL(10,2) NOT NULL,
-- lost_card_penalty       DECIMAL(10,2) NOT NULL DEFAULT 50000,
+- id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid()
+- vehicle_type            VARCHAR(15) NOT NULL CHECK (vehicle_type IN ('VAN_TRUCK','MINIBUS_16','FAMILY_CAR'))
+- first_hour_fee          DECIMAL(10,2) NOT NULL
+- additional_hour_fee     DECIMAL(10,2) NOT NULL
+- max_daily_fee           DECIMAL(10,2) NOT NULL
+- lost_card_penalty       DECIMAL(10,2) NOT NULL DEFAULT 50000
 - ev_violation_penalty    DECIMAL(10,2) NOT NULL DEFAULT 20000,   -- Vi pháº¡m EV zone
-- is_active               BOOLEAN     NOT NULL DEFAULT TRUE,
-- effective_from          DATE        NOT NULL,
+- is_active               BOOLEAN     NOT NULL DEFAULT TRUE
+- effective_from          DATE        NOT NULL
 - effective_to            DATE,       -- NULL = Ä‘ang hiá»‡u lá»±c
-- created_by              UUID,
+- created_by              UUID
 - CONSTRAINT fk_pr_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
-\n
-### Table: blacklisted_cards\n
+
+### Table: blacklisted_cards
 Columns:
-- id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+- id              UUID        PRIMARY KEY DEFAULT gen_random_uuid()
 - card_id         UUID        NOT NULL UNIQUE,    -- 1 tháº» chá»‰ blacklist 1 láº§n
 - session_id      UUID,                           -- Session phÃ¡t sinh máº¥t tháº»
-- reason          VARCHAR(15) NOT NULL CHECK (reason IN ('LOST','STOLEN','DAMAGED','FRAUDULENT')),
-- blacklisted_by  UUID        NOT NULL,
-- blacklisted_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-- notes           TEXT,
-- CONSTRAINT fk_bl_card    FOREIGN KEY (card_id)       REFERENCES cards(id) ON DELETE CASCADE,
-- CONSTRAINT fk_bl_session FOREIGN KEY (session_id)    REFERENCES parking_sessions(id) ON DELETE SET NULL,
+- reason          VARCHAR(15) NOT NULL CHECK (reason IN ('LOST','STOLEN','DAMAGED','FRAUDULENT'))
+- blacklisted_by  UUID        NOT NULL
+- blacklisted_at  TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+- notes           TEXT
+- CONSTRAINT fk_bl_card    FOREIGN KEY (card_id)       REFERENCES cards(id) ON DELETE CASCADE
+- CONSTRAINT fk_bl_session FOREIGN KEY (session_id)    REFERENCES parking_sessions(id) ON DELETE SET NULL
 - CONSTRAINT fk_bl_staff   FOREIGN KEY (blacklisted_by) REFERENCES users(id)
-\n
-### Table: ai_scan_logs\n
+
+### Table: ai_scan_logs
 Columns:
-- id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-- session_id          UUID,
+- id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid()
+- session_id          UUID
 - scan_location       VARCHAR(25) NOT NULL
 - CHECK (scan_location IN (
 - 'MAIN_ENTRANCE',    -- Cá»•ng vÃ o chÃ­nh
 - 'VIP_EXIT',         -- Cá»•ng ra VIP
 - 'CASUAL_EXIT',      -- Cá»•ng ra vÃ£ng lai
 - 'EXCEPTION_COUNTER' -- Quáº§y ngoáº¡i lá»‡ (xe khÃ´ng cÃ³ ETC)
-- )),
+- ))
 - scan_type           VARCHAR(25) NOT NULL DEFAULT 'STANDARD'
 - CHECK (scan_type IN (
 - 'STANDARD',         -- QuÃ©t bÃ¬nh thÆ°á»ng
@@ -268,98 +232,82 @@ Columns:
 - 'CHECK_OUT_FP',     -- Check-out + so sÃ¡nh fingerprint
 - 'ANTI_THEFT',       -- Khi is_locked trigger
 - 'SUSPICIOUS'        -- Scan khi phÃ¡t hiá»‡n báº¥t thÆ°á»ng
-- )),
-- camera_id           VARCHAR(50) NOT NULL,
-- -- AI Detection Results
+- ))
+- camera_id           VARCHAR(50) NOT NULL
 - image_url           VARCHAR(255) NOT NULL,      -- áº¢nh lÆ°u S3/MinIO (giá»¯ 30 ngÃ y)
-- detected_plate      VARCHAR(20) NOT NULL,
+- detected_plate      VARCHAR(20) NOT NULL
 - confidence_score    DECIMAL(5,2) NOT NULL,      -- 0.00â€“100.00 (< 70% â†’ Staff kiá»ƒm tra)
-- detected_vehicle_type VARCHAR(15),
+- detected_vehicle_type VARCHAR(15)
 - detected_color      VARCHAR(30),                -- MÃ u xe AI phÃ¡t hiá»‡n
 - detected_color_rgb  VARCHAR(7),                 -- Hex color AI phÃ¡t hiá»‡n
 - detected_shape      VARCHAR(20),                -- DÃ¡ng xe AI phÃ¡t hiá»‡n
-- -- Vehicle Fingerprint Match (checkout VIP)
 - match_score         DECIMAL(5,2),               -- % khá»›p vá»›i check-in fingerprint
 - color_diff          DECIMAL(5,2),               -- RGB color difference (> 30 = cáº£nh bÃ¡o)
 - shape_match         BOOLEAN,                    -- TRUE = dÃ¡ng khá»›p
-- -- ETC Read Result (VIP dual-auth)
 - etc_read_device_id  VARCHAR(50),                -- ETC device ID Ä‘á»c Ä‘Æ°á»£c táº¡i cá»•ng
 - etc_match           BOOLEAN,                    -- TRUE = ETC khá»›p vá»›i Ä‘Äƒng kÃ½
-- -- Staff Override
-- is_overridden       BOOLEAN     NOT NULL DEFAULT FALSE,
-- override_plate      VARCHAR(20),
-- override_by         UUID,
-- override_reason     TEXT,
-- -- Evidence flag (khi anti-theft hoáº·c suspicious)
-- is_evidence         BOOLEAN     NOT NULL DEFAULT FALSE,
-- scanned_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-- CONSTRAINT fk_scan_session  FOREIGN KEY (session_id)  REFERENCES parking_sessions(id) ON DELETE SET NULL,
+- is_overridden       BOOLEAN     NOT NULL DEFAULT FALSE
+- override_plate      VARCHAR(20)
+- override_by         UUID
+- override_reason     TEXT
+- is_evidence         BOOLEAN     NOT NULL DEFAULT FALSE
+- scanned_at          TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+- CONSTRAINT fk_scan_session  FOREIGN KEY (session_id)  REFERENCES parking_sessions(id) ON DELETE SET NULL
 - CONSTRAINT fk_scan_override FOREIGN KEY (override_by) REFERENCES users(id) ON DELETE SET NULL
-\n
-### Table: parking_violations\n
+
+### Table: parking_violations
 Columns:
-- id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-- session_id      UUID        NOT NULL,
-- slot_id         UUID        NOT NULL,
-- violation_type  VARCHAR(25) NOT NULL CHECK (violation_type IN ('EV_ZONE_MISUSE','DISABLED_ZONE_MISUSE','DOUBLE_PARKING')),
+- id              UUID        PRIMARY KEY DEFAULT gen_random_uuid()
+- session_id      UUID        NOT NULL
+- slot_id         UUID        NOT NULL
+- violation_type  VARCHAR(25) NOT NULL CHECK (violation_type IN ('EV_ZONE_MISUSE','DISABLED_ZONE_MISUSE','DOUBLE_PARKING'))
 - photo_urls      JSON        NOT NULL,           -- ["url1","url2"] â€” Staff chá»¥p
 - detected_by     UUID        NOT NULL,           -- Staff ID
 - is_first_violation BOOLEAN  NOT NULL DEFAULT TRUE, -- TRUE: chá»‰ cáº£nh bÃ¡o; FALSE: pháº¡t tiá»n
-- penalty_applied BOOLEAN     NOT NULL DEFAULT FALSE,
-- penalty_amount  DECIMAL(10,2) NOT NULL DEFAULT 0,
-- notes           TEXT,
-- detected_at     TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-- CONSTRAINT fk_vio_session FOREIGN KEY (session_id)  REFERENCES parking_sessions(id) ON DELETE CASCADE,
-- CONSTRAINT fk_vio_slot    FOREIGN KEY (slot_id)     REFERENCES parking_slots(id),
+- penalty_applied BOOLEAN     NOT NULL DEFAULT FALSE
+- penalty_amount  DECIMAL(10,2) NOT NULL DEFAULT 0
+- notes           TEXT
+- detected_at     TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+- CONSTRAINT fk_vio_session FOREIGN KEY (session_id)  REFERENCES parking_sessions(id) ON DELETE CASCADE
+- CONSTRAINT fk_vio_slot    FOREIGN KEY (slot_id)     REFERENCES parking_slots(id)
 - CONSTRAINT fk_vio_staff   FOREIGN KEY (detected_by) REFERENCES users(id)
-\n
-### Table: audit_logs\n
+
+### Table: audit_logs
 Columns:
-- id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+- id              UUID        PRIMARY KEY DEFAULT gen_random_uuid()
 - user_id         UUID,                           -- NULL náº¿u system tá»± Ä‘á»™ng
 - action_type     VARCHAR(40) NOT NULL CHECK (action_type IN (
-- -- Auth
-- 'LOGIN', 'LOGOUT',
-- -- AI & Override
-- 'OVERRIDE_AI',
-- -- Gate Control
-- 'REMOTE_OPEN_BARRIER', 'STAFF_HELD_VEHICLE',
-- -- VIP
-- 'APPROVE_VIP', 'REJECT_VIP',
-- -- Card
-- 'BLACKLIST_CARD',
-- -- Checkout
-- 'MANUAL_CHECKOUT', 'MOBILE_CHECKOUT',
-- -- Lost Card
-- 'LOST_CARD_HANDLED',
-- -- Pricing
-- 'UPDATE_PRICING',
-- -- Violation
-- 'RECORD_VIOLATION',
-- -- ETC
-- 'REGISTER_ETC_DEVICE', 'ISSUE_PARKING_TAG',
-- -- Security Events
-- 'ANTI_THEFT_TRIGGERED',
-- 'SUSPICIOUS_EARLY_EXIT',
-- 'FINGERPRINT_MISMATCH',
-- 'COLOR_MISMATCH',
-- 'ETC_MISMATCH',
-- 'PLATE_MISMATCH_CHECKOUT',
-- 'OWNER_UNLOCKED_REMOTE',
-- 'STAFF_OVERRIDE_SUSPICIOUS',
+- 'LOGIN', 'LOGOUT'
+- 'OVERRIDE_AI'
+- 'REMOTE_OPEN_BARRIER', 'STAFF_HELD_VEHICLE'
+- 'APPROVE_VIP', 'REJECT_VIP'
+- 'BLACKLIST_CARD'
+- 'MANUAL_CHECKOUT', 'MOBILE_CHECKOUT'
+- 'LOST_CARD_HANDLED'
+- 'UPDATE_PRICING'
+- 'RECORD_VIOLATION'
+- 'REGISTER_ETC_DEVICE', 'ISSUE_PARKING_TAG'
+- 'ANTI_THEFT_TRIGGERED'
+- 'SUSPICIOUS_EARLY_EXIT'
+- 'FINGERPRINT_MISMATCH'
+- 'COLOR_MISMATCH'
+- 'ETC_MISMATCH'
+- 'PLATE_MISMATCH_CHECKOUT'
+- 'OWNER_UNLOCKED_REMOTE'
+- 'STAFF_OVERRIDE_SUSPICIOUS'
 - 'AUTO_LOCK_TRIGGERED'
-- )),
+- ))
 - entity_type     VARCHAR(50),                    -- TÃªn báº£ng bá»‹ tÃ¡c Ä‘á»™ng
-- entity_id       UUID,
-- old_value       JSON,
-- new_value       JSON,
-- ip_address      VARCHAR(45),
-- user_agent      VARCHAR(255),
-- created_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+- entity_id       UUID
+- old_value       JSON
+- new_value       JSON
+- ip_address      VARCHAR(45)
+- user_agent      VARCHAR(255)
+- created_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
 - CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-\n
----\n
-Full SQL file (for reference):\n
+
+---
+Full SQL (reference):
 ```sql
 -- ================================================================
 -- DATABASE SCHEMA: PARKING BUILDING MANAGEMENT SYSTEM
@@ -1107,4 +1055,4 @@ Khi is_suspicious = TRUE: Barrier HOLD, mÃ n hÃ¬nh Staff hiá»ƒn thá»‹
 */
 
 -- END OF SCHEMA v3.0 FINAL
-```\n
+```
