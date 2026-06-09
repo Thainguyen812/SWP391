@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { 
   AppstoreOutlined, 
   EyeOutlined, 
@@ -15,19 +14,17 @@ import {
 import './Sidebar.css';
 
 const navItems = [
-  { id: 'overview', label: 'Tổng quan', icon: <AppstoreOutlined /> },
+  { id: 'overview', label: 'Tổng quan', icon: <AppstoreOutlined />, active: true },
   { id: 'monitoring', label: 'Giám sát bãi xe', icon: <EyeOutlined /> },
   { id: 'revenue', label: 'Doanh thu', icon: <DollarOutlined /> },
-  { id: 'staff', label: 'Quản lý nhân sY', icon: <TeamOutlined /> },
+  { id: 'staff', label: 'Quản lý nhân sự', icon: <TeamOutlined /> },
   { id: 'customers', label: 'Khách hàng', icon: <UserOutlined /> },
   { id: 'settings', label: 'Cấu hình kỹ thuật', icon: <SettingOutlined /> },
   { id: 'security', label: 'Bảo mật', icon: <SafetyOutlined /> },
-  { id: 'logs', label: 'Nhật ký HS thống', icon: <HistoryOutlined /> },
+  { id: 'logs', label: 'Nhật ký hệ thống', icon: <HistoryOutlined /> },
 ];
 
 export const Sidebar = ({ onOpenAddBranch }) => {
-  const [activeItem, setActiveItem] = useState('overview');
-
   return (
     <aside className="sidebar">
       {/* Logo Area */}
@@ -47,14 +44,13 @@ export const Sidebar = ({ onOpenAddBranch }) => {
           {navItems.map((item) => (
             <li key={item.id}>
               <button 
-                onClick={() => setActiveItem(item.id)}
                 className={`sidebar-nav-item ${
-                  activeItem === item.id 
+                  item.active 
                     ? 'sidebar-nav-item-active' 
                     : 'sidebar-nav-item-inactive'
                 }`}
               >
-                <span className={`sidebar-nav-icon ${activeItem === item.id ? 'sidebar-nav-icon-active' : ''}`}>{item.icon}</span>
+                <span className={`sidebar-nav-icon ${item.active ? 'sidebar-nav-icon-active' : ''}`}>{item.icon}</span>
                 <span className="sidebar-nav-label">{item.label}</span>
               </button>
             </li>
