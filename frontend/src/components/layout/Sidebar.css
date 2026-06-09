@@ -41,7 +41,7 @@
 }
 
 .sidebar-nav-item-inactive {
-  @apply text-[#64748b] border-l-[3px] border-transparent;
+  @apply text-[#64748b] border-l-[3px] border-transparent pl-[21px];
 }
 
 .sidebar-nav-icon {

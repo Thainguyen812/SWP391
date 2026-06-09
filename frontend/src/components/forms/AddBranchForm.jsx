@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { CloseOutlined } from '@ant-design/icons';
+import { CloseOutlined, LoadingOutlined } from '@ant-design/icons';
+import { dashboardService } from '../../services/dashboardService';
 import './AddBranchForm.css';
 
 export const AddBranchForm = ({ isOpen, onClose }) => {
@@ -8,14 +9,25 @@ export const AddBranchForm = ({ isOpen, onClose }) => {
     address: '',
     capacity: ''
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Dữ liệu cơ sở mới:", formData);
-    // TODO: Gọi API lưu dữ liệu ở đây
-    onClose();
+    setIsSubmitting(true);
+    try {
+      const response = await dashboardService.createBranch(formData);
+      if (response.success) {
+        alert("🎉 " + response.message + "\n\n(Dữ liệu trả về: ID " + response.data.id + ")");
+        setFormData({ name: '', address: '', capacity: '' });
+        onClose();
+      }
+    } catch (error) {
+      alert("❌ Có lỗi xảy ra: " + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -24,12 +36,17 @@ export const AddBranchForm = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={!isSubmitting ? onClose : undefined}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="modal-header">
           <h2 className="modal-title">Thêm cơ sở đỗ xe mới</h2>
-          <button onClick={onClose} className="modal-close-btn" title="Đóng">
+          <button 
+            onClick={onClose} 
+            className="modal-close-btn" 
+            title="Đóng"
+            disabled={isSubmitting}
+          >
             <CloseOutlined />
           </button>
         </div>
@@ -50,6 +67,7 @@ export const AddBranchForm = ({ isOpen, onClose }) => {
                 placeholder="VD: Bãi xe ngầm Vincom"
                 value={formData.name}
                 onChange={handleChange}
+                disabled={isSubmitting}
               />
             </div>
 
@@ -66,6 +84,7 @@ export const AddBranchForm = ({ isOpen, onClose }) => {
                 placeholder="VD: 72 Lê Thánh Tôn, Quận 1, TP.HCM"
                 value={formData.address}
                 onChange={handleChange}
+                disabled={isSubmitting}
               />
             </div>
 
@@ -83,17 +102,28 @@ export const AddBranchForm = ({ isOpen, onClose }) => {
                 placeholder="VD: 500"
                 value={formData.capacity}
                 onChange={handleChange}
+                disabled={isSubmitting}
               />
             </div>
           </div>
 
           {/* Footer */}
           <div className="modal-footer">
-            <button type="button" onClick={onClose} className="btn-cancel">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="btn-cancel"
+              disabled={isSubmitting}
+            >
               Hủy bỏ
             </button>
-            <button type="submit" className="btn-submit">
-              Xác nhận thêm
+            <button 
+              type="submit" 
+              className={`btn-submit flex items-center gap-2 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+              disabled={isSubmitting}
+            >
+              {isSubmitting && <LoadingOutlined />}
+              {isSubmitting ? 'Đang xử lý...' : 'Xác nhận thêm'}
             </button>
           </div>
         </form>

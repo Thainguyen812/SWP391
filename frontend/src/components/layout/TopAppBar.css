@@ -29,7 +29,7 @@
 }
 
 .location-item {
-  @apply h-full flex flex-col justify-center px-2 transition-colors hover:bg-gray-50 border-b-[3px] outline-none;
+  @apply h-full flex flex-col justify-center px-2 transition-colors hover:bg-gray-50 border-b-[4px] outline-none;
 }
 
 .location-item-active {

@@ -3,26 +3,15 @@ import { SearchOutlined, BellOutlined, MoonOutlined, CheckCircleOutlined } from 
 import "./TopAppBar.css";
 
 const locations = [
-  {
-    id: "co-so-01",
-    label: ["Cơ", "sở 01"],
-    active: false,
-  },
-  {
-    id: "co-so-02",
-    label: ["Cơ sở", "02"],
-    active: false,
-  },
-  {
-    id: "toan-he-thong",
-    label: ["Toàn hệ", "thống"],
-    active: true,
-  },
+  { id: "co-so-01", label: ["Cơ", "sở 01"] },
+  { id: "co-so-02", label: ["Cơ sở", "02"] },
+  { id: "toan-he-thong", label: ["Toàn hệ", "thống"] },
 ];
 
 export const TopAppBarSection = () => {
   const searchId = useId();
   const [searchValue, setSearchValue] = useState("");
+  const [activeLocation, setActiveLocation] = useState("toan-he-thong");
 
   return (
     <header className="top-app-bar">
@@ -48,11 +37,12 @@ export const TopAppBarSection = () => {
           {locations.map((loc) => (
             <button
               key={loc.id}
+              onClick={() => setActiveLocation(loc.id)}
               className={`location-item ${
-                loc.active ? "location-item-active" : "location-item-inactive"
+                activeLocation === loc.id ? "location-item-active" : "location-item-inactive"
               }`}
             >
-              <span className={`location-text ${loc.active ? "location-text-active" : "location-text-inactive"}`}>
+              <span className={`location-text ${activeLocation === loc.id ? "location-text-active" : "location-text-inactive"}`}>
                 {loc.label[0]} <br/> {loc.label[1]}
               </span>
             </button>
