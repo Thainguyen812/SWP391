@@ -1,3 +1,4 @@
+import { Link, useLocation } from 'react-router-dom';
 import { 
   AppstoreOutlined, 
   EyeOutlined, 
@@ -14,17 +15,19 @@ import {
 import './Sidebar.css';
 
 const navItems = [
-  { id: 'overview', label: 'Tổng quan', icon: <AppstoreOutlined />, active: true },
-  { id: 'monitoring', label: 'Giám sát bãi xe', icon: <EyeOutlined /> },
-  { id: 'revenue', label: 'Doanh thu', icon: <DollarOutlined /> },
-  { id: 'staff', label: 'Quản lý nhân sự', icon: <TeamOutlined /> },
-  { id: 'customers', label: 'Khách hàng', icon: <UserOutlined /> },
-  { id: 'settings', label: 'Cấu hình kỹ thuật', icon: <SettingOutlined /> },
-  { id: 'security', label: 'Bảo mật', icon: <SafetyOutlined /> },
-  { id: 'logs', label: 'Nhật ký hệ thống', icon: <HistoryOutlined /> },
+  { path: '/overview', label: 'Tổng quan', icon: <AppstoreOutlined /> },
+  { path: '/monitoring', label: 'Giám sát bãi xe', icon: <EyeOutlined /> },
+  { path: '/revenue', label: 'Doanh thu', icon: <DollarOutlined /> },
+  { path: '/staff', label: 'Quản lý nhân sự', icon: <TeamOutlined /> },
+  { path: '/customers', label: 'Khách hàng', icon: <UserOutlined /> },
+  { path: '/settings', label: 'Cấu hình kỹ thuật', icon: <SettingOutlined /> },
+  { path: '/security', label: 'Bảo mật', icon: <SafetyOutlined /> },
+  { path: '/logs', label: 'Nhật ký hệ thống', icon: <HistoryOutlined /> },
 ];
 
 export const Sidebar = ({ onOpenAddBranch }) => {
+  const location = useLocation();
+
   return (
     <aside className="sidebar">
       {/* Logo Area */}
@@ -34,27 +37,31 @@ export const Sidebar = ({ onOpenAddBranch }) => {
         </div>
         <div className="sidebar-logo-text-wrapper">
           <span className="sidebar-logo-title">UrbanPark</span>
-          <span className="sidebar-logo-subtitle">HS thống đỗ xe thông minh</span>
+          <span className="sidebar-logo-subtitle">Hệ thống đỗ xe thông minh</span>
         </div>
       </div>
 
       {/* Navigation */}
       <nav className="sidebar-nav">
         <ul className="sidebar-nav-list">
-          {navItems.map((item) => (
-            <li key={item.id}>
-              <button 
-                className={`sidebar-nav-item ${
-                  item.active 
-                    ? 'sidebar-nav-item-active' 
-                    : 'sidebar-nav-item-inactive'
-                }`}
-              >
-                <span className={`sidebar-nav-icon ${item.active ? 'sidebar-nav-icon-active' : ''}`}>{item.icon}</span>
-                <span className="sidebar-nav-label">{item.label}</span>
-              </button>
-            </li>
-          ))}
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path || (location.pathname === '/' && item.path === '/overview');
+            return (
+              <li key={item.path}>
+                <Link 
+                  to={item.path}
+                  className={`sidebar-nav-item ${
+                    isActive 
+                      ? 'sidebar-nav-item-active' 
+                      : 'sidebar-nav-item-inactive'
+                  }`}
+                >
+                  <span className={`sidebar-nav-icon ${isActive ? 'sidebar-nav-icon-active' : ''}`}>{item.icon}</span>
+                  <span className="sidebar-nav-label">{item.label}</span>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </nav>
 

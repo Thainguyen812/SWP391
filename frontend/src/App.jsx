@@ -1,8 +1,28 @@
-import ManagerDashboard from './pages/ManagerDashboard'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import MainLayout from './components/layout/MainLayout';
+import { SystemOverviewSection } from './components/dashboard/SystemOverview';
+import MonitoringPage from './pages/MonitoringPage';
+import RevenuePage from './pages/RevenuePage';
 
 function App() {
   return (
-    <ManagerDashboard />
+    <BrowserRouter>
+      <MainLayout>
+        <Routes>
+          <Route path="/" element={<Navigate to="/overview" replace />} />
+          <Route path="/overview" element={<SystemOverviewSection />} />
+          <Route path="/monitoring" element={<MonitoringPage />} />
+          <Route path="/revenue" element={<RevenuePage />} />
+          {/* Catch-all cho các chức năng chưa làm */}
+          <Route path="*" element={
+            <div className="flex flex-col items-center justify-center w-full h-full p-8">
+              <h2 className="text-2xl font-bold text-gray-700">Tính năng đang phát triển</h2>
+              <p className="text-gray-500 mt-2">Vui lòng quay lại sau.</p>
+            </div>
+          } />
+        </Routes>
+      </MainLayout>
+    </BrowserRouter>
   )
 }
 

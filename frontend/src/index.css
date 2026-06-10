@@ -14,3 +14,45 @@ body {
 * {
   box-sizing: border-box;
 }
+
+@layer components {
+  /* Typography */
+  .text-h1 {
+    @apply font-bold text-5xl tracking-[-0.96px] leading-[56px];
+  }
+  .text-h2 {
+    @apply font-semibold text-xl tracking-[-0.96px] leading-7;
+  }
+  .text-h3 {
+    @apply font-semibold text-xl leading-7;
+  }
+  .text-body {
+    @apply font-normal text-sm leading-5;
+  }
+  .text-body-strong {
+    @apply font-medium text-sm leading-5;
+  }
+  .text-caption {
+    @apply font-normal text-xs leading-4;
+  }
+  .text-caption-bold {
+    @apply font-bold text-xs tracking-[0.60px] leading-4;
+  }
+  .text-caption-strong {
+    @apply font-medium text-xs leading-4;
+  }
+  .text-micro {
+    @apply font-normal text-[10px] leading-[15px];
+  }
+  
+  /* Layout utilities */
+  .flex-center {
+    @apply flex items-center justify-center;
+  }
+  .flex-between {
+    @apply flex items-center justify-between;
+  }
+  .flex-col-start {
+    @apply flex flex-col items-start;
+  }
+}

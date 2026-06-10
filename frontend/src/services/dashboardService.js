@@ -1,8 +1,20 @@
+import { apiClient } from '../api/apiClient';
+
 const MOCK_DELAY = 1000; // Giả lập độ trễ mạng 1 giây
+
+// Lấy cờ từ cấu hình môi trường (.env)
+// Nếu bằng 'true' (string), hệ thống sẽ dùng dữ liệu giả. Nếu 'false', nó sẽ gọi API.
+const isMock = import.meta.env.VITE_USE_MOCK_API === 'true';
 
 export const dashboardService = {
   // Lấy dữ liệu 4 thẻ thống kê trên cùng
   getSummaryStats: async () => {
+    if (!isMock) {
+      // Dùng Real API
+      return apiClient.get('/dashboard/summary');
+    }
+
+    // Dùng Mock Data
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve({
@@ -34,6 +46,12 @@ export const dashboardService = {
 
   // Lấy danh sách nhân viên xuất sắc
   getTopStaff: async () => {
+    if (!isMock) {
+      // Dùng Real API
+      return apiClient.get('/dashboard/top-staff');
+    }
+
+    // Dùng Mock Data
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve([
@@ -47,6 +65,12 @@ export const dashboardService = {
 
   // Lấy danh sách thông báo hệ thống
   getSystemAlerts: async () => {
+    if (!isMock) {
+      // Dùng Real API
+      return apiClient.get('/dashboard/alerts');
+    }
+
+    // Dùng Mock Data
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve([
@@ -79,17 +103,20 @@ export const dashboardService = {
     });
   },
 
-  // Mock API tạo cơ sở mới
+  // Gọi API tạo cơ sở mới
   createBranch: async (branchData) => {
+    if (!isMock) {
+      // Dùng Real API
+      return apiClient.post('/branches', branchData);
+    }
+
+    // Dùng Mock Data
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         // Giả lập thành công 100%
         console.log("Mock API nhận dữ liệu Create Branch:", branchData);
         resolve({ success: true, message: "Thêm cơ sở thành công", data: { id: Date.now(), ...branchData } });
-        
-        // Nếu muốn test lỗi thì uncomment dòng này:
-        // reject(new Error("Lỗi giả lập từ server"));
-      }, MOCK_DELAY * 1.5); // Nút quay 1.5s để nhìn cho rõ
+      }, MOCK_DELAY * 1.5);
     });
   }
 };
