@@ -1,0 +1,85 @@
+@reference "../../index.css";
+
+.top-app-bar {
+  @apply h-[72px] bg-white border-b border-[#e9e7e9] flex items-center justify-between px-6 z-10 w-full flex-shrink-0;
+}
+
+.search-container {
+  @apply flex items-center h-full w-[280px];
+}
+
+.search-input-wrapper {
+  @apply relative w-full flex items-center;
+}
+
+.search-icon {
+  @apply absolute left-3 text-gray-400 z-10 text-lg;
+}
+
+.search-input {
+  @apply w-full bg-[#f4f5f7] border border-transparent rounded h-[42px] pl-10 pr-4 text-[13px] focus:outline-none focus:border-[#0058be] transition-colors;
+}
+
+.location-nav {
+  @apply flex items-center justify-center flex-1 h-full pl-12 pr-12;
+}
+
+.location-list {
+  @apply flex items-center h-full gap-16;
+}
+
+.location-item {
+  @apply h-full flex flex-col justify-center px-2 transition-colors hover:bg-gray-50 border-b-[4px] outline-none;
+}
+
+.location-item-active {
+  @apply border-[#0058be];
+}
+
+.location-item-inactive {
+  @apply border-transparent text-[#44474c];
+}
+
+.location-text {
+  @apply text-[13px] leading-tight text-left;
+}
+
+.location-text-active {
+  @apply text-[#0058be] font-bold;
+}
+
+.location-text-inactive {
+  @apply font-medium;
+}
+
+.actions-container {
+  @apply flex items-center gap-7;
+}
+
+.status-btn {
+  @apply flex items-center gap-2 px-3 py-1.5 bg-[#eaf6f0] rounded-sm text-[#00a572] hover:bg-[#d6eedf] transition-colors outline-none;
+}
+
+.status-icon {
+  @apply text-sm;
+}
+
+.status-text {
+  @apply text-xs font-bold whitespace-nowrap;
+}
+
+.icons-group {
+  @apply flex items-center gap-5 text-[#44474c] text-xl;
+}
+
+.icon-btn {
+  @apply hover:text-gray-800 transition-colors outline-none flex items-center justify-center;
+}
+
+.avatar-btn {
+  @apply w-9 h-9 rounded-full overflow-hidden border border-gray-200 outline-none flex items-center justify-center;
+}
+
+.avatar-img {
+  @apply w-full h-full object-cover;
+}
