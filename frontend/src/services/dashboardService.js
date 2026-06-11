@@ -118,5 +118,78 @@ export const dashboardService = {
         resolve({ success: true, message: "Thêm cơ sở thành công", data: { id: Date.now(), ...branchData } });
       }, MOCK_DELAY * 1.5);
     });
+  },
+
+  // --- TRANG GIÁM SÁT BÃI XE ---
+
+  // Lấy trạng thái bãi xe hiện tại
+  getMonitoringStatus: async (branchId = "HQ", floorId = "B1") => {
+    if (!isMock) {
+      return apiClient.get('/monitoring/status', { params: { branchId, floorId } });
+    }
+
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        if (floorId === "B2") {
+          resolve({
+            totalCapacity: 800,
+            currentlyParked: 350,
+            parkedPercentage: 43,
+            availableSpots: 450,
+            vipVehicles: 15
+          });
+        } else if (floorId === "T1") {
+          resolve({
+            totalCapacity: 500,
+            currentlyParked: 490,
+            parkedPercentage: 98,
+            availableSpots: 10,
+            vipVehicles: 5
+          });
+        } else {
+          // Mặc định B1
+          resolve({
+            totalCapacity: 1500,
+            currentlyParked: 1248,
+            parkedPercentage: 83,
+            availableSpots: 252,
+            vipVehicles: 42
+          });
+        }
+      }, MOCK_DELAY);
+    });
+  },
+
+  // Lấy danh sách hoạt động vào ra gần đây
+  getRecentActivities: async (branchId = "HQ", floorId = "B1") => {
+    if (!isMock) {
+      return apiClient.get('/monitoring/activities', { params: { branchId, floorId } });
+    }
+
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const activitiesB1 = [
+          { id: 1, plateNumber: "51A-892.44", vehicleType: "Sedan", location: "Cổng vào 1", time: "10:42:15", status: "Vào", isVip: false },
+          { id: 2, plateNumber: "29C-123.99", vehicleType: "SUV", location: "Cổng ra 2", time: "10:40:05", status: "Ra", isVip: false },
+          { id: 3, plateNumber: "30F-999.99", vehicleType: "Sang trọng", location: "VIP Làn 1", time: "10:38:22", status: "Vào", isVip: true },
+          { id: 4, plateNumber: "60A-112.33", vehicleType: "Hatchback", location: "Cổng vào 2", time: "10:35:10", status: "Vào", isVip: false }
+        ];
+
+        const activitiesB2 = [
+          { id: 5, plateNumber: "61C-555.22", vehicleType: "Tải nhỏ", location: "Hầm B2 Lối 1", time: "10:45:10", status: "Ra", isVip: false },
+          { id: 6, plateNumber: "51G-111.00", vehicleType: "SUV", location: "Hầm B2 Lối 2", time: "10:41:00", status: "Vào", isVip: false },
+          { id: 7, plateNumber: "99A-999.99", vehicleType: "Sang trọng", location: "VIP B2", time: "10:30:15", status: "Ra", isVip: true }
+        ];
+        
+        const activitiesT1 = [
+          { id: 8, plateNumber: "29A-123.45", vehicleType: "Sedan", location: "Cổng chính", time: "10:46:12", status: "Vào", isVip: false },
+          { id: 9, plateNumber: "30E-678.90", vehicleType: "SUV", location: "Cổng chính", time: "10:44:30", status: "Vào", isVip: false }
+        ];
+
+        if (floorId === "B2") resolve(activitiesB2);
+        else if (floorId === "T1") resolve(activitiesT1);
+        else resolve(activitiesB1);
+      }, MOCK_DELAY);
+    });
   }
 };

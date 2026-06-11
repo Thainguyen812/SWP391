@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import { SystemOverviewSection } from './components/dashboard/SystemOverview';
-import MonitoringPage from './pages/MonitoringPage';
+import { MonitoringPage } from './components/monitoring/MonitoringPage';
 import RevenuePage from './pages/RevenuePage';
 
 function App() {
