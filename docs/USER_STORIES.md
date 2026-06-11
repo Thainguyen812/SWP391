@@ -1,14 +1,14 @@
 # USER_STORIES - Parking Building Management System (SWP391)
 
-Tài liệu user stories được sinh tự động từ SRS trong thư mục.
+
 
 ---
 
 ## Epic: Quản lý luồng vào/ra bãi
 
-1. As a Driver (VIP), I want the system to automatically open the VIP lane when my plate and ETC match so that I can exit/enter without stopping.
+1. As a Driver (VIP), I want the system to automatically open the VIP lane when my plate matches and I scan my dynamic QR code so that I can exit/enter securely without physical cards.
    - Acceptance:
-     - Plate + ETC validated against VIP subscription
+     - Plate matches and dynamic QR token validated (valid 5-min, single-use) against VIP subscription
      - Active parking session exists
      - is_locked == FALSE
 
@@ -45,14 +45,14 @@ Tài liệu user stories được sinh tự động từ SRS trong thư mục.
 
 ## Epic: Thành viên VIP & Quản lý hồ sơ
 
-7. As a Driver (VIP applicant), I want to register for VIP with ETC and documents so that I can be approved for automatic lanes.
+7. As a Driver (VIP applicant), I want to register for VIP with license plate and documents so that I can be approved for dynamic QR-based lanes.
    - Acceptance:
-     - Uploads CMND, vehicle docs, ETC code required
+     - Uploads CMND, vehicle docs, registration photos required
      - Payment webhook transitions to PENDING_APPROVAL
 
-8. As a Manager, I want to review and approve VIP applications so that only valid ETC-linked vehicles gain VIP status.
+8. As a Manager, I want to review and approve VIP applications so that only valid registered vehicles gain VIP status.
    - Acceptance:
-     - Manager can view uploaded images and ETC code
+     - Manager can view uploaded images and vehicle details
      - Approve action sets subscription to ACTIVE and logs audit
 
 ---
@@ -116,4 +116,3 @@ Tài liệu user stories được sinh tự động từ SRS trong thư mục.
 
 ---
 
-> Lưu ý: Các user stories trên được sinh tự động từ SRS (C:\SWP391\srs.md). Có thể mở rộng thành các task/acceptance criteria chi tiết hơn theo sprint planning.
