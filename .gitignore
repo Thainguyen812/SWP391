@@ -4,3 +4,11 @@ node_modules/
 *.iml
 *.class
 .DS_Store
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
