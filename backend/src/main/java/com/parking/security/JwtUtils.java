@@ -7,7 +7,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
+import java.security.Key;
 import java.util.Date;
+import java.util.List;
 
 @Component
 public class JwtUtils {
@@ -64,8 +66,8 @@ public class JwtUtils {
     // 3. Lấy Username từ trong Token ra
     public String getUserNameFromJwtToken(String token) {
         Claims claims = Jwts.parserBuilder() // Khởi tạo bộ giải mã Token
-                .setSigningKey(getSigningKey()) // Đưa Khóa bí mật vào để đối chiếu (Nếu chữ ký sai hoặc bị sửa đổi, hàm
-                                                // sẽ báo lỗi ngay tại đây)
+                .setSigningKey(getSignKey()) // Đưa Khóa bí mật vào để đối chiếu (Nếu chữ ký sai hoặc bị sửa đổi, hàm
+                                             // sẽ báo lỗi ngay tại đây)
                 .build() // Xây dựng hoàn chỉnh bộ Parser
                 .parseClaimsJws(token)// Truyền chuỗi Token vào để bóc tách các lớp mã hóa
                 .getBody();// Lấy ra phần thân chứa dữ liệu (Phần Payload/Claims)
@@ -77,8 +79,8 @@ public class JwtUtils {
     @SuppressWarnings("unchecked")
     public List<String> getRolesFromToken(String token) {
         Claims claims = Jwts.parserBuilder()
-                .setSigningKey(getSigningKey()) // Dùng khóa bí mật để xác thực xem token có bị ai sửa đổi lén lút hay
-                                                // không
+                .setSigningKey(getSignKey()) // Dùng khóa bí mật để xác thực xem token có bị ai sửa đổi lén lút hay
+                                             // không
                 .build()
                 .parseClaimsJws(token)
                 .getBody();

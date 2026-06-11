@@ -3,6 +3,7 @@ package com.parking.controller;
 import com.parking.dto.LoginRequest;
 import com.parking.dto.LoginResponse;
 import com.parking.dto.RegisterRequest;
+import com.parking.security.JwtUtils;
 import com.parking.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -61,7 +62,7 @@ public class AuthController {
 
             // Bước F: Tiến hành "Đổi thẻ mới" - Cấp một chuỗi Access Token mới tinh có hạn
             // 15 phút cho người dùng
-            String newAccessToken = jwtUtils.generateAccessToken(username, roles);
+            String newAccessToken = jwtUtils.generateJwtToken(username);
 
             // Bước G: Đóng gói Access Token mới và giữ lại Refresh Token cũ vào đối tượng
             // LoginResponse đúng chuẩn của DEV 2
