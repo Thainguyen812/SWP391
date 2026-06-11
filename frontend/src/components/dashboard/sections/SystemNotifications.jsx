@@ -17,7 +17,7 @@ export const SystemNotifications = ({ notifications, loading }) => {
         {notifications.map((notification, index) => (
           <div key={index} className={notification.containerClassName}>
             <div className="pt-1">
-              <img className={notification.iconClassName} alt="icon" src={notification.icon} />
+              {notification.icon}
             </div>
             <div className="flex flex-col gap-1 w-full">
               <p className="text-body-strong text-[#1b1c1d]">{notification.title}</p>

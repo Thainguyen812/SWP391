@@ -1,7 +1,7 @@
 @reference "../../index.css";
 
 .sidebar {
-  @apply w-[256px] bg-[#0c1421] flex flex-col h-screen flex-shrink-0;
+  @apply w-[256px] bg-[#0c1421] dark:bg-[#020617] border-r border-transparent dark:border-[#1e293b] flex flex-col h-screen flex-shrink-0 transition-colors;
 }
 
 .sidebar-logo-area {
@@ -10,6 +10,7 @@
 
 .sidebar-logo-icon {
   @apply w-9 h-9 bg-[#0058be] text-white flex items-center justify-center font-bold text-xl rounded shadow-sm;
+  /* Revert invert trick is no longer needed */
 }
 
 .sidebar-logo-text-wrapper {
@@ -33,15 +34,16 @@
 }
 
 .sidebar-nav-item {
-  @apply w-full flex items-center gap-4 px-6 py-3 hover:text-white transition-colors outline-none;
+  @apply w-full flex items-center gap-4 px-4 py-2.5 mx-2 rounded-md hover:text-white transition-all outline-none;
+  width: calc(100% - 16px);
 }
 
 .sidebar-nav-item-active {
-  @apply bg-[#1e293b] text-white border-l-[3px] border-white pl-[21px];
+  @apply bg-[#1677ff] dark:bg-[#3b82f6] text-white;
 }
 
 .sidebar-nav-item-inactive {
-  @apply text-[#64748b] border-l-[3px] border-transparent pl-[21px];
+  @apply text-[#64748b] dark:text-[#94a3b8] bg-transparent hover:bg-[#1e293b]/50 dark:hover:bg-[#1e293b];
 }
 
 .sidebar-nav-icon {
@@ -57,7 +59,7 @@
 }
 
 .sidebar-bottom-area {
-  @apply px-5 py-6 flex flex-col gap-4 bg-[#1e293b];
+  @apply px-5 py-6 flex flex-col gap-4 bg-[#1e293b] dark:bg-[#0f172a] transition-colors border-t border-transparent dark:border-[#1e293b];
 }
 
 .sidebar-add-btn {

@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import { SystemOverviewSection } from './components/dashboard/SystemOverview';
 import { MonitoringPage } from './components/monitoring/MonitoringPage';
-import RevenuePage from './pages/RevenuePage';
+import { RevenuePage } from './components/revenue/RevenuePage';
 
 function App() {
   return (

@@ -32,7 +32,7 @@ export const TopEmployees = ({ employees, loading }) => {
               <span className="text-body-strong text-[#041627]">{employee.count}</span>
               {employee.highlight && (
                 <div className="flex items-center gap-1 mt-1">
-                  <img className="w-[11.67px] h-[11.08px]" alt="top badge" src={employee.highlight.icon} />
+                  {employee.highlight.icon}
                   <span className="text-micro text-[#00a572]">{employee.highlight.label}</span>
                 </div>
               )}

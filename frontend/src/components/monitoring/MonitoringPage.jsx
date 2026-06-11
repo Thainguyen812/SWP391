@@ -3,6 +3,7 @@ import { dashboardService } from "../../services/dashboardService";
 import { BlueprintViewer } from "./BlueprintViewer";
 import { ParkingStatusCard } from "./ParkingStatusCard";
 import { ActivityLogCard } from "./ActivityLogCard";
+import { ErrorState } from "../common/ErrorState";
 
 export const MonitoringPage = () => {
   const [branch, setBranch] = useState("HQ");
@@ -10,6 +11,7 @@ export const MonitoringPage = () => {
   const [status, setStatus] = useState(null);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -22,8 +24,10 @@ export const MonitoringPage = () => {
         
         setStatus(statusData);
         setActivities(activitiesData);
-      } catch (error) {
-        console.error("Lỗi lấy dữ liệu giám sát:", error);
+        setError(null);
+      } catch (err) {
+        console.error("Lỗi lấy dữ liệu giám sát:", err);
+        setError("Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại Backend hoặc bật Mock API.");
       } finally {
         setLoading(false);
       }
@@ -35,20 +39,21 @@ export const MonitoringPage = () => {
     return () => clearInterval(interval);
   }, [branch, floor]);
 
+  if (error) {
+    return (
+      <ErrorState 
+        title="Lỗi kết nối dữ liệu"
+        message={error}
+        onRetry={() => window.location.reload()}
+      />
+    );
+  }
+
   return (
-    <section className="flex flex-col w-full h-full p-6 pb-8 gap-6">
+    <section className="flex flex-col w-full h-full p-6 pb-8 gap-6 bg-[#f8fafc] dark:bg-slate-900 overflow-y-auto transition-colors">
       {/* Header riêng của trang Giám sát */}
-      <header className="flex-between w-full pb-4 border-b border-[#e9e7e9]">
-        <h1 className="text-h2 text-[#041627]">Giám sát bãi xe thời gian thực</h1>
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <span className="text-body text-[#44474c]">Hệ thống:</span>
-            <span className="text-body-strong text-[#041627] flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#4edea3]"></span>
-              Hoạt động
-            </span>
-          </div>
-        </div>
+      <header className="flex-between w-full pb-4 border-b border-[#e9e7e9] dark:border-slate-700 transition-colors">
+        <h1 className="text-h2 text-[#041627] dark:text-slate-100 transition-colors">Giám sát bãi xe thời gian thực</h1>
       </header>
 
       {/* Main Content Grid 2 cột */}

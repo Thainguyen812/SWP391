@@ -1,8 +1,4 @@
-import icon4 from "../../../assets/icons/icon-4.svg";
-import icon5 from "../../../assets/icons/icon-5.svg";
-import icon6 from "../../../assets/icons/icon-6.svg";
-import icon7 from "../../../assets/icons/icon-7.svg";
-import icon8 from "../../../assets/icons/icon-8.svg";
+import { DollarOutlined, ArrowUpOutlined, CarOutlined, PieChartOutlined, WarningOutlined } from "@ant-design/icons";
 
 export const SummaryCards = ({ data }) => {
   if (!data) return null;
@@ -10,9 +6,8 @@ export const SummaryCards = ({ data }) => {
   const cards = [
     {
       title: "TỔNG DOANH THU",
-      icon: icon4,
-      iconWrapperClassName: "bg-[#d8e2ff33]",
-      iconClassName: "w-[22px] h-4",
+      icon: <DollarOutlined className="text-[#1677ff] text-xl" />,
+      iconWrapperClassName: "bg-[#d8e2ff33] dark:bg-[#1677ff]/20",
       content: (
         <div className="flex flex-col gap-[3.5px] mt-4 w-full">
           <div className="h-14 relative w-full">
@@ -25,7 +20,7 @@ export const SummaryCards = ({ data }) => {
           </div>
           <div className="flex items-center gap-1 w-full">
             {data?.totalRevenue?.isPositive && (
-              <img className="w-[11.67px] h-[7px]" alt="trend up" src={icon5} />
+              <ArrowUpOutlined className="text-[#00a572] text-xs" />
             )}
             <p className="text-body text-[#00a572]">
               {data?.totalRevenue?.trend || "..."}
@@ -36,9 +31,8 @@ export const SummaryCards = ({ data }) => {
     },
     {
       title: "XE ĐANG ĐỖ",
-      icon: icon6,
-      iconWrapperClassName: "bg-[#d2e4fb33]",
-      iconClassName: "w-[18px] h-4",
+      icon: <CarOutlined className="text-[#2b6a9a] dark:text-[#3b82f6] text-xl" />,
+      iconWrapperClassName: "bg-[#d2e4fb33] dark:bg-[#3b82f6]/20",
       content: (
         <div className="flex flex-col gap-2 mt-4 w-full">
           <div className="text-h1 text-[#041627]">
@@ -52,9 +46,8 @@ export const SummaryCards = ({ data }) => {
     },
     {
       title: "HIỆU SUẤT LẤP ĐẦY",
-      icon: icon7,
-      iconWrapperClassName: "bg-[#4edea333]",
-      iconClassName: "w-5 h-5",
+      icon: <PieChartOutlined className="text-[#4edea3] text-xl" />,
+      iconWrapperClassName: "bg-[#4edea333] dark:bg-[#4edea3]/20",
       content: (
         <div className="flex flex-col gap-1 mt-4 w-full">
           <div className="text-h1 text-[#041627]">
@@ -68,9 +61,8 @@ export const SummaryCards = ({ data }) => {
     },
     {
       title: "SỰ CỐ CẦN XỬ LÝ",
-      icon: icon8,
-      iconWrapperClassName: "bg-[#ffdad680]",
-      iconClassName: "w-[22px] h-[19px]",
+      icon: <WarningOutlined className="text-[#ba1a1a] dark:text-red-400 text-xl" />,
+      iconWrapperClassName: "bg-[#ffdad680] dark:bg-red-500/20",
       cardClassName: "border-[#ba1a1a4c]",
       titleClassName: "text-[#ba1a1a]",
       isAlert: true,
@@ -104,7 +96,7 @@ export const SummaryCards = ({ data }) => {
               </h3>
             </div>
             <div className={`p-2 rounded flex-center ${card.iconWrapperClassName}`}>
-              <img className={card.iconClassName} alt="" src={card.icon} />
+              {card.icon}
             </div>
           </div>
           {card.content}
