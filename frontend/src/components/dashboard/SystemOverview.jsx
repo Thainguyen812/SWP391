@@ -113,7 +113,9 @@ export const SystemOverviewSection = () => {
 
         <div className="grid grid-cols-2 gap-6 w-full">
           <TopEmployees employees={employees} loading={loading} />
-          <SystemNotifications notifications={notifications} loading={loading} />
+          <div id="system-notifications">
+            <SystemNotifications notifications={notifications} loading={loading} />
+          </div>
         </div>
       </div>
     </section>

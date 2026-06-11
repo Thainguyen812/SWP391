@@ -71,7 +71,24 @@ export const SummaryCards = ({ data }) => {
           <div className="text-h1 text-[#ba1a1a]">
             {data?.issues?.value || "0"}
           </div>
-          <button type="button" className="text-caption-bold text-[#0058be] hover:underline">
+          <button 
+            type="button" 
+            className="text-caption-bold text-[#0058be] hover:underline"
+            onClick={() => {
+              const el = document.getElementById('system-notifications');
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Thêm hiệu ứng nhấp nháy nhẹ để người dùng chú ý
+                el.style.transition = 'all 0.5s ease';
+                el.style.transform = 'scale(1.02)';
+                el.style.boxShadow = '0 0 15px rgba(220, 38, 38, 0.3)';
+                setTimeout(() => {
+                  el.style.transform = 'scale(1)';
+                  el.style.boxShadow = 'none';
+                }, 800);
+              }
+            }}
+          >
             {data?.issues?.trend || "Xem"}
           </button>
         </div>
