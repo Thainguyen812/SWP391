@@ -1,3 +1,4 @@
+//Thành
 # ĐẶC SẢ KỸ THUẬT: TASK 5 - STANDARD CHECK-OUT API & CASUAL GUEST PAYMENT TERMINAL
 
 ## 1. FUNCTIONAL & BUSINESS LOGIC ANALYSIS
@@ -21,10 +22,66 @@ Staff processes payment; system can accept webhook from Payment Gateway.
 Staff checkout UI: input card id, display fee breakdown, show QR for payment, Confirm button.
 
 ## 3. BACK-END SPECIFICATIONS
-POST /api/checkout/{cardId} -> calculates fee and returns invoice
-POST /api/transactions/{id}/confirm -> marks PAID (Staff action or webhook)
+### 3.1 Calculate Casual Guest Check-out Fee
 
-Errors: 400 validation, 409 if session not ACTIVE.
+Endpoint:
+
+POST /api/parking/check-out/casual
+
+Description:
+
+Staff quẹt thẻ tạm của khách vãng lai. Backend dùng cardId để tìm parking session đang ACTIVE, sau đó tính phí và trả thông tin phiên gửi xe về cho màn hình staff.
+
+Request Body:
+
+{
+  "cardId": "CARD001",
+}
+
+Response Success:
+
+{
+  "sessionId": "S001",
+  "licensePlate": "51A-12345",
+  "cardId": "CARD001",
+  "checkInTime": "2026-06-08T08:00:00Z",
+  "parkingHours": 3,
+  "totalFee": 30000,
+  "status": "PENDING_PAYMENT"
+}
+
+### 3.2 Confirm Casual Guest Payment
+
+Endpoint:
+
+POST /api/parking/check-out/casual/confirm
+
+Request Body:
+
+Description:
+
+Sau khi staff thu tiền thành công, frontend gửi lệnh xác nhận. Backend đổi trạng thái session sang COMPLETED, cập nhật thẻ tạm về AVAILABLE và trả lệnh mở barrier.
+
+
+{
+  "sessionId": "S001",
+  "paymentMethod": "CASH",
+  "processedBy": "STAFF001"
+}
+
+Response Success:
+
+{
+  "sessionId": "S001",
+  "status": "COMPLETED",
+  "barrierCommand": "OPEN"
+}
+
+Errors:
+
+- 400 validation error
+- 404 active session not found
+- 409 session is not ACTIVE
 
 ## 4. ACCEPTANCE CRITERIA
 - Given session active and payment completed, checkout closes session and frees slot.

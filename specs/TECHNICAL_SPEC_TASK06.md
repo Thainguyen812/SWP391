@@ -1,4 +1,4 @@
-# ĐẶC TẢ KỸ THUẬT: TASK 6 - MFA SECURITY VIA MOCK ETC READER
+# ĐẶC TẢ KỸ THUẬT: TASK 6 - MFA SECURITY VIA DYNAMIC QR VERIFICATION
 
 ## 1. FUNCTIONAL & BUSINESS LOGIC ANALYSIS
 ### 1.1. CRUD Matrix
@@ -9,8 +9,9 @@
 vehicles.etc_tag_code, parking_sessions.detected_etc_code
 
 ### 1.3. Business Rules
-- VIP auto-open only when plate matches VIP record AND detected_etc_code == registered etc_tag_code
-- If mismatch -> deny and raise alert
+VIP exit requires:
+- Plate match
+- Dynamic QR verification
 
 ### 1.4. RBAC
 Staff can manually override after verification steps and audit.
@@ -19,7 +20,7 @@ Staff can manually override after verification steps and audit.
 VIP lane UI shows MATCH/MISMATCH, big green/red indicator, and manual override modal.
 
 ## 3. BACK-END SPECIFICATIONS
-POST /api/etc/verify {sessionId, etc_tag_code} -> 200 {match:true/false}
+POST /api/qr/verify {sessionId, etc_tag_code} -> 200 {match:true/false}
 If match true and session active and is_locked==false -> trigger barrier open.
 
 ## 4. ACCEPTANCE CRITERIA
