@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { SearchOutlined, BellOutlined, MoonOutlined, CheckCircleOutlined } from "@ant-design/icons";
+import { SearchOutlined, BellOutlined, MoonOutlined, SunOutlined, CheckCircleOutlined, WarningOutlined } from "@ant-design/icons";
 import "./TopAppBar.css";
 
 const locations = [
@@ -12,6 +12,18 @@ export const TopAppBarSection = () => {
   const searchId = useId();
   const [searchValue, setSearchValue] = useState("");
   const [activeLocation, setActiveLocation] = useState("toan-he-thong");
+  const [isOnline, setIsOnline] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  const toggleDarkMode = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    if (newMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
 
   return (
     <header className="top-app-bar">
@@ -52,17 +64,24 @@ export const TopAppBarSection = () => {
 
       {/* Right Area: Actions & Avatar */}
       <div className="actions-container">
-        <button className="status-btn">
-          <CheckCircleOutlined className="status-icon" />
-          <span className="status-text">Trạng thái Hệ thống</span>
+        <button 
+          className={`status-btn ${!isOnline ? 'bg-orange-50 text-orange-600 border-orange-200 hover:bg-orange-100' : ''}`}
+          onClick={() => setIsOnline(!isOnline)}
+        >
+          {isOnline ? (
+            <CheckCircleOutlined className="status-icon" />
+          ) : (
+            <WarningOutlined className="status-icon text-orange-500" />
+          )}
+          <span className="status-text">{isOnline ? 'Hệ thống: Hoạt động' : 'Hệ thống: Bảo trì'}</span>
         </button>
 
         <div className="icons-group">
           <button className="icon-btn">
             <BellOutlined />
           </button>
-          <button className="icon-btn">
-            <MoonOutlined />
+          <button className="icon-btn" onClick={toggleDarkMode}>
+            {isDarkMode ? <SunOutlined /> : <MoonOutlined />}
           </button>
           <button className="avatar-btn">
             <img src="https://i.pravatar.cc/150?img=11" alt="Avatar" className="avatar-img" />

@@ -7,11 +7,11 @@ const MainLayout = ({ children }) => {
   const [isAddBranchOpen, setIsAddBranchOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans">
+    <div className="flex h-screen bg-[#f8fafc] dark:bg-slate-900 overflow-hidden font-sans">
       <Sidebar onOpenAddBranch={() => setIsAddBranchOpen(true)} />
       <div className="flex flex-col flex-1 overflow-hidden relative w-full">
         <TopAppBarSection />
-        <main className="flex-1 overflow-auto bg-[#f8fafc] p-0">
+        <main className="flex-1 overflow-auto bg-[#f8fafc] dark:bg-slate-900 p-0">
           <div className="min-h-full">
             {children}
           </div>

@@ -1,11 +1,7 @@
 import { useState, useEffect } from "react";
 import { dashboardService } from "../../services/dashboardService";
-import icon2 from "../../assets/icons/icon-2.svg";
-import icon3 from "../../assets/icons/icon-3.svg";
-import icon10 from "../../assets/icons/icon-10.svg";
-import icon11 from "../../assets/icons/icon-11.svg";
-import icon12 from "../../assets/icons/icon-12.svg";
-import icon13 from "../../assets/icons/icon-13.svg";
+import { CalendarOutlined, DownloadOutlined } from "@ant-design/icons";
+import "./SystemOverview.css";
 import "./SystemOverview.css";
 
 // Import UI Sections
@@ -14,12 +10,15 @@ import { RevenueChart } from "./sections/RevenueChart";
 import { VehicleDistribution } from "./sections/VehicleDistribution";
 import { TopEmployees } from "./sections/TopEmployees";
 import { SystemNotifications } from "./sections/SystemNotifications";
+import { ErrorState } from "../common/ErrorState";
+import { TrophyOutlined, ExclamationCircleOutlined, WarningOutlined, InfoCircleOutlined } from "@ant-design/icons";
 
 export const SystemOverviewSection = () => {
   const [summaryData, setSummaryData] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -38,7 +37,7 @@ export const SystemOverviewSection = () => {
           name: staff.name,
           role: staff.location,
           count: staff.count + " lượt",
-          highlight: staff.rank === 1 ? { icon: icon10, label: "TOP 1" } : null,
+          highlight: staff.rank === 1 ? { icon: <TrophyOutlined className="text-yellow-500" />, label: "TOP 1" } : null,
           avatarClassName: index === 0 ? "bg-[#d2e4fb]" : "bg-[#efedef]",
           initialClassName: index === 0 ? "text-[#041627]" : "text-[#44474c]",
         })));
@@ -47,16 +46,18 @@ export const SystemOverviewSection = () => {
           title: alert.title,
           description: alert.description,
           time: alert.time,
-          icon: alert.type === 'error' ? icon11 : alert.type === 'warning' ? icon12 : icon13,
-          iconClassName: alert.type === 'warning' ? "w-[22px] h-[19px]" : "w-5 h-5",
+          icon: alert.type === 'error' ? <ExclamationCircleOutlined className="text-[#ba1a1a] text-xl" /> : alert.type === 'warning' ? <WarningOutlined className="text-yellow-500 text-xl" /> : <InfoCircleOutlined className="text-blue-500 text-xl" />,
           containerClassName: alert.type === 'error' 
             ? "flex items-start gap-4 p-3 w-full bg-[#ffdad633] rounded border border-[#ba1a1a33]"
             : "flex items-start gap-4 p-3 w-full rounded border border-transparent",
           actionLabel: alert.actionText
         })));
         
-      } catch (error) {
-        console.error("Lỗi lấy dữ liệu:", error);
+        setNotifications(alerts);
+        setError(null);
+      } catch (err) {
+        console.error("Lỗi lấy dữ liệu dashboard:", err);
+        setError("Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại Backend hoặc bật Mock API.");
       } finally {
         setLoading(false);
       }
@@ -64,8 +65,18 @@ export const SystemOverviewSection = () => {
     fetchData();
   }, []);
 
+  if (error) {
+    return (
+      <ErrorState 
+        title="Lỗi kết nối dữ liệu"
+        message={error}
+        onRetry={() => window.location.reload()}
+      />
+    );
+  }
+
   return (
-    <section className="system-overview-container">
+    <section className="system-overview-container dark:bg-slate-900 transition-colors">
       {/* Loading overlay */}
       {loading && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#f8fafc]/70 backdrop-blur-[1px]">
@@ -80,12 +91,12 @@ export const SystemOverviewSection = () => {
           <p className="system-overview-subtitle">Dữ liệu cập nhật theo thời gian thực: 24/10/2023 14:30</p>
         </div>
         <div className="system-overview-header-actions">
-          <button className="gap-2 px-4 py-2 bg-[#efedef] rounded border border-[#c4c6cd] flex items-center focus:outline-none hover:bg-gray-200 transition-colors">
-            <img className="w-[10.5px] h-[11.67px]" alt="calendar" src={icon2} />
-            <span className="font-bold text-[#1b1c1d] text-xs">Hôm nay</span>
+          <button className="gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded border border-[#c4c6cd] dark:border-slate-600 flex items-center focus:outline-none hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+            <CalendarOutlined className="text-[#64748b] dark:text-slate-400" />
+            <span className="font-bold text-[#1b1c1d] dark:text-slate-200 text-xs">Hôm nay</span>
           </button>
-          <button className="gap-2 px-4 py-[9px] bg-[#2170e4] hover:bg-[#1a5bb8] transition-colors rounded flex items-center focus:outline-none">
-            <img className="w-[9.33px] h-[9.33px]" alt="export" src={icon3} />
+          <button className="gap-2 px-4 py-[9px] bg-[#1677ff] hover:bg-[#0058be] transition-colors rounded flex items-center focus:outline-none">
+            <DownloadOutlined className="text-white" />
             <span className="font-bold text-white text-xs">Xuất báo cáo</span>
           </button>
         </div>
@@ -102,7 +113,9 @@ export const SystemOverviewSection = () => {
 
         <div className="grid grid-cols-2 gap-6 w-full">
           <TopEmployees employees={employees} loading={loading} />
-          <SystemNotifications notifications={notifications} loading={loading} />
+          <div id="system-notifications">
+            <SystemNotifications notifications={notifications} loading={loading} />
+          </div>
         </div>
       </div>
     </section>
