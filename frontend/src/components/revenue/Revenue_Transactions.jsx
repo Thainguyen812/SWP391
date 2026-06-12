@@ -1,7 +1,32 @@
+import { useState } from 'react';
 import { SearchOutlined, FilterOutlined, ExclamationCircleOutlined, SyncOutlined, StarFilled, CreditCardOutlined } from "@ant-design/icons";
+import { Pagination } from 'antd';
 
 export const RecentTransactions = ({ transactions }) => {
-  if (!transactions) return null;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const pageSize = 4;
+
+  if (!transactions || !transactions.items) return null;
+
+  // Search logic
+  const filteredItems = transactions.items.filter(trx => {
+    if (!searchKeyword.trim()) return true;
+    const lowerKey = searchKeyword.toLowerCase();
+    return trx.id.toLowerCase().includes(lowerKey) || trx.plate.toLowerCase().includes(lowerKey);
+  });
+
+  // Pagination logic
+  const totalItems = filteredItems.length;
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const currentItems = filteredItems.slice(startIndex, endIndex);
+
+  // Reset to page 1 when searching
+  const handleSearchChange = (e) => {
+    setSearchKeyword(e.target.value);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="w-full bg-white dark:bg-slate-800 border border-[#e9e7e9] dark:border-slate-700 rounded-lg shadow-sm flex flex-col mt-6 transition-colors">
@@ -13,6 +38,8 @@ export const RecentTransactions = ({ transactions }) => {
             <input 
               type="text" 
               placeholder="Mã GD, Biển số..." 
+              value={searchKeyword}
+              onChange={handleSearchChange}
               className="pl-9 pr-4 py-1.5 border border-[#e2e8f0] dark:border-slate-600 rounded-md text-sm focus:outline-none focus:border-[#1677ff] dark:focus:border-blue-500 w-64 placeholder-[#94a3b8] dark:placeholder-slate-400 bg-transparent dark:text-white transition-colors"
             />
           </div>
@@ -36,7 +63,7 @@ export const RecentTransactions = ({ transactions }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-[#e9e7e9] dark:divide-slate-700">
-            {transactions.items.map((trx, idx) => {
+            {currentItems.map((trx, idx) => {
               let statusBadge = null;
               if (trx.status === "THÀNH CÔNG") {
                 statusBadge = <span className="inline-flex items-center px-2 py-1 rounded bg-[#ecfdf5] text-[#10b981] text-xs font-medium"><span className="w-1.5 h-1.5 rounded-full bg-[#10b981] mr-1.5"></span>{trx.status}</span>;
@@ -82,15 +109,17 @@ export const RecentTransactions = ({ transactions }) => {
       
       {/* Footer Paginator */}
       <div className="flex-between p-4 border-t border-[#e9e7e9] dark:border-slate-700 bg-white dark:bg-slate-800 rounded-b-lg">
-        <span className="text-sm text-[#64748b] dark:text-slate-400">Hiển thị 1-4 trên {transactions.total} giao dịch</span>
-        <div className="flex items-center gap-1">
-          <button className="w-8 h-8 rounded border border-[#e2e8f0] dark:border-slate-600 flex items-center justify-center text-[#94a3b8] dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700">{"<"}</button>
-          <button className="w-8 h-8 rounded border border-[#1677ff] bg-[#eff6ff] dark:bg-blue-900/30 text-[#1677ff] dark:text-blue-400 flex items-center justify-center font-medium">1</button>
-          <button className="w-8 h-8 rounded border border-[#e2e8f0] dark:border-slate-600 flex items-center justify-center text-[#475569] dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700">2</button>
-          <button className="w-8 h-8 rounded border border-[#e2e8f0] dark:border-slate-600 flex items-center justify-center text-[#475569] dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700">3</button>
-          <span className="w-8 h-8 flex items-center justify-center text-[#94a3b8] dark:text-slate-500">...</span>
-          <button className="w-8 h-8 rounded border border-[#e2e8f0] dark:border-slate-600 flex items-center justify-center text-[#475569] dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700">{">"}</button>
-        </div>
+        <span className="text-sm text-[#64748b] dark:text-slate-400">
+          Hiển thị {totalItems === 0 ? 0 : startIndex + 1} - {Math.min(endIndex, totalItems)} trên {totalItems} giao dịch
+        </span>
+        <Pagination 
+          current={currentPage} 
+          total={totalItems} 
+          pageSize={pageSize} 
+          onChange={(page) => setCurrentPage(page)} 
+          size="small" 
+          showSizeChanger={false} 
+        />
       </div>
     </div>
   );
