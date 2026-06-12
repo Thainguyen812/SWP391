@@ -16,7 +16,7 @@ export const PersonnelShiftSchedule = ({ data, loading }) => {
 
   return (
     <Card className="w-full flex flex-col p-5 bg-white dark:bg-slate-800 border border-[#e9e7e9] dark:border-slate-700 shadow-sm rounded-lg mb-6">
-      <div className="flex items-center justify-between mb-4 pb-2">
+      <div className="w-full flex items-center justify-between mb-4 pb-2">
         <h3 className="text-lg font-bold text-[#041627] dark:text-slate-100">
           Phân ca hôm nay (14/11)
         </h3>

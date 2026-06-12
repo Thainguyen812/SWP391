@@ -16,7 +16,7 @@ export const PersonnelHandoverLog = ({ data, loading }) => {
 
   return (
     <Card className="w-full flex flex-col p-5 bg-white dark:bg-slate-800 border border-[#e9e7e9] dark:border-slate-700 shadow-sm rounded-lg flex-1">
-      <div className="flex items-center justify-between mb-4 border-b border-[#e9e7e9] dark:border-slate-700 pb-3">
+      <div className="w-full flex items-center justify-between mb-4 border-b border-[#e9e7e9] dark:border-slate-700 pb-3">
         <h3 className="text-lg font-bold text-[#041627] dark:text-slate-100 flex items-center gap-2">
           <span className="text-[#1677ff]">📋</span> Bàn giao ca gần nhất
         </h3>

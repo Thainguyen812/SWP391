@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { SearchOutlined, CalendarOutlined, UserAddOutlined } from "@ant-design/icons";
+import { notification } from "antd";
 import { PageLayout } from "../common/PageLayout";
 import { personnelService } from "../../services/personnelService";
 
@@ -49,6 +50,22 @@ export const PersonnelMain = () => {
            emp.role.toLowerCase().includes(lowerKey);
   });
 
+  const handleAddEmployee = () => {
+    notification.info({
+      message: 'Tính năng đang phát triển',
+      description: 'Chức năng Thêm nhân viên sẽ sớm ra mắt trong bản cập nhật tới.',
+      placement: 'topRight',
+    });
+  };
+
+  const handleScheduleShift = () => {
+    notification.info({
+      message: 'Tính năng đang phát triển',
+      description: 'Chức năng Sắp xếp ca tự động bằng AI đang được hoàn thiện.',
+      placement: 'topRight',
+    });
+  };
+
   return (
     <PageLayout
       title="Quản lý Nhân sự & Ca trực"
@@ -65,11 +82,17 @@ export const PersonnelMain = () => {
               className="pl-9 pr-4 py-2 border border-[#e2e8f0] dark:border-slate-600 rounded-md text-sm focus:outline-none focus:border-[#1677ff] dark:focus:border-blue-500 w-64 placeholder-[#94a3b8] dark:placeholder-slate-400 bg-white dark:bg-slate-800 dark:text-white transition-colors"
             />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-[#cbd5e1] dark:border-slate-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors dark:text-slate-200 shadow-sm">
+          <button 
+            onClick={handleScheduleShift}
+            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-[#cbd5e1] dark:border-slate-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors dark:text-slate-200 shadow-sm"
+          >
             <CalendarOutlined />
             Sắp xếp ca
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#041627] hover:bg-[#0a2744] text-white rounded-lg text-sm font-medium transition-colors shadow-sm">
+          <button 
+            onClick={handleAddEmployee}
+            className="flex items-center gap-2 px-4 py-2 bg-[#041627] hover:bg-[#0a2744] text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+          >
             <UserAddOutlined />
             Thêm nhân viên
           </button>
