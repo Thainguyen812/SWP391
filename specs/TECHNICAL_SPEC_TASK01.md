@@ -1,49 +1,34 @@
-# ĐẶC TẢ KỸ THUẬT: TASK 1 - SETUP PROJECT BOILERPLATE & INITIAL CONFIGURATIONS
+# ĐẶC TẢ KỸ THUẬT: TASK 1 - CHECK IN TRONG THƯ VIỆN
 
-## 1. FUNCTIONAL & BUSINESS LOGIC ANALYSIS
-### 1.1. CRUD Matrix
-- Init repo skeleton (Create)
-- Read/Show README and infra docs (Read)
-- Update configs (Update)
-- Archive/cleanup legacy files (Delete/Deactivate)
+## 1. MÔ TẢ CHUNG
+Task 1: Cung cấp chức năng "check in" cho thư viện — ghi nhận khi người dùng (hoặc sách) được trả/đi vào kho/nhà sách.
 
-### 1.2. Data Dictionary / Fields
-Không có bảng dữ liệu mới; chỉ cấu hình: git branches, CI env vars, .env template.
+## 2. PHÂN TÍCH CHỨC NĂNG
+### 2.1. CRUD Matrix
+- Create: Ghi nhận một lần check-in mới (POST /api/checkin)
+- Read: Lấy danh sách check-in hoặc chi tiết một check-in (GET /api/checkin, GET /api/checkin/{id})
+- Update: Sửa thông tin check-in khi cần (PUT /api/checkin/{id})
+- Delete: Hủy bản ghi check-in (DELETE /api/checkin/{id})
 
-### 1.3. Business Rules & Constraints
-- Branch policy: main protected, PR review required.
-- CI must pass before merge.
+### 2.2. Data Dictionary / Fields
+- `userId`: ID người dùng thực hiện check-in
+- `itemId`: ID đối tượng được check-in (sách, thiết bị, v.v.)
+- `timestamp`: thời gian check-in
+- `location`: vị trí check-in (khu vực/ tầng/ kệ)
 
-### 1.4. RBAC
-Chỉ Admin (repo owner) được cấu hình bảo vệ nhánh và secrets.
+### 2.3. Business Rules
+- Chỉ nhân viên/thủ thư hoặc người dùng đã xác thực mới có quyền tạo check-in.
+- Mỗi check-in phải có `userId`, `itemId` và `timestamp` hợp lệ.
 
-## 2. FRONT-END SPECIFICATIONS (FE)
-### 2.1. UI/UX
-Placeholder pages for Admin/Manager/Staff; navigation shell.
+## 3. GIAO DIỆN & API
+- Backend endpoint tối thiểu: `POST /api/checkin`, `GET /api/checkin`, `GET /api/checkin/{id}`.
+- Frontend: form đơn giản để nhập `itemId`, chọn `location` và xác nhận check-in.
 
-### 2.2. Components
-App shell, Navbar, Auth pages, Dashboard placeholders.
+## 4. ACCEPTANCE CRITERIA
+- Khi gửi `POST /api/checkin` với dữ liệu hợp lệ, server trả về 201 và bản ghi mới.
+- Danh sách check-in có thể được truy vấn và hiển thị trong giao diện.
 
-### 2.3. Client Validation
-N/A
+## 5. GHI CHÚ KỸ THUẬT
+- Lưu trữ bảng `checkins` trong DB với các trường nêu ở mục 2.2.
+- Thực hiện kiểm tra quyền (RBAC) cho các endpoint CRUD.
 
-### 2.4. UX States
-Loading skeletons for initial app boot.
-
-## 3. BACK-END SPECIFICATIONS (BE)
-### 3.1. Database Schema
-Không thay đổi schema; đảm bảo schema.sql ở repo root và Flyway migration.
-
-### 3.2. RESTful API Contract
-Base health endpoint: GET /api/health -> 200 {status: "ok"}
-
-### 3.3. Exception Handling & HTTP Status Codes
-Standard error envelope {message, code}
-
-## 4. ACCEPTANCE CRITERIA (AC)
-### 4.1. Happy Paths
-- Given repo cloned, when run mvn package, then backend builds.
-- Given frontend setup, when npm install && npm start, then app serves.
-
-### 4.2. Edge Cases
-- CI fails if formatting/linting errors.
