@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { dashboardService } from "../../services/dashboardService";
-import { BlueprintViewer } from "./BlueprintViewer";
-import { ParkingStatusCard } from "./ParkingStatusCard";
-import { ActivityLogCard } from "./ActivityLogCard";
+import { BlueprintViewer } from "./Monitoring_Blueprint";
+import { ParkingStatusCard } from "./Monitoring_Status";
+import { ActivityLogCard } from "./Monitoring_Activity";
 import { ErrorState } from "../common/ErrorState";
+import { PageLayout } from "../common/PageLayout";
 
 export const MonitoringPage = () => {
   const [branch, setBranch] = useState("HQ");
@@ -50,13 +51,19 @@ export const MonitoringPage = () => {
   }
 
   return (
-    <section className="flex flex-col w-full h-full p-6 pb-8 gap-6 bg-[#f8fafc] dark:bg-slate-900 overflow-y-auto transition-colors">
-      {/* Header riêng của trang Giám sát */}
-      <header className="flex-between w-full pb-4 border-b border-[#e9e7e9] dark:border-slate-700 transition-colors">
-        <h1 className="text-h2 text-[#041627] dark:text-slate-100 transition-colors">Giám sát bãi xe thời gian thực</h1>
-      </header>
-
-      {/* Main Content Grid 2 cột */}
+    <PageLayout
+      title="Giám sát thời gian thực"
+      subtitle="Theo dõi trạng thái bãi đỗ xe và các hoạt động đang diễn ra"
+      actions={
+        <div className="flex items-center gap-2 mr-4">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+          </span>
+          <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Trực tuyến</span>
+        </div>
+      }
+    >
       <div className="flex gap-6 w-full h-[calc(100vh-200px)] min-h-[600px]">
         {/* Cột Trái (Sơ đồ) - Chiếm 70% */}
         <div className="flex-grow w-[70%] h-full">
@@ -76,6 +83,6 @@ export const MonitoringPage = () => {
           </div>
         </div>
       </div>
-    </section>
+    </PageLayout>
   );
 };
