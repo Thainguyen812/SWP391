@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-@Entity
+@Entity // đại diện cho 1 bảng có trong cơ sở dữ liệu
 @Table(name = "pricing_rules")
 public class PricingRule {
 

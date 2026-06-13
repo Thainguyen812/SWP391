@@ -11,33 +11,61 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/sessions")
 public class ParkingSessionController {
+
     private final ParkingSessionRepository repo;
-    public ParkingSessionController(ParkingSessionRepository repo){ this.repo = repo; }
 
-    @GetMapping
-    public List<ParkingSession> all(){ return repo.findAll(); }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<ParkingSession> get(@PathVariable String id){
-        Optional<ParkingSession> s = repo.findById(id);
-        return s.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    public ParkingSessionController(ParkingSessionRepository repo) {
+        this.repo = repo;
     }
 
-    @PostMapping
-    public ParkingSession create(@RequestBody ParkingSession s){ return repo.save(s); }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<ParkingSession> update(@PathVariable String id, @RequestBody ParkingSession s){
-        return repo.findById(id).map(existing -> {
-            s.setId(existing.getId());
-            return ResponseEntity.ok(repo.save(s));
-        }).orElseGet(() -> ResponseEntity.notFound().build());
+    @GetMapping // Full parking session 
+    public List<ParkingSession> getAllSessions() {
+        return repo.findAll();
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable String id){
-        if (!repo.existsById(id)) return ResponseEntity.notFound().build();
+    @GetMapping("/{id}") // xem lẻ từng session mình muốn
+    public ResponseEntity<ParkingSession> getSessionById(@PathVariable String id) {
+        Optional<ParkingSession> session = repo.findById(id);
+
+        if (session.isPresent()) {
+            return ResponseEntity.ok(session.get());
+        }
+
+        return ResponseEntity.notFound().build();
+    }
+
+    @PostMapping // tạo mới parking session
+    public ParkingSession createSession(@RequestBody ParkingSession session) {
+        return repo.save(session);
+    }
+
+    @PutMapping("/{id}") // cập nhật session
+    public ResponseEntity<ParkingSession> updateSession(
+            @PathVariable String id,
+            @RequestBody ParkingSession newSession
+    ) {
+        Optional<ParkingSession> existingSession = repo.findById(id);
+
+        if (existingSession.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        newSession.setId(id);
+        ParkingSession savedSession = repo.save(newSession);
+
+        return ResponseEntity.ok(savedSession);
+    }
+
+    @DeleteMapping("/{id}") // xóa parking session
+    public ResponseEntity<Void> deleteSession(@PathVariable String id) {
+        boolean exists = repo.existsById(id);
+
+        if (!exists) {
+            return ResponseEntity.notFound().build();
+        }
+
         repo.deleteById(id);
+
         return ResponseEntity.noContent().build();
     }
 }
