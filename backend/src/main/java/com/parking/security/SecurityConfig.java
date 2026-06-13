@@ -52,19 +52,6 @@ public class SecurityConfig {
 
                 // 3. Cấu hình các cổng API ra vào
                 .authorizeHttpRequests(auth -> auth
-<<<<<<< Updated upstream
-                        // Giữ nguyên các đường dẫn công khai của DEV 2 (Cho phép vào thẳng không cần
-                        // Token)
-                        .requestMatchers("/api/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
-                        .permitAll()
-
-                        // Tất cả các request còn lại (bao gồm API Check-out của bạn) đều phải quẹt thẻ
-                        // thành công
-                        .anyRequest().authenticated());
-
-        // 4. Chèn máy quét thẻ JwtAuthFilter của bạn vào chạy trước bộ lọc mặc định của
-        // Spring
-=======
                         // Giữ nguyên các đường dẫn công khai (Cho phép vào thẳng không cần Token)
                         // Bao gồm cả OpenAPI / Swagger UI
                         .requestMatchers(
@@ -78,7 +65,6 @@ public class SecurityConfig {
                         .anyRequest().authenticated());
 
         // 4. Chèn máy quét thẻ JwtAuthFilter của bạn vào chạy trước bộ lọc mặc định của Spring
->>>>>>> Stashed changes
         http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
