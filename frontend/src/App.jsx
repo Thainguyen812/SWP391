@@ -5,7 +5,10 @@ import { MonitoringPage } from './components/monitoring/Monitoring_Main';
 import { RevenuePage } from './components/revenue/Revenue_Main';
 import { CustomerPage } from './components/customers/Customer_Main';
 import { PersonnelMain } from './components/personnel/Personnel_Main';
+<<<<<<< HEAD
 import { SettingsMain } from './components/settings/Settings_Main';
+=======
+>>>>>>> b00e6e33d77ffed27ad98b928e68f110452d9188
 
 function App() {
   return (
