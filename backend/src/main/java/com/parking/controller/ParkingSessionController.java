@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/sessions")
@@ -18,7 +19,7 @@ public class ParkingSessionController {
     public List<ParkingSession> all(){ return repo.findAll(); }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ParkingSession> get(@PathVariable String id){
+    public ResponseEntity<ParkingSession> get(@PathVariable UUID id){
         Optional<ParkingSession> s = repo.findById(id);
         return s.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -27,7 +28,7 @@ public class ParkingSessionController {
     public ParkingSession create(@RequestBody ParkingSession s){ return repo.save(s); }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ParkingSession> update(@PathVariable String id, @RequestBody ParkingSession s){
+    public ResponseEntity<ParkingSession> update(@PathVariable UUID id, @RequestBody ParkingSession s){
         return repo.findById(id).map(existing -> {
             s.setId(existing.getId());
             return ResponseEntity.ok(repo.save(s));
@@ -35,7 +36,7 @@ public class ParkingSessionController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable String id){
+    public ResponseEntity<Void> delete(@PathVariable UUID id){
         if (!repo.existsById(id)) return ResponseEntity.notFound().build();
         repo.deleteById(id);
         return ResponseEntity.noContent().build();

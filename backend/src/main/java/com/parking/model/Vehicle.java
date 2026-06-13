@@ -1,50 +1,74 @@
 package com.parking.model;
 
 import jakarta.persistence.*;
+import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "vehicles")
 public class Vehicle {
     @Id
-    @Column(length = 36)
-    private String id;
+    private UUID id;
 
-    @Column(length = 36)
-    private String ownerId;
+    @Column(name = "owner_id", nullable = false)
+    private UUID ownerId;
 
-    @Column(unique = true, nullable = false)
+    @Column(name = "license_plate", unique = true, nullable = false)
     private String licensePlate;
 
-    @Column(unique = true)
-    private String etcTagCode;
-
-    @Enumerated(EnumType.STRING)
-    private VehicleType vehicleType;
+    @Column(name = "vehicle_size", nullable = false)
+    private String vehicleSize;
 
     private String color;
+    private String colorRgb;
+    private String bodyShape;
     private String brand;
-    private String registrationDocUrl;
-    private Boolean isActive = true;
 
-    public enum VehicleType { CAR_4, CAR_7, VAN_16, TRUCK }
+    @Column(name = "registration_doc_url")
+    private String registrationDocUrl;
+
+    @Column(name = "registration_photo_url")
+    private String registrationPhotoUrl;
+
+    @Column(name = "violation_count", nullable = false)
+    private int violationCount = 0;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
+    @Column(name = "created_at")
+    private Instant createdAt;
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 
     // getters/setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-    public String getOwnerId() { return ownerId; }
-    public void setOwnerId(String ownerId) { this.ownerId = ownerId; }
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+    public UUID getOwnerId() { return ownerId; }
+    public void setOwnerId(UUID ownerId) { this.ownerId = ownerId; }
     public String getLicensePlate() { return licensePlate; }
     public void setLicensePlate(String licensePlate) { this.licensePlate = licensePlate; }
-    public String getEtcTagCode() { return etcTagCode; }
-    public void setEtcTagCode(String etcTagCode) { this.etcTagCode = etcTagCode; }
-    public VehicleType getVehicleType() { return vehicleType; }
-    public void setVehicleType(VehicleType vehicleType) { this.vehicleType = vehicleType; }
+    public String getVehicleSize() { return vehicleSize; }
+    public void setVehicleSize(String vehicleSize) { this.vehicleSize = vehicleSize; }
     public String getColor() { return color; }
     public void setColor(String color) { this.color = color; }
+    public String getColorRgb() { return colorRgb; }
+    public void setColorRgb(String colorRgb) { this.colorRgb = colorRgb; }
+    public String getBodyShape() { return bodyShape; }
+    public void setBodyShape(String bodyShape) { this.bodyShape = bodyShape; }
     public String getBrand() { return brand; }
     public void setBrand(String brand) { this.brand = brand; }
     public String getRegistrationDocUrl() { return registrationDocUrl; }
     public void setRegistrationDocUrl(String registrationDocUrl) { this.registrationDocUrl = registrationDocUrl; }
-    public Boolean getIsActive() { return isActive; }
-    public void setIsActive(Boolean isActive) { this.isActive = isActive; }
+    public String getRegistrationPhotoUrl() { return registrationPhotoUrl; }
+    public void setRegistrationPhotoUrl(String registrationPhotoUrl) { this.registrationPhotoUrl = registrationPhotoUrl; }
+    public int getViolationCount() { return violationCount; }
+    public void setViolationCount(int violationCount) { this.violationCount = violationCount; }
+    public boolean isActive() { return isActive; }
+    public void setActive(boolean active) { isActive = active; }
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
 }

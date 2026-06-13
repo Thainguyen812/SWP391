@@ -35,19 +35,19 @@ public class AuthService {
         User u = uOpt.get();
         if (!passwordEncoder.matches(req.getPassword(), u.getPasswordHash())) throw new RuntimeException("Invalid credentials");
         String access = jwtUtils.generateJwtToken(u.getUsername());
-        String refresh = UUID.randomUUID().toString();
+        UUID refreshUuid = UUID.randomUUID();
         RefreshToken rt = new RefreshToken();
-        rt.setId(UUID.randomUUID().toString());
+        rt.setId(UUID.randomUUID());
         rt.setUserId(u.getId());
-        rt.setToken(refresh);
+        rt.setToken(refreshUuid);
         rt.setExpiresAt(Instant.now().plusSeconds(7*24*3600));
         refreshRepo.save(rt);
-        return new LoginResponse(access, refresh);
+        return new LoginResponse(access, refreshUuid.toString());
     }
 
     public LoginResponse register(RegisterRequest req){
         User u = new User();
-        u.setId(UUID.randomUUID().toString());
+        u.setId(UUID.randomUUID());
         u.setUsername(req.getUsername());
         u.setPasswordHash(passwordEncoder.encode(req.getPassword()));
         u.setFullName(req.getFullName());
@@ -60,7 +60,8 @@ public class AuthService {
     }
 
     public String refresh(String refreshToken){
-        Optional<RefreshToken> opt = refreshRepo.findByToken(refreshToken);
+        UUID tokenUuid = UUID.fromString(refreshToken);
+        Optional<RefreshToken> opt = refreshRepo.findByToken(tokenUuid);
         if (opt.isEmpty()) throw new RuntimeException("Invalid refresh token");
         RefreshToken rt = opt.get();
         if (rt.getExpiresAt().isBefore(Instant.now())) { refreshRepo.delete(rt); throw new RuntimeException("Refresh token expired"); }
