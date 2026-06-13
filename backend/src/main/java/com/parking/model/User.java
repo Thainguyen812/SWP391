@@ -2,21 +2,23 @@ package com.parking.model;
 
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "users")
 public class User {
     @Id
-    @Column(length = 36)
-    private String id;
+    private UUID id;
 
     @Column(unique = true, nullable = false)
     private String username;
 
-    @Column(nullable = false)
+    @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    @Column(name = "full_name")
     private String fullName;
+
     private String email;
     private String phone;
 
@@ -26,8 +28,10 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Status status;
 
+    @Column(name = "fcm_token")
     private String fcmToken;
 
+    @Column(name = "created_at")
     private Instant createdAt;
 
     public enum Role { ADMIN, MANAGER, STAFF, DRIVER }
@@ -35,8 +39,8 @@ public class User {
 
     // getters / setters
 
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
     public String getPasswordHash() { return passwordHash; }
