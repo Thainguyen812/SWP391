@@ -36,13 +36,8 @@ public class JwtUtils {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-<<<<<<< Updated upstream
-    // 1. tạo access token (chứa username)
-    public String generateJwtToken(String username) {
-=======
     // 1. tạo access token (chứa username và roles)
     public String generateJwtToken(String username, List<String> roles) {
->>>>>>> Stashed changes
 
         Date now = new Date();
         Date expireDate = new Date(now.getTime() + jwtExpirationMs);
