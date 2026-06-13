@@ -520,7 +520,7 @@ COMMENT ON TABLE audit_logs IS 'Kho lưu trữ nhật ký hệ thống bất bi�
 -- DATA SEEDING (Dữ liệu nền tảng ban đầu)
 -- ================================================================
 INSERT INTO users (username, password_hash, full_name, email, role)
-VALUES ('admin', '$2b$10$CHANGE_THIS_HASH_IN_PRODUCTION', 'System Administrator', 'admin@parking.com', 'ADMIN');
+VALUES ('admin', '$2a$10$ByI6gSkP.K8mE/.71Wn/6unD0n1tU.v9U9oWJpUOn7I0V9H9fG1KG', 'System Administrator', 'admin@parking.com', 'ADMIN');
 
 INSERT INTO zones (zone_name, zone_code, allowed_sizes, total_slots, has_ev_charger) VALUES
     ('Tầng B2 — Xe Tải & Van',       'B2', '["VAN_TRUCK"]',             50,  FALSE),
