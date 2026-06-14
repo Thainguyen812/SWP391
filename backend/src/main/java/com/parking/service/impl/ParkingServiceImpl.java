@@ -3,12 +3,12 @@ package com.parking.service.impl;
 import com.parking.dto.AiCheckInRequest;
 import com.parking.dto.CheckInResponse;
 import com.parking.exception.ApiExceptions;
-import com.parking.model.BlacklistEntry;
+import com.parking.model.BlacklistedCard;
 import com.parking.model.ParkingSession;
 import com.parking.model.VipSubscription;
 import com.parking.model.Zone;
 import com.parking.model.Vehicle;
-import com.parking.repository.BlacklistRepository;
+import com.parking.repository.BlacklistedCardRepository;
 import com.parking.repository.ParkingSessionRepository;
 import com.parking.repository.VipSubscriptionRepository;
 import com.parking.repository.VehicleRepository;
@@ -25,13 +25,13 @@ import java.util.UUID;
 @Service
 public class ParkingServiceImpl implements ParkingService {
 
-    private final BlacklistRepository blacklistRepository;
+    private final BlacklistedCardRepository blacklistRepository;
     private final ParkingSessionRepository parkingSessionRepository;
     private final ZoneRepository zoneRepository;
     private final VipSubscriptionRepository vipSubscriptionRepository;
     private final VehicleRepository vehicleRepository;
 
-    public ParkingServiceImpl(BlacklistRepository blacklistRepository,
+    public ParkingServiceImpl(BlacklistedCardRepository blacklistRepository,
                               ParkingSessionRepository parkingSessionRepository,
                               ZoneRepository zoneRepository,
                               VipSubscriptionRepository vipSubscriptionRepository,
@@ -55,7 +55,7 @@ public class ParkingServiceImpl implements ParkingService {
             Vehicle vehicle = vehicleOpt.get();
             java.util.UUID vehicleUuid = vehicle.getId();
             try {
-                Optional<BlacklistEntry> black = blacklistRepository.findByCardId(vehicleUuid);
+                Optional<BlacklistedCard> black = blacklistRepository.findByCardId(vehicleUuid);
                 if (black.isPresent()) {
                     throw new ApiExceptions.ForbiddenException("License plate is associated with a blacklisted card");
                 }
