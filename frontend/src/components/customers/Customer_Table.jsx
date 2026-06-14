@@ -1,7 +1,18 @@
+import { useState, useEffect } from 'react';
 import { Pagination } from 'antd';
 import { EditOutlined, HistoryOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
 export const CustomerTable = ({ customers, loading, onOpenVipApproval }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 4;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [customers]);
+
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const currentData = customers.slice(startIndex, endIndex);
   if (loading) {
     return (
       <div className="w-full bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-8 flex justify-center">
@@ -28,7 +39,7 @@ export const CustomerTable = ({ customers, loading, onOpenVipApproval }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-slate-700/50">
-            {customers.map((c, idx) => (
+            {currentData.map((c, idx) => (
               <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                 <td className="px-4 py-4 text-center">
                   <input type="checkbox" className="rounded border-gray-300 dark:border-slate-600" />
@@ -114,9 +125,16 @@ export const CustomerTable = ({ customers, loading, onOpenVipApproval }) => {
       
       <div className="flex justify-between items-center p-4 border-t border-gray-100 dark:border-slate-700">
         <span className="text-sm text-gray-500 dark:text-gray-400">
-          Hiển thị 1 - {customers.length} trong số 1,248
+          Hiển thị {customers.length === 0 ? 0 : startIndex + 1} - {Math.min(endIndex, customers.length)} trong số {customers.length}
         </span>
-        <Pagination defaultCurrent={1} total={50} size="small" showSizeChanger={false} />
+        <Pagination 
+          current={currentPage} 
+          total={customers.length} 
+          pageSize={pageSize} 
+          onChange={(page) => setCurrentPage(page)} 
+          size="small" 
+          showSizeChanger={false} 
+        />
       </div>
     </div>
   );

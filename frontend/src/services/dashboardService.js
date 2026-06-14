@@ -273,7 +273,15 @@ export const dashboardService = {
             { id: "#TRX-8924", time: "14:32:05 Hôm nay", plate: "30G-123.45", type: "Ô tô - Vãng lai", amount: "25,000đ", method: "VNPAY", status: "THÀNH CÔNG" },
             { id: "#TRX-8923", time: "14:28:11 Hôm nay", plate: "29A-999.99", type: "Vé tháng (VIP)", amount: "0đ", method: "Thẻ từ Auto", status: "ĐÃ GHI NHẬN" },
             { id: "#TRX-8922", time: "14:15:00 Hôm nay", plate: "15B-678.90", type: "Xe máy", amount: "5,000đ", method: "Lỗi kết nối", status: "CẦN XỬ LÝ" },
-            { id: "#TRX-8921", time: "14:10:22 Hôm nay", plate: "30E-555.22", type: "Ô tô - Vãng lai", amount: "25,000đ", method: "Tiền mặt", status: "THÀNH CÔNG" }
+            { id: "#TRX-8921", time: "14:10:22 Hôm nay", plate: "30E-555.22", type: "Ô tô - Vãng lai", amount: "25,000đ", method: "Tiền mặt", status: "THÀNH CÔNG" },
+            { id: "#TRX-8920", time: "13:45:10 Hôm nay", plate: "51F-111.11", type: "Ô tô - Vãng lai", amount: "25,000đ", method: "VNPAY", status: "THÀNH CÔNG" },
+            { id: "#TRX-8919", time: "13:30:00 Hôm nay", plate: "51G-222.22", type: "Xe máy", amount: "5,000đ", method: "Tiền mặt", status: "THÀNH CÔNG" },
+            { id: "#TRX-8918", time: "13:15:44 Hôm nay", plate: "51H-333.33", type: "Vé tháng", amount: "0đ", method: "Thẻ từ Auto", status: "THÀNH CÔNG" },
+            { id: "#TRX-8917", time: "13:00:21 Hôm nay", plate: "51K-444.44", type: "Ô tô - Vãng lai", amount: "25,000đ", method: "Tiền mặt", status: "THÀNH CÔNG" },
+            { id: "#TRX-8916", time: "12:45:00 Hôm nay", plate: "51L-555.55", type: "Xe máy", amount: "5,000đ", method: "VNPAY", status: "ĐÃ GHI NHẬN" },
+            { id: "#TRX-8915", time: "12:30:15 Hôm nay", plate: "51M-666.66", type: "Vé tháng (VIP)", amount: "0đ", method: "Thẻ từ Auto", status: "CẦN XỬ LÝ" },
+            { id: "#TRX-8914", time: "12:15:00 Hôm nay", plate: "51N-777.77", type: "Ô tô - Vãng lai", amount: "25,000đ", method: "Tiền mặt", status: "THÀNH CÔNG" },
+            { id: "#TRX-8913", time: "12:00:00 Hôm nay", plate: "51P-888.88", type: "Xe máy", amount: "5,000đ", method: "Lỗi kết nối", status: "CẦN XỬ LÝ" }
           ]
         });
       }, MOCK_DELAY);
