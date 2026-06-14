@@ -1,0 +1,85 @@
+@reference "../../index.css";
+
+.top-app-bar {
+  @apply w-full h-[72px] bg-white dark:bg-[#1e293b] border-b border-[#e9e7e9] dark:border-[#334155] flex items-center justify-between px-6 flex-shrink-0 transition-colors;
+}
+
+.search-container {
+  @apply flex items-center h-full w-[280px];
+}
+
+.search-input-wrapper {
+  @apply relative w-full flex items-center;
+}
+
+.search-icon {
+  @apply absolute left-3 text-gray-400 z-10 text-lg;
+}
+
+.search-input {
+  @apply w-full bg-[#f4f5f7] dark:bg-[#334155] border border-transparent rounded h-[42px] pl-10 pr-4 text-[#041627] dark:text-white placeholder:text-[#94a3b8] text-[13px] focus:outline-none focus:border-[#0058be] dark:focus:border-[#3b82f6] transition-colors;
+}
+
+.location-nav {
+  @apply flex items-center justify-center flex-1 h-full pl-12 pr-12;
+}
+
+.location-list {
+  @apply flex items-center h-full gap-16;
+}
+
+.location-item {
+  @apply h-full flex flex-col justify-center px-2 transition-colors hover:bg-gray-50 border-b-[4px] outline-none;
+}
+
+.location-item-active {
+  @apply border-b-[3px] border-[#1677ff] bg-transparent;
+}
+
+.location-item-inactive {
+  @apply border-b-[3px] border-transparent hover:border-[#cbd5e1] dark:hover:border-[#475569] bg-transparent;
+}
+
+.location-text {
+  @apply text-left text-[13px] font-medium tracking-wide transition-colors;
+}
+
+.location-text-active {
+  @apply text-[#1677ff] font-bold;
+}
+
+.location-text-inactive {
+  @apply text-[#64748b] dark:text-[#94a3b8] group-hover:text-[#041627] dark:group-hover:text-white;
+}
+
+.actions-container {
+  @apply flex items-center gap-7;
+}
+
+.status-btn {
+  @apply flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#ecfdf5] dark:bg-[#064e3b] border border-[#a7f3d0] dark:border-[#047857] hover:bg-[#d1fae5] dark:hover:bg-[#065f46] transition-colors outline-none cursor-pointer;
+}
+
+.status-icon {
+  @apply text-[#10b981] dark:text-[#34d399] text-base;
+}
+
+.status-text {
+  @apply text-[#047857] dark:text-[#6ee7b7] font-semibold text-[13px];
+}
+
+.icons-group {
+  @apply flex items-center gap-2;
+}
+
+.icon-btn {
+  @apply w-10 h-10 flex items-center justify-center rounded-full text-[#64748b] dark:text-[#94a3b8] hover:bg-[#f1f5f9] dark:hover:bg-[#334155] hover:text-[#041627] dark:hover:text-white transition-colors outline-none cursor-pointer text-xl;
+}
+
+.avatar-btn {
+  @apply w-9 h-9 rounded-full overflow-hidden border border-gray-200 outline-none flex items-center justify-center;
+}
+
+.avatar-img {
+  @apply w-full h-full object-cover;
+}
