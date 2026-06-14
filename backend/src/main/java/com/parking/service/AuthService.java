@@ -48,30 +48,52 @@ public class AuthService implements org.springframework.security.core.userdetail
     }
 
     public LoginResponse login(LoginRequest req) {
-        Optional<User> uOpt = userRepo.findByUsername(req.getUsername());
-        if (uOpt.isEmpty()) {
-            throw new RuntimeException("Invalid credentials");
+        try {
+            // 1. Kiểm tra username tồn tại dưới DB
+            Optional<User> uOpt = userRepo.findByUsername(req.getUsername());
+            if (uOpt.isEmpty()) {
+                throw new RuntimeException("❌ LỖI: Không tìm thấy Username '" + req.getUsername() + "' dưới Database!");
+            }
+
+            User u = uOpt.get();
+
+            // 2. Kiểm tra mật khẩu khớp hay không
+            if (!passwordEncoder.matches(req.getPassword(), u.getPasswordHash())) {
+                throw new RuntimeException(
+                        "❌ LỖI: Tìm thấy Username nhưng Mật khẩu bị sai (hoặc chưa mã hóa băm Bcrypt)!");
+            }
+
+            // 3. Kiểm tra Role trước khi tạo JWT (Tránh lỗi NullPointerException)
+            if (u.getRole() == null) {
+                throw new RuntimeException(
+                        "❌ LỖI: User này tồn tại nhưng cột 'role' dưới Database đang bị rỗng (NULL)!");
+            }
+            String access = jwtUtils.generateJwtToken(u.getUsername(), java.util.List.of("ROLE_" + u.getRole().name()));
+
+            // 4. Tạo cấu trúc Refresh Token
+            UUID refreshUuid = UUID.randomUUID();
+            RefreshToken rt = new RefreshToken();
+            rt.setId(UUID.randomUUID());
+            rt.setUserId(u.getId());
+            rt.setToken(refreshUuid);
+            rt.setExpiresAt(java.time.Instant.now().plusSeconds(7 * 24 * 3600));
+
+            // 5. Lưu Refresh Token vào Database
+            refreshRepo.save(rt);
+
+            return new LoginResponse(access, refreshUuid.toString());
+
+        } catch (Exception e) {
+            // Khối này sẽ tóm gọn tất cả các lỗi hệ thống phát sinh đột xuất (Lỗi SQL, lỗi
+            // thư viện JWT,...)
+            System.err.println("=================================================");
+            System.err.println("❌ PHÁT HIỆN LỖI HỆ THỐNG TẠI HÀM LOGIN:");
+            System.err.println("=================================================");
+
+            e.printStackTrace(); // Ép console in chữ đỏ Stack Trace
+
+            throw e; // Đẩy ngoại lệ ra ngoài để Swagger hiển thị mã 500 kèm thông báo tương ứng
         }
-
-        User u = uOpt.get();
-        if (!passwordEncoder.matches(req.getPassword(), u.getPasswordHash())) {
-            throw new RuntimeException("Invalid credentials");
-        }
-
-        // Bóc tách danh sách quyền từ Database để nhét vào Access Token
-        List<String> roles = List.of("ROLE_" + u.getRole().name());
-        String access = jwtUtils.generateJwtToken(u.getUsername(), roles);
-
-        // Tạo mới Refresh Token để duy trì phiên đăng nhập bãi đỗ xe
-        UUID refreshUuid = UUID.randomUUID();
-        RefreshToken rt = new RefreshToken();
-        rt.setId(UUID.randomUUID());
-        rt.setUserId(u.getId());
-        rt.setToken(refreshUuid);
-        rt.setExpiresAt(Instant.now().plusSeconds(7 * 24 * 3600)); // Hết hạn sau 7 ngày
-        refreshRepo.save(rt);
-
-        return new LoginResponse(access, refreshUuid.toString());
     }
 
     public LoginResponse register(RegisterRequest req) {
