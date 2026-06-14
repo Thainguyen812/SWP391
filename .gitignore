@@ -1,6 +1,15 @@
 target/
 node_modules/
 .env
+.env*
+!.env.example
+
 *.iml
 *.class
+
 .DS_Store
+*.log
+
+build/
+dist/
+coverage/
