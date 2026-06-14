@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { DownloadOutlined, CalendarOutlined, DownOutlined } from "@ant-design/icons";
 import { dashboardService } from "../../services/dashboardService";
-import { RevenueSummaryCards } from "./RevenueSummaryCards";
-import { RevenueCharts } from "./RevenueCharts";
-import { RecentTransactions } from "./RecentTransactions";
+import { RevenueSummaryCards } from "./Revenue_SummaryCards";
+import { RevenueCharts } from "./Revenue_Charts";
+import { RecentTransactions } from "./Revenue_RecentTransactions";
 import { ErrorState } from "../common/ErrorState";
 
 export const RevenuePage = () => {

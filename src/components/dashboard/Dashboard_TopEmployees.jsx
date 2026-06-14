@@ -1,4 +1,4 @@
-import { Card, CardHeader, CardBody } from "../../common/Card";
+import { Card, CardHeader, CardBody } from "../common/Card";
 
 export const TopEmployees = ({ employees, loading }) => {
   return (

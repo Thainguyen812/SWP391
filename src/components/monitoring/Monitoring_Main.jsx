@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { dashboardService } from "../../services/dashboardService";
-import { BlueprintViewer } from "./BlueprintViewer";
-import { ParkingStatusCard } from "./ParkingStatusCard";
-import { ActivityLogCard } from "./ActivityLogCard";
+import { BlueprintViewer } from "./Monitoring_BlueprintViewer";
+import { ParkingStatusCard } from "./Monitoring_ParkingStatus";
+import { ActivityLogCard } from "./Monitoring_ActivityLog";
 import { ErrorState } from "../common/ErrorState";
 
 export const MonitoringPage = () => {

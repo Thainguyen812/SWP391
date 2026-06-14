@@ -1,4 +1,4 @@
-import { Card, CardHeader, CardBody } from "../../common/Card";
+import { Card, CardHeader, CardBody } from "../common/Card";
 
 const distributionItems = [
   { label: "Ô tô", value: "60%", color: "#041627" },

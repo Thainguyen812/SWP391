@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { DownloadOutlined, UserAddOutlined } from '@ant-design/icons';
-import { CustomerStats } from './CustomerStats';
-import { CustomerFilter } from './CustomerFilter';
-import { CustomerTable } from './CustomerTable';
-import { VipApprovalModal } from './VipApprovalModal';
+import { CustomerStats } from './Customer_Stats';
+import { CustomerFilter } from './Customer_Filter';
+import { CustomerTable } from './Customer_Table';
+import { VipApprovalModal } from './Customer_VipApprovalModal';
 import { customerService } from '../../services/customerService';
 import { notification } from 'antd';
 

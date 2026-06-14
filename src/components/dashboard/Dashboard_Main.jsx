@@ -1,15 +1,14 @@
 import { useState, useEffect } from "react";
 import { dashboardService } from "../../services/dashboardService";
 import { CalendarOutlined, DownloadOutlined } from "@ant-design/icons";
-import "./SystemOverview.css";
-import "./SystemOverview.css";
+import "./Dashboard_Main.css";
 
 // Import UI Sections
-import { SummaryCards } from "./sections/SummaryCards";
-import { RevenueChart } from "./sections/RevenueChart";
-import { VehicleDistribution } from "./sections/VehicleDistribution";
-import { TopEmployees } from "./sections/TopEmployees";
-import { SystemNotifications } from "./sections/SystemNotifications";
+import { SummaryCards } from "./Dashboard_SummaryCards";
+import { RevenueChart } from "./Dashboard_RevenueChart";
+import { VehicleDistribution } from "./Dashboard_VehicleDistribution";
+import { TopEmployees } from "./Dashboard_TopEmployees";
+import { SystemNotifications } from "./Dashboard_SystemNotifications";
 import { ErrorState } from "../common/ErrorState";
 import { TrophyOutlined, ExclamationCircleOutlined, WarningOutlined, InfoCircleOutlined } from "@ant-design/icons";
 

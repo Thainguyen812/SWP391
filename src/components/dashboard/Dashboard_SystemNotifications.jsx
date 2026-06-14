@@ -1,5 +1,5 @@
-import { Card, CardHeader, CardBody } from "../../common/Card";
-import { Badge } from "../../common/Badge";
+import { Card, CardHeader, CardBody } from "../common/Card";
+import { Badge } from "../common/Badge";
 
 export const SystemNotifications = ({ notifications, loading }) => {
   return (
