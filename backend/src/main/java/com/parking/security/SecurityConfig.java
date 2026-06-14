@@ -26,8 +26,23 @@ public class SecurityConfig {
     }
 
     @Bean
+    public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
+        org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
+        configuration.setAllowedOrigins(java.util.List.of("http://localhost:5173"));
+        configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(java.util.List.of("Authorization", "Cache-Control", "Content-Type"));
+        configuration.setAllowCredentials(true);
+        org.springframework.web.cors.UrlBasedCorsConfigurationSource source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+                // 0. Cấu hình CORS cho phép gọi từ http://localhost:5173
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
                 // 1. Tắt CSRF bằng cú pháp Lambda mới (Spring Boot 3 bắt buộc)
                 .csrf(csrf -> csrf.disable())
 
@@ -37,17 +52,19 @@ public class SecurityConfig {
 
                 // 3. Cấu hình các cổng API ra vào
                 .authorizeHttpRequests(auth -> auth
-                        // Giữ nguyên các đường dẫn công khai của DEV 2 (Cho phép vào thẳng không cần
-                        // Token)
-                        .requestMatchers("/api/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
-                        .permitAll()
+                        // Giữ nguyên các đường dẫn công khai (Cho phép vào thẳng không cần Token)
+                        // Bao gồm cả OpenAPI / Swagger UI
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
 
-                        // Tất cả các request còn lại (bao gồm API Check-out của bạn) đều phải quẹt thẻ
-                        // thành công
+                        // Tất cả các request còn lại đều phải quẹt thẻ thành công
                         .anyRequest().authenticated());
 
-        // 4. Chèn máy quét thẻ JwtAuthFilter của bạn vào chạy trước bộ lọc mặc định của
-        // Spring
+        // 4. Chèn máy quét thẻ JwtAuthFilter của bạn vào chạy trước bộ lọc mặc định của Spring
         http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

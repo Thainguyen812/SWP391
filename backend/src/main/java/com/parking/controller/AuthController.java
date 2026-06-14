@@ -62,7 +62,7 @@ public class AuthController {
                     .toList();
 
             // Cấp Access Token mới tích hợp đầy đủ Roles lấy từ DB
-            String newAccessToken = jwtUtils.generateJwtToken(username);
+            String newAccessToken = jwtUtils.generateJwtToken(username, roles);
 
             LoginResponse responseData = new LoginResponse(newAccessToken, clientRefreshToken);
             return ResponseEntity.ok(responseData);
