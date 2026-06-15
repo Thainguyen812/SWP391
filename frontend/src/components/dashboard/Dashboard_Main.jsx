@@ -1,26 +1,16 @@
 import { useState, useEffect } from "react";
 import { dashboardService } from "../../services/dashboardService";
 import { CalendarOutlined, DownloadOutlined } from "@ant-design/icons";
-<<<<<<< HEAD
 import "./Dashboard_Main.css";
-=======
-import "./SystemOverview.css";
-import "./SystemOverview.css";
->>>>>>> origin/main
 
 // Import UI Sections
 import { SummaryCards } from "./Dashboard_SummaryCards";
 import { RevenueChart } from "./Dashboard_RevenueChart";
 import { VehicleDistribution } from "./Dashboard_VehicleDistribution";
 import { TopEmployees } from "./Dashboard_TopEmployees";
-<<<<<<< HEAD
 import { SystemNotifications } from "./Dashboard_SystemNotifications";
 import { ErrorState } from "../common/ErrorState";
-=======
-import { SystemNotifications } from "./Dashboard_Notifications";
-import { ErrorState } from "../common/ErrorState";
 import { PageLayout } from "../common/PageLayout";
->>>>>>> origin/main
 import { TrophyOutlined, ExclamationCircleOutlined, WarningOutlined, InfoCircleOutlined } from "@ant-design/icons";
 
 export const SystemOverviewSection = () => {

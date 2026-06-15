@@ -1,17 +1,10 @@
 import { useState, useEffect } from "react";
 import { dashboardService } from "../../services/dashboardService";
-<<<<<<< HEAD
-import { BlueprintViewer } from "./Monitoring_BlueprintViewer";
-import { ParkingStatusCard } from "./Monitoring_ParkingStatus";
-import { ActivityLogCard } from "./Monitoring_ActivityLog";
-import { ErrorState } from "../common/ErrorState";
-=======
 import { BlueprintViewer } from "./Monitoring_Blueprint";
 import { ParkingStatusCard } from "./Monitoring_Status";
 import { ActivityLogCard } from "./Monitoring_Activity";
 import { ErrorState } from "../common/ErrorState";
 import { PageLayout } from "../common/PageLayout";
->>>>>>> origin/main
 
 export const MonitoringPage = () => {
   const [branch, setBranch] = useState("HQ");

@@ -3,16 +3,10 @@ import { DownloadOutlined, UserAddOutlined } from '@ant-design/icons';
 import { CustomerStats } from './Customer_Stats';
 import { CustomerFilter } from './Customer_Filter';
 import { CustomerTable } from './Customer_Table';
-<<<<<<< HEAD
-import { VipApprovalModal } from './Customer_VipApprovalModal';
-import { customerService } from '../../services/customerService';
-import { notification } from 'antd';
-=======
 import { VipApprovalModal } from './Customer_VipModal';
 import { customerService } from '../../services/customerService';
 import { notification } from 'antd';
 import { PageLayout } from '../common/PageLayout';
->>>>>>> origin/main
 
 export const CustomerPage = () => {
   const [stats, setStats] = useState(null);

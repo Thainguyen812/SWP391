@@ -1,18 +1,11 @@
 import { useState, useEffect } from "react";
 import { DownloadOutlined, CalendarOutlined, DownOutlined } from "@ant-design/icons";
 import { dashboardService } from "../../services/dashboardService";
-<<<<<<< HEAD
-import { RevenueSummaryCards } from "./Revenue_SummaryCards";
-import { RevenueCharts } from "./Revenue_Charts";
-import { RecentTransactions } from "./Revenue_RecentTransactions";
-import { ErrorState } from "../common/ErrorState";
-=======
 import { RevenueSummaryCards } from "./Revenue_Summary";
 import { RevenueCharts } from "./Revenue_Charts";
 import { RecentTransactions } from "./Revenue_Transactions";
 import { ErrorState } from "../common/ErrorState";
 import { PageLayout } from "../common/PageLayout";
->>>>>>> origin/main
 
 export const RevenuePage = () => {
   const [loading, setLoading] = useState(true);
