@@ -6,5 +6,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface BlacklistRepository extends JpaRepository<BlacklistEntry, UUID> {
+    boolean existsByCardId(UUID cardId);
+
     Optional<BlacklistEntry> findByCardId(UUID cardId);
 }
