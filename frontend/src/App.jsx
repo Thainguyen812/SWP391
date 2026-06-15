@@ -1,8 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { Login } from './components/auth/Login';
-import { Register } from './components/auth/Register';
+import { AuthPage } from './components/auth/AuthPage';
 import { SystemOverviewSection } from './components/dashboard/Dashboard_Main';
 import { MonitoringPage } from './components/monitoring/Monitoring_Main';
 import { RevenuePage } from './components/revenue/Revenue_Main';
@@ -24,15 +23,50 @@ const DriverPage = ({ children }) => (
   </ProtectedRoute>
 );
 
+import React from 'react';
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, info: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    this.setState({ info });
+    console.error('React Error Boundary caught an error:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 20, background: '#fee2e2', color: '#991b1b', height: '100vh', width: '100vw', overflow: 'auto' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Hệ thống giao diện gặp lỗi (React Crash)</h1>
+          <h2 style={{ fontSize: '16px', marginTop: '10px' }}>Vui lòng copy toàn bộ lỗi dưới đây gửi cho Agent:</h2>
+          <pre style={{ background: '#fef2f2', padding: 15, borderRadius: 5, marginTop: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {this.state.error && this.state.error.toString()}
+          </pre>
+          <h3 style={{ fontSize: '16px', marginTop: '20px' }}>Component Stack:</h3>
+          <pre style={{ background: '#fef2f2', padding: 15, borderRadius: 5, marginTop: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {this.state.info && this.state.info.componentStack}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   const managementRoles = ['MANAGER', 'ADMIN', 'STAFF'];
 
   return (
     <BrowserRouter>
+      <ErrorBoundary>
       <Routes>
         {/* Public Route */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/login" element={<AuthPage />} />
+        <Route path="/register" element={<AuthPage />} />
 
         {/* Protected Routes */}
         <Route path="/" element={<Navigate to="/overview" replace />} />
@@ -74,6 +108,7 @@ function App() {
           </ProtectedPage>
         } />
       </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   )
 }

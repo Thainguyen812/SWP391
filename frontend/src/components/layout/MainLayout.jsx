@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Sidebar from './Sidebar';
 import { TopAppBarSection } from './TopAppBar';
-import AddBranchForm from '../forms/AddBranchForm';
+import { AddBranchForm } from '../forms/AddBranchForm';
 
 const MainLayout = ({ children }) => {
   const [isAddBranchOpen, setIsAddBranchOpen] = useState(false);
