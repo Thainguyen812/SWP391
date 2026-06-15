@@ -20,14 +20,6 @@ export const CustomerPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  useEffect(() => {
-    fetchCustomers(filter);
-  }, [filter]);
-
   const fetchStats = async () => {
     try {
       setLoadingStats(true);
@@ -51,6 +43,14 @@ export const CustomerPage = () => {
       setLoadingTable(false);
     }
   };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  useEffect(() => {
+    fetchCustomers(filter);
+  }, [filter]);
 
   const handleSearch = (keyword) => {
     // Implement local search for mock or trigger API
@@ -80,7 +80,7 @@ export const CustomerPage = () => {
       notification.success({ message: 'Phê duyệt thẻ VIP thành công!' });
       setIsModalOpen(false);
       fetchCustomers(filter); // Refresh data
-    } catch (error) {
+    } catch {
       notification.error({ message: 'Có lỗi xảy ra khi phê duyệt.' });
     } finally {
       setProcessing(false);
@@ -94,7 +94,7 @@ export const CustomerPage = () => {
       notification.success({ message: 'Đã từ chối thẻ VIP.' });
       setIsModalOpen(false);
       fetchCustomers(filter); // Refresh data
-    } catch (error) {
+    } catch {
       notification.error({ message: 'Có lỗi xảy ra khi từ chối.' });
     } finally {
       setProcessing(false);
