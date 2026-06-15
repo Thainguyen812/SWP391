@@ -61,7 +61,6 @@ public class AuthService implements org.springframework.security.core.userdetail
     }
 
     public LoginResponse register(RegisterRequest req){
-<<<<<<< HEAD
         try {
             User u = new User();
             u.setId(UUID.randomUUID());
@@ -82,27 +81,8 @@ public class AuthService implements org.springframework.security.core.userdetail
             LoginRequest lr = new LoginRequest(); lr.setUsername(req.getUsername()); lr.setPassword(req.getPassword());
             return login(lr);
         } catch (Exception e) {
-            try {
-                java.io.PrintWriter pw = new java.io.PrintWriter(new java.io.FileWriter("d:/CodeProject/SWP391/error.log", true));
-                e.printStackTrace(pw);
-                pw.close();
-            } catch (Exception ignored) {}
             throw new RuntimeException("Register failed: " + e.getMessage(), e);
         }
-=======
-        User u = new User();
-        u.setId(UUID.randomUUID());
-        u.setUsername(req.getUsername());
-        u.setPasswordHash(passwordEncoder.encode(req.getPassword()));
-        u.setFullName(req.getFullName());
-        u.setEmail(req.getEmail());
-        u.setRole(User.Role.DRIVER);
-        u.setStatus(User.Status.ACTIVE); // Default status
-        userRepo.save(u);
-        // auto login
-        LoginRequest lr = new LoginRequest(); lr.setUsername(req.getUsername()); lr.setPassword(req.getPassword());
-        return login(lr);
->>>>>>> origin/main
     }
 
     public String refresh(String refreshToken){

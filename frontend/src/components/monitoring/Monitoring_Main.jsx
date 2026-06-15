@@ -51,15 +51,6 @@ export const MonitoringPage = () => {
   }
 
   return (
-<<<<<<< HEAD
-    <section className="flex flex-col w-full h-full p-6 pb-8 gap-6 bg-[#f8fafc] dark:bg-slate-900 overflow-y-auto transition-colors">
-      {/* Header riêng của trang Giám sát */}
-      <header className="flex-between w-full pb-4 border-b border-[#e9e7e9] dark:border-slate-700 transition-colors">
-        <h1 className="text-h2 text-[#041627] dark:text-slate-100 transition-colors">Giám sát bãi xe thời gian thực</h1>
-      </header>
-
-      {/* Main Content Grid 2 cột */}
-=======
     <PageLayout
       title="Giám sát thời gian thực"
       subtitle="Theo dõi trạng thái bãi đỗ xe và các hoạt động đang diễn ra"
@@ -73,7 +64,6 @@ export const MonitoringPage = () => {
         </div>
       }
     >
->>>>>>> origin/main
       <div className="flex gap-6 w-full h-[calc(100vh-200px)] min-h-[600px]">
         {/* Cột Trái (Sơ đồ) - Chiếm 70% */}
         <div className="flex-grow w-[70%] h-full">
@@ -93,10 +83,6 @@ export const MonitoringPage = () => {
           </div>
         </div>
       </div>
-<<<<<<< HEAD
-    </section>
-=======
     </PageLayout>
->>>>>>> origin/main
   );
 };

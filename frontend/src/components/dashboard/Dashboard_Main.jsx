@@ -76,11 +76,7 @@ export const SystemOverviewSection = () => {
   }
 
   return (
-<<<<<<< HEAD
-    <section className="system-overview-container dark:bg-slate-900 transition-colors">
-=======
     <div className="relative h-full w-full">
->>>>>>> origin/main
       {/* Loading overlay */}
       {loading && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#f8fafc]/70 backdrop-blur-[1px]">
@@ -88,28 +84,6 @@ export const SystemOverviewSection = () => {
         </div>
       )}
 
-<<<<<<< HEAD
-      {/* Header */}
-      <header className="system-overview-header">
-        <div className="flex flex-col gap-1">
-          <h2 className="system-overview-title">Tổng quan Hệ thống</h2>
-          <p className="system-overview-subtitle">Dữ liệu cập nhật theo thời gian thực: 24/10/2023 14:30</p>
-        </div>
-        <div className="system-overview-header-actions">
-          <button className="gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded border border-[#c4c6cd] dark:border-slate-600 flex items-center focus:outline-none hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
-            <CalendarOutlined className="text-[#64748b] dark:text-slate-400" />
-            <span className="font-bold text-[#1b1c1d] dark:text-slate-200 text-xs">Hôm nay</span>
-          </button>
-          <button className="gap-2 px-4 py-[9px] bg-[#1677ff] hover:bg-[#0058be] transition-colors rounded flex items-center focus:outline-none">
-            <DownloadOutlined className="text-white" />
-            <span className="font-bold text-white text-xs">Xuất báo cáo</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Main Content Grid */}
-      <div className="flex flex-col gap-6 w-full pb-8">
-=======
       <PageLayout
         title="Tổng quan Hệ thống"
         subtitle="Dữ liệu cập nhật theo thời gian thực: 24/10/2023 14:30"
@@ -126,7 +100,6 @@ export const SystemOverviewSection = () => {
           </>
         }
       >
->>>>>>> origin/main
         <SummaryCards data={summaryData} />
         
         <div className="grid grid-cols-3 gap-6 w-full">
@@ -140,12 +113,7 @@ export const SystemOverviewSection = () => {
             <SystemNotifications notifications={notifications} loading={loading} />
           </div>
         </div>
-<<<<<<< HEAD
-      </div>
-    </section>
-=======
       </PageLayout>
     </div>
->>>>>>> origin/main
   );
 };
