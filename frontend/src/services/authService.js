@@ -66,5 +66,25 @@ export const authService = {
     // Kiểm tra xem có token trong kho không
     const token = localStorage.getItem('token');
     return !!token;
+  },
+
+  getUser: () => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return null;
+    try {
+      return JSON.parse(userStr);
+    } catch (e) {
+      return null;
+    }
+  },
+
+  hasRole: (allowedRoles) => {
+    const user = authService.getUser();
+    if (!user || !user.role) return false;
+    // Nếu allowedRoles là mảng, kiểm tra xem role của user có nằm trong mảng không
+    if (Array.isArray(allowedRoles)) {
+      return allowedRoles.includes(user.role);
+    }
+    return user.role === allowedRoles;
   }
 };

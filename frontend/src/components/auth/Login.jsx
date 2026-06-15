@@ -25,7 +25,13 @@ export const Login = () => {
         description: 'Chào mừng bạn đến với Hệ thống Quản lý Bãi xe!',
         placement: 'topRight'
       });
-      navigate('/overview');
+      
+      const user = result.user;
+      if (user && user.role === 'DRIVER') {
+        navigate('/driver');
+      } else {
+        navigate('/overview');
+      }
     } else {
       notification.error({
         message: 'Đăng nhập thất bại',

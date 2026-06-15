@@ -57,7 +57,7 @@ public class AuthService implements org.springframework.security.core.userdetail
         rt.setToken(refreshUuid);
         rt.setExpiresAt(Instant.now().plusSeconds(7*24*3600));
         refreshRepo.save(rt);
-        return new LoginResponse(access, refreshUuid.toString());
+        return new LoginResponse(access, refreshUuid.toString(), u);
     }
 
     public LoginResponse register(RegisterRequest req){
