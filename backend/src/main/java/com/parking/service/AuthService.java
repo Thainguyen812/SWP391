@@ -96,7 +96,7 @@ public class AuthService implements org.springframework.security.core.userdetail
         }
     }
 
-    public LoginResponse register(RegisterRequest req) {
+    public LoginResponse register(RegisterRequest req){
         User u = new User();
         u.setId(UUID.randomUUID());
         u.setUsername(req.getUsername());

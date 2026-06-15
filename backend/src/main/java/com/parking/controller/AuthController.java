@@ -55,23 +55,13 @@ public class AuthController {
                     .body("Lỗi: Thiếu Refresh Token trong Request!");
         }
 
-        if (jwtUtils.validateJwtToken(clientRefreshToken)) {
-            String username = jwtUtils.getUserNameFromJwtToken(clientRefreshToken);
-
-            // Chạy an toàn qua customUserDetailsService đã được chỉ định rõ ở trên
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-
-            List<String> roles = userDetails.getAuthorities().stream()
-                    .map(grantedAuthority -> grantedAuthority.getAuthority())
-                    .toList();
-
-            String newAccessToken = jwtUtils.generateJwtToken(username, roles);
-
+        try {
+            String newAccessToken = authService.refresh(clientRefreshToken);
             LoginResponse responseData = new LoginResponse(newAccessToken, clientRefreshToken);
             return ResponseEntity.ok(responseData);
+        } catch (Exception e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)
+                    .body("Lỗi: Refresh Token không hợp lệ hoặc đã hết hạn! Vui lòng Đăng nhập lại. Chi tiết: " + e.getMessage());
         }
-
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body("Lỗi: Refresh Token không hợp lệ hoặc đã hết hạn! Vui lòng Đăng nhập lại.");
     }
 }
