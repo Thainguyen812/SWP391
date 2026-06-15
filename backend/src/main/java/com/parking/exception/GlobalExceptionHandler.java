@@ -17,6 +17,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     @ResponseBody
     public ResponseEntity<?> handleOther(Exception ex) {
+        if (ex instanceof RuntimeException) {
+            return ResponseEntity.status(400).body(new ErrorBody(ex.getMessage()));
+        }
         return ResponseEntity.status(500).body(new ErrorBody("Internal server error"));
     }
 

@@ -45,7 +45,7 @@ public class AuthController {
 
         try {
             String newAccessToken = authService.refresh(clientRefreshToken);
-            LoginResponse responseData = new LoginResponse(newAccessToken, clientRefreshToken);
+            LoginResponse responseData = new LoginResponse(newAccessToken, clientRefreshToken, null);
             return ResponseEntity.ok(responseData);
         } catch (Exception e) {
             return ResponseEntity.status(org.springframework.http.HttpStatus.UNAUTHORIZED)

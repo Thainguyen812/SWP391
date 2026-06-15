@@ -23,6 +23,14 @@
             "request": "launch",
             "mainClass": "com.parking.Application",
             "projectName": "parking-system"
+        },
+        {
+            "type": "java",
+            "name": "Run Full Stack (Backend + Frontend)",
+            "request": "launch",
+            "mainClass": "com.parking.Application",
+            "projectName": "com.parking-parking-system",
+            "preLaunchTask": "Start Frontend"
         }
     ]
 }
