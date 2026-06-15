@@ -8,6 +8,11 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 
+// phần 1 / check out task 5
+import java.util.UUID;
+import com.parking.model.Transaction;
+//
+
 @RestController
 @RequestMapping("/api/v1/parking")
 public class ParkingController {
@@ -39,4 +44,15 @@ public class ParkingController {
         public String getQrToken() { return qrToken; }
         public void setQrToken(String qrToken) { this.qrToken = qrToken; }
     }
+
+    // phần 1 / check out task 5
+    @PostMapping("/checkout/{cardId}")
+    public ResponseEntity<Transaction> checkout(
+        @PathVariable UUID cardId
+    ) {
+    return ResponseEntity.ok(
+            parkingService.checkoutCard(cardId)
+    );
+    }
+
 }
