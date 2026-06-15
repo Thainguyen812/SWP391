@@ -1,10 +1,18 @@
 import { useState, useEffect } from "react";
 import { DownloadOutlined, CalendarOutlined, DownOutlined } from "@ant-design/icons";
 import { dashboardService } from "../../services/dashboardService";
+<<<<<<< HEAD
 import { RevenueSummaryCards } from "./Revenue_SummaryCards";
 import { RevenueCharts } from "./Revenue_Charts";
 import { RecentTransactions } from "./Revenue_RecentTransactions";
 import { ErrorState } from "../common/ErrorState";
+=======
+import { RevenueSummaryCards } from "./Revenue_Summary";
+import { RevenueCharts } from "./Revenue_Charts";
+import { RecentTransactions } from "./Revenue_Transactions";
+import { ErrorState } from "../common/ErrorState";
+import { PageLayout } from "../common/PageLayout";
+>>>>>>> origin/main
 
 export const RevenuePage = () => {
   const [loading, setLoading] = useState(true);
@@ -38,6 +46,7 @@ export const RevenuePage = () => {
   }, []);
 
   return (
+<<<<<<< HEAD
     <section className="flex flex-col w-full h-full p-6 pb-8 gap-6 bg-[#f8fafc] dark:bg-slate-900 overflow-y-auto transition-colors">
       {/* Header riêng của trang Doanh thu */}
       <header className="flex-between w-full pb-4">
@@ -47,6 +56,13 @@ export const RevenuePage = () => {
         </div>
         
         <div className="flex items-center gap-4">
+=======
+    <PageLayout
+      title="Báo cáo Doanh thu"
+      subtitle="Phân tích dòng tiền và hiệu suất hệ thống toàn diện"
+      actions={
+        <>
+>>>>>>> origin/main
           <button className="flex items-center gap-2 px-4 py-2 border border-[#cbd5e1] dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-sm font-medium text-[#334155] dark:text-slate-200 shadow-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
             <CalendarOutlined className="text-[#64748b] dark:text-slate-400" />
             Tháng 10, 2023 <DownOutlined className="text-xs" />
@@ -55,21 +71,32 @@ export const RevenuePage = () => {
             <DownloadOutlined />
             Xuất báo cáo
           </button>
+<<<<<<< HEAD
         </div>
       </header>
 
       {/* Main Content Area */}
+=======
+        </>
+      }
+    >
+>>>>>>> origin/main
       {loading ? (
         <div className="w-full flex-1 flex items-center justify-center">
           <div className="w-8 h-8 border-4 border-[#1677ff] border-t-transparent rounded-full animate-spin"></div>
         </div>
       ) : error ? (
         <ErrorState 
+<<<<<<< HEAD
           title="Lỗi kết nối dữ liệu"
+=======
+          title="Lỗi tải dữ liệu"
+>>>>>>> origin/main
           message={error}
           onRetry={() => window.location.reload()}
         />
       ) : (
+<<<<<<< HEAD
         <div className="flex flex-col gap-6 w-full">
           <RevenueSummaryCards summary={summary} />
           <RevenueCharts barData={charts?.barData} pieData={charts?.pieData} totalVehicleRevenue={charts?.totalVehicleRevenue} />
@@ -77,5 +104,14 @@ export const RevenuePage = () => {
         </div>
       )}
     </section>
+=======
+        <div className="flex flex-col gap-6 w-full pb-8">
+          <RevenueSummaryCards summary={summary} />
+          <RevenueCharts charts={charts} />
+          <RecentTransactions transactions={transactions} />
+        </div>
+      )}
+    </PageLayout>
+>>>>>>> origin/main
   );
 };

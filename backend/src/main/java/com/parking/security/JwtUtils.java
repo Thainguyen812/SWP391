@@ -36,14 +36,15 @@ public class JwtUtils {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    // 1. tạo access token (chứa username)
-    public String generateJwtToken(String username) {
+    // 1. tạo access token (chứa username và roles)
+    public String generateJwtToken(String username, List<String> roles) {
 
         Date now = new Date();
         Date expireDate = new Date(now.getTime() + jwtExpirationMs);
 
         return Jwts.builder()
                 .setSubject(username) // đặt chủ đề của token là username
+                .claim("roles", roles) // thêm danh sách quyền hạn
                 .setIssuedAt(now) // đặt thời gian phát hành token
                 .setExpiration(expireDate) // đặt thời gian hết hạn token
                 .signWith(getSignKey(), SignatureAlgorithm.HS256) // ký token bằng khóa bí mật và thuật toán HS256

@@ -1,6 +1,6 @@
-import { Card, CardHeader, CardBody } from "../../common/Card";
-import icon9 from "../../../assets/icons/icon-9.svg";
-import vector from "../../../assets/icons/vector.svg";
+import { Card, CardHeader, CardBody } from "../common/Card";
+import icon9 from "../../assets/icons/icon-9.svg";
+import vector from "../../assets/icons/vector.svg";
 
 const weekdays = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 const revenueAxisLabels = ["60M", "40M", "20M", "0M"];
