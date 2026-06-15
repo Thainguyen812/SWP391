@@ -3,10 +3,16 @@ import { DownloadOutlined, UserAddOutlined } from '@ant-design/icons';
 import { CustomerStats } from './Customer_Stats';
 import { CustomerFilter } from './Customer_Filter';
 import { CustomerTable } from './Customer_Table';
+<<<<<<< HEAD
+import { VipApprovalModal } from './Customer_VipApprovalModal';
+import { customerService } from '../../services/customerService';
+import { notification } from 'antd';
+=======
 import { VipApprovalModal } from './Customer_VipModal';
 import { customerService } from '../../services/customerService';
 import { notification } from 'antd';
 import { PageLayout } from '../common/PageLayout';
+>>>>>>> origin/main
 
 export const CustomerPage = () => {
   const [stats, setStats] = useState(null);
@@ -102,12 +108,24 @@ export const CustomerPage = () => {
   };
 
   return (
+<<<<<<< HEAD
+    <div className="flex flex-col w-full h-full p-6 pb-8 gap-6 bg-[#f8fafc] dark:bg-slate-900 overflow-y-auto transition-colors">
+      {/* Header */}
+      <header className="flex justify-between items-end w-full pb-4 border-b border-gray-200 dark:border-slate-700">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Quản lý Khách hàng</h1>
+          <p className="text-gray-500 dark:text-gray-400">Danh sách người dùng, trạng thái thẻ và lịch sử giao dịch.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors dark:text-gray-200">
+=======
     <PageLayout
       title="Quản lý Khách hàng"
       subtitle="Danh sách người dùng, trạng thái thẻ và lịch sử giao dịch."
       actions={
         <>
           <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors dark:text-gray-200 shadow-sm">
+>>>>>>> origin/main
             <DownloadOutlined />
             Xuất báo cáo
           </button>
@@ -115,14 +133,24 @@ export const CustomerPage = () => {
             <UserAddOutlined />
             Thêm khách hàng
           </button>
+<<<<<<< HEAD
+        </div>
+      </header>
+
+=======
         </>
       }
     >
+>>>>>>> origin/main
       {/* Stats Cards */}
       <CustomerStats stats={stats} loading={loadingStats} />
 
       {/* Main Content Area */}
+<<<<<<< HEAD
+      <div className="flex flex-col gap-4">
+=======
       <div className="flex flex-col w-full">
+>>>>>>> origin/main
         <CustomerFilter 
           filter={filter} 
           setFilter={setFilter} 
@@ -144,6 +172,10 @@ export const CustomerPage = () => {
         onReject={handleReject}
         processing={processing}
       />
+<<<<<<< HEAD
+    </div>
+=======
     </PageLayout>
+>>>>>>> origin/main
   );
 };

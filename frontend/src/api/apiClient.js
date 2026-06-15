@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Khởi tạo một instance của axios với các cấu hình mặc định
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -12,8 +12,8 @@ export const apiClient = axios.create({
 // Interceptor cho Request: Tự động gắn Token trước khi gửi API
 apiClient.interceptors.request.use(
   (config) => {
-    // Thường lấy token từ localStorage hoặc Redux/Zustand
-    const token = localStorage.getItem('access_token');
+    // Lấy token từ localStorage (sử dụng key 'token' theo chuẩn mới)
+    const token = localStorage.getItem('token');
     
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
@@ -36,8 +36,15 @@ apiClient.interceptors.response.use(
     // Bắt các mã lỗi phổ biến (401: Hết phiên, 403: Không có quyền...)
     if (error.response) {
       if (error.response.status === 401) {
-        console.error("Phiên đăng nhập hết hạn, vui lòng đăng nhập lại.");
-        // Code xử lý logout hoặc redirect về /login ở đây
+        console.error("Phiên đăng nhập hết hạn hoặc Token không hợp lệ. Đang đá văng về màn hình Login...");
+        // Tự động xóa token lỗi
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        
+        // Tránh reload liên tục nếu đang ở trang login
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);
