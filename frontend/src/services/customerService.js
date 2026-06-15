@@ -56,9 +56,34 @@ export const customerService = {
   },
 
   getCustomers: async (filter = 'all') => {
-    if (!isMock) {
-      return apiClient.get('/customers', { params: { filter } });
+    try {
+      if (!isMock) {
+        const response = await apiClient.get('/users');
+        const realData = response.data.map(u => ({
+          id: u.id,
+          name: u.fullName || u.username,
+          phone: u.phone || "N/A",
+          plate: "N/A", // Chưa có trong User model của backend
+          type: u.role === "VIP" ? "VIP" : "Tháng",
+          status: u.status,
+          expireDate: "N/A"
+        }));
+        
+        let filtered = realData;
+        if (filter === 'month') {
+          filtered = realData.filter(c => c.type === 'Tháng');
+        } else if (filter === 'vip') {
+          filtered = realData.filter(c => c.type === 'VIP' && c.status === 'ACTIVE');
+        } else if (filter === 'pending') {
+          filtered = realData.filter(c => c.type === 'VIP' && c.status === 'PENDING');
+        }
+        return filtered;
+      }
+    } catch (error) {
+      console.warn("API lỗi hoặc chưa có data, tự động chuyển về Dữ liệu giả (Mock Data). Chi tiết:", error.message);
     }
+
+    // Fallback: Chạy khi isMock = true HOẶC khi gọi API thật thất bại
     return new Promise(resolve => {
       setTimeout(() => {
         let filtered = mockCustomers;

@@ -1,0 +1,29 @@
+@reference "../../index.css";
+
+.system-overview-container {
+  @apply flex flex-col min-h-screen items-start gap-6 px-10 py-8 relative flex-1 grow w-full bg-[#f8fafc];
+}
+
+.system-overview-header {
+  @apply flex items-end justify-between relative self-stretch w-full flex-[0_0_auto];
+}
+
+.system-overview-title {
+  @apply relative flex items-center w-fit mt-[-1.00px] font-semibold text-[#041627] text-[32px] tracking-[-0.80px] leading-10 whitespace-nowrap;
+}
+
+.system-overview-subtitle {
+  @apply relative flex items-center w-fit font-medium text-[#798592] text-xs tracking-tight leading-none whitespace-nowrap;
+}
+
+.system-overview-header-actions {
+  @apply inline-flex items-start gap-3 relative flex-[0_0_auto];
+}
+
+.system-overview-grid {
+  @apply grid grid-cols-4 gap-4 self-stretch w-full;
+}
+
+.system-overview-main-grid {
+  @apply grid grid-cols-3 gap-6 self-stretch w-full;
+}

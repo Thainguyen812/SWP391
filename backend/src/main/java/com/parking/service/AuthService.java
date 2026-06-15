@@ -46,17 +46,33 @@ public class AuthService {
     }
 
     public LoginResponse register(RegisterRequest req){
-        User u = new User();
-        u.setId(UUID.randomUUID());
-        u.setUsername(req.getUsername());
-        u.setPasswordHash(passwordEncoder.encode(req.getPassword()));
-        u.setFullName(req.getFullName());
-        u.setEmail(req.getEmail());
-        u.setRole(User.Role.DRIVER);
-        userRepo.save(u);
-        // auto login
-        LoginRequest lr = new LoginRequest(); lr.setUsername(req.getUsername()); lr.setPassword(req.getPassword());
-        return login(lr);
+        try {
+            User u = new User();
+            u.setId(UUID.randomUUID());
+            u.setUsername(req.getUsername());
+            u.setPasswordHash(passwordEncoder.encode(req.getPassword()));
+            u.setFullName(req.getFullName());
+            u.setEmail(req.getEmail());
+            u.setPhone(req.getPhone());
+            if (req.getRole() != null && req.getRole().equalsIgnoreCase("STAFF")) {
+                u.setRole(User.Role.STAFF);
+            } else {
+                u.setRole(User.Role.DRIVER);
+            }
+            u.setStatus(User.Status.ACTIVE);
+            u.setCreatedAt(Instant.now());
+            userRepo.save(u);
+            // auto login
+            LoginRequest lr = new LoginRequest(); lr.setUsername(req.getUsername()); lr.setPassword(req.getPassword());
+            return login(lr);
+        } catch (Exception e) {
+            try {
+                java.io.PrintWriter pw = new java.io.PrintWriter(new java.io.FileWriter("d:/CodeProject/SWP391/error.log", true));
+                e.printStackTrace(pw);
+                pw.close();
+            } catch (Exception ignored) {}
+            throw new RuntimeException("Register failed: " + e.getMessage(), e);
+        }
     }
 
     public String refresh(String refreshToken){
