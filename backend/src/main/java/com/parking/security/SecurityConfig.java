@@ -33,7 +33,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // Cấu hình CORS cho phép gọi từ http://localhost:5173
+                // Cấu hình CORS cho phép gọi từ các origin Frontend được chỉ định
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 // 1. Tắt CSRF bằng cú pháp Lambda mới (Spring Boot 3 bắt buộc)
                 .csrf(csrf -> csrf.disable())
