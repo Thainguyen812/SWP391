@@ -1,4 +1,5 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { authService } from '../../services/authService';
 import { 
   AppstoreOutlined, 
   EyeOutlined, 
@@ -27,6 +28,12 @@ const navItems = [
 
 export const Sidebar = ({ onOpenAddBranch }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    authService.logout();
+    navigate('/login');
+  };
 
   return (
     <aside className="sidebar">
@@ -82,7 +89,7 @@ export const Sidebar = ({ onOpenAddBranch }) => {
             </button>
           </li>
           <li>
-            <button className="sidebar-bottom-item">
+            <button className="sidebar-bottom-item" onClick={handleLogout}>
               <LogoutOutlined className="sidebar-bottom-icon" />
               <span className="sidebar-bottom-label">Đăng xuất</span>
             </button>

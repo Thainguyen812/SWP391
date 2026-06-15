@@ -23,4 +23,8 @@ public class ApiExceptions {
     public static class BadRequestException extends ApiException {
         public BadRequestException(String message) { super(HttpStatus.BAD_REQUEST, message); }
     }
+
+    public static class NotFoundException extends ApiException {
+        public NotFoundException(String message) { super(HttpStatus.NOT_FOUND, message); }
+    }
 }

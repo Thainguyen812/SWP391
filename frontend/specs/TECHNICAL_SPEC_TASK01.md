@@ -47,3 +47,4 @@ Standard error envelope {message, code}
 
 ### 4.2. Edge Cases
 - CI fails if formatting/linting errors.
+

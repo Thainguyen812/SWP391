@@ -1,7 +1,11 @@
-import { SwapRightOutlined, CheckCircleOutlined } from "@ant-design/icons";
+import { useState } from "react";
+import { SwapRightOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { Modal, notification } from "antd";
 import { Card } from "../common/Card";
 
 export const PersonnelHandoverLog = ({ data, loading }) => {
+  const [isSigned, setIsSigned] = useState(false);
+
   if (loading) {
     return (
       <Card className="w-full flex-1">
@@ -13,6 +17,29 @@ export const PersonnelHandoverLog = ({ data, loading }) => {
   }
 
   if (!data) return null;
+
+  const handleSignOff = () => {
+    Modal.confirm({
+      title: 'Xác nhận tiếp nhận ca trực?',
+      icon: <ExclamationCircleOutlined />,
+      content: 'Bạn xác nhận đã kiểm tra đầy đủ các ghi chú bàn giao và tình trạng tài sản tại chốt trực.',
+      okText: 'Ký nhận ngay',
+      cancelText: 'Hủy',
+      onOk() {
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            setIsSigned(true);
+            notification.success({
+              message: 'Ký nhận ca thành công',
+              description: 'Bạn đã tiếp nhận ca trực. Chúc bạn một ca làm việc hiệu quả!',
+              placement: 'topRight',
+            });
+            resolve();
+          }, 800);
+        });
+      },
+    });
+  };
 
   return (
     <Card className="w-full flex flex-col p-5 bg-white dark:bg-slate-800 border border-[#e9e7e9] dark:border-slate-700 shadow-sm rounded-lg flex-1">
@@ -58,15 +85,26 @@ export const PersonnelHandoverLog = ({ data, loading }) => {
         <div className="flex items-center justify-between mt-2 pt-3 border-t border-dashed border-[#cbd5e1] dark:border-slate-600">
           <div className="flex flex-col items-center">
             <div className="flex items-center gap-1 text-emerald-500 dark:text-emerald-400 text-xs font-medium mb-1">
-              <CheckCircleOutlined /> Đã ký xác nhận
+              <CheckCircleOutlined /> Đã ký bàn giao
             </div>
             <span className="text-[10px] text-[#94a3b8] dark:text-slate-500 font-mono tracking-wider">ID: {data.from.id}</span>
           </div>
           <div className="flex flex-col items-center">
-            <div className="flex items-center gap-1 text-emerald-500 dark:text-emerald-400 text-xs font-medium mb-1">
-              <CheckCircleOutlined /> Đã ký nhận
-            </div>
-            <span className="text-[10px] text-[#94a3b8] dark:text-slate-500 font-mono tracking-wider">ID: {data.to.id}</span>
+            {isSigned ? (
+              <>
+                <div className="flex items-center gap-1 text-emerald-500 dark:text-emerald-400 text-xs font-medium mb-1">
+                  <CheckCircleOutlined /> Đã tiếp nhận
+                </div>
+                <span className="text-[10px] text-[#94a3b8] dark:text-slate-500 font-mono tracking-wider">ID: {data.to.id}</span>
+              </>
+            ) : (
+              <button 
+                onClick={handleSignOff}
+                className="px-4 py-1.5 bg-[#1677ff] hover:bg-[#0058be] text-white text-xs font-bold rounded shadow-sm transition-colors"
+              >
+                Ký nhận ca
+              </button>
+            )}
           </div>
         </div>
       </div>

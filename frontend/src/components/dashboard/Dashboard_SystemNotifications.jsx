@@ -2,12 +2,17 @@ import { Card, CardHeader, CardBody } from "../common/Card";
 import { Badge } from "../common/Badge";
 
 export const SystemNotifications = ({ notifications, loading }) => {
+  // Count important notifications (assuming type is in the original object, but we only have containerClassName or icon to check if type is lost. 
+  // Let's use the containerClassName which has 'bg-[#ffdad633]' for errors, or check the raw notifications array in Dashboard_Main)
+  // Since Dashboard_Main passes raw 'alerts' now, we can check the 'type' property directly!
+  const importantCount = notifications.filter(n => n.type === 'error' || n.type === 'warning').length;
+
   return (
     <Card noPadding>
       <CardHeader 
         title="Thông báo hệ thống" 
         action={
-          <Badge type="danger">2 QUAN TRỌNG</Badge>
+          importantCount > 0 ? <Badge type="danger">{importantCount} QUAN TRỌNG</Badge> : null
         }
       />
       <CardBody className="p-4 gap-4">

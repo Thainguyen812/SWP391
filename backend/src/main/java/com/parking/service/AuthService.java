@@ -47,6 +47,48 @@ public class AuthService implements org.springframework.security.core.userdetail
                 .build();
     }
 
+<<<<<<< HEAD
+    public LoginResponse login(LoginRequest req){
+        Optional<User> uOpt = userRepo.findByUsername(req.getUsername());
+        if (uOpt.isEmpty()) throw new RuntimeException("Invalid credentials");
+        User u = uOpt.get();
+        if (!passwordEncoder.matches(req.getPassword(), u.getPasswordHash())) throw new RuntimeException("Invalid credentials");
+        
+        String access = jwtUtils.generateJwtToken(u.getUsername(), java.util.List.of("ROLE_" + u.getRole().name()));
+        UUID refreshUuid = UUID.randomUUID();
+        RefreshToken rt = new RefreshToken();
+        rt.setId(UUID.randomUUID());
+        rt.setUserId(u.getId());
+        rt.setToken(refreshUuid);
+        rt.setExpiresAt(Instant.now().plusSeconds(7*24*3600));
+        refreshRepo.save(rt);
+        return new LoginResponse(access, refreshUuid.toString(), u);
+    }
+
+    public LoginResponse register(RegisterRequest req){
+        try {
+            User u = new User();
+            u.setId(UUID.randomUUID());
+            u.setUsername(req.getUsername());
+            u.setPasswordHash(passwordEncoder.encode(req.getPassword()));
+            u.setFullName(req.getFullName());
+            u.setEmail(req.getEmail());
+            u.setPhone(req.getPhone());
+            if (req.getRole() != null && req.getRole().equalsIgnoreCase("STAFF")) {
+                u.setRole(User.Role.STAFF);
+            } else {
+                u.setRole(User.Role.DRIVER);
+            }
+            u.setStatus(User.Status.ACTIVE);
+            u.setCreatedAt(Instant.now());
+            userRepo.save(u);
+            // auto login
+            LoginRequest lr = new LoginRequest(); lr.setUsername(req.getUsername()); lr.setPassword(req.getPassword());
+            return login(lr);
+        } catch (Exception e) {
+            throw new RuntimeException("Register failed: " + e.getMessage(), e);
+        }
+=======
     public LoginResponse login(LoginRequest req) {
         try {
             // 1. Kiểm tra username tồn tại dưới DB
@@ -112,6 +154,7 @@ public class AuthService implements org.springframework.security.core.userdetail
         lr.setUsername(req.getUsername());
         lr.setPassword(req.getPassword());
         return login(lr);
+>>>>>>> origin/main
     }
 
     public String refresh(String refreshToken) {

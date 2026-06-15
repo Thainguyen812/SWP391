@@ -1,5 +1,7 @@
 import { useId, useState } from "react";
 import { SearchOutlined, BellOutlined, MoonOutlined, SunOutlined, CheckCircleOutlined, WarningOutlined } from "@ant-design/icons";
+import { notification } from "antd";
+import { useGlobalContext } from "../../context/GlobalContext";
 import "./TopAppBar.css";
 
 const locations = [
@@ -10,8 +12,7 @@ const locations = [
 
 export const TopAppBarSection = () => {
   const searchId = useId();
-  const [searchValue, setSearchValue] = useState("");
-  const [activeLocation, setActiveLocation] = useState("toan-he-thong");
+  const { searchValue, setSearchValue, activeLocation, setActiveLocation } = useGlobalContext();
   const [isOnline, setIsOnline] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -77,7 +78,10 @@ export const TopAppBarSection = () => {
         </button>
 
         <div className="icons-group">
-          <button className="icon-btn">
+          <button 
+            className="icon-btn"
+            onClick={() => notification.info({ message: "Không có thông báo mới", description: "Hệ thống đang hoạt động bình thường.", placement: "topRight" })}
+          >
             <BellOutlined />
           </button>
           <button className="icon-btn" onClick={toggleDarkMode}>

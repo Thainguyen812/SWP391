@@ -1,29 +1,22 @@
 import { useState, useEffect } from "react";
 import { dashboardService } from "../../services/dashboardService";
-import { CalendarOutlined, DownloadOutlined } from "@ant-design/icons";
-<<<<<<< HEAD
+import { DatePicker, notification } from "antd";
+import dayjs from "dayjs";
+import { useGlobalContext } from "../../context/GlobalContext";
 import "./Dashboard_Main.css";
-=======
-import "./SystemOverview.css";
-import "./SystemOverview.css";
->>>>>>> origin/main
 
 // Import UI Sections
 import { SummaryCards } from "./Dashboard_SummaryCards";
 import { RevenueChart } from "./Dashboard_RevenueChart";
 import { VehicleDistribution } from "./Dashboard_VehicleDistribution";
 import { TopEmployees } from "./Dashboard_TopEmployees";
-<<<<<<< HEAD
 import { SystemNotifications } from "./Dashboard_SystemNotifications";
 import { ErrorState } from "../common/ErrorState";
-=======
-import { SystemNotifications } from "./Dashboard_Notifications";
-import { ErrorState } from "../common/ErrorState";
 import { PageLayout } from "../common/PageLayout";
->>>>>>> origin/main
-import { TrophyOutlined, ExclamationCircleOutlined, WarningOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { TrophyOutlined, ExclamationCircleOutlined, WarningOutlined, InfoCircleOutlined, DownloadOutlined } from "@ant-design/icons";
 
 export const SystemOverviewSection = () => {
+  const { searchValue, activeLocation } = useGlobalContext();
   const [summaryData, setSummaryData] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -56,6 +49,7 @@ export const SystemOverviewSection = () => {
           title: alert.title,
           description: alert.description,
           time: alert.time,
+          type: alert.type,
           icon: alert.type === 'error' ? <ExclamationCircleOutlined className="text-[#ba1a1a] text-xl" /> : alert.type === 'warning' ? <WarningOutlined className="text-yellow-500 text-xl" /> : <InfoCircleOutlined className="text-blue-500 text-xl" />,
           containerClassName: alert.type === 'error' 
             ? "flex items-start gap-4 p-3 w-full bg-[#ffdad633] rounded border border-[#ba1a1a33]"
@@ -63,7 +57,6 @@ export const SystemOverviewSection = () => {
           actionLabel: alert.actionText
         })));
         
-        setNotifications(alerts);
         setError(null);
       } catch (err) {
         console.error("Lỗi lấy dữ liệu dashboard:", err);
@@ -74,6 +67,17 @@ export const SystemOverviewSection = () => {
     };
     fetchData();
   }, []);
+
+  // Filter based on search
+  const filteredEmployees = employees.filter(emp => 
+    emp.name.toLowerCase().includes(searchValue.toLowerCase()) || 
+    emp.role.toLowerCase().includes(searchValue.toLowerCase())
+  );
+
+  const filteredNotifications = notifications.filter(notif => 
+    notif.title.toLowerCase().includes(searchValue.toLowerCase()) || 
+    notif.description.toLowerCase().includes(searchValue.toLowerCase())
+  );
 
   if (error) {
     return (
@@ -86,11 +90,7 @@ export const SystemOverviewSection = () => {
   }
 
   return (
-<<<<<<< HEAD
-    <section className="system-overview-container dark:bg-slate-900 transition-colors">
-=======
     <div className="relative h-full w-full">
->>>>>>> origin/main
       {/* Loading overlay */}
       {loading && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#f8fafc]/70 backdrop-blur-[1px]">
@@ -98,64 +98,51 @@ export const SystemOverviewSection = () => {
         </div>
       )}
 
-<<<<<<< HEAD
-      {/* Header */}
-      <header className="system-overview-header">
-        <div className="flex flex-col gap-1">
-          <h2 className="system-overview-title">Tổng quan Hệ thống</h2>
-          <p className="system-overview-subtitle">Dữ liệu cập nhật theo thời gian thực: 24/10/2023 14:30</p>
-        </div>
-        <div className="system-overview-header-actions">
-          <button className="gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded border border-[#c4c6cd] dark:border-slate-600 flex items-center focus:outline-none hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
-            <CalendarOutlined className="text-[#64748b] dark:text-slate-400" />
-            <span className="font-bold text-[#1b1c1d] dark:text-slate-200 text-xs">Hôm nay</span>
-          </button>
-          <button className="gap-2 px-4 py-[9px] bg-[#1677ff] hover:bg-[#0058be] transition-colors rounded flex items-center focus:outline-none">
-            <DownloadOutlined className="text-white" />
-            <span className="font-bold text-white text-xs">Xuất báo cáo</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Main Content Grid */}
-      <div className="flex flex-col gap-6 w-full pb-8">
-=======
       <PageLayout
         title="Tổng quan Hệ thống"
         subtitle="Dữ liệu cập nhật theo thời gian thực: 24/10/2023 14:30"
         actions={
           <>
-            <button className="gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded border border-[#c4c6cd] dark:border-slate-600 flex items-center focus:outline-none hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
-              <CalendarOutlined className="text-[#64748b] dark:text-slate-400" />
-              <span className="font-bold text-[#1b1c1d] dark:text-slate-200 text-xs">Hôm nay</span>
-            </button>
-            <button className="gap-2 px-4 py-[9px] bg-[#1677ff] hover:bg-[#0058be] transition-colors rounded flex items-center focus:outline-none">
+            <DatePicker 
+              defaultValue={dayjs()} 
+              format="DD/MM/YYYY"
+              allowClear={false}
+              className="px-4 py-2 bg-white dark:bg-slate-800 rounded border border-[#c4c6cd] dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors font-bold text-[#1b1c1d] dark:text-slate-200 text-xs shadow-sm focus:outline-none focus:border-blue-500"
+            />
+            <button 
+              className="gap-2 px-4 py-[9px] bg-[#1677ff] hover:bg-[#0058be] transition-colors rounded flex items-center focus:outline-none"
+              onClick={() => {
+                notification.success({ 
+                  message: "Xuất báo cáo thành công", 
+                  description: "Tệp báo cáo tổng quan hệ thống đã được tải xuống.", 
+                  placement: "topRight" 
+                });
+              }}
+            >
               <DownloadOutlined className="text-white" />
               <span className="font-bold text-white text-xs">Xuất báo cáo</span>
             </button>
           </>
         }
       >
->>>>>>> origin/main
         <SummaryCards data={summaryData} />
         
-        <div className="grid grid-cols-3 gap-6 w-full">
-          <RevenueChart />
-          <VehicleDistribution />
-        </div>
-
-        <div className="grid grid-cols-2 gap-6 w-full">
-          <TopEmployees employees={employees} loading={loading} />
-          <div id="system-notifications">
-            <SystemNotifications notifications={notifications} loading={loading} />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+          <div className="md:col-span-2">
+            <RevenueChart />
+          </div>
+          <div className="md:col-span-1">
+            <VehicleDistribution />
           </div>
         </div>
-<<<<<<< HEAD
-      </div>
-    </section>
-=======
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mt-6">
+          <TopEmployees employees={filteredEmployees} loading={loading} />
+          <div id="system-notifications">
+            <SystemNotifications notifications={filteredNotifications} loading={loading} />
+          </div>
+        </div>
       </PageLayout>
     </div>
->>>>>>> origin/main
   );
 };
