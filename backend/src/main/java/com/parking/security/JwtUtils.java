@@ -15,16 +15,16 @@ import java.util.List;
 public class JwtUtils {
 
     // Khóa bí mật dùng để ký token
-    @Value("${parking.app.jwtSecret}")
+    @Value("${app.jwtSecret}")
     private String jwtSecret;
 
     // Thời gian sống của access token (thường là 15 phút: 15 * 60 * 1000 mili giây)
-    @Value("${parking.app.jwtExpirationMs}")
+    @Value("${app.jwtExpirationMs}")
     private long jwtExpirationMs;
 
     // Thời gian sống của refresh token (nếu trong properties tính bằng giây thì
     // nhân thêm 1000)
-    @Value("${parking.app.refreshExpirationSec}")
+    @Value("${app.refreshExpirationSec}")
     private long refreshExpiration;
 
     // Hàm này dùng để tạo khóa bí mật cho việc ký và xác thực jwt
