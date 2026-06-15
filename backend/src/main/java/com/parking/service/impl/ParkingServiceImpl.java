@@ -32,10 +32,10 @@ public class ParkingServiceImpl implements ParkingService {
     private final VehicleRepository vehicleRepository;
 
     public ParkingServiceImpl(BlacklistedCardRepository blacklistRepository,
-                              ParkingSessionRepository parkingSessionRepository,
-                              ZoneRepository zoneRepository,
-                              VipSubscriptionRepository vipSubscriptionRepository,
-                              VehicleRepository vehicleRepository) {
+            ParkingSessionRepository parkingSessionRepository,
+            ZoneRepository zoneRepository,
+            VipSubscriptionRepository vipSubscriptionRepository,
+            VehicleRepository vehicleRepository) {
         this.blacklistRepository = blacklistRepository;
         this.parkingSessionRepository = parkingSessionRepository;
         this.zoneRepository = zoneRepository;
@@ -48,6 +48,22 @@ public class ParkingServiceImpl implements ParkingService {
     public CheckInResponse aiCheckIn(AiCheckInRequest request) {
         String plate = request.getPlate();
         Double confidence = request.getConfidence_score() != null ? request.getConfidence_score() : 0.0;
+
+        // =====================================================================
+        // CHỐT CHẶN CỦA PHƯỚC: Kiểm tra mã thẻ vật lý xem có bị báo mất/khóa không
+        // =====================================================================
+        if (request.getCardId() == null) {
+            throw new ApiExceptions.BadRequestException("Không tìm thấy thông tin mã thẻ xe (Card ID).");
+        }
+
+        boolean isCardBlocked = blacklistRepository.existsByCardId(request.getCardId());
+        if (isCardBlocked) {
+            // Trả về lỗi 403 Forbidden để Front-end chặn lệnh nhả thẻ, không mở Barie
+            throw new ApiExceptions.ForbiddenException("Thẻ xe này đã bị báo mất hoặc khóa! Từ chối quẹt vào.");
+        }
+        // =====================================================================
+
+        // Duplicate active session check
 
         // Blacklist check: attempt to resolve vehicle and check card blacklist
         Optional<Vehicle> vehicleOpt = vehicleRepository.findByLicensePlate(plate);
@@ -64,14 +80,16 @@ public class ParkingServiceImpl implements ParkingService {
             }
         }
         // Duplicate active session check
-        Optional<ParkingSession> existing = parkingSessionRepository.findByLicensePlateAndSessionStatus(plate, ParkingSession.SessionStatus.ACTIVE);
+        Optional<ParkingSession> existing = parkingSessionRepository.findByLicensePlateAndSessionStatus(plate,
+                ParkingSession.SessionStatus.ACTIVE);
         if (existing.isPresent()) {
             throw new ApiExceptions.ConflictException("Active parking session already exists for this vehicle");
         }
 
         // Confidence threshold
         if (confidence < 70.0) {
-            throw new ApiExceptions.BadRequestException("Ảnh mờ, yêu cầu tài xế chuyển sang dùng quét mã QR Động vào bãi");
+            throw new ApiExceptions.BadRequestException(
+                    "Ảnh mờ, yêu cầu tài xế chuyển sang dùng quét mã QR Động vào bãi");
         }
 
         // Find matching zone
@@ -96,8 +114,10 @@ public class ParkingServiceImpl implements ParkingService {
         if (vehicleOpt.isPresent()) {
             Vehicle vehicle = vehicleOpt.get();
             java.util.UUID vehicleUuid = vehicle.getId();
-            Optional<VipSubscription> vip = vipSubscriptionRepository.findByVehicleIdAndStatus(vehicleUuid, VipSubscription.Status.ACTIVE);
-            if (vip.isPresent()) isVip = true;
+            Optional<VipSubscription> vip = vipSubscriptionRepository.findByVehicleIdAndStatus(vehicleUuid,
+                    VipSubscription.Status.ACTIVE);
+            if (vip.isPresent())
+                isVip = true;
         }
 
         // Create session
