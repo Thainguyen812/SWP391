@@ -67,30 +67,32 @@ export const SummaryCards = ({ data }) => {
       titleClassName: "text-[#ba1a1a]",
       isAlert: true,
       content: (
-        <div className="flex-between items-end mt-4 w-full">
-          <div className="text-h1 text-[#ba1a1a]">
-            {data?.issues?.value || "0"}
+        <div className="flex flex-col justify-end mt-4 w-full h-full gap-[3.5px]">
+          <div className="flex items-end justify-between w-full h-14">
+            <div className="text-h1 text-[#ba1a1a] leading-none">
+              {data?.issues?.value || "0"}
+            </div>
+            <button 
+              type="button" 
+              className="text-caption-bold text-[#0058be] hover:underline mb-1"
+              onClick={() => {
+                const el = document.getElementById('system-notifications');
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  el.style.transition = 'all 0.5s ease';
+                  el.style.transform = 'scale(1.02)';
+                  el.style.boxShadow = '0 0 15px rgba(220, 38, 38, 0.3)';
+                  setTimeout(() => {
+                    el.style.transform = 'scale(1)';
+                    el.style.boxShadow = 'none';
+                  }, 800);
+                }
+              }}
+            >
+              {data?.issues?.trend || "Xem"}
+            </button>
           </div>
-          <button 
-            type="button" 
-            className="text-caption-bold text-[#0058be] hover:underline"
-            onClick={() => {
-              const el = document.getElementById('system-notifications');
-              if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // Thêm hiệu ứng nhấp nháy nhẹ để người dùng chú ý
-                el.style.transition = 'all 0.5s ease';
-                el.style.transform = 'scale(1.02)';
-                el.style.boxShadow = '0 0 15px rgba(220, 38, 38, 0.3)';
-                setTimeout(() => {
-                  el.style.transform = 'scale(1)';
-                  el.style.boxShadow = 'none';
-                }, 800);
-              }
-            }}
-          >
-            {data?.issues?.trend || "Xem"}
-          </button>
+          <div className="h-4"></div> {/* Spacer to match other cards' trend height if needed, or just let flex-end push it to bottom */}
         </div>
       )
     }
@@ -101,7 +103,7 @@ export const SummaryCards = ({ data }) => {
       {cards.map((card) => (
         <article
           key={card.title}
-          className={`relative w-full h-fit flex flex-col items-start justify-between p-4 bg-white rounded-lg border shadow-sm ${
+          className={`relative w-full h-full flex flex-col items-start justify-between p-4 bg-white rounded-lg border shadow-sm ${
             card.cardClassName ?? "border-[#e9e7e9]"
           }`}
         >

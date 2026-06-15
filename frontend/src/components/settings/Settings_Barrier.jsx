@@ -1,5 +1,6 @@
 import { SecurityScanOutlined } from "@ant-design/icons";
 import { Card } from "../common/Card";
+import { Switch } from "antd";
 
 export const SettingsBarrier = ({ data, onChange }) => {
   if (!data) return null;
@@ -56,11 +57,12 @@ export const SettingsBarrier = ({ data, onChange }) => {
           <span className="text-sm text-[#475569] dark:text-slate-300 font-medium">
             Chống va đập (Anti-crash)
           </span>
-          {data.antiCrash && (
-            <span className="px-2 py-0.5 text-[10px] font-bold bg-[#d1fae5] text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 uppercase tracking-wider rounded">
-              ĐANG BẬT
-            </span>
-          )}
+          <Switch 
+            checked={data.antiCrash}
+            onChange={(checked) => onChange('barrier', 'antiCrash', checked)}
+            checkedChildren="BẬT"
+            unCheckedChildren="TẮT"
+          />
         </div>
       </div>
     </Card>

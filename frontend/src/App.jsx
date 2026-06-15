@@ -7,6 +7,11 @@ import { MonitoringPage } from './components/monitoring/Monitoring_Main';
 import { RevenuePage } from './components/revenue/Revenue_Main';
 import { CustomerPage } from './components/customers/Customer_Main';
 import { SettingsMain } from './components/settings/Settings_Main';
+import { PersonnelMain } from './components/personnel/Personnel_Main';
+import { SecurityMain } from './components/security/Security_Main';
+import { LogsMain } from './components/logs/Logs_Main';
+import { GlobalProvider } from './context/GlobalContext';
+
 // Helper component to wrap protected pages with MainLayout
 const ProtectedPage = ({ children, allowedRoles }) => (
   <ProtectedRoute allowedRoles={allowedRoles}>
@@ -63,7 +68,8 @@ function App() {
   return (
     <BrowserRouter>
       <ErrorBoundary>
-      <Routes>
+        <GlobalProvider>
+          <Routes>
         {/* Public Route */}
         <Route path="/login" element={<AuthPage />} />
         <Route path="/register" element={<AuthPage />} />
@@ -84,8 +90,17 @@ function App() {
         <Route path="/customers" element={
           <ProtectedPage allowedRoles={managementRoles}><CustomerPage /></ProtectedPage>
         } />
+        <Route path="/staff" element={
+          <ProtectedPage allowedRoles={managementRoles}><PersonnelMain /></ProtectedPage>
+        } />
+        <Route path="/security" element={
+          <ProtectedPage allowedRoles={managementRoles}><SecurityMain /></ProtectedPage>
+        } />
         <Route path="/settings" element={
           <ProtectedPage allowedRoles={managementRoles}><SettingsMain /></ProtectedPage>
+        } />
+        <Route path="/logs" element={
+          <ProtectedPage allowedRoles={managementRoles}><LogsMain /></ProtectedPage>
         } />
 
         {/* Nhóm Khách hàng (Driver) */}
@@ -107,7 +122,8 @@ function App() {
             </div>
           </ProtectedPage>
         } />
-      </Routes>
+          </Routes>
+        </GlobalProvider>
       </ErrorBoundary>
     </BrowserRouter>
   )

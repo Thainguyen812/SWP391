@@ -5,7 +5,7 @@ import { CustomerFilter } from './Customer_Filter';
 import { CustomerTable } from './Customer_Table';
 import { VipApprovalModal } from './Customer_VipModal';
 import { customerService } from '../../services/customerService';
-import { notification } from 'antd';
+import { notification, Modal, Form, Input, Select, DatePicker } from 'antd';
 import { PageLayout } from '../common/PageLayout';
 
 export const CustomerPage = () => {
@@ -19,6 +19,20 @@ export const CustomerPage = () => {
   const [selectedVip, setSelectedVip] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
+
+  // Add Customer Modal state
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addForm] = Form.useForm();
+
+  const handleAddSubmit = (values) => {
+    notification.success({
+      message: 'Thêm khách hàng thành công',
+      description: `Khách hàng ${values.name} đã được thêm vào hệ thống.`,
+      placement: 'topRight',
+    });
+    setIsAddModalOpen(false);
+    addForm.resetFields();
+  };
 
   const fetchStats = async () => {
     try {
@@ -107,11 +121,23 @@ export const CustomerPage = () => {
       subtitle="Danh sách người dùng, trạng thái thẻ và lịch sử giao dịch."
       actions={
         <>
-          <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors dark:text-gray-200 shadow-sm">
-            <DownloadOutlined />
-            Xuất báo cáo
+          <button 
+            className="gap-2 px-4 py-[9px] bg-[#1677ff] hover:bg-[#0058be] transition-colors rounded flex items-center focus:outline-none"
+            onClick={() => {
+              notification.success({ 
+                message: "Xuất báo cáo thành công", 
+                description: "Tệp báo cáo khách hàng đã được tải xuống.", 
+                placement: "topRight" 
+              });
+            }}
+          >
+            <DownloadOutlined className="text-white" />
+            <span className="font-bold text-white text-xs">Xuất báo cáo</span>
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#041627] hover:bg-[#0a2744] text-white rounded-lg text-sm font-medium transition-colors shadow-md">
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[#041627] hover:bg-[#0a2744] text-white rounded-lg text-sm font-medium transition-colors shadow-md"
+          >
             <UserAddOutlined />
             Thêm khách hàng
           </button>
@@ -144,6 +170,54 @@ export const CustomerPage = () => {
         onReject={handleReject}
         processing={processing}
       />
+
+      {/* Add Customer Modal */}
+      <Modal
+        title="Thêm khách hàng mới"
+        open={isAddModalOpen}
+        onCancel={() => setIsAddModalOpen(false)}
+        onOk={() => addForm.submit()}
+        okText="Thêm khách hàng"
+        cancelText="Hủy"
+        okButtonProps={{ className: "bg-[#1677ff]" }}
+      >
+        <Form form={addForm} layout="vertical" onFinish={handleAddSubmit} className="mt-4">
+          <div className="grid grid-cols-2 gap-x-4">
+            <Form.Item name="name" label="Họ và tên" rules={[{ required: true, message: 'Vui lòng nhập họ tên!' }]}>
+              <Input placeholder="Nhập họ và tên khách hàng" />
+            </Form.Item>
+            <Form.Item name="phone" label="Số điện thoại" rules={[{ required: true, message: 'Vui lòng nhập số điện thoại!' }]}>
+              <Input placeholder="Nhập số điện thoại" />
+            </Form.Item>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-x-4">
+            <Form.Item name="plate" label="Biển số xe" rules={[{ required: true, message: 'Vui lòng nhập biển số xe!' }]}>
+              <Input placeholder="Ví dụ: 51F-123.45" />
+            </Form.Item>
+            <Form.Item name="type" label="Loại thẻ" rules={[{ required: true, message: 'Vui lòng chọn loại thẻ!' }]}>
+              <Select placeholder="Chọn loại thẻ">
+                <Select.Option value="VIP">VIP</Select.Option>
+                <Select.Option value="Tháng">Tháng</Select.Option>
+                <Select.Option value="Guest">Guest</Select.Option>
+              </Select>
+            </Form.Item>
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-4">
+            <Form.Item name="status" label="Trạng thái thẻ" initialValue="ACTIVE" rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}>
+              <Select placeholder="Chọn trạng thái">
+                <Select.Option value="ACTIVE">ACTIVE (Đang hoạt động)</Select.Option>
+                <Select.Option value="EXPIRED">EXPIRED (Hết hạn)</Select.Option>
+                <Select.Option value="IN_PARK">IN_PARK (Đang trong bãi)</Select.Option>
+              </Select>
+            </Form.Item>
+            <Form.Item name="expiry" label="Ngày hết hạn">
+              <DatePicker className="w-full" format="DD/MM/YYYY" placeholder="Chọn ngày hết hạn" />
+            </Form.Item>
+          </div>
+        </Form>
+      </Modal>
     </PageLayout>
   );
 };

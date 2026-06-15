@@ -1,12 +1,19 @@
 import { Card, CardHeader, CardBody } from "../common/Card";
+import { useNavigate } from "react-router-dom";
 
 export const TopEmployees = ({ employees, loading }) => {
+  const navigate = useNavigate();
+
   return (
     <Card noPadding>
       <CardHeader 
         title="Nhân viên xuất sắc ca hiện tại" 
         action={
-          <button type="button" className="text-caption-bold text-[#0058be] focus:outline-none hover:underline">
+          <button 
+            type="button" 
+            onClick={() => navigate('/staff')}
+            className="text-caption-bold text-[#0058be] focus:outline-none hover:underline"
+          >
             Xem tất cả
           </button>
         }

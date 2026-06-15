@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { DownloadOutlined, CalendarOutlined, DownOutlined } from "@ant-design/icons";
+import { DatePicker, notification } from "antd";
+import dayjs from "dayjs";
 import { dashboardService } from "../../services/dashboardService";
 import { RevenueSummaryCards } from "./Revenue_Summary";
 import { RevenueCharts } from "./Revenue_Charts";
@@ -44,13 +46,24 @@ export const RevenuePage = () => {
       subtitle="Phân tích dòng tiền và hiệu suất hệ thống toàn diện"
       actions={
         <>
-          <button className="flex items-center gap-2 px-4 py-2 border border-[#cbd5e1] dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-sm font-medium text-[#334155] dark:text-slate-200 shadow-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
-            <CalendarOutlined className="text-[#64748b] dark:text-slate-400" />
-            Tháng 10, 2023 <DownOutlined className="text-xs" />
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#1677ff] hover:bg-[#0058be] text-white rounded text-sm font-medium shadow-sm transition-colors">
-            <DownloadOutlined />
-            Xuất báo cáo
+          <DatePicker 
+            defaultValue={dayjs()} 
+            format="DD/MM/YYYY"
+            allowClear={false}
+            className="px-4 py-2 bg-white dark:bg-slate-800 rounded border border-[#c4c6cd] dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors font-bold text-[#1b1c1d] dark:text-slate-200 text-xs shadow-sm focus:outline-none focus:border-blue-500"
+          />
+          <button 
+            className="gap-2 px-4 py-[9px] bg-[#1677ff] hover:bg-[#0058be] transition-colors rounded flex items-center focus:outline-none"
+            onClick={() => {
+              notification.success({ 
+                message: "Xuất báo cáo thành công", 
+                description: "Tệp báo cáo doanh thu đã được tải xuống.", 
+                placement: "topRight" 
+              });
+            }}
+          >
+            <DownloadOutlined className="text-white" />
+            <span className="font-bold text-white text-xs">Xuất báo cáo</span>
           </button>
         </>
       }

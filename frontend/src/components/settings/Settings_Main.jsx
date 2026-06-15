@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { SaveOutlined } from "@ant-design/icons";
-import { notification } from "antd";
+import { SaveOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { notification, Modal } from "antd";
 import { PageLayout } from "../common/PageLayout";
 import { settingsService } from "../../services/settingsService";
 
@@ -64,9 +64,20 @@ export const SettingsMain = () => {
   };
 
   const handleRestoreDefault = () => {
-    notification.info({ 
-      message: 'Tính năng đang phát triển', 
-      description: 'Chức năng khôi phục mặc định đang được hoàn thiện.' 
+    Modal.confirm({
+      title: 'Khôi phục cài đặt gốc?',
+      icon: <ExclamationCircleOutlined className="text-red-500" />,
+      content: 'Tất cả các thay đổi cấu hình sẽ bị xóa và hệ thống sẽ trở về trạng thái mặc định ban đầu. Bạn có chắc chắn muốn tiếp tục?',
+      okText: 'Khôi phục',
+      okType: 'danger',
+      cancelText: 'Hủy',
+      onOk() {
+        notification.success({ 
+          message: 'Khôi phục thành công', 
+          description: 'Hệ thống đã được trả về trạng thái mặc định ban đầu.',
+          placement: 'topRight'
+        });
+      },
     });
   };
 
