@@ -345,13 +345,40 @@ public class ParkingServiceImpl implements ParkingService {
             throw new ApiExceptions.BadRequestException("Không còn zone phù hợp cho loại xe này");
         }
 
-        // chosen.setCurrentOccupied(chosen.getCurrentOccupied() + 1);
-        // zoneRepository.save(chosen);
+        zoneRepository.increaseOccupied(chosen.getId());
+
+        Vehicle vehicle = vehicleRepository
+        .findByLicensePlate(plate)
+        .orElseGet(() -> {
+
+            Vehicle newVehicle = new Vehicle();
+
+            newVehicle.setId(UUID.randomUUID());
+
+            // driver_casual trong seed data
+            newVehicle.setOwnerId(
+                    UUID.fromString(
+                            "a0000000-0000-0000-0000-000000000005"));
+
+            newVehicle.setLicensePlate(plate);
+
+            newVehicle.setVehicleSize(
+                    request.getVehicle_type());
+
+            newVehicle.setActive(true);
+
+            newVehicle.setCreatedAt(Instant.now());
+
+            newVehicle.setUpdatedAt(Instant.now());
+
+            return vehicleRepository.save(newVehicle);
+        });
 
         ParkingSession session = new ParkingSession();
         session.setId(UUID.randomUUID());
         session.setLicensePlate(plate);
         session.setCardId(card.getId());
+        session.setVehicleId(vehicle.getId());
         session.setCheckInTime(Instant.now());
         session.setCreatedAt(Instant.now());
         session.setUpdatedAt(Instant.now());
