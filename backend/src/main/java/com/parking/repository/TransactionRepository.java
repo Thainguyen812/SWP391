@@ -10,14 +10,14 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-    // phần 1 / check out task 5
+// phần 1 / check out task 5
 
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
 
     Optional<Transaction> findBySessionId(UUID sessionId);
 
-    @Query(value = "SELECT calculate_parking_fee(:vehicleSize, CAST(:checkIn AS timestamp), CAST(:checkOut AS timestamp))", nativeQuery = true)
+    @Query(value = "SELECT calculate_parking_fee(CAST(:vehicleSize AS varchar), CAST(:checkIn AS timestamp), CAST(:checkOut AS timestamp))", nativeQuery = true)
     BigDecimal calculateParkingFee(@Param("vehicleSize") String vehicleSize,
-                                   @Param("checkIn") Instant checkIn,
-                                   @Param("checkOut") Instant checkOut);
+            @Param("checkIn") Instant checkIn,
+            @Param("checkOut") Instant checkOut);
 }
