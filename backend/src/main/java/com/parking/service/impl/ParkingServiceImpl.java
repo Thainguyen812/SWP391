@@ -311,7 +311,9 @@ public class ParkingServiceImpl implements ParkingService {
     public CheckInResponse visitorCheckIn(VisitorCheckInRequest request) {
         String plate = request.getPlate();
 
-        Optional<ParkingSession> existing = parkingSessionRepository.findByLicensePlateAndSessionStatus( // kiểm tra xe có phiên gửi xe chưa 
+        Optional<ParkingSession> existing = parkingSessionRepository.findByLicensePlateAndSessionStatus( // kiểm tra xe
+                                                                                                         // có phiên gửi
+                                                                                                         // xe chưa
                 plate,
                 ParkingSession.SessionStatus.ACTIVE);
 
@@ -319,14 +321,14 @@ public class ParkingServiceImpl implements ParkingService {
             throw new ApiExceptions.ConflictException("Xe này đang có phiên gửi xe ACTIVE");
         }
 
-        Card card = cardRepository.findByCardCode(request.getCard_code()) // tìm thẻ để sử dung 
+        Card card = cardRepository.findByCardCode(request.getCard_code()) // tìm thẻ để sử dung
                 .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thẻ tạm này"));
 
         if (card.getStatus() != Card.CardStatus.AVAILABLE) {
             throw new ApiExceptions.BadRequestException("Thẻ này không khả dụng để cấp cho khách vãng lai");
         }
 
-        if (blacklistRepository.existsByCardId(card.getId())) { //Kiểm tra blacklist
+        if (blacklistRepository.existsByCardId(card.getId())) { // Kiểm tra blacklist
             throw new ApiExceptions.ForbiddenException("Thẻ này đang nằm trong blacklist");
         }
         List<Zone> candidates = zoneRepository.findAll(); // tim zone phù hợp
@@ -345,35 +347,36 @@ public class ParkingServiceImpl implements ParkingService {
             throw new ApiExceptions.BadRequestException("Không còn zone phù hợp cho loại xe này");
         }
 
-        zoneRepository.increaseOccupied(chosen.getId());
+        zoneRepository.increaseOccupied(chosen.getId()); // trừ số lượng slot còn trống 
 
-        Vehicle vehicle = vehicleRepository
-        .findByLicensePlate(plate)
-        .orElseGet(() -> {
+        Vehicle vehicle = vehicleRepository // chưa có thì tạo và lưu vehicle 
+                .findByLicensePlate(plate)
+                .orElseGet(() -> {
 
-            Vehicle newVehicle = new Vehicle();
+                    Vehicle newVehicle = new Vehicle();
 
-            newVehicle.setId(UUID.randomUUID());
+                    newVehicle.setId(UUID.randomUUID());
 
-            // driver_casual trong seed data
-            newVehicle.setOwnerId(
-                    UUID.fromString(
-                            "a0000000-0000-0000-0000-000000000005"));
+                    // driver_casual trong seed data
+                    newVehicle.setOwnerId(
+                            UUID.fromString(
+                                    "a0000000-0000-0000-0000-000000000005"));
 
-            newVehicle.setLicensePlate(plate);
+                    newVehicle.setLicensePlate(plate);
 
-            newVehicle.setVehicleSize(
-                    request.getVehicle_type());
+                    newVehicle.setVehicleSize(
+                            request.getVehicle_type());
 
-            newVehicle.setActive(true);
+                    newVehicle.setActive(true);
 
-            newVehicle.setCreatedAt(Instant.now());
+                    newVehicle.setCreatedAt(Instant.now());
 
-            newVehicle.setUpdatedAt(Instant.now());
+                    newVehicle.setUpdatedAt(Instant.now());
 
-            return vehicleRepository.save(newVehicle);
-        });
+                    return vehicleRepository.save(newVehicle);
+                });
 
+        // Tao parking session 
         ParkingSession session = new ParkingSession();
         session.setId(UUID.randomUUID());
         session.setLicensePlate(plate);
@@ -387,19 +390,20 @@ public class ParkingServiceImpl implements ParkingService {
         session.setIsVip(false);
         session.setMobileCheckoutPhoto(request.getImage_url());
 
-        parkingSessionRepository.save(session);
+        parkingSessionRepository.save(session); // save vào database
 
+        //Đổi trạng thái thẻ
         card.setStatus(Card.CardStatus.IN_USE);
         card.setUpdatedAt(Instant.now());
         cardRepository.save(card);
 
-        return new CheckInResponse(
+        return new CheckInResponse( // trả respone về controller
                 session.getId().toString(),
                 chosen.getCode(),
                 "VISITOR_CHECK_IN_OK");
     }
 
-    // task5
+    // task5 check out
     @Override
     @Transactional
     public Transaction checkoutCard(UUID cardId) {
@@ -425,7 +429,7 @@ public class ParkingServiceImpl implements ParkingService {
 
         Instant checkOutTime = Instant.now();
 
-        BigDecimal parkingFee = transactionRepository.calculateParkingFee(
+        BigDecimal parkingFee = transactionRepository.calculateParkingFee( // gọi transaction để tính phí
                 vehicle.getVehicleSize(),
                 session.getCheckInTime(),
                 checkOutTime);
@@ -442,7 +446,26 @@ public class ParkingServiceImpl implements ParkingService {
         transaction.setIsMobileCheckout(false);
         transaction.setProcessedAt(checkOutTime);
 
-        return transactionRepository.save(transaction);
+        transaction = transactionRepository.save(transaction);
+        session.setSessionStatus(
+        ParkingSession.SessionStatus.COMPLETED);              
+        session.setCheckOutTime(checkOutTime);
+        parkingSessionRepository.save(session);
+
+        Card card = cardRepository.findById(cardId) 
+                .orElseThrow(() -> new ApiExceptions.NotFoundException(
+                        "Không tìm thấy thẻ"));
+
+        card.setStatus(Card.CardStatus.AVAILABLE);
+
+        cardRepository.save(card);
+        
+        if (session.getAssignedZoneId() != null) {
+            zoneRepository.decreaseOccupied(
+                    session.getAssignedZoneId());
+        }
+        return transaction;
     }
+    
 
 }

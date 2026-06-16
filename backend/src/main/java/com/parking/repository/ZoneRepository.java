@@ -18,4 +18,12 @@ public interface ZoneRepository extends JpaRepository<Zone, UUID> {
                 WHERE z.id = :zoneId
             """)
     void increaseOccupied(UUID zoneId);
+
+    @Modifying
+    @Query("""
+                UPDATE Zone z
+                SET z.currentOccupied = z.currentOccupied - 1
+                WHERE z.id = :zoneId
+            """)
+    void decreaseOccupied(UUID zoneId);
 }
