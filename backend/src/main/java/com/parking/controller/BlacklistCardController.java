@@ -2,6 +2,7 @@ package com.parking.controller;
 
 import com.parking.dto.BlacklistCardRequest;
 import com.parking.model.BlacklistEntry;
+import com.parking.model.ParkingSession;
 import com.parking.service.BlacklistCardService;
 import org.springframework.web.bind.annotation.*;
 
@@ -43,12 +44,17 @@ public class BlacklistCardController {
 
         // Bước B: Đóng gói thông tin lại thành một Request hoàn chỉnh để tái sử dụng
         // hàm create()
+        // Cần ép kiểu hoặc đảm bảo tìm đúng Session đang ACTIVE của biển số này
+        ParkingSession activeSession = blacklistCardService.getActiveSessionByLicensePlate(plate);
+        String cleanPlate = plate.trim().toUpperCase();
+
         BlacklistCardRequest request = new BlacklistCardRequest();
-        request.setCardId(detectedCardId);
+        request.setCardId(activeSession.getCardId());
+        request.setSessionId(activeSession.getId());
         request.setReason(reason);
         request.setBlacklistedBy(staffId);
         request.setNotes(
-                "Hệ thống tự động khóa qua chức năng báo mất cho xe có biển số: " + plate.trim().toUpperCase());
+                "Hệ thống tự động khóa qua chức năng báo mất cho xe có biển số: " + cleanPlate);
 
         // Bước C: Gọi hàm tạo bản ghi blacklist
         return blacklistCardService.create(request);
