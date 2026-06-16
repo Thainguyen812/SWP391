@@ -113,6 +113,10 @@ public class ParkingServiceImpl implements ParkingService {
         // store image url if provided
         ps.setMobileCheckoutPhoto(request.getImage_url());
 
+        if (vehicleOpt.isPresent()) {
+            ps.setVehicleId(vehicleOpt.get().getId());
+        }
+
         parkingSessionRepository.save(ps);
 
         return new CheckInResponse(ps.getId().toString(), chosen.getCode(), "OK");
