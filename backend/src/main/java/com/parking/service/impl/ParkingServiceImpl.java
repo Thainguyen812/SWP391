@@ -33,6 +33,10 @@ import java.time.Instant;
 
 import java.math.BigDecimal;// task 5
 
+import com.parking.dto.VisitorCheckInRequest;// task 5
+import com.parking.model.Card;// task 5
+import com.parking.repository.CardRepository;// task 5
+
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,7 +53,8 @@ public class ParkingServiceImpl implements ParkingService {
     private final AuditLogRepository auditLogRepository;
     private final AiScanLogRepository aiScanLogRepository;
 
-    private final TransactionRepository transactionRepository;
+    private final TransactionRepository transactionRepository;// task 5
+    private final CardRepository cardRepository;// task 5
 
     public ParkingServiceImpl(BlacklistRepository blacklistRepository,
             ParkingSessionRepository parkingSessionRepository,
@@ -59,7 +64,8 @@ public class ParkingServiceImpl implements ParkingService {
             VipQrIdentifierRepository vipQrIdentifierRepository,
             AuditLogRepository auditLogRepository,
             AiScanLogRepository aiScanLogRepository,
-            TransactionRepository transactionRepository) { // task 5
+            TransactionRepository transactionRepository, // task 5
+            CardRepository cardRepository) { // task 5
         this.blacklistRepository = blacklistRepository;
         this.parkingSessionRepository = parkingSessionRepository;
         this.zoneRepository = zoneRepository;
@@ -68,7 +74,8 @@ public class ParkingServiceImpl implements ParkingService {
         this.vipQrIdentifierRepository = vipQrIdentifierRepository;
         this.auditLogRepository = auditLogRepository;
         this.aiScanLogRepository = aiScanLogRepository;
-        this.transactionRepository = transactionRepository;
+        this.transactionRepository = transactionRepository; // task 5
+        this.cardRepository = cardRepository; // task 5
     }
 
     @Override
@@ -298,7 +305,74 @@ public class ParkingServiceImpl implements ParkingService {
         }
     }
 
-    //task 5
+    // task 5 visitor check in
+    @Override
+    @Transactional
+    public CheckInResponse visitorCheckIn(VisitorCheckInRequest request) {
+        String plate = request.getPlate();
+
+        Optional<ParkingSession> existing = parkingSessionRepository.findByLicensePlateAndSessionStatus( // kiểm tra xe có phiên gửi xe chưa 
+                plate,
+                ParkingSession.SessionStatus.ACTIVE);
+
+        if (existing.isPresent()) {
+            throw new ApiExceptions.ConflictException("Xe này đang có phiên gửi xe ACTIVE");
+        }
+
+        Card card = cardRepository.findByCardCode(request.getCard_code()) // tìm thẻ để sử dung 
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thẻ tạm này"));
+
+        if (card.getStatus() != Card.CardStatus.AVAILABLE) {
+            throw new ApiExceptions.BadRequestException("Thẻ này không khả dụng để cấp cho khách vãng lai");
+        }
+
+        if (blacklistRepository.existsByCardId(card.getId())) { //Kiểm tra blacklist
+            throw new ApiExceptions.ForbiddenException("Thẻ này đang nằm trong blacklist");
+        }
+        List<Zone> candidates = zoneRepository.findAll(); // tim zone phù hợp
+        Zone chosen = null;
+
+        for (Zone z : candidates) {
+            if (z.getAllowedSizes() != null
+                    && z.getAllowedSizes().contains(request.getVehicle_type())
+                    && z.getTotalSlots() - z.getCurrentOccupied() > 0) {
+                chosen = z;
+                break;
+            }
+        }
+
+        if (chosen == null) {
+            throw new ApiExceptions.BadRequestException("Không còn zone phù hợp cho loại xe này");
+        }
+
+        // chosen.setCurrentOccupied(chosen.getCurrentOccupied() + 1);
+        // zoneRepository.save(chosen);
+
+        ParkingSession session = new ParkingSession();
+        session.setId(UUID.randomUUID());
+        session.setLicensePlate(plate);
+        session.setCardId(card.getId());
+        session.setCheckInTime(Instant.now());
+        session.setCreatedAt(Instant.now());
+        session.setUpdatedAt(Instant.now());
+        session.setAssignedZoneId(chosen.getId());
+        session.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
+        session.setIsVip(false);
+        session.setMobileCheckoutPhoto(request.getImage_url());
+
+        parkingSessionRepository.save(session);
+
+        card.setStatus(Card.CardStatus.IN_USE);
+        card.setUpdatedAt(Instant.now());
+        cardRepository.save(card);
+
+        return new CheckInResponse(
+                session.getId().toString(),
+                chosen.getCode(),
+                "VISITOR_CHECK_IN_OK");
+    }
+
+    // task5
     @Override
     @Transactional
     public Transaction checkoutCard(UUID cardId) {

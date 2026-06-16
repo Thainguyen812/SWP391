@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 
+import com.parking.dto.VisitorCheckInRequest;// TASK 5
+
 // phần 1 / check out task 5
 import java.util.UUID;
 import com.parking.model.Transaction;
@@ -45,7 +47,13 @@ public class ParkingController {
         public void setQrToken(String qrToken) { this.qrToken = qrToken; }
     }
 
-    // phần 1 / check out task 5
+    //CHECK IN VISITOR
+    @PostMapping("/check-in/visitor")
+    public ResponseEntity<CheckInResponse> visitorCheckIn(@RequestBody VisitorCheckInRequest request) {
+    CheckInResponse response = parkingService.visitorCheckIn(request);
+    return ResponseEntity.status(201).body(response);
+}   
+    // phần 1 / check out VISITOR task 5
     @PostMapping("/checkout/{cardId}")
     public ResponseEntity<Transaction> checkout(
         @PathVariable UUID cardId
