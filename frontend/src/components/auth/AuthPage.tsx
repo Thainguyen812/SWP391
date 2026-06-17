@@ -206,6 +206,8 @@ export const AuthPage = () => {
       setTimeout(() => {
         if (user && user.role === 'DRIVER') {
           navigate('/driver');
+        } else if (user && user.role === 'STAFF') {
+          navigate('/staff-dashboard');
         } else {
           navigate('/overview');
         }

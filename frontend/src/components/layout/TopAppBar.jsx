@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { SearchOutlined, BellOutlined, MoonOutlined, SunOutlined, CheckCircleOutlined, WarningOutlined } from "@ant-design/icons";
 import { notification } from "antd";
+import { useLocation } from "react-router-dom";
 import { useGlobalContext } from "../../context/GlobalContext";
 import "./TopAppBar.css";
 
@@ -12,9 +13,16 @@ const locations = [
 
 export const TopAppBarSection = () => {
   const searchId = useId();
+  const location = useLocation();
   const { searchValue, setSearchValue, activeLocation, setActiveLocation } = useGlobalContext();
   const [isOnline, setIsOnline] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Xác định Title của trang dựa vào Route
+  let pageTitle = null;
+  if (location.pathname === '/staff-dashboard') pageTitle = 'Bảng điều khiển';
+  else if (location.pathname === '/staff-gate-control') pageTitle = 'Điều khiển Cổng';
+  else if (location.pathname === '/staff-payment') pageTitle = 'Hệ thống quản lý đỗ xe';
 
   const toggleDarkMode = () => {
     const newMode = !isDarkMode;
@@ -28,20 +36,28 @@ export const TopAppBarSection = () => {
 
   return (
     <header className="top-app-bar">
-      {/* Left Area: Search */}
+      {/* Left Area: Search or Title */}
       <div className="search-container">
-        <div className="search-input-wrapper">
-          <label htmlFor={searchId} className="sr-only">Tìm kiếm</label>
-          <SearchOutlined className="search-icon" />
-          <input
-            id={searchId}
-            type="search"
-            value={searchValue}
-            onChange={(event) => setSearchValue(event.target.value)}
-            placeholder="Tìm kiếm..."
-            className="search-input"
-          />
-        </div>
+        {pageTitle ? (
+          <div className="flex items-center gap-2 text-base text-slate-500 ml-4 min-w-0">
+            <h2 className="text-xl font-bold text-slate-800 m-0 whitespace-nowrap truncate">{pageTitle}</h2>
+            <span className="px-2 flex-shrink-0">|</span>
+            <span className="tracking-wide whitespace-nowrap truncate hidden sm:block">UrbanPark Systems</span>
+          </div>
+        ) : (
+          <div className="search-input-wrapper">
+            <label htmlFor={searchId} className="sr-only">Tìm kiếm</label>
+            <SearchOutlined className="search-icon" />
+            <input
+              id={searchId}
+              type="search"
+              value={searchValue}
+              onChange={(event) => setSearchValue(event.target.value)}
+              placeholder="Tìm kiếm..."
+              className="search-input"
+            />
+          </div>
+        )}
       </div>
 
       {/* Center Area: Location Selector */}

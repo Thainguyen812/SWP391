@@ -10,14 +10,25 @@ import { SettingsMain } from './components/settings/Settings_Main';
 import { PersonnelMain } from './components/personnel/Personnel_Main';
 import { SecurityMain } from './components/security/Security_Main';
 import { LogsMain } from './components/logs/Logs_Main';
+import { StaffDashboard } from './components/staff/StaffDashboard';
+import { StaffGateControl } from './components/staff/StaffGateControl';
+import { StaffPayment } from './components/staff/StaffPayment';
+import StaffLayout from './components/layout/StaffLayout';
 import { GlobalProvider } from './context/GlobalContext';
 
-// Helper component to wrap protected pages with MainLayout
 const ProtectedPage = ({ children, allowedRoles }) => (
   <ProtectedRoute allowedRoles={allowedRoles}>
     <MainLayout>
       {children}
     </MainLayout>
+  </ProtectedRoute>
+);
+
+const StaffProtectedPage = ({ children }) => (
+  <ProtectedRoute allowedRoles={['STAFF']}>
+    <StaffLayout>
+      {children}
+    </StaffLayout>
   </ProtectedRoute>
 );
 
@@ -63,7 +74,7 @@ class ErrorBoundary extends React.Component {
 }
 
 function App() {
-  const managementRoles = ['MANAGER', 'ADMIN', 'STAFF'];
+  const managementRoles = ['MANAGER', 'ADMIN'];
 
   return (
     <BrowserRouter>
@@ -101,6 +112,17 @@ function App() {
         } />
         <Route path="/logs" element={
           <ProtectedPage allowedRoles={managementRoles}><LogsMain /></ProtectedPage>
+        } />
+
+        {/* Nhóm Nhân viên (Staff) */}
+        <Route path="/staff-dashboard" element={
+          <StaffProtectedPage><StaffDashboard /></StaffProtectedPage>
+        } />
+        <Route path="/staff-gate-control" element={
+          <StaffProtectedPage><StaffGateControl /></StaffProtectedPage>
+        } />
+        <Route path="/staff-payment" element={
+          <StaffProtectedPage><StaffPayment /></StaffProtectedPage>
         } />
 
         {/* Nhóm Khách hàng (Driver) */}

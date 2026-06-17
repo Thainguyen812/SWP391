@@ -1,7 +1,24 @@
 import { apiClient } from '../api/apiClient';
 
+const isMock = import.meta.env.VITE_USE_MOCK_API === 'true';
+
 export const authService = {
   login: async (username, password) => {
+    if (isMock) {
+      await new Promise(resolve => setTimeout(resolve, 600)); // fake delay
+      let role = 'ADMIN';
+      let fullName = 'Admin User';
+      if (username === 'staff') { role = 'STAFF'; fullName = 'Operations Staff'; }
+      else if (username === 'manager') { role = 'MANAGER'; fullName = 'Parking Manager'; }
+      else if (username.includes('driver')) { role = 'DRIVER'; fullName = 'Driver User'; }
+      else if (password !== '123456') { return { success: false, message: "Mật khẩu sai (Mock API chấp nhận pass: 123456)" }; }
+
+      const mockUser = { id: 'mock-id', username, role, fullName };
+      localStorage.setItem('token', 'mock-jwt-token-12345');
+      localStorage.setItem('user', JSON.stringify(mockUser));
+      return { success: true, user: mockUser };
+    }
+
     try {
       // Bắn dữ liệu username/password sang Backend
       const response = await apiClient.post('/auth/login', {
