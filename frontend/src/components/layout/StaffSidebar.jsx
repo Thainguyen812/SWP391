@@ -17,9 +17,9 @@ import './Sidebar.css';
 const navItems = [
   { path: '/staff-dashboard', label: 'Bảng điều khiển', icon: <AppstoreOutlined /> },
   { path: '/staff-gate-control', label: 'Điều khiển cổng', icon: <DesktopOutlined /> },
-  { path: '#', label: 'Giám sát', icon: <VideoCameraOutlined /> },
+  { path: '/staff-monitoring', label: 'Giám sát', icon: <VideoCameraOutlined /> },
   { path: '/staff-payment', label: 'Thanh toán', icon: <CreditCardOutlined /> },
-  { path: '#', label: 'Cảnh báo an ninh', icon: <AlertOutlined /> },
+  { path: '/staff-security', label: 'Cảnh báo an ninh', icon: <AlertOutlined /> },
   { path: '#', label: 'Báo mất thẻ', icon: <IdcardOutlined /> },
   { path: '#', label: 'Lịch sử giao ca', icon: <HistoryOutlined /> },
 ];

@@ -7,7 +7,7 @@ import {
   ExpandAltOutlined
 } from '@ant-design/icons';
 
-export const MonitoringPage = () => {
+export const StaffMonitoring = () => {
   return (
     <div className="p-6 max-w-[1400px] mx-auto w-full">
       {/* Page Header */}

@@ -23,6 +23,8 @@ export const TopAppBarSection = () => {
   if (location.pathname === '/staff-dashboard') pageTitle = 'Bảng điều khiển';
   else if (location.pathname === '/staff-gate-control') pageTitle = 'Điều khiển Cổng';
   else if (location.pathname === '/staff-payment') pageTitle = 'Hệ thống quản lý đỗ xe';
+  else if (location.pathname === '/staff-monitoring') pageTitle = 'Giám sát bãi xe';
+  else if (location.pathname === '/staff-security') pageTitle = 'Cảnh báo An ninh';
 
   const toggleDarkMode = () => {
     const newMode = !isDarkMode;

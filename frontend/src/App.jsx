@@ -13,6 +13,8 @@ import { LogsMain } from './components/logs/Logs_Main';
 import { StaffDashboard } from './components/staff/StaffDashboard';
 import { StaffGateControl } from './components/staff/StaffGateControl';
 import { StaffPayment } from './components/staff/StaffPayment';
+import { StaffMonitoring } from './components/staff/StaffMonitoring';
+import { StaffSecurityAlerts } from './components/staff/StaffSecurityAlerts';
 import StaffLayout from './components/layout/StaffLayout';
 import { GlobalProvider } from './context/GlobalContext';
 
@@ -123,6 +125,12 @@ function App() {
         } />
         <Route path="/staff-payment" element={
           <StaffProtectedPage><StaffPayment /></StaffProtectedPage>
+        } />
+        <Route path="/staff-monitoring" element={
+          <StaffProtectedPage><StaffMonitoring /></StaffProtectedPage>
+        } />
+        <Route path="/staff-security" element={
+          <StaffProtectedPage><StaffSecurityAlerts /></StaffProtectedPage>
         } />
 
         {/* Nhóm Khách hàng (Driver) */}
