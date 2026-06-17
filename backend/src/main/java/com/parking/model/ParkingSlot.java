@@ -19,7 +19,7 @@ public class ParkingSlot {
     // Sửa từ chargerStatus -> ev_charger_id
     // Dùng kiểu UUID để tham chiếu tới bảng trụ sạc (mock)
     @Column(name = "ev_charger_id")
-    private UUID evChargerId;
+    private String evChargerId;
 
     @Column(name = "last_updated")
     private Instant lastUpdated;

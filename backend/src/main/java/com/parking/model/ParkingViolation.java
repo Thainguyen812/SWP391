@@ -50,4 +50,9 @@ public class ParkingViolation {
 
     @Column(name = "status")
     private String status = "PENDING"; // PENDING, PROCESSED
+
+    // Thêm trường này thay cho reason cũ
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes;
+
 }

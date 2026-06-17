@@ -57,7 +57,7 @@ public class ParkingScheduler {
                         violation.setDetectedBy(adminId);
                         violation.setDetectedAt(Instant.now());
                         violation.setViolationType("EV_ZONE_MISUSE");
-                        violation.setReason("Đỗ xe tại vị trí sạc nhưng không sạc quá 15 phút.");
+                        violation.setNotes("Đỗ xe tại vị trí sạc nhưng không sạc quá 15 phút.");
                         violation.setStatus("PENDING");
 
                         violationRepository.save(violation);
