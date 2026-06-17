@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
 
+    // phần 1 / check out task 5
 @Entity
 @Table(name = "cards")
 public class Card {

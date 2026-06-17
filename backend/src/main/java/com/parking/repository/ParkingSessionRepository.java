@@ -14,5 +14,10 @@ public interface ParkingSessionRepository extends JpaRepository<ParkingSession, 
     UUID cardId,
     ParkingSession.SessionStatus sessionStatus
     //
-);
+    );
+
+    java.util.List<ParkingSession> findByCardIdAndSessionStatusIn(
+    UUID cardId,
+    java.util.Collection<ParkingSession.SessionStatus> statuses
+    );
 }
