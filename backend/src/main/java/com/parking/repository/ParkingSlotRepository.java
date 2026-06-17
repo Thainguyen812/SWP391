@@ -13,9 +13,10 @@ import java.util.UUID;
 @Repository
 public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, UUID> {
 
-    // Query này dùng để tìm xe đỗ quá 15 phút tại vị trí sạc mà không sạc
-    @Query("SELECT s FROM ParkingSlot s WHERE s.status = 'OCCUPIED' " +
-            "AND s.chargerStatus = 'NOT_CHARGING' " +
+    // CHỈNH SỬA: Dùng slotStatus và evChargerId khớp với Entity mới
+    // Lưu ý: Kiểm tra evChargerId IS NOT NULL để xác định đó là ô có trụ sạc
+    @Query("SELECT s FROM ParkingSlot s WHERE s.slotStatus = 'OCCUPIED' " +
+            "AND s.evChargerId IS NOT NULL " +
             "AND s.lastUpdated <= :timeLimit")
     List<ParkingSlot> findViolatingSlots(@Param("timeLimit") Instant timeLimit);
 }
