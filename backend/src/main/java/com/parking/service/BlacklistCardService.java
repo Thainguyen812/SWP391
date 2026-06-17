@@ -46,7 +46,12 @@ public class BlacklistCardService {
             throw new ApiExceptions.ConflictException("Card is already blacklisted");
         }
 
-        ParkingSession session = parkingSessionRepository.findById(request.getSessionId())
+        UUID sessionId = request.getSessionId();
+        if (sessionId == null) {
+            throw new ApiExceptions.BadRequestException("ID phiên gửi xe không được để trống!");
+        }
+
+        ParkingSession session = parkingSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ApiExceptions.BadRequestException(
                         "Không tìm thấy phiên gửi xe tương ứng với yêu cầu này!"));
 
@@ -54,9 +59,19 @@ public class BlacklistCardService {
             throw new ApiExceptions.ConflictException("Phiên gửi xe này đã được xác nhận hoàn tất trước đó rồi!");
         }
 
+        // TỐI ƯU HÓA: Kiểm tra lý do để quyết định trạng thái phiên xe
+        String reason = (request.getReason() != null) ? request.getReason().toUpperCase() : "";
+
+        if (reason.equals("LOST") || reason.equals("STOLEN") ||
+                reason.equals("DAMAGED") || reason.equals("FRAUDULENT")) {
+            session.setSessionStatus(ParkingSession.SessionStatus.LOST_CARD);
+        } else {
+            session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
+        }
+
         // 3. Đóng phiên gửi xe vãng lai, cập nhật thời gian ra thực tế và Staff xử lý
         // sự cố
-        session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
+
         session.setCheckOutTime(Instant.now());
 
         // Sửa hàm lỗi: Dùng setOverrideByStaff để ghi nhận ID nhân viên xử lý tại bốt
@@ -89,6 +104,9 @@ public class BlacklistCardService {
     }
 
     public void delete(UUID id) {
+        if (id == null) {
+            throw new ApiExceptions.BadRequestException("ID cần xóa không được để trống!");
+        }
         blacklistedCardRepository.deleteById(id);
     }
 

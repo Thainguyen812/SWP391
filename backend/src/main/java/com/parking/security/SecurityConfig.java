@@ -49,9 +49,14 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html",
-                                "/api/blacklisted-cards/**" // 🔥 PHƯỚC THÊM DÒNG NÀY VÀO ĐÂY NHA!
-                        ).permitAll()
+                                "/swagger-ui.html")
+                        .permitAll()
+
+                        // Phân quyền (Role-based): Sử dụng .hasAnyRole("STAFF", "MANAGER", "ADMIN")
+                        // đảm bảo rằng chỉ những người dùng có chức danh phù hợp mới được quyền thay
+                        // đổi trạng thái phiên đỗ xe (tránh việc khách hàng tự "hack" trạng thái xe về
+                        // COMPLETED).
+                        .requestMatchers("/api/blacklisted-cards/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
 
                         // Tất cả các request còn lại đều phải quẹt thẻ thành công
                         .anyRequest().authenticated());

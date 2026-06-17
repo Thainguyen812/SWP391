@@ -38,26 +38,16 @@ public class BlacklistCardController {
             @RequestParam String reason,
             @RequestParam UUID staffId) {
 
-        // Bước A: Gọi hàm bạn vừa viết trong Service để tìm ngược ra Card ID đang nằm
-        // trong bãi
-        UUID detectedCardId = blacklistCardService.getCardIdByActiveLicensePlate(plate);
-
-        // Bước B: Đóng gói thông tin lại thành một Request hoàn chỉnh để tái sử dụng
-        // hàm create()
-        // Cần ép kiểu hoặc đảm bảo tìm đúng Session đang ACTIVE của biển số này
-        ParkingSession activeSession = blacklistCardService.getActiveSessionByLicensePlate(plate);
-        String cleanPlate = plate.trim().toUpperCase();
-
+        // 1. Đóng gói các thông tin cơ bản vào DTO
         BlacklistCardRequest request = new BlacklistCardRequest();
-        request.setCardId(activeSession.getCardId());
-        request.setSessionId(activeSession.getId());
         request.setReason(reason);
         request.setBlacklistedBy(staffId);
-        request.setNotes(
-                "Hệ thống tự động khóa qua chức năng báo mất cho xe có biển số: " + cleanPlate);
 
-        // Bước C: Gọi hàm tạo bản ghi blacklist
-        return blacklistCardService.create(request);
+        // 2. Chỉ gọi đúng 1 hàm Service duy nhất
+        // Mọi logic tìm kiếm phiên xe, chuẩn hóa dữ liệu, set ID, set trạng thái
+        // LOST_CARD
+        // đều đã được xử lý bên trong processLostCardByPlate
+        return blacklistCardService.processLostCardByPlate(plate, request);
     }
     // =====================================================================
 
