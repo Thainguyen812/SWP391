@@ -61,7 +61,9 @@ public class ParkingSession {
     @Column(name = "mobile_checkout_photo")
     private String mobileCheckoutPhoto;
 
-    @Column(name = "lost_card_proof_photos", columnDefinition = "json")
+    // @Column(name = "lost_card_proof_photos", columnDefinition = "json")
+    // private String lostCardProofPhotos;
+    @Column(name = "lost_card_proof_photos", columnDefinition = "jsonb", insertable = false, updatable = false) // sửa để chạy chạy check in vãn lai
     private String lostCardProofPhotos;
 
     @Column(name = "created_at")
