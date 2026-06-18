@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { 
   InfoCircleOutlined, 
   SoundOutlined,
@@ -10,105 +11,133 @@ import {
   WarningOutlined,
   CreditCardOutlined
 } from '@ant-design/icons';
-import { Tag, Modal, notification } from 'antd';
+import { Tag, Modal, notification, Spin } from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { logService } from '../../services/logService';
 
 export const StaffDashboard = () => {
-  const logs = [
-    {
-      plate: "51A-123.45",
-      model: "Tesla Model S (Trắng)",
-      type: "VIP",
-      typeColor: "#000",
-      gate: "Cổng vào 1",
-      action: "Vào bãi",
-      actionColor: "text-emerald-600",
-      time: "14:45:22",
-      status: "THÀNH CÔNG",
-      statusColor: "bg-emerald-100 text-emerald-700"
-    },
-    {
-      plate: "30E-882.11",
-      model: "Toyota Camry (Xám)",
-      type: "KHÁCH",
-      typeColor: "#64748b",
-      gate: "Cổng ra 2",
-      action: "Ra bãi",
-      actionColor: "text-blue-600",
-      time: "14:42:10",
-      status: "ĐÃ THU 30.000Đ",
-      statusColor: "bg-blue-100 text-blue-700"
-    },
-    {
-      plate: "-- KHÔNG RÕ --",
-      model: "Lỗi nhận diện biển số",
-      type: "LỖI",
-      typeColor: "#ef4444",
-      gate: "Cổng vào 1",
-      action: "Chặn Tự động",
-      actionColor: "text-red-600",
-      time: "14:40:05",
-      status: "CẦN XỬ LÝ",
-      statusColor: "bg-red-100 text-red-700"
-    },
-    {
-      plate: "51K-998.02",
-      model: "Ford Ranger (Xanh)",
-      type: "KHÁCH",
-      typeColor: "#64748b",
-      gate: "Cổng vào 2",
-      action: "Vào bãi",
-      actionColor: "text-emerald-600",
-      time: "14:38:55",
-      status: "THÀNH CÔNG",
-      statusColor: "bg-emerald-100 text-emerald-700"
-    }
-  ];
+  const navigate = useNavigate();
+  const [isManualBarrierOpen, setIsManualBarrierOpen] = useState(false);
+  
+  // States for Violation Modal
+  const [isViolationModalVisible, setIsViolationModalVisible] = useState(false);
+  const [violationPlate, setViolationPlate] = useState('');
+  const [violationReason, setViolationReason] = useState('Đỗ sai quy định');
+
+  const [logs, setLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(true);
+
+  useEffect(() => {
+    const fetchSessions = async () => {
+      try {
+        setLoadingLogs(true);
+        const data = await logService.getParkingSessions();
+        if (data && Array.isArray(data)) {
+          const mappedLogs = data.map((session, index) => {
+            const isCheckIn = !session.checkOutTime;
+            
+            // Map vehicle details from backend DTO
+            let vehicleDisplay = "Khách vãng lai";
+            if (session.vehicleBrand || session.vehicleModel) {
+               vehicleDisplay = `${session.vehicleModel} ${session.vehicleColor ? `(${session.vehicleColor})` : ''}`.trim();
+            } else if (session.isVip) {
+               vehicleDisplay = "Xe đăng ký tháng";
+            } else if (session.isSuspicious) {
+               vehicleDisplay = "Lỗi nhận diện biển số";
+            }
+            
+            // Map gate
+            const gateStr = isCheckIn ? `Cổng vào ${index % 2 === 0 ? '1' : '2'}` : `Cổng ra ${index % 2 === 0 ? '1' : '2'}`;
+            
+            // Map status
+            let statusStr = "THÀNH CÔNG";
+            if (session.isSuspicious) {
+                statusStr = "CẦN XỬ LÝ";
+            } else if (session.sessionStatus === 'COMPLETED') {
+                statusStr = "ĐÃ THU 30.000Đ"; // Fake fee amount for UI
+            }
+
+            return {
+              id: session.id,
+              plate: session.licensePlate || '-- KHÔNG RÕ --',
+              model: vehicleDisplay,
+              type: session.isVip ? "VIP" : (session.isSuspicious ? "LỖI" : "KHÁCH"),
+              typeColor: session.isVip ? "#000" : (session.isSuspicious ? "#ef4444" : "#64748b"),
+              gate: gateStr, 
+              action: session.isSuspicious ? "Chặn Tự động" : (isCheckIn ? "Vào bãi" : "Ra bãi"),
+              actionColor: session.isSuspicious ? "text-red-600" : (isCheckIn ? "text-emerald-600" : "text-blue-600"),
+              time: new Date(session.checkOutTime || session.checkInTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+              status: statusStr,
+              statusColor: session.isSuspicious ? "bg-red-100 text-red-700" : (session.sessionStatus === 'COMPLETED' ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700")
+            };
+          });
+          // Sort newest first
+          mappedLogs.sort((a, b) => b.time.localeCompare(a.time));
+          setLogs(mappedLogs);
+        } else {
+          setLogs([]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch parking sessions:", error);
+        // Soft fallback if API not ready
+        setLogs([]);
+      } finally {
+        setLoadingLogs(false);
+      }
+    };
+    fetchSessions();
+  }, []);
 
   const handleOpenManualBarrier = () => {
-    Modal.confirm({
-      title: 'Mở Barrier Thủ Công',
-      content: 'Bạn đang yêu cầu mở Barrier thủ công. Hành động này sẽ được lưu vào nhật ký.',
-      okText: 'Xác nhận Mở',
-      cancelText: 'Hủy bỏ',
-      onOk() {
-        notification.success({ message: 'Thành công', description: 'Lệnh mở Barrier đã được gửi đến thiết bị.', placement: 'topRight' });
-      }
-    });
+    if (!isManualBarrierOpen) {
+      Modal.confirm({
+        title: 'Mở Barrier Thủ Công',
+        icon: <WarningOutlined className="text-yellow-500" />,
+        content: 'Bạn đang yêu cầu mở Barrier thủ công. Hành động này sẽ được lưu vào nhật ký.',
+        okText: 'Xác nhận Mở',
+        cancelText: 'Hủy bỏ',
+        okButtonProps: { type: 'primary', className: 'bg-blue-600' },
+        onOk() {
+          setIsManualBarrierOpen(true);
+          notification.success({ message: 'Thành công', description: 'Lệnh mở Barrier đã được gửi đến thiết bị.', placement: 'topRight' });
+        }
+      });
+    } else {
+      Modal.confirm({
+        title: 'Đóng Barrier Thủ Công',
+        icon: <WarningOutlined className="text-yellow-500" />,
+        content: 'Bạn đang yêu cầu đóng Barrier. Hành động này sẽ được lưu vào nhật ký.',
+        okText: 'Xác nhận Đóng',
+        cancelText: 'Hủy bỏ',
+        okButtonProps: { type: 'primary', danger: true, className: 'bg-red-600' },
+        onOk() {
+          setIsManualBarrierOpen(false);
+          notification.success({ message: 'Thành công', description: 'Lệnh đóng Barrier đã được gửi đến thiết bị.', placement: 'topRight' });
+        }
+      });
+    }
   };
 
   const handleCashCollection = () => {
-    Modal.info({
-      title: 'Thu Tiền Mặt',
-      content: 'Vui lòng quét thẻ hoặc nhập biển số xe để tra cứu phí đỗ xe cần thu.',
-      okText: 'Xác nhận',
-      onOk() {
-        notification.info({ message: 'Hệ thống', description: 'Đang mở giao diện máy POS thu phí...', placement: 'topRight' });
-      }
-    });
+    notification.info({ message: 'Hệ thống', description: 'Đang mở giao diện máy POS thu phí...', placement: 'topRight' });
+    navigate('/staff-payment');
   };
 
   const handleReportViolation = () => {
-    Modal.warning({
-      title: 'Đánh dấu Vi phạm',
-      content: 'Chức năng này dùng để khóa biển số các xe đỗ sai quy định hoặc trốn vé.',
-      okText: 'Đưa vào Blacklist',
-      cancelText: 'Hủy bỏ',
-      okType: 'danger',
-      onOk() {
-        notification.warning({ message: 'Đã cảnh báo', description: 'Biển số đã được thêm vào danh sách đen.', placement: 'topRight' });
-      }
-    });
+    setIsViolationModalVisible(true);
   };
 
   const handleReportLostCard = () => {
     Modal.confirm({
       title: 'Báo Mất Thẻ',
+      icon: <WarningOutlined className="text-yellow-500" />,
       content: 'Bạn có chắc chắn muốn khóa thẻ bị mất và tiến hành quy trình phạt mất thẻ không?',
       okText: 'Khóa Thẻ',
-      okType: 'danger',
       cancelText: 'Hủy',
+      okButtonProps: { danger: true, type: 'primary', className: 'bg-white text-red-500 border-red-500 hover:bg-red-50' },
       onOk() {
         notification.error({ message: 'Thẻ đã bị khóa', description: 'Hệ thống đã khóa thẻ hiện tại và ghi nhận báo mất.', placement: 'topRight' });
+        navigate('/staff-lost-card');
       }
     });
   };
@@ -125,7 +154,10 @@ export const StaffDashboard = () => {
             <p className="text-slate-700 text-sm m-0">Cổng vào số 1 đang có dấu hiệu ùn tắc. Vui lòng hỗ trợ điều phối.</p>
           </div>
         </div>
-        <button className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium px-4 py-2 rounded flex items-center gap-2 text-sm transition-colors">
+        <button 
+          onClick={() => notification.info({ message: 'Hệ thống', description: 'Đã ghi nhận báo cáo ùn tắc và thông báo cho Quản lý.', placement: 'topRight' })}
+          className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium px-4 py-2 rounded flex items-center gap-2 text-sm transition-colors"
+        >
           <SoundOutlined />
           Báo cáo Ùn tắc
         </button>
@@ -270,8 +302,10 @@ export const StaffDashboard = () => {
           
           <div className="grid grid-cols-2 gap-4 mb-4">
             <button onClick={handleOpenManualBarrier} className="bg-white border border-slate-200 hover:border-blue-500 hover:shadow-md transition-all rounded-xl p-5 flex flex-col items-center justify-center gap-3 h-32">
-              <ExportOutlined className="text-blue-600 text-2xl" />
-              <span className="text-sm font-bold text-slate-700 text-center">Mở Barrier<br/>Thủ công</span>
+              <ExportOutlined className={`${isManualBarrierOpen ? "text-red-500 rotate-180" : "text-blue-600"} text-2xl transition-transform`} />
+              <span className="text-sm font-bold text-slate-700 text-center whitespace-pre-line">
+                {isManualBarrierOpen ? "Đóng Barrier\nThủ công" : "Mở Barrier\nThủ công"}
+              </span>
             </button>
             
             <button onClick={handleCashCollection} className="bg-white border border-slate-200 hover:border-blue-500 hover:shadow-md transition-all rounded-xl p-5 flex flex-col items-center justify-center gap-3 h-32">
@@ -305,8 +339,18 @@ export const StaffDashboard = () => {
         <div className="p-4 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-lg font-bold text-slate-800">Nhật ký Cổng Trực tiếp</h3>
           <div className="flex gap-2">
-            <button className="p-2 text-slate-500 hover:bg-slate-100 rounded transition-colors"><FilterOutlined /></button>
-            <button className="p-2 text-slate-500 hover:bg-slate-100 rounded transition-colors"><DownloadOutlined /></button>
+            <button 
+              onClick={() => notification.info({ message: 'Bộ lọc', description: 'Tính năng bộ lọc nâng cao đang được cập nhật.', placement: 'topRight' })}
+              className="p-2 text-slate-500 hover:bg-slate-100 rounded transition-colors"
+            >
+              <FilterOutlined />
+            </button>
+            <button 
+              onClick={() => notification.success({ message: 'Tải xuống thành công', description: 'File nhat_ky_truc_tiep.xlsx đã được lưu.', placement: 'topRight' })}
+              className="p-2 text-slate-500 hover:bg-slate-100 rounded transition-colors"
+            >
+              <DownloadOutlined />
+            </button>
           </div>
         </div>
         
@@ -323,7 +367,19 @@ export const StaffDashboard = () => {
               </tr>
             </thead>
             <tbody>
-              {logs.map((log, i) => (
+              {loadingLogs ? (
+                <tr>
+                  <td colSpan="6" className="p-8 text-center">
+                    <Spin size="large" tip="Đang tải dữ liệu thực từ máy chủ..." />
+                  </td>
+                </tr>
+              ) : logs.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="p-8 text-center text-slate-500">
+                    Không có dữ liệu
+                  </td>
+                </tr>
+              ) : logs.map((log, i) => (
                 <tr key={i} className="hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
                   <td className="p-4">
                     <div className="flex items-center gap-3">
@@ -358,11 +414,77 @@ export const StaffDashboard = () => {
           </table>
         </div>
         
-        <div className="p-3 border-t border-slate-100 text-center bg-slate-50">
-          <button className="text-blue-600 text-xs font-bold uppercase tracking-wider hover:underline">Xem tất cả hoạt động</button>
+        <div className="p-3 border-t border-slate-100 bg-slate-50 flex justify-center">
+          <button onClick={() => navigate('/staff-transactions')} className="text-blue-600 text-xs font-bold uppercase tracking-wider hover:underline cursor-pointer">Xem tất cả hoạt động</button>
         </div>
       </div>
-      
+
+      {/* Violation Custom Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-red-600">
+            <WarningOutlined className="text-xl" />
+            <span>Đánh dấu Vi phạm & Gửi An ninh</span>
+          </div>
+        }
+        open={isViolationModalVisible}
+        onCancel={() => setIsViolationModalVisible(false)}
+        footer={[
+          <button key="cancel" onClick={() => setIsViolationModalVisible(false)} className="px-4 py-2 border border-slate-300 rounded hover:bg-slate-50 mr-2 text-slate-700 cursor-pointer">Hủy bỏ</button>,
+          <button 
+            key="submit" 
+            onClick={() => {
+              if(!violationPlate) {
+                notification.error({ message: 'Lỗi', description: 'Vui lòng nhập biển số xe vi phạm', placement: 'topRight' });
+                return;
+              }
+              notification.success({ 
+                message: 'Đã gửi bộ phận An ninh', 
+                description: `Hệ thống đã đưa xe ${violationPlate} vào Blacklist và đẩy cảnh báo trực tiếp sang màn hình của đội An ninh.`, 
+                placement: 'topRight' 
+              });
+              setIsViolationModalVisible(false);
+              setViolationPlate('');
+              navigate('/staff-security');
+            }} 
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 shadow-md font-bold cursor-pointer"
+          >
+            Đưa vào Blacklist & Gửi
+          </button>
+        ]}
+      >
+        <p className="mb-4 text-slate-600 text-sm">Điền thông tin xe vi phạm để hệ thống đưa vào danh sách đen và tự động đẩy cảnh báo sang màn hình của bộ phận An ninh.</p>
+        
+        <div className="mb-3">
+          <label className="block text-xs font-bold text-slate-700 mb-1">Biển số xe vi phạm <span className="text-red-500">*</span></label>
+          <input 
+            type="text" 
+            value={violationPlate}
+            onChange={(e) => setViolationPlate(e.target.value)}
+            placeholder="VD: 51A-123.45"
+            className="w-full border border-slate-300 rounded px-3 py-2 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 uppercase"
+          />
+        </div>
+        
+        <div className="mb-4">
+          <label className="block text-xs font-bold text-slate-700 mb-1">Lý do vi phạm</label>
+          <select 
+            value={violationReason}
+            onChange={(e) => setViolationReason(e.target.value)}
+            className="w-full border border-slate-300 rounded px-3 py-2 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+          >
+            <option value="Đỗ sai quy định">Đỗ sai quy định / Lấn vạch</option>
+            <option value="Trốn vé">Trốn vé / Vượt rào</option>
+            <option value="Gây rối trật tự">Gây rối trật tự an ninh</option>
+            <option value="Tai nạn">Gây tai nạn / Hư hỏng tài sản</option>
+          </select>
+        </div>
+        
+        <div className="bg-slate-50 p-3 rounded border border-slate-200 flex items-start gap-2">
+          <InfoCircleOutlined className="text-blue-500 mt-0.5" />
+          <span className="text-xs text-slate-600">Hình ảnh bằng chứng sẽ tự động được trích xuất từ Camera gần nhất (Cổng vào 1 / Lối đi khu A).</span>
+        </div>
+      </Modal>
     </div>
   );
 };

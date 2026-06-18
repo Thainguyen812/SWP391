@@ -7,11 +7,14 @@ import {
   ExclamationCircleFilled
 } from '@ant-design/icons';
 import { useState } from 'react';
-import { notification, Modal } from 'antd';
+import { notification, Modal, Dropdown } from 'antd';
+import { useNavigate } from 'react-router-dom';
 
 export const StaffGateControl = () => {
+  const navigate = useNavigate();
   const [isEmergency, setIsEmergency] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterMode, setFilterMode] = useState('Tất cả');
   const [logs, setLogs] = useState([
     "[OK] L-IN-01: Thẻ VIP xác nhận thành công",
     "[INFO] L-OUT-01: Chế độ chuyển sang THỦ CÔNG",
@@ -19,7 +22,7 @@ export const StaffGateControl = () => {
     "[INFO] Hệ thống: Sẵn sàng."
   ]);
 
-  const gateData = [
+  const [gates, setGates] = useState([
     {
       id: "L-IN-01",
       type: "Ô TÔ VIP",
@@ -50,9 +53,24 @@ export const StaffGateControl = () => {
       mode: "Thủ công",
       actions: ["approve", "reject"]
     }
-  ];
+  ]);
 
-  const handleApprove = (plate) => {
+  const addLog = (msg, type = 'INFO') => {
+    let colorClass = "text-slate-300";
+    if (type === 'OK') colorClass = "text-emerald-400";
+    if (type === 'WARN') colorClass = "text-yellow-400";
+    if (type === 'ERROR') colorClass = "text-red-400";
+    setLogs(prev => [`<span class="${colorClass}"><span class="opacity-70">[${type}]</span> ${msg}</span>`, ...prev].slice(0, 20));
+  };
+
+  const handleApprove = (id, plate) => {
+    setGates(prev => prev.map(g => {
+      if (g.id === id) {
+        return { ...g, barrier: "MỞ", barrierColor: "text-emerald-500", actions: ["lock", "wrench"] };
+      }
+      return g;
+    }));
+    addLog(`${id}: Phê duyệt thủ công, Barrier MỞ cho xe ${plate}`, 'OK');
     notification.success({
       message: 'Đã phê duyệt',
       description: `Barrier đã được mở cho xe ${plate}.`,
@@ -60,12 +78,52 @@ export const StaffGateControl = () => {
     });
   };
 
-  const handleReject = (plate) => {
+  const handleReject = (id, plate) => {
+    setGates(prev => prev.map(g => {
+      if (g.id === id) {
+        return { ...g, barrier: "ĐÓNG", barrierColor: "text-red-500", actions: ["lock", "wrench"] };
+      }
+      return g;
+    }));
+    addLog(`${id}: Từ chối mở cổng cho xe ${plate}`, 'WARN');
     notification.error({
       message: 'Từ chối mở cổng',
       description: `Đã từ chối xe ${plate} qua cổng.`,
       placement: 'topRight'
     });
+  };
+
+  const handleLock = (id) => {
+    const gate = gates.find(g => g.id === id);
+    if (!gate) return;
+    
+    const isLocked = gate.mode === "Khóa";
+    if (isLocked) {
+       addLog(`${id}: Mở khóa làn`, 'INFO');
+    } else {
+       addLog(`${id}: Đã khóa làn khẩn cấp`, 'ERROR');
+    }
+
+    setGates(prev => prev.map(g => {
+      if (g.id === id) {
+        if (isLocked) {
+           return { ...g, barrier: "ĐÓNG", barrierColor: "text-red-500", mode: "Tự động" };
+        } else {
+           return { ...g, barrier: "ĐÓNG", barrierColor: "text-red-500", mode: "Khóa" };
+        }
+      }
+      return g;
+    }));
+  };
+
+  const handleMaintenance = (id) => {
+    addLog(`${id}: Chuyển sang chế độ bảo trì`, 'WARN');
+    setGates(prev => prev.map(g => {
+      if (g.id === id) {
+        return { ...g, barrier: "ĐÓNG", barrierColor: "text-red-500", mode: "Bảo trì" };
+      }
+      return g;
+    }));
   };
 
   const handleEmergencyStop = () => {
@@ -171,8 +229,28 @@ export const StaffGateControl = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="border border-slate-200 text-slate-600 text-xs px-3 py-1.5 rounded focus:outline-none focus:border-blue-500 w-[220px]"
               />
-              <button className="border border-slate-200 text-slate-600 text-xs font-bold px-3 py-1.5 rounded hover:bg-slate-50 transition-colors">Lọc: Tất cả</button>
-              <button className="border border-slate-200 text-slate-600 text-xs font-bold px-3 py-1.5 rounded hover:bg-slate-50 transition-colors">Tải lại</button>
+              <Dropdown menu={{ 
+                items: [
+                  { key: 'Tất cả', label: 'Tất cả trạng thái' },
+                  { key: 'Tự động', label: 'Chế độ Tự động' },
+                  { key: 'Thủ công', label: 'Chế độ Thủ công' },
+                  { key: 'Khóa', label: 'Làn bị Khóa' },
+                  { key: 'Bảo trì', label: 'Đang Bảo trì' }
+                ], 
+                onClick: (e) => setFilterMode(e.key) 
+              }} trigger={['click']}>
+                <button className="border border-slate-200 text-slate-600 text-xs font-bold px-3 py-1.5 rounded hover:bg-slate-50 transition-colors cursor-pointer">Lọc: {filterMode}</button>
+              </Dropdown>
+              <button 
+                onClick={() => {
+                  setSearchQuery('');
+                  setFilterMode('Tất cả');
+                  notification.success({message: 'Tải lại thành công', description: 'Đã cập nhật trạng thái làn xe mới nhất.', placement: 'topRight'});
+                }}
+                className="border border-slate-200 text-slate-600 text-xs font-bold px-3 py-1.5 rounded hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Tải lại
+              </button>
             </div>
           </div>
           
@@ -189,7 +267,8 @@ export const StaffGateControl = () => {
                 </tr>
               </thead>
               <tbody>
-                {gateData
+                {gates
+                  .filter(gate => filterMode === 'Tất cả' || gate.mode === filterMode)
                   .filter(gate => 
                     gate.plate.toLowerCase().includes(searchQuery.toLowerCase()) || 
                     gate.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -221,18 +300,18 @@ export const StaffGateControl = () => {
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         {gate.actions.includes("lock") && (
-                          <button className="w-8 h-8 rounded bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 transition-colors">
+                          <button onClick={() => handleLock(gate.id)} className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${gate.mode === "Khóa" ? "bg-red-600 text-white hover:bg-red-700" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
                             <LockOutlined />
                           </button>
                         )}
                         {gate.actions.includes("wrench") && (
-                          <button className="w-8 h-8 rounded border border-slate-300 text-slate-600 flex items-center justify-center hover:bg-slate-100 transition-colors">
+                          <button onClick={() => handleMaintenance(gate.id)} className={`w-8 h-8 rounded border flex items-center justify-center transition-colors ${gate.mode === "Bảo trì" ? "bg-orange-50 border-orange-200 text-orange-500" : "border-slate-300 text-slate-600 hover:bg-slate-100"}`}>
                             <ToolOutlined />
                           </button>
                         )}
                         {gate.actions.includes("approve") && (
                           <button 
-                            onClick={() => handleApprove(gate.plate)}
+                            onClick={() => handleApprove(gate.id, gate.plate)}
                             className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded flex items-center gap-1.5 transition-colors shadow-sm"
                           >
                             <CheckCircleFilled className="text-white" />
@@ -241,7 +320,7 @@ export const StaffGateControl = () => {
                         )}
                         {gate.actions.includes("reject") && (
                           <button 
-                            onClick={() => handleReject(gate.plate)}
+                            onClick={() => handleReject(gate.id, gate.plate)}
                             className="w-8 h-8 rounded border border-red-500 text-red-500 flex items-center justify-center hover:bg-red-50 transition-colors"
                           >
                             <CloseCircleOutlined />
@@ -256,7 +335,12 @@ export const StaffGateControl = () => {
           </div>
 
           <div className="p-4 border-t border-slate-100 text-center bg-slate-50 mt-auto">
-            <button className="text-slate-700 text-xs font-bold uppercase tracking-wider hover:underline">Xem thêm báo cáo lưu lượng</button>
+            <button 
+              onClick={() => navigate('/staff-monitoring')}
+              className="text-slate-700 text-xs font-bold uppercase tracking-wider hover:underline cursor-pointer"
+            >
+              Xem thêm báo cáo lưu lượng
+            </button>
           </div>
         </div>
 
@@ -297,11 +381,9 @@ export const StaffGateControl = () => {
               <span className="text-[9px] font-mono text-slate-500">14:45:22 GMT+7</span>
             </div>
             <div className="p-4 font-mono text-[10px] sm:text-xs text-slate-300 flex flex-col gap-2 overflow-auto custom-scrollbar">
-              <div className="text-emerald-400"><span className="opacity-70">[OK]</span> L-IN-01: Thẻ VIP xác nhận thành công</div>
-              <div className="text-blue-300"><span className="opacity-70">[INFO]</span> L-OUT-01: Chuyển sang THỦ CÔNG</div>
-              <div className="text-yellow-400"><span className="opacity-70">[WARN]</span> Cảm biến làn L-IN-02 có độ trễ 200ms</div>
-              <div className="text-slate-400"><span className="opacity-70">[SYS]</span> Ping check: 5ms</div>
-              <div className="text-emerald-400"><span className="opacity-70">[OK]</span> Hệ thống sẵn sàng.</div>
+              {logs.map((log, i) => (
+                 <div key={i} dangerouslySetInnerHTML={{ __html: log }} />
+              ))}
               {/* Fake cursor */}
               <div className="w-2 h-3.5 bg-slate-400 animate-pulse mt-1"></div>
             </div>

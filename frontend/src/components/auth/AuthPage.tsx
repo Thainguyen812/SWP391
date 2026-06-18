@@ -196,7 +196,7 @@ export const AuthPage = () => {
     }
 
     setIsSubmitting(true);
-    const result = await authService.login(signPhone, signPass);
+    const result = await authService.login(signPhone.trim(), signPass);
     setIsSubmitting(false);
 
     if (result.success) {

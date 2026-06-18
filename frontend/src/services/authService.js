@@ -6,12 +6,15 @@ export const authService = {
   login: async (username, password) => {
     if (isMock) {
       await new Promise(resolve => setTimeout(resolve, 600)); // fake delay
+      if (password !== '123456') {
+        return { success: false, message: "Mật khẩu sai (Mock API chấp nhận pass: 123456)" };
+      }
+
       let role = 'ADMIN';
       let fullName = 'Admin User';
       if (username === 'staff') { role = 'STAFF'; fullName = 'Operations Staff'; }
       else if (username === 'manager') { role = 'MANAGER'; fullName = 'Parking Manager'; }
       else if (username.includes('driver')) { role = 'DRIVER'; fullName = 'Driver User'; }
-      else if (password !== '123456') { return { success: false, message: "Mật khẩu sai (Mock API chấp nhận pass: 123456)" }; }
 
       const mockUser = { id: 'mock-id', username, role, fullName };
       localStorage.setItem('token', 'mock-jwt-token-12345');

@@ -4,6 +4,15 @@ const isMock = import.meta.env.VITE_USE_MOCK_API === 'true';
 const MOCK_DELAY = 800;
 
 export const logService = {
+  // Lấy danh sách nhật ký cổng (Parking Sessions)
+  getParkingSessions: async () => {
+    if (!isMock) {
+      return apiClient.get('/sessions');
+    }
+    // Return empty array if mock, we will rely on backend for this feature
+    return Promise.resolve([]);
+  },
+
   // Lấy danh sách nhật ký hệ thống
   getSystemLogs: async (params = {}) => {
     if (!isMock) {

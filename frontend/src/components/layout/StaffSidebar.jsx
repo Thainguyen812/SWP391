@@ -10,7 +10,8 @@ import {
   HistoryOutlined,
   QuestionCircleOutlined,
   LogoutOutlined,
-  UserOutlined
+  UserOutlined,
+  SettingOutlined
 } from '@ant-design/icons';
 import './Sidebar.css';
 
@@ -20,8 +21,9 @@ const navItems = [
   { path: '/staff-monitoring', label: 'Giám sát', icon: <VideoCameraOutlined /> },
   { path: '/staff-payment', label: 'Thanh toán', icon: <CreditCardOutlined /> },
   { path: '/staff-security', label: 'Cảnh báo an ninh', icon: <AlertOutlined /> },
-  { path: '#', label: 'Báo mất thẻ', icon: <IdcardOutlined /> },
-  { path: '#', label: 'Lịch sử giao ca', icon: <HistoryOutlined /> },
+  { path: '/staff-lost-card', label: 'Báo mất thẻ', icon: <IdcardOutlined /> },
+  { path: '/staff-transactions', label: 'Lịch sử giao dịch', icon: <HistoryOutlined /> },
+  { path: '/staff-settings', label: 'Cài đặt', icon: <SettingOutlined /> },
 ];
 
 export const StaffSidebar = () => {

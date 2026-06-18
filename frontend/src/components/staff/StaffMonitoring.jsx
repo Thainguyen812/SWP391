@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   WarningOutlined, 
   CheckCircleOutlined,
@@ -6,31 +6,113 @@ import {
   InfoCircleOutlined,
   ExpandAltOutlined
 } from '@ant-design/icons';
+import { notification } from 'antd';
+import { useNavigate } from 'react-router-dom';
 
 export const StaffMonitoring = () => {
+  const navigate = useNavigate();
+  const [alerts, setAlerts] = useState([
+    { id: 1, type: 'Cao', time: '08:44:05', title: 'Phát hiện xe không biển số', desc: 'Cổng ra 1 • Yêu cầu kiểm tra thủ công', actionable: true },
+    { id: 2, type: 'Trung bình', time: '08:30:12', title: 'Cảnh báo đỗ sai vị trí', desc: 'Tầng hầm B1, Khu C • Đỗ lấn vạch', actionable: true },
+    { id: 3, type: 'Thấp', time: '08:15:00', title: 'Khởi động lại Camera Cổng 2', desc: 'Hệ thống • Đã hoàn thành (15s)', actionable: false },
+    { id: 4, type: 'Thấp', time: '07:55:22', title: 'Thay đổi ca trực', desc: 'Quản trị viên • Nhận ca sáng', actionable: false }
+  ]);
+
+  const [cameras, setCameras] = useState([
+    {
+      id: 1,
+      name: 'Cổng vào 1',
+      location: 'LPR Camera - Lối vào chính',
+      status: 'NORMAL',
+      statusText: 'Nhận diện BSX ổn định',
+      time: '08:45:12',
+      image: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80'
+    },
+    {
+      id: 2,
+      name: 'Cổng vào 2',
+      location: 'LPR Camera - Lối vào phụ',
+      status: 'NORMAL',
+      statusText: 'Trạng thái bình thường',
+      time: '08:45:12',
+      image: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80'
+    },
+    {
+      id: 3,
+      name: 'Cổng ra 1',
+      location: 'LPR Camera - Lối ra chính',
+      status: 'WARNING',
+      statusText: 'CẢNH BÁO: Không thể đọc BSX',
+      time: '08:45:12',
+      image: 'https://images.unsplash.com/photo-1621416953228-868f04179e87?auto=format&fit=crop&w=600&q=80'
+    },
+    {
+      id: 4,
+      name: 'Cổng ra 2',
+      location: 'LPR Camera - Lối ra phụ',
+      status: 'NORMAL',
+      statusText: 'Giao thông thông suốt',
+      time: '08:45:12',
+      image: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=600&q=80'
+    },
+    {
+      id: 5,
+      name: 'Tầng hầm B1',
+      location: 'Camera Toàn cảnh - Khu A B1',
+      status: 'NORMAL',
+      statusText: 'Quan sát bình thường',
+      time: '08:45:12',
+      image: 'https://images.unsplash.com/photo-1510443697925-eb43fb60341e?auto=format&fit=crop&w=600&q=80'
+    }
+  ]);
+
+  const handleFixCamera = (id) => {
+    notification.success({
+      message: 'Xử lý thành công',
+      description: 'Đã thiết lập lại thuật toán nhận diện cho Camera.',
+      placement: 'topRight'
+    });
+    setCameras(prev => prev.map(c => 
+      c.id === id ? { ...c, status: 'NORMAL', statusText: 'Đã khôi phục nhận diện' } : c
+    ));
+  };
+
+  const handleIgnore = (id) => {
+    setAlerts(prev => prev.filter(a => a.id !== id));
+    notification.info({ message: 'Đã bỏ qua cảnh báo', placement: 'topRight' });
+  };
+
+  const handleProcess = (id) => {
+    setAlerts(prev => prev.filter(a => a.id !== id));
+    notification.success({ message: 'Đang xử lý cảnh báo', description: 'Đã tiếp nhận yêu cầu và điều phối An ninh.', placement: 'topRight' });
+  };
+
+  const newAlertsCount = alerts.filter(a => a.type === 'Cao' || a.type === 'Trung bình').length;
+  const [isSystemActive, setIsSystemActive] = useState(true);
   return (
     <div className="p-6 max-w-[1400px] mx-auto w-full">
       {/* Page Header */}
-      <div className="mb-8">
-        <div className="text-[11px] text-slate-500 font-medium mb-1 flex items-center gap-1">
-          <span>Trang chủ</span> <span className="text-slate-300">&gt;</span> <span>Giám sát bãi xe</span>
+      <div className="flex justify-between items-end mb-6 pb-4 border-b border-slate-200">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 m-0 mb-1">Trung tâm Giám sát Thời gian thực</h2>
+          <p className="text-slate-500 text-sm m-0">Hệ thống Camera & Phân tích thông minh</p>
         </div>
-        <h1 className="text-xl font-bold text-slate-800 m-0 mb-6 tracking-tight">Giám sát Camera</h1>
-
-        <div className="flex justify-between items-end border-t border-slate-200 pt-6">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800 m-0 mb-1">Trung tâm Giám sát Thời gian thực</h2>
-            <p className="text-slate-500 text-sm m-0">Hệ thống Camera & Phân tích thông minh</p>
-          </div>
-          <div className="flex gap-3">
-            <button className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-              Hệ thống đang hoạt động
-            </button>
-            <button className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-              Tải lại trang
-            </button>
-          </div>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => setIsSystemActive(!isSystemActive)}
+            className={`border px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 cursor-pointer transition-colors ${
+              isSystemActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            <div className={`w-2 h-2 rounded-full ${isSystemActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></div>
+            {isSystemActive ? 'Hệ thống đang hoạt động' : 'Hệ thống đang bảo trì'}
+          </button>
+          <button 
+            onClick={() => notification.success({message: 'Đã tải lại hệ thống', description: 'Đã cập nhật luồng Camera và dữ liệu mới nhất.', placement: 'topRight'})}
+            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+          >
+            Tải lại trang
+          </button>
         </div>
       </div>
 
@@ -65,7 +147,7 @@ export const StaffMonitoring = () => {
             <h4 className="text-red-800 text-xs font-bold mb-2">Cảnh báo hiện tại</h4>
             <WarningOutlined className="text-red-500" />
           </div>
-          <div className="text-4xl font-extrabold text-red-600">2</div>
+          <div className="text-4xl font-extrabold text-red-600">{newAlertsCount}</div>
         </div>
       </div>
 
@@ -73,126 +155,53 @@ export const StaffMonitoring = () => {
         {/* Cameras Grid */}
         <div className="lg:col-span-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            
-            {/* Camera 1 */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col h-[280px]">
-              <div className="relative h-[160px] bg-black flex-shrink-0">
-                <div className="absolute top-3 left-3 flex gap-0.5">
-                  <span className="bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-l flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
-                    LIVE
-                  </span>
-                  <span className="bg-white/90 text-slate-800 text-[9px] font-bold px-1.5 py-0.5 rounded-r">Cổng vào 1</span>
-                </div>
-                <div className="absolute top-3 right-3 text-white text-[10px] font-mono drop-shadow-md">08:45:12</div>
-              </div>
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-bold text-sm text-slate-800 leading-tight">LPR Camera - Lối vào chính</h4>
-                  <ExpandAltOutlined className="text-slate-400 cursor-pointer hover:text-blue-500 flex-shrink-0" />
-                </div>
-                <div className="text-xs text-emerald-600 font-medium flex items-center gap-1 mt-auto">
-                  <CheckCircleOutlined /> Nhận diện BSX ổn định
-                </div>
-              </div>
-            </div>
-
-            {/* Camera 2 */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col h-[280px]">
-              <div className="relative h-[160px] bg-black flex-shrink-0">
-                <div className="absolute top-3 left-3 flex gap-0.5">
-                  <span className="bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-l flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
-                    LIVE
-                  </span>
-                  <span className="bg-white/90 text-slate-800 text-[9px] font-bold px-1.5 py-0.5 rounded-r">Cổng vào 2</span>
-                </div>
-                <div className="absolute top-3 right-3 text-white text-[10px] font-mono drop-shadow-md">08:45:12</div>
-              </div>
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-bold text-sm text-slate-800 leading-tight">LPR Camera - Lối vào phụ</h4>
-                  <ExpandAltOutlined className="text-slate-400 cursor-pointer hover:text-blue-500 flex-shrink-0" />
-                </div>
-                <div className="text-xs text-emerald-600 font-medium flex items-center gap-1 mt-auto">
-                  <CheckCircleOutlined /> Trạng thái bình thường
-                </div>
-              </div>
-            </div>
-
-            {/* Camera 3 (Warning) */}
-            <div className="bg-red-50 border-2 border-red-400 rounded-xl overflow-hidden shadow-md flex flex-col h-[280px]">
-              <div className="relative h-[160px] bg-black flex-shrink-0">
-                <div className="absolute top-3 left-3 flex gap-0.5">
-                  <span className="bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-l flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
-                    LIVE
-                  </span>
-                  <span className="bg-white/90 text-slate-800 text-[9px] font-bold px-1.5 py-0.5 rounded-r">Cổng ra 1</span>
-                </div>
-                <div className="absolute top-3 right-3 text-white text-[10px] font-mono drop-shadow-md">08:45:12</div>
-              </div>
-              <div className="p-4 flex-1 flex flex-col">
-                <h4 className="font-bold text-sm text-red-700 leading-tight mb-2">LPR Camera - Lối ra chính</h4>
-                
-                <div className="flex justify-between items-end mt-auto gap-2">
-                  <div className="text-[11px] text-red-600 font-bold flex items-start gap-1.5 leading-tight flex-1">
-                    <WarningOutlined className="mt-0.5 flex-shrink-0" />
-                    <span>CẢNH BÁO: Không thể đọc BSX</span>
+            {cameras.map(cam => (
+              <div 
+                key={cam.id} 
+                className={`border-2 rounded-xl overflow-hidden shadow-sm flex flex-col h-[280px] transition-colors ${
+                  cam.status === 'WARNING' ? 'bg-red-50 border-red-400' : 'bg-white border-slate-200'
+                }`}
+              >
+                <div className="relative h-[160px] bg-black flex-shrink-0 group">
+                  <img src={cam.image} alt={cam.name} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" />
+                  <div className="absolute top-3 left-3 flex gap-0.5">
+                    <span className="bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-l flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
+                      LIVE
+                    </span>
+                    <span className="bg-white/90 text-slate-800 text-[9px] font-bold px-1.5 py-0.5 rounded-r">{cam.name}</span>
                   </div>
-                  <button className="bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold w-12 h-10 rounded shadow-sm transition-colors flex-shrink-0 flex items-center justify-center text-center leading-tight">
-                    Xử<br/>lý
-                  </button>
+                  <div className="absolute top-3 right-3 text-white text-[10px] font-mono drop-shadow-md bg-black/40 px-1.5 py-0.5 rounded">{cam.time}</div>
                 </div>
-              </div>
-            </div>
+                
+                <div className="p-4 flex-1 flex flex-col relative">
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className={`font-bold text-sm leading-tight ${cam.status === 'WARNING' ? 'text-red-600' : 'text-slate-800'}`}>
+                      {cam.location}
+                    </h4>
+                    {cam.status === 'NORMAL' && (
+                      <ExpandAltOutlined className="text-slate-400 cursor-pointer hover:text-blue-500 flex-shrink-0" />
+                    )}
+                  </div>
+                  
+                  <div className={`text-[11px] font-bold flex items-center gap-1.5 leading-tight flex-1 mt-auto ${
+                    cam.status === 'WARNING' ? 'text-red-600' : 'text-emerald-600'
+                  }`}>
+                    {cam.status === 'WARNING' ? <WarningOutlined className="mt-0.5 flex-shrink-0" /> : <CheckCircleOutlined className="mt-0.5 flex-shrink-0" />}
+                    <span>{cam.statusText}</span>
+                  </div>
 
-            {/* Camera 4 */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col h-[280px]">
-              <div className="relative h-[160px] bg-black flex-shrink-0">
-                <div className="absolute top-3 left-3 flex gap-0.5">
-                  <span className="bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-l flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
-                    LIVE
-                  </span>
-                  <span className="bg-white/90 text-slate-800 text-[9px] font-bold px-1.5 py-0.5 rounded-r">Cổng ra 2</span>
-                </div>
-                <div className="absolute top-3 right-3 text-white text-[10px] font-mono drop-shadow-md">08:45:12</div>
-              </div>
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-bold text-sm text-slate-800 leading-tight">LPR Camera - Lối ra phụ</h4>
-                  <ExpandAltOutlined className="text-slate-400 cursor-pointer hover:text-blue-500 flex-shrink-0" />
-                </div>
-                <div className="text-xs text-emerald-600 font-medium flex items-center gap-1 mt-auto">
-                  <CheckCircleOutlined /> Giao thông thông suốt
+                  {cam.status === 'WARNING' && (
+                    <button 
+                      onClick={() => handleFixCamera(cam.id)}
+                      className="absolute bottom-4 right-4 bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold w-12 h-10 rounded shadow-sm transition-colors flex-shrink-0 flex items-center justify-center text-center leading-tight cursor-pointer"
+                    >
+                      Xử<br/>lý
+                    </button>
+                  )}
                 </div>
               </div>
-            </div>
-
-            {/* Camera 5 */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col h-[280px]">
-              <div className="relative h-[160px] bg-black flex-shrink-0">
-                <div className="absolute top-3 left-3 flex gap-0.5">
-                  <span className="bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-l flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
-                    LIVE
-                  </span>
-                  <span className="bg-white/90 text-slate-800 text-[9px] font-bold px-1.5 py-0.5 rounded-r">Tầng hầm B1</span>
-                </div>
-                <div className="absolute top-3 right-3 text-white text-[10px] font-mono drop-shadow-md">08:45:12</div>
-              </div>
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-bold text-sm text-slate-800 leading-tight">Camera Toàn cảnh - Khu A B1</h4>
-                  <ExpandAltOutlined className="text-slate-400 cursor-pointer hover:text-blue-500 flex-shrink-0" />
-                </div>
-                <div className="text-xs text-emerald-600 font-medium flex items-center gap-1 mt-auto">
-                  <CheckCircleOutlined /> Quan sát bình thường
-                </div>
-              </div>
-            </div>
-
+            ))}
           </div>
         </div>
 
@@ -201,71 +210,81 @@ export const StaffMonitoring = () => {
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col h-full">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <h3 className="text-base font-bold text-slate-800 m-0">Nhật ký Cảnh báo</h3>
-              <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-full">2 Mới</span>
+              {newAlertsCount > 0 && <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-full">{newAlertsCount} Mới</span>}
             </div>
 
             <div className="flex-1 p-4 flex flex-col gap-3 overflow-y-auto">
               
-              {/* High Alert */}
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-red-600 text-xs font-bold flex items-center gap-1">
-                    <WarningOutlined /> Cao
-                  </span>
-                  <span className="text-slate-500 text-[10px] font-mono">08:44:05</span>
-                </div>
-                <h4 className="font-bold text-slate-800 text-sm mb-1">Phát hiện xe không biển số</h4>
-                <p className="text-xs text-slate-500 mb-3">Cổng ra 1 • Yêu cầu kiểm tra thủ công</p>
-                <div className="flex gap-2">
-                  <button className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-1.5 rounded text-xs font-bold transition-colors">
-                    Bỏ qua
-                  </button>
-                  <button className="flex-1 bg-red-600 hover:bg-red-700 text-white border border-red-600 py-1.5 rounded text-xs font-bold shadow-sm transition-colors">
-                    Xử lý ngay
-                  </button>
-                </div>
-              </div>
-
-              {/* Medium Alert */}
-              <div className="bg-white border-l-4 border-l-blue-500 border-y border-r border-slate-200 rounded-lg p-3 shadow-sm">
-                <div className="flex justify-between items-start mb-1">
-                  <span className="text-blue-600 text-xs font-bold flex items-center gap-1">
-                    <InfoCircleOutlined /> Trung bình
-                  </span>
-                  <span className="text-slate-500 text-[10px] font-mono">08:30:12</span>
-                </div>
-                <h4 className="font-bold text-slate-800 text-sm mb-1">Cảnh báo đỗ sai vị trí</h4>
-                <p className="text-xs text-slate-500 m-0">Tầng hầm B1, Khu C • Đỗ lấn vạch</p>
-              </div>
-
-              {/* Low Alert 1 */}
-              <div className="bg-white border border-slate-200 rounded-lg p-3">
-                <div className="flex justify-between items-start mb-1">
-                  <span className="text-slate-500 text-xs font-bold flex items-center gap-1">
-                    <SyncOutlined /> Thấp
-                  </span>
-                  <span className="text-slate-400 text-[10px] font-mono">08:15:00</span>
-                </div>
-                <h4 className="font-medium text-slate-700 text-sm mb-1">Khởi động lại Camera Cổng 2</h4>
-                <p className="text-xs text-slate-400 m-0">Hệ thống • Đã hoàn thành (15s)</p>
-              </div>
-
-              {/* Low Alert 2 */}
-              <div className="bg-white border border-slate-200 rounded-lg p-3">
-                <div className="flex justify-between items-start mb-1">
-                  <span className="text-slate-500 text-xs font-bold flex items-center gap-1">
-                    <SyncOutlined /> Thấp
-                  </span>
-                  <span className="text-slate-400 text-[10px] font-mono">07:55:22</span>
-                </div>
-                <h4 className="font-medium text-slate-700 text-sm mb-1">Thay đổi ca trực</h4>
-                <p className="text-xs text-slate-400 m-0">Quản trị viên • Nhận ca sáng</p>
-              </div>
+              {alerts.map(alert => {
+                if (alert.type === 'Cao') {
+                  return (
+                    <div key={alert.id} className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-red-600 text-xs font-bold flex items-center gap-1">
+                          <WarningOutlined /> {alert.type}
+                        </span>
+                        <span className="text-slate-500 text-[10px] font-mono">{alert.time}</span>
+                      </div>
+                      <h4 className="font-bold text-slate-800 text-sm mb-1">{alert.title}</h4>
+                      <p className="text-xs text-slate-500 mb-3">{alert.desc}</p>
+                      {alert.actionable && (
+                        <div className="flex gap-2">
+                          <button onClick={() => handleIgnore(alert.id)} className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-1.5 rounded text-xs font-bold transition-colors cursor-pointer">
+                            Bỏ qua
+                          </button>
+                          <button onClick={() => handleProcess(alert.id)} className="flex-1 bg-red-600 hover:bg-red-700 text-white border border-red-600 py-1.5 rounded text-xs font-bold shadow-sm transition-colors cursor-pointer">
+                            Xử lý ngay
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                if (alert.type === 'Trung bình') {
+                  return (
+                    <div key={alert.id} className="bg-white border-l-4 border-l-blue-500 border-y border-r border-slate-200 rounded-lg p-3 shadow-sm">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="text-blue-600 text-xs font-bold flex items-center gap-1">
+                          <InfoCircleOutlined /> {alert.type}
+                        </span>
+                        <span className="text-slate-500 text-[10px] font-mono">{alert.time}</span>
+                      </div>
+                      <h4 className="font-bold text-slate-800 text-sm mb-1">{alert.title}</h4>
+                      <p className="text-xs text-slate-500 mb-3">{alert.desc}</p>
+                      {alert.actionable && (
+                        <div className="flex gap-2">
+                          <button onClick={() => handleIgnore(alert.id)} className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-1.5 rounded text-xs font-bold transition-colors cursor-pointer">
+                            Bỏ qua
+                          </button>
+                          <button onClick={() => handleProcess(alert.id)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 py-1.5 rounded text-xs font-bold shadow-sm transition-colors cursor-pointer">
+                            Xử lý
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                return (
+                  <div key={alert.id} className="bg-white border border-slate-200 rounded-lg p-3">
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="text-slate-500 text-xs font-bold flex items-center gap-1">
+                        <SyncOutlined /> {alert.type}
+                      </span>
+                      <span className="text-slate-400 text-[10px] font-mono">{alert.time}</span>
+                    </div>
+                    <h4 className="font-medium text-slate-700 text-sm mb-1">{alert.title}</h4>
+                    <p className="text-xs text-slate-400 m-0">{alert.desc}</p>
+                  </div>
+                );
+              })}
 
             </div>
 
             <div className="p-3 border-t border-slate-100 bg-slate-50/50 text-center">
-              <button className="text-blue-600 hover:text-blue-800 text-xs font-bold transition-colors">
+              <button 
+                onClick={() => navigate('/staff-security')}
+                className="text-blue-600 hover:text-blue-800 text-xs font-bold transition-colors cursor-pointer"
+              >
                 Xem toàn bộ lịch sử
               </button>
             </div>

@@ -5,7 +5,7 @@
 }
 
 .search-container {
-  @apply flex items-center h-full w-[280px];
+  @apply flex items-center h-full w-auto flex-shrink-0;
 }
 
 .search-input-wrapper {
@@ -21,7 +21,11 @@
 }
 
 .location-nav {
-  @apply flex items-center justify-center flex-1 h-full pl-12 pr-12;
+  @apply flex items-center justify-center flex-1 h-full px-4 overflow-x-auto overflow-y-hidden;
+  scrollbar-width: none; /* Firefox */
+}
+.location-nav::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
 }
 
 .location-list {

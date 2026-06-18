@@ -11,7 +11,8 @@ import {
   HistoryOutlined,
   PlusOutlined,
   QuestionCircleOutlined,
-  LogoutOutlined
+  LogoutOutlined,
+  SwapOutlined
 } from '@ant-design/icons';
 import './Sidebar.css';
 
@@ -21,9 +22,9 @@ const navItems = [
   { path: '/revenue', label: 'Doanh thu', icon: <DollarOutlined /> },
   { path: '/staff', label: 'Quản lý nhân sự', icon: <TeamOutlined /> },
   { path: '/customers', label: 'Khách hàng', icon: <UserOutlined /> },
-  { path: '/settings', label: 'Cấu hình kỹ thuật', icon: <SettingOutlined /> },
+  { path: '/transactions', label: 'Lịch sử giao dịch', icon: <HistoryOutlined /> },
   { path: '/security', label: 'Bảo mật', icon: <SafetyOutlined /> },
-  { path: '/logs', label: 'Nhật ký hệ thống', icon: <HistoryOutlined /> },
+  { path: '#', label: 'Bàn giao ca', icon: <SwapOutlined /> },
 ];
 
 export const Sidebar = ({ onOpenAddBranch }) => {
