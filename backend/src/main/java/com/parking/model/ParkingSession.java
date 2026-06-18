@@ -75,6 +75,7 @@ public class ParkingSession {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+
     public enum SessionStatus { ACTIVE, COMPLETED, PASSED_CONFIRMED, LOST_CARD }
 
     // getters/setters
@@ -118,6 +119,7 @@ public class ParkingSession {
     public void setMobileCheckoutAt(Instant mobileCheckoutAt) { this.mobileCheckoutAt = mobileCheckoutAt; }
     public String getMobileCheckoutPhoto() { return mobileCheckoutPhoto; }
     public void setMobileCheckoutPhoto(String mobileCheckoutPhoto) { this.mobileCheckoutPhoto = mobileCheckoutPhoto; }
+
     public String getLostCardProofPhotos() { return lostCardProofPhotos; }
     public void setLostCardProofPhotos(String lostCardProofPhotos) { this.lostCardProofPhotos = lostCardProofPhotos; }
     public Instant getCreatedAt() { return createdAt; }

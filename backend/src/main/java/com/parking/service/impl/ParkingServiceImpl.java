@@ -2,6 +2,7 @@ package com.parking.service.impl;
 
 import com.parking.dto.AiCheckInRequest;
 import com.parking.dto.CheckInResponse;
+import com.parking.dto.CongestionCheckoutRequest;
 import com.parking.exception.ApiExceptions;
 import com.parking.model.BlacklistEntry;
 import com.parking.model.ParkingSession;
@@ -36,6 +37,8 @@ import java.math.BigDecimal;// task 5
 import com.parking.dto.VisitorCheckInRequest;// task 5
 import com.parking.model.Card;// task 5
 import com.parking.repository.CardRepository;// task 5
+
+import com.parking.dto.CongestionCheckoutRequest; // task 7 
 
 import java.util.List;
 import java.util.Optional;
@@ -351,9 +354,9 @@ public class ParkingServiceImpl implements ParkingService {
             throw new ApiExceptions.BadRequestException("Không còn zone phù hợp cho loại xe này");
         }
 
-        zoneRepository.increaseOccupied(chosen.getId()); // trừ số lượng slot còn trống 
+        zoneRepository.increaseOccupied(chosen.getId()); // trừ số lượng slot còn trống
 
-        Vehicle vehicle = vehicleRepository // chưa có thì tạo và lưu vehicle 
+        Vehicle vehicle = vehicleRepository // chưa có thì tạo và lưu vehicle
                 .findByLicensePlate(plate)
                 .orElseGet(() -> {
 
@@ -380,7 +383,7 @@ public class ParkingServiceImpl implements ParkingService {
                     return vehicleRepository.save(newVehicle);
                 });
 
-        // Tao parking session 
+        // Tao parking session
         ParkingSession session = new ParkingSession();
         session.setId(UUID.randomUUID());
         session.setLicensePlate(plate);
@@ -396,7 +399,7 @@ public class ParkingServiceImpl implements ParkingService {
 
         parkingSessionRepository.save(session); // save vào database
 
-        //Đổi trạng thái thẻ
+        // Đổi trạng thái thẻ
         card.setStatus(Card.CardStatus.IN_USE);
         card.setUpdatedAt(Instant.now());
         cardRepository.save(card);
@@ -411,65 +414,225 @@ public class ParkingServiceImpl implements ParkingService {
     @Override
     @Transactional
     public Transaction checkoutCard(UUID cardId) {
-        ParkingSession session = parkingSessionRepository.findByCardIdAndSessionStatus(
-                cardId,
-                ParkingSession.SessionStatus.ACTIVE).orElseThrow(
-                        () -> new ApiExceptions.NotFoundException("Không tìm thấy phiên gửi xe ACTIVE cho thẻ này"));
+        // ParkingSession session =
+        // parkingSessionRepository.findByCardIdAndSessionStatus(
+        // cardId,
+        // ParkingSession.SessionStatus.ACTIVE).orElseThrow(
+        // () -> new ApiExceptions.NotFoundException("Không tìm thấy phiên gửi xe ACTIVE
+        // cho thẻ này"));
 
-        if (session.getIsVip() != null && session.getIsVip()) {
-            throw new ApiExceptions.BadRequestException("Xe VIP không checkout bằng thẻ vãng lai");
-        }
+        ParkingSession session = parkingSessionRepository
+                .findByCardIdAndSessionStatusIn(
+                        cardId,
+                        java.util.List.of(
+                                ParkingSession.SessionStatus.ACTIVE,
+                                ParkingSession.SessionStatus.PASSED_CONFIRMED))
 
-        if (blacklistRepository.existsByCardId(cardId)) {
-            throw new ApiExceptions.ForbiddenException("Thẻ này đang nằm trong blacklist, không thể checkout");
-        }
+                .stream()
+                .findFirst()
+                .orElseThrow(
+                        () -> new ApiExceptions.NotFoundException(
+                                "Không tìm thấy phiên gửi xe hợp lệ"));
+        
+        // task 7 
+if (session.getSessionStatus()
+        == ParkingSession.SessionStatus.PASSED_CONFIRMED) {
 
-        if (transactionRepository.findBySessionId(session.getId()).isPresent()) {
-            throw new ApiExceptions.ConflictException("Phiên gửi xe này đã có transaction");
-        }
+    Instant expireTime =
+            session.getMobileCheckoutAt()
+                    .plusSeconds(1800);
 
-        Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
-                .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin xe để tính phí"));
+    if (Instant.now().isAfter(expireTime)) {
 
-        Instant checkOutTime = Instant.now();
-
-        BigDecimal parkingFee = transactionRepository.calculateParkingFee( // gọi transaction để tính phí
-                vehicle.getVehicleSize(),
-                session.getCheckInTime(),
-                checkOutTime);
-
-        Transaction transaction = new Transaction();
-        transaction.setId(UUID.randomUUID());
-        transaction.setSessionId(session.getId());
-        transaction.setParkingFee(parkingFee);
-        transaction.setLostCardPenalty(BigDecimal.ZERO);
-        transaction.setViolationPenalty(BigDecimal.ZERO);
-        transaction.setTotalAmount(parkingFee);
-        transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
-        transaction.setPaymentStatus(Transaction.PaymentStatus.PENDING);
-        transaction.setIsMobileCheckout(false);
-        transaction.setProcessedAt(checkOutTime);
-
-        transaction = transactionRepository.save(transaction);
         session.setSessionStatus(
-        ParkingSession.SessionStatus.COMPLETED);              
-        session.setCheckOutTime(checkOutTime);
+                ParkingSession.SessionStatus.ACTIVE);
+
         parkingSessionRepository.save(session);
 
-        Card card = cardRepository.findById(cardId) 
-                .orElseThrow(() -> new ApiExceptions.NotFoundException(
-                        "Không tìm thấy thẻ"));
+        throw new ApiExceptions.BadRequestException(
+                "Phiên thanh toán lưu động đã hết hạn 30 phút");
+    }
 
-        card.setStatus(Card.CardStatus.AVAILABLE);
+    session.setSessionStatus(
+            ParkingSession.SessionStatus.COMPLETED);
 
-        cardRepository.save(card);
+    session.setCheckOutTime(
+            Instant.now());
+
+    parkingSessionRepository.save(session);
+
+    Card card = cardRepository.findById(cardId)
+            .orElseThrow(() ->
+                    new ApiExceptions.NotFoundException(
+                            "Không tìm thấy thẻ"));
+
+    card.setStatus(Card.CardStatus.AVAILABLE);
+
+    cardRepository.save(card);
+
+    if (session.getAssignedZoneId() != null) {
+        zoneRepository.decreaseOccupied(
+                session.getAssignedZoneId());
+    }
+
+    return transactionRepository
+            .findBySessionId(session.getId())
+            .orElseThrow();
+}
         
-        if (session.getAssignedZoneId() != null) {
-            zoneRepository.decreaseOccupied(
-                    session.getAssignedZoneId());
+    //
+
+    if(session.getIsVip()!=null&&session.getIsVip())
+
+    {
+        throw new ApiExceptions.BadRequestException("Xe VIP không checkout bằng thẻ vãng lai");
+    }
+
+    if(blacklistRepository.existsByCardId(cardId))
+    {
+        throw new ApiExceptions.ForbiddenException("Thẻ này đang nằm trong blacklist, không thể checkout");
+    }
+
+    if(transactionRepository.findBySessionId(session.getId()).isPresent())
+    {
+        throw new ApiExceptions.ConflictException("Phiên gửi xe này đã có transaction");
+    }
+
+    Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
+            .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin xe để tính phí"));
+
+    Instant checkOutTime = Instant.now();
+
+    BigDecimal parkingFee = transactionRepository.calculateParkingFee( // gọi transaction để tính phí
+            vehicle.getVehicleSize(),
+            session.getCheckInTime(),
+            checkOutTime);
+
+    Transaction transaction = new Transaction();transaction.setId(UUID.randomUUID());transaction.setSessionId(session.getId());transaction.setParkingFee(parkingFee);transaction.setLostCardPenalty(BigDecimal.ZERO);transaction.setViolationPenalty(BigDecimal.ZERO);transaction.setTotalAmount(parkingFee);transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);transaction.setPaymentStatus(Transaction.PaymentStatus.PENDING);transaction.setIsMobileCheckout(false);transaction.setProcessedAt(checkOutTime);
+
+    transaction=transactionRepository.save(transaction);session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);session.setCheckOutTime(checkOutTime);parkingSessionRepository.save(session);
+
+    Card card = cardRepository.findById(cardId)
+            .orElseThrow(() -> new ApiExceptions.NotFoundException(
+                    "Không tìm thấy thẻ"));
+
+    card.setStatus(Card.CardStatus.AVAILABLE);
+
+    cardRepository.save(card);
+
+    if(session.getAssignedZoneId()!=null)
+    {
+        zoneRepository.decreaseOccupied(
+                session.getAssignedZoneId());
+    }return transaction;
+    }
+
+    // task 7 check out lưu động
+
+    @Override
+    @Transactional
+    public Transaction congestionCheckout(
+            CongestionCheckoutRequest request) {
+
+        ParkingSession session = parkingSessionRepository
+                .findByLicensePlateAndSessionStatus(
+                        request.getLicensePlate(),
+                        ParkingSession.SessionStatus.ACTIVE)
+                .orElseThrow(
+                        () -> new ApiExceptions.NotFoundException(
+                                "Không tìm thấy phiên gửi xe ACTIVE"));
+
+        if (session.getIsVip() != null
+                && session.getIsVip()) {
+
+            throw new ApiExceptions.BadRequestException(
+                    "Xe VIP không thuộc luồng congestion checkout");
         }
+
+        if (transactionRepository.findBySessionId(
+                session.getId()).isPresent()) {
+
+            throw new ApiExceptions.ConflictException(
+                    "Phiên gửi xe này đã có transaction");
+        }
+
+        Vehicle vehicle = vehicleRepository
+                .findByLicensePlate(
+                        session.getLicensePlate())
+                .orElseThrow(
+                        () -> new ApiExceptions.NotFoundException(
+                                "Không tìm thấy thông tin xe"));
+
+        Instant checkoutTime = Instant.now();
+
+        BigDecimal parkingFee = transactionRepository.calculateParkingFee(
+                vehicle.getVehicleSize(),
+                session.getCheckInTime(),
+                checkoutTime);
+
+        Transaction transaction = new Transaction();
+
+        transaction.setId(UUID.randomUUID());
+
+        transaction.setSessionId(
+                session.getId());
+
+        transaction.setParkingFee(
+                parkingFee);
+
+        transaction.setLostCardPenalty(
+                BigDecimal.ZERO);
+
+        transaction.setViolationPenalty(
+                BigDecimal.ZERO);
+
+        transaction.setTotalAmount(
+                parkingFee);
+
+        transaction.setPaymentMethod(
+                request.getPaymentMethod());
+
+        transaction.setPaymentStatus(
+                Transaction.PaymentStatus.SUCCESS);
+
+        transaction.setIsMobileCheckout(true);
+
+        transaction.setMobileGpsLocation(
+                request.getGpsLocation());
+
+        transaction.setMobilePhotoProof(
+                request.getProofImageUrl());
+
+        transaction.setProcessedBy(
+                request.getStaffId());
+
+        transaction.setProcessedAt(
+                checkoutTime);
+
+        transaction = transactionRepository.save(
+                transaction);
+
+        session.setMobileCheckoutStaffId(
+                request.getStaffId());
+
+        session.setMobileCheckoutLocation(
+                request.getGpsLocation());
+
+        session.setMobileCheckoutPhoto(
+                request.getProofImageUrl());
+
+        session.setMobileCheckoutAt(
+                checkoutTime);
+
+        session.setSessionStatus(
+                ParkingSession.SessionStatus.PASSED_CONFIRMED);
+
+
+
+        parkingSessionRepository.save(
+                session);
+
         return transaction;
     }
-    
 
 }

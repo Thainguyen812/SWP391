@@ -20,8 +20,13 @@ public interface ParkingSessionRepository extends JpaRepository<ParkingSession, 
     // Tìm theo ID thẻ
     Optional<ParkingSession> findByCardIdAndSessionStatus(UUID cardId, ParkingSession.SessionStatus sessionStatus);
 
-    // MẢNH GHÉP CÒN THIẾU: Tìm phiên xe đang ACTIVE tại ô đỗ cụ thể
-    // Đây là phương thức Scheduler dùng để liên kết vi phạm với phiên xe
+    // Tìm phiên xe đang ACTIVE tại ô đỗ cụ thể (Dành cho Scheduler)
     Optional<ParkingSession> findByParkedSlotIdAndSessionStatus(UUID parkedSlotId,
             ParkingSession.SessionStatus sessionStatus);
+
+    // Tìm phiên xe theo thẻ và danh sách trạng thái 
+    List<ParkingSession> findByCardIdAndSessionStatusIn(
+            UUID cardId,
+            Collection<ParkingSession.SessionStatus> statuses
+    );
 }

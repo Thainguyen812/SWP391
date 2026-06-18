@@ -2,6 +2,7 @@ package com.parking.controller;
 
 import com.parking.dto.AiCheckInRequest;
 import com.parking.dto.CheckInResponse;
+import com.parking.dto.CongestionCheckoutRequest;
 import com.parking.service.ParkingService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
 import com.parking.dto.VisitorCheckInRequest;// TASK 5
+import com.parking.dto.CongestionCheckoutRequest; // task 7 
 
 // phần 1 / check out task 5
 import java.util.UUID;
@@ -41,26 +43,43 @@ public class ParkingController {
         private String detectedPlate;
         private String qrToken;
 
-        public String getDetectedPlate() { return detectedPlate; }
-        public void setDetectedPlate(String detectedPlate) { this.detectedPlate = detectedPlate; }
-        public String getQrToken() { return qrToken; }
-        public void setQrToken(String qrToken) { this.qrToken = qrToken; }
+        public String getDetectedPlate() {
+            return detectedPlate;
+        }
+
+        public void setDetectedPlate(String detectedPlate) {
+            this.detectedPlate = detectedPlate;
+        }
+
+        public String getQrToken() {
+            return qrToken;
+        }
+
+        public void setQrToken(String qrToken) {
+            this.qrToken = qrToken;
+        }
     }
 
-    //CHECK IN VISITOR
+    // CHECK IN VISITOR
     @PostMapping("/check-in/visitor")
     public ResponseEntity<CheckInResponse> visitorCheckIn(@RequestBody VisitorCheckInRequest request) {
-    CheckInResponse response = parkingService.visitorCheckIn(request);
-    return ResponseEntity.status(201).body(response);
-}   
+        CheckInResponse response = parkingService.visitorCheckIn(request); // gọi qua serviceyml
+        return ResponseEntity.status(201).body(response);
+    }
+
     // phần 1 / check out VISITOR task 5
     @PostMapping("/checkout/{cardId}")
     public ResponseEntity<Transaction> checkout(
-        @PathVariable UUID cardId
-    ) {
-    return ResponseEntity.ok(
-            parkingService.checkoutCard(cardId)
-    );
+            @PathVariable UUID cardId) {
+        return ResponseEntity.ok(
+                parkingService.checkoutCard(cardId));
+    }
+
+    @PostMapping("/congestion/checkout") // check out lưu động 
+    public ResponseEntity<Transaction> congestionCheckout(
+            @RequestBody CongestionCheckoutRequest request) {
+        return ResponseEntity.ok(
+                parkingService.congestionCheckout(request)); //nhảy qua serviceyml để xử lý 
     }
 
 }
