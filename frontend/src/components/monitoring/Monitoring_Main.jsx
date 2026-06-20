@@ -12,16 +12,7 @@ export const MonitoringPage = () => {
     <div className="p-6 max-w-[1400px] mx-auto w-full">
       {/* Page Header */}
       <div className="mb-8">
-        <div className="text-[11px] text-slate-500 font-medium mb-1 flex items-center gap-1">
-          <span>Trang chủ</span> <span className="text-slate-300">&gt;</span> <span>Giám sát bãi xe</span>
-        </div>
-        <h1 className="text-xl font-bold text-slate-800 m-0 mb-6 tracking-tight">Giám sát Camera</h1>
-
-        <div className="flex justify-between items-end border-t border-slate-200 pt-6">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800 m-0 mb-1">Trung tâm Giám sát Thời gian thực</h2>
-            <p className="text-slate-500 text-sm m-0">Hệ thống Camera & Phân tích thông minh</p>
-          </div>
+        <div className="flex justify-end items-end pt-6">
           <div className="flex gap-3">
             <button className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>

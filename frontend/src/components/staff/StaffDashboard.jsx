@@ -14,6 +14,7 @@ import {
 import { Tag, Modal, notification, Spin } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { logService } from '../../services/logService';
+import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffDashboard = () => {
   const navigate = useNavigate();
@@ -24,8 +25,13 @@ export const StaffDashboard = () => {
   const [violationPlate, setViolationPlate] = useState('');
   const [violationReason, setViolationReason] = useState('Đỗ sai quy định');
 
+  const { activityLogs, addSecurityAlert, securityAlerts, currentVehicle, setCurrentVehicle, activeVehicles } = useGlobalContext();
+
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
+
+  // Combine local global context logs (for live interactions) with backend logs
+  const displayLogs = [...activityLogs, ...logs];
 
   useEffect(() => {
     const fetchSessions = async () => {
@@ -124,6 +130,7 @@ export const StaffDashboard = () => {
   };
 
   const handleReportViolation = () => {
+    setViolationPlate(currentVehicle?.plate || '');
     setIsViolationModalVisible(true);
   };
 
@@ -143,7 +150,7 @@ export const StaffDashboard = () => {
   };
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto w-full">
+    <div className="p-6 w-full">
       
       {/* Alert Banner */}
       <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg flex justify-between items-center mb-6">
@@ -181,7 +188,6 @@ export const StaffDashboard = () => {
 
         {/* Xe chờ xử lý */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
           <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Xe chờ xử lý</h4>
           <div className="text-4xl font-extrabold text-slate-800 mb-2">12</div>
           <div className="text-xs text-emerald-500 font-medium flex items-center gap-1">
@@ -202,10 +208,9 @@ export const StaffDashboard = () => {
 
         {/* Cảnh báo mở */}
         <div className="bg-white p-5 rounded-xl border border-red-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
           <div className="flex justify-between items-start mb-2">
             <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Cảnh báo mở</h4>
-            <span className="text-red-500 text-xl font-bold leading-none">*</span>
+            <span className="text-red-500 text-3xl font-bold leading-none mt-[-5px]">*</span>
           </div>
           <div className="text-4xl font-extrabold text-red-600 mb-2">02</div>
           <div className="text-xs text-red-500 font-medium">Cần xử lý ngay lập tức</div>
@@ -229,70 +234,60 @@ export const StaffDashboard = () => {
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-            {/* Cam 1 */}
-            <div className="relative rounded-lg overflow-hidden border border-slate-200 aspect-[16/9] bg-slate-900 group">
-              <img src="https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80" alt="Cam 1" className="w-full h-full object-cover opacity-80" />
-              <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm">CAM-01: CỔNG VÀO 1</div>
-              {/* Bounding Box Mock */}
-              <div className="absolute top-[40%] left-[30%] w-[40%] h-[20%] border-2 border-emerald-400">
-                <div className="absolute -top-6 left-0 bg-emerald-400 text-black text-[10px] font-bold px-1 py-0.5">NHẬN DIỆN BIỂN SỐ</div>
-              </div>
-              <div className="absolute bottom-0 left-0 w-full p-3 bg-gradient-to-t from-black/80 to-transparent">
-                <div className="flex justify-between items-end">
-                  <div>
-                    <div className="text-white text-xl font-bold tracking-widest drop-shadow-md">51A-123.45</div>
-                    <div className="text-emerald-400 text-[10px] font-bold uppercase tracking-wider">Độ tin cậy: 98.4%</div>
-                  </div>
-                  <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded">HỢP LỆ</span>
-                </div>
-              </div>
-            </div>
+            {activeVehicles.slice(0, 4).map((vehicle, index) => {
+              const isSelected = currentVehicle?.id === vehicle.id;
+              
+              // Helper to map status to color
+              const getStatusBadge = (type, status) => {
+                if (type === 'VIP') return <span className="bg-slate-800 border border-slate-600 text-white text-[10px] font-bold px-2 py-1 rounded">VIP</span>;
+                if (status === 'Lỗi thẻ' || status === 'Chờ thanh toán') return <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase">{status}</span>;
+                return <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded">HỢP LỆ</span>;
+              };
 
-            {/* Cam 2 */}
-            <div className="relative rounded-lg overflow-hidden border border-slate-200 aspect-[16/9] bg-slate-900 group">
-              <img src="https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" alt="Cam 2" className="w-full h-full object-cover opacity-80" />
-              <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm">CAM-02: CỔNG RA 1</div>
-              <div className="absolute bottom-0 left-0 w-full p-3 bg-gradient-to-t from-black/80 to-transparent">
-                <div className="flex justify-between items-end">
-                  <div>
-                    <div className="text-white text-xl font-bold tracking-widest drop-shadow-md">72C-889.01</div>
-                    <div className="text-emerald-400 text-[10px] font-bold uppercase tracking-wider">Độ tin cậy: 99.1%</div>
+              return (
+                <div 
+                  key={vehicle.id}
+                  onClick={() => setCurrentVehicle(vehicle)}
+                  className={`relative rounded-lg overflow-hidden border-2 aspect-[16/9] bg-slate-900 group cursor-pointer transition-all ${isSelected ? 'border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)] scale-[1.02] z-10' : 'border-slate-200 hover:border-slate-400 opacity-90 hover:opacity-100'}`}
+                >
+                  <img src={vehicle.image || "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80"} alt={`Cam ${index + 1}`} className="w-full h-full object-cover opacity-80" />
+                  
+                  <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm">
+                    CAM-0{index + 1}: {vehicle.gate.toUpperCase()}
                   </div>
-                  <span className="bg-slate-800 border border-slate-600 text-white text-[10px] font-bold px-2 py-1 rounded">VIP</span>
-                </div>
-              </div>
-            </div>
+                  
+                  {/* Bounding Box Mock based on index to simulate variety */}
+                  {index === 0 && (
+                    <div className="absolute top-[40%] left-[30%] w-[40%] h-[20%] border-2 border-emerald-400 transition-all duration-300">
+                      <div className="absolute -top-6 left-0 bg-emerald-400 text-black text-[10px] font-bold px-1 py-0.5">NHẬN DIỆN BIỂN SỐ</div>
+                    </div>
+                  )}
+                  {index === 3 && (
+                    <div className="absolute top-[20%] left-[20%] w-[60%] h-[50%] border-2 border-red-500 transition-all duration-300"></div>
+                  )}
 
-            {/* Cam 3 */}
-            <div className="relative rounded-lg overflow-hidden border border-slate-200 aspect-[16/9] bg-slate-900 group">
-              <img src="https://images.unsplash.com/photo-1503376713246-1e66cce2b164?auto=format&fit=crop&w=600&q=80" alt="Cam 3" className="w-full h-full object-cover opacity-80" />
-              <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm">CAM-03: CỔNG RA VIP</div>
-              <div className="absolute bottom-0 left-0 w-full p-3 bg-gradient-to-t from-black/80 to-transparent">
-                <div className="flex justify-between items-end">
-                  <div>
-                    <div className="text-white text-xl font-bold tracking-widest drop-shadow-md">30E-555.55</div>
-                    <div className="text-amber-400 text-[10px] font-bold uppercase tracking-wider">Khớp đặt chỗ: GOLD-01</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+                  {/* Selected Overlay */}
+                  {isSelected && (
+                    <div className="absolute top-2 right-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg flex items-center gap-1 animate-pulse">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                      ĐANG CHỌN
+                    </div>
+                  )}
 
-            {/* Cam 4 */}
-            <div className="relative rounded-lg overflow-hidden border border-slate-200 aspect-[16/9] bg-slate-900 group">
-              <img src="https://images.unsplash.com/photo-1600661653561-629509216228?auto=format&fit=crop&w=600&q=80" alt="Cam 4" className="w-full h-full object-cover opacity-80" />
-              <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm">CAM-04: CỔNG RA KHÁCH</div>
-              {/* Red Bounding Box */}
-              <div className="absolute top-[20%] left-[20%] w-[60%] h-[50%] border-2 border-red-500"></div>
-              <div className="absolute bottom-0 left-0 w-full p-3 bg-gradient-to-t from-black/80 to-transparent">
-                <div className="flex justify-between items-end">
-                  <div>
-                    <div className="text-white text-xl font-bold tracking-widest drop-shadow-md">51K-443.21</div>
-                    <div className="text-red-400 text-[10px] font-bold uppercase tracking-wider">Chờ thanh toán</div>
+                  <div className={`absolute bottom-0 left-0 w-full p-3 bg-gradient-to-t from-black/90 to-transparent transition-all ${isSelected ? 'from-blue-900/90' : ''}`}>
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <div className={`text-xl font-bold tracking-widest drop-shadow-md ${isSelected ? 'text-blue-100' : 'text-white'}`}>{vehicle.plate}</div>
+                        <div className={`${vehicle.status === 'Hợp lệ' ? 'text-emerald-400' : 'text-red-400'} text-[10px] font-bold uppercase tracking-wider`}>
+                          {vehicle.type === 'Vé tháng' && vehicle.status === 'Lỗi thẻ' ? 'Khớp đặt chỗ: LỖI' : `Độ tin cậy: ${vehicle.confidence}`}
+                        </div>
+                      </div>
+                      {getStatusBadge(vehicle.type, vehicle.status)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-
+              );
+            })}
           </div>
         </div>
 
@@ -444,7 +439,18 @@ export const StaffDashboard = () => {
                 placement: 'topRight' 
               });
               setIsViolationModalVisible(false);
+              const submittedPlate = violationPlate;
+              const submittedReason = violationReason;
               setViolationPlate('');
+              
+              addSecurityAlert({
+                id: `blacklist-${Date.now()}`,
+                type: 'BIỂN SỐ ĐEN',
+                plate: submittedPlate,
+                reason: submittedReason,
+                time: 'Vừa xong'
+              });
+              
               navigate('/staff-security');
             }} 
             className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 shadow-md font-bold cursor-pointer"
@@ -462,7 +468,7 @@ export const StaffDashboard = () => {
             value={violationPlate}
             onChange={(e) => setViolationPlate(e.target.value)}
             placeholder="VD: 51A-123.45"
-            className="w-full border border-slate-300 rounded px-3 py-2 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 uppercase"
+            className="w-full border border-red-500 rounded px-3 py-2 focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 uppercase"
           />
         </div>
         

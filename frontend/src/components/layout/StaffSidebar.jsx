@@ -11,7 +11,8 @@ import {
   QuestionCircleOutlined,
   LogoutOutlined,
   UserOutlined,
-  SettingOutlined
+  SettingOutlined,
+  SwapOutlined
 } from '@ant-design/icons';
 import './Sidebar.css';
 
@@ -23,7 +24,7 @@ const navItems = [
   { path: '/staff-security', label: 'Cảnh báo an ninh', icon: <AlertOutlined /> },
   { path: '/staff-lost-card', label: 'Báo mất thẻ', icon: <IdcardOutlined /> },
   { path: '/staff-transactions', label: 'Lịch sử giao dịch', icon: <HistoryOutlined /> },
-  { path: '/staff-settings', label: 'Cài đặt', icon: <SettingOutlined /> },
+  { path: '/staff-settings', label: 'Bàn giao ca', icon: <SwapOutlined /> },
 ];
 
 export const StaffSidebar = () => {
@@ -52,9 +53,8 @@ export const StaffSidebar = () => {
         {/* Logo Area */}
         <div className="sidebar-logo-area border-b border-white/10 pb-6 mb-4 flex-shrink-0">
           <div className="flex flex-col gap-1 px-6">
-            <h1 className="text-2xl font-bold text-white m-0 tracking-wide">UrbanPark</h1>
-            <h2 className="text-xl font-bold text-white m-0">Staff</h2>
-            <span className="text-xs text-slate-400 font-mono tracking-wider mt-1">Terminal Operations</span>
+            <h1 className="text-2xl font-bold text-white m-0 tracking-wide">Urban</h1>
+            <h2 className="text-2xl font-bold text-white m-0">Park System</h2>
           </div>
         </div>
 

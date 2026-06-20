@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   EditOutlined, 
   CheckCircleFilled,
@@ -9,19 +9,30 @@ import {
   CreditCardOutlined,
   ArrowRightOutlined,
   WarningFilled,
-  CarOutlined
+  CarOutlined,
+  WalletOutlined
 } from '@ant-design/icons';
-import { notification, Input, Button } from 'antd';
+import { notification, Input, Button, Modal, Spin } from 'antd';
+import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffPayment = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { addTransaction, updateShiftStats, addActivityLog, currentVehicle, removeActiveVehicle } = useGlobalContext();
+  
+  const lostCardData = location.state?.lostCardVehicle;
+  const isLostCard = location.state?.isLostCard;
+  const penaltyAmount = location.state?.penaltyAmount || 200000;
+  const baseAmount = 50000;
+  const totalAmount = isLostCard ? (baseAmount + penaltyAmount) : baseAmount;
+
   const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [lan1Status, setLan1Status] = useState('free');
+  const [lan1Status, setLan1Status] = useState(isLostCard ? 'busy' : 'free');
   const [lan2Status, setLan2Status] = useState('busy');
-  const [lpr, setLpr] = useState('30G-123.45');
+  const [lpr, setLpr] = useState(lostCardData?.plate || currentVehicle?.plate || '30G-123.45');
   const [isEditingLpr, setIsEditingLpr] = useState(false);
   const [hasVehicle, setHasVehicle] = useState(true);
-  const [cashGiven, setCashGiven] = useState(50000);
+  const [cashGiven, setCashGiven] = useState(totalAmount);
   
   const [transactions, setTransactions] = useState([
     { id: 1, time: '12:35:10', lpr: '29A-999.99', type: 'Vãng lai', typeClass: 'bg-slate-100 text-slate-600', amount: '30,000', status: 'Thành công', statusClass: 'text-emerald-600', icon: <CheckCircleFilled className="mr-1"/> },
@@ -31,23 +42,79 @@ export const StaffPayment = () => {
   ]);
 
   const handlePayment = () => {
-    notification.success({message: 'Thanh toán thành công', description: 'Đã gửi lệnh mở cổng ra.', placement: 'topRight'});
-    setTransactions([{ id: Date.now(), time: new Date().toLocaleTimeString('en-GB'), lpr: lpr, type: 'Vãng lai', typeClass: 'bg-slate-100 text-slate-600', amount: '50,000', status: 'Thành công', statusClass: 'text-emerald-600', icon: <CheckCircleFilled className="mr-1"/> }, ...transactions.slice(0, 3)]);
-    setHasVehicle(false);
-    setLan1Status('free');
+    Modal.confirm({
+      title: 'Xác nhận thanh toán',
+      content: isLostCard ? `Tiến hành thu ${totalAmount.toLocaleString()} đ (Bao gồm phí đỗ xe và phạt mất thẻ) và mở cổng cho xe ${lpr}?` : `Tiến hành thu phí và mở cổng cho xe ${lpr}?`,
+      okText: 'Thu tiền & Mở cổng',
+      cancelText: 'Hủy',
+      okButtonProps: { className: 'bg-emerald-600 border-emerald-600 hover:bg-emerald-700' },
+      onOk() {
+        notification.success({message: 'Thanh toán thành công', description: 'Đã gửi lệnh mở cổng ra.', placement: 'topRight'});
+        
+        // Update Local Mock
+        setTransactions([{ id: Date.now(), time: new Date().toLocaleTimeString('en-GB'), lpr: lpr, type: isLostCard ? 'Phạt thẻ' : 'Vãng lai', typeClass: isLostCard ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600', amount: totalAmount.toLocaleString(), status: 'Thành công', statusClass: 'text-emerald-600', icon: <CheckCircleFilled className="mr-1"/> }, ...transactions.slice(0, 3)]);
+        
+        // Update Global Context
+        addTransaction({
+          id: `#TRX-${Math.floor(1000 + Math.random() * 9000)}`,
+          plate: lpr,
+          type: "car",
+          inTime: isLostCard ? lostCardData?.inTime : "07:00",
+          inDate: "24/05",
+          outTime: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}),
+          outDate: "24/05",
+          duration: isLostCard ? lostCardData?.duration : "3h 0m",
+          amount: `${totalAmount.toLocaleString()} đ`,
+          paymentMethod: isLostCard ? (paymentMethod === 'cash' ? "Tiền mặt (Phạt)" : "Chuyển khoản (Phạt)") : (paymentMethod === 'cash' ? "Tiền mặt" : "Chuyển khoản"),
+          paymentIcon: <WalletOutlined className="text-blue-600" />,
+          status: isLostCard ? "Xử lý mất thẻ" : "Thành công",
+          statusColor: isLostCard ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700",
+          hasError: isLostCard
+        });
+        updateShiftStats(totalAmount, paymentMethod === 'cash');
+        addActivityLog({
+          plate: lpr,
+          model: isLostCard ? lostCardData?.model : "Khách vãng lai",
+          type: isLostCard ? "MẤT THẺ" : "VÉ NGÀY",
+          gate: "Làn ra 1 - Cửa B",
+          action: isLostCard ? "Ra bãi (Thu phạt)" : "Ra bãi (Đã thu)",
+          time: "Vừa xong",
+          status: "Thành Công",
+          typeColor: isLostCard ? "text-red-600" : "text-blue-600",
+          statusColor: "bg-emerald-100 text-emerald-700",
+          actionColor: "text-emerald-600"
+        });
+
+        if (isLostCard) {
+            removeActiveVehicle(lpr);
+        }
+
+        setHasVehicle(false);
+        setLan1Status('free');
+      }
+    });
   };
 
   const handleCancel = () => {
-    notification.info({message: 'Đã huỷ bỏ giao dịch', placement: 'topRight'});
-    setHasVehicle(false);
-    setLan1Status('free');
+    Modal.confirm({
+      title: 'Xác nhận huỷ giao dịch',
+      content: 'Bạn có chắc chắn muốn huỷ bỏ giao dịch này? Phương tiện sẽ không được phép qua cổng.',
+      okText: 'Huỷ giao dịch',
+      cancelText: 'Quay lại',
+      okButtonProps: { danger: true },
+      onOk() {
+        notification.error({message: 'Đã huỷ bỏ giao dịch', placement: 'topRight'});
+        setHasVehicle(false);
+        setLan1Status('free');
+      }
+    });
   };
 
   const simulateNextVehicle = () => {
     const plates = ['29A-888.88', '30F-123.45', '51G-555.55', '14A-111.11'];
     setLpr(plates[Math.floor(Math.random() * plates.length)]);
     setPaymentMethod('cash');
-    setCashGiven(50000);
+    setCashGiven(totalAmount);
     setHasVehicle(true);
     setLan1Status('busy');
     notification.info({message: 'Xe mới tiến vào làn', description: `Camera LPR đã nhận diện biển số.`, placement: 'topRight'});
@@ -58,10 +125,9 @@ export const StaffPayment = () => {
   };
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto w-full">
+    <div className="p-6 w-full">
       {/* Header Tags */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold text-slate-800 m-0">Thanh toán xe ra</h2>
+      <div className="flex justify-end items-center mb-6">
         <div className="flex gap-3">
           <button 
             onClick={() => setLan1Status(lan1Status === 'free' ? 'busy' : 'free')}
@@ -106,7 +172,9 @@ export const StaffPayment = () => {
           ) : (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-slate-800 m-0">Xử lý vé vãng lai</h3>
+                <h3 className="text-lg font-bold text-slate-800 m-0">
+                  {isLostCard ? <span className="text-red-600"><WarningFilled className="mr-2"/> Xử lý Sự cố Mất thẻ</span> : "Xử lý vé vãng lai"}
+                </h3>
                 <span className="bg-slate-100 text-slate-500 font-mono text-xs px-3 py-1 rounded">TICKET #{Math.floor(Math.random() * 9000) + 1000}</span>
               </div>
 
@@ -170,13 +238,14 @@ export const StaffPayment = () => {
               <div className="flex flex-col border-l border-slate-100 pl-8">
                 <div className="flex justify-between items-start mb-8">
                   <div>
-                    <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Thời gian gửi</h4>
-                    <div className="text-base font-bold text-slate-800">04h 25m</div>
-                    <div className="text-xs text-slate-500 mt-0.5">08:15 - 12:40</div>
+                    <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Thời gian gửi ({isLostCard ? 'Sự cố' : (currentVehicle?.type || 'Vãng lai')})</h4>
+                    <div className="text-base font-bold text-slate-800">{isLostCard ? lostCardData?.duration : (currentVehicle?.duration || '04h 25m')}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{isLostCard ? lostCardData?.inTime : (currentVehicle?.inTime || '08:15')} - {new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})}</div>
                   </div>
                   <div className="text-right">
                     <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Tổng tiền thu</h4>
-                    <div className="text-2xl font-black text-red-600">50,000 <span className="text-sm font-bold">VND</span></div>
+                    <div className="text-2xl font-black text-red-600">{totalAmount.toLocaleString()} <span className="text-sm font-bold">VND</span></div>
+                    {isLostCard && <div className="text-[10px] text-red-500 mt-1">Đã bao gồm 200k tiền phạt</div>}
                   </div>
                 </div>
 

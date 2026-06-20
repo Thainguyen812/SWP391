@@ -6,7 +6,7 @@ const StaffLayout = ({ children }) => {
   return (
     <div className="flex h-screen overflow-hidden bg-[#f1f5f9] dark:bg-slate-900 w-full">
       {/* Sidebar - Cố định bên trái */}
-      <div className="flex-shrink-0 h-full w-[280px] relative z-20 hidden md:block">
+      <div className="flex-shrink-0 h-full w-[250px] relative z-20 hidden md:block">
         <StaffSidebar />
       </div>
 

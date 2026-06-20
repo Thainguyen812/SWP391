@@ -25,6 +25,9 @@ public class VipSubscription {
     @Enumerated(EnumType.STRING)
     private Status status;
 
+    @Column(name = "document_photos", columnDefinition = "jsonb")
+    private String documentPhotos;
+
     public enum Status {
         PENDING_APPROVAL, ACTIVE, EXPIRED, REJECTED, CANCELLED
     }

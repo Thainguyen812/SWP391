@@ -13,4 +13,9 @@ public interface ParkingSessionRepository extends JpaRepository<ParkingSession, 
     java.util.List<ParkingSession> findByIsSuspiciousTrue();
     long countBySessionStatusAndIsVipTrue(ParkingSession.SessionStatus sessionStatus);
     java.util.List<ParkingSession> findTop10ByOrderByUpdatedAtDesc();
+
+    // Queries cho Staff Features
+    org.springframework.data.domain.Page<ParkingSession> findByLicensePlateContainingIgnoreCase(String licensePlate, org.springframework.data.domain.Pageable pageable);
+    java.util.List<ParkingSession> findByIsSuspiciousTrueAndSessionStatus(ParkingSession.SessionStatus sessionStatus);
+    java.util.List<ParkingSession> findByLicensePlateContainingIgnoreCaseAndSessionStatus(String licensePlate, ParkingSession.SessionStatus sessionStatus);
 }

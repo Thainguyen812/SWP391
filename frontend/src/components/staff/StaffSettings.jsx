@@ -1,16 +1,109 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   SwapOutlined, 
   DownloadOutlined, 
   DesktopOutlined, 
   SettingOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  LoadingOutlined,
+  CheckOutlined
 } from '@ant-design/icons';
-import { Switch } from 'antd'; // Using antd Switch for nice toggles
+import { Switch, Modal, notification, Spin } from 'antd'; // Using antd for components
+import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffSettings = () => {
+  const { shiftStats, setShiftStats, currentUser, setCurrentUser, shiftHistory, setShiftHistory } = useGlobalContext();
+  const [shiftState, setShiftState] = useState('active'); // 'active', 'handed_over'
+  const [checks, setChecks] = useState({ printer: false, camera: false, gate: false });
+  
+  const availableStaff = [
+    { name: 'Nguyễn Văn A', id: 'NV-1042', avatar: 'https://randomuser.me/api/portraits/men/32.jpg' },
+    { name: 'Trần Thị B', id: 'NV-1088', avatar: 'https://randomuser.me/api/portraits/women/44.jpg' },
+    { name: 'Lê Hoàng C', id: 'NV-1102', avatar: 'https://randomuser.me/api/portraits/men/65.jpg' },
+  ];
+  const [selectedStaffId, setSelectedStaffId] = useState('');
+
+  const [isExporting, setIsExporting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isHandoverProcessing, setIsHandoverProcessing] = useState(false);
+
+  const allChecked = checks.printer && checks.camera && checks.gate;
+
+  const handleTakeover = () => {
+    if (!selectedStaffId) {
+      notification.warning({ message: 'Vui lòng chọn nhân viên tiếp nhận', placement: 'topRight' });
+      return;
+    }
+    const nextStaff = availableStaff.find(s => s.id === selectedStaffId);
+
+    Modal.confirm({
+      title: 'Xác nhận tiếp nhận ca',
+      content: `Bạn (${nextStaff.name}) xác nhận đã kiểm tra đủ thiết bị và tiền mặt để tiếp nhận ca trực này?`,
+      okText: 'Tiếp nhận',
+      cancelText: 'Hủy',
+      onOk() {
+        setIsHandoverProcessing(true);
+        return new Promise(resolve => {
+          setTimeout(() => {
+            setIsHandoverProcessing(false);
+            setShiftState('active');
+            setCurrentUser({...nextStaff, shift: 'Sáng', station: "Làn Ra 02 (T-OUT-02)"});
+            setShiftHistory(prev => [
+              { id: Date.now(), staff: nextStaff.name, shift: 'Sáng', start: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), end: '--:--', vehicles: 0, status: 'ĐANG TRỰC', isCurrent: true },
+              ...prev.map(sh => ({...sh, isCurrent: false}))
+            ]);
+            setShiftStats({ revenue: 0, cash: 0, transfer: 0, transactions: 0 });
+            setChecks({ printer: false, camera: false, gate: false });
+            setSelectedStaffId('');
+            notification.success({ message: 'Tiếp nhận ca thành công', description: `Ca trực mới đã bắt đầu cho ${nextStaff.name}.`, placement: 'topRight' });
+            resolve();
+          }, 1500);
+        });
+      }
+    });
+  };
+
+  const handleHandover = () => {
+    Modal.confirm({
+      title: 'Xác nhận bàn giao ca',
+      content: 'Hệ thống sẽ chốt doanh thu và in báo cáo bàn giao. Bạn có chắc chắn?',
+      okText: 'Bàn giao & In',
+      cancelText: 'Hủy',
+      okButtonProps: { danger: true },
+      onOk() {
+        setShiftState('handed_over');
+        setShiftHistory(prev => {
+          const newHistory = [...prev];
+          if (newHistory.length > 0 && newHistory[0].status === 'ĐANG TRỰC') {
+            newHistory[0].status = 'HOÀN THÀNH';
+            newHistory[0].end = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            newHistory[0].vehicles = shiftStats.transactions;
+            newHistory[0].isCurrent = false;
+          }
+          return newHistory;
+        });
+        notification.success({ message: 'Bàn giao thành công', description: 'Đang in báo cáo chốt ca... Vui lòng chọn nhân viên tiếp nhận.', placement: 'topRight' });
+      }
+    });
+  };
+
+  const handleExport = () => {
+    setIsExporting(true);
+    setTimeout(() => {
+      setIsExporting(false);
+      notification.success({ message: 'Xuất báo cáo thành công', description: 'File excel đã được tải xuống.' });
+    }, 2000);
+  };
+
+  const handleSaveConfig = () => {
+    setIsSaving(true);
+    setTimeout(() => {
+      setIsSaving(false);
+      notification.success({ message: 'Lưu cấu hình thành công', description: 'Các cài đặt thiết bị đã được cập nhật.' });
+    }, 1000);
+  };
   return (
-    <div className="p-6 max-w-[1200px] mx-auto w-full">
+    <div className="p-6 w-full">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left Column: Shift Handover */}
@@ -18,13 +111,15 @@ export const StaffSettings = () => {
           
           {/* Active User Card */}
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full overflow-hidden bg-slate-200 flex-shrink-0">
-              <img src="https://i.pravatar.cc/150?img=11" alt="Avatar" className="w-full h-full object-cover" />
+            <div className="w-14 h-14 rounded-full overflow-hidden bg-slate-200 flex-shrink-0 shadow-sm border border-slate-100">
+              <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
             </div>
             <div>
-              <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-0.5">ĐANG TRỰC CA</div>
-              <h3 className="text-lg font-bold text-slate-800 m-0 leading-tight">Nguyễn Văn A</h3>
-              <div className="text-xs text-slate-500 mt-1">Mã NV: NV-1042 • Trạm: T-OUT-02</div>
+              <div className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${shiftState === 'handed_over' ? 'text-amber-500' : 'text-blue-600'}`}>
+                {shiftState === 'handed_over' ? 'CHỜ TIẾP NHẬN' : 'ĐANG TRỰC CA'}
+              </div>
+              <h3 className="text-lg font-bold text-slate-800 m-0 leading-tight">{shiftState === 'handed_over' ? '---' : currentUser.name}</h3>
+              <div className="text-xs text-slate-500 mt-1">Mã NV: {shiftState === 'handed_over' ? '---' : currentUser.id} • Trạm: T-OUT-02</div>
             </div>
           </div>
 
@@ -40,35 +135,54 @@ export const StaffSettings = () => {
               <div className="grid grid-cols-2 gap-3 mb-6">
                 <div className="bg-slate-50 border border-slate-100 p-3 rounded-lg">
                   <div className="text-xs text-slate-500 mb-1">Doanh thu</div>
-                  <div className="text-lg font-bold text-slate-800">4.520.000đ</div>
+                  <div className="text-lg font-bold text-slate-800">{shiftStats.revenue.toLocaleString()}đ</div>
                 </div>
                 <div className="bg-slate-50 border border-slate-100 p-3 rounded-lg">
                   <div className="text-xs text-slate-500 mb-1">Tiền mặt</div>
-                  <div className="text-lg font-bold text-slate-800">1.200.000đ</div>
+                  <div className="text-lg font-bold text-slate-800">{shiftStats.cash.toLocaleString()}đ</div>
                 </div>
               </div>
 
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">NHÂN VIÊN TIẾP NHẬN</div>
+              <select 
+                value={selectedStaffId}
+                onChange={e => setSelectedStaffId(e.target.value)}
+                disabled={shiftState !== 'handed_over'}
+                className="w-full border border-slate-300 rounded-lg py-2.5 px-3 text-sm text-slate-800 font-medium bg-slate-50 mb-6 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+              >
+                <option value="">-- Chọn nhân viên mới --</option>
+                {availableStaff.filter(s => s.id !== currentUser.id).map(s => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.id})</option>
+                ))}
+              </select>
+
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">KIỂM TRA THIẾT BỊ (NHÂN VIÊN MỚI)</div>
               <div className="flex flex-col gap-3 mb-8">
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <div className="w-4 h-4 border border-slate-300 rounded flex items-center justify-center group-hover:border-blue-500 transition-colors"></div>
+                <label className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); setChecks(p => ({...p, printer: !p.printer})); }}>
+                  <div className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${checks.printer ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 group-hover:border-blue-500'}`}>
+                    {checks.printer && <CheckOutlined className="text-[10px]" />}
+                  </div>
                   <span className="text-sm text-slate-700">Máy in hoạt động tốt</span>
                 </label>
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <div className="w-4 h-4 border border-slate-300 rounded flex items-center justify-center group-hover:border-blue-500 transition-colors"></div>
+                <label className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); setChecks(p => ({...p, camera: !p.camera})); }}>
+                  <div className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${checks.camera ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 group-hover:border-blue-500'}`}>
+                    {checks.camera && <CheckOutlined className="text-[10px]" />}
+                  </div>
                   <span className="text-sm text-slate-700">Camera LPR rõ nét</span>
                 </label>
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <div className="w-4 h-4 border border-slate-300 rounded flex items-center justify-center group-hover:border-blue-500 transition-colors"></div>
+                <label className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); setChecks(p => ({...p, gate: !p.gate})); }}>
+                  <div className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${checks.gate ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 group-hover:border-blue-500'}`}>
+                    {checks.gate && <CheckOutlined className="text-[10px]" />}
+                  </div>
                   <span className="text-sm text-slate-700">Cổng chắn (Gate) ổn định</span>
                 </label>
               </div>
 
               <div className="mt-auto flex flex-col gap-3">
-                <button className="w-full bg-[#0f172a] hover:bg-slate-800 text-white font-bold py-3 rounded-lg text-xs tracking-wide transition-colors">
-                  TIẾP NHẬN CA (NV MỚI)
+                <button onClick={handleTakeover} disabled={isHandoverProcessing || !allChecked || shiftState === 'active'} className="w-full bg-[#0f172a] hover:bg-slate-800 text-white font-bold py-3 rounded-lg text-xs tracking-wide transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                  {isHandoverProcessing && <LoadingOutlined spin />} TIẾP NHẬN CA (NV MỚI)
                 </button>
-                <button className="w-full bg-white hover:bg-red-50 text-red-600 border border-red-200 font-bold py-3 rounded-lg text-xs tracking-wide transition-colors">
+                <button onClick={handleHandover} disabled={shiftState === 'handed_over'} className="w-full bg-white hover:bg-red-50 text-red-600 border border-red-200 font-bold py-3 rounded-lg text-xs tracking-wide transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                   XÁC NHẬN BÀN GIAO
                 </button>
               </div>
@@ -84,8 +198,8 @@ export const StaffSettings = () => {
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
             <div className="p-5 border-b border-slate-100 flex justify-between items-center">
               <h3 className="font-bold text-slate-800 text-lg m-0">Lịch sử Ca trực</h3>
-              <button className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors">
-                <DownloadOutlined /> XUẤT BÁO CÁO
+              <button onClick={handleExport} disabled={isExporting} className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors disabled:opacity-50">
+                {isExporting ? <LoadingOutlined spin /> : <DownloadOutlined />} XUẤT BÁO CÁO
               </button>
             </div>
             
@@ -102,26 +216,22 @@ export const StaffSettings = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  <tr className="hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-4 font-bold text-slate-800">Nguyễn Văn A</td>
-                    <td className="px-5 py-4">Sáng</td>
-                    <td className="px-5 py-4 font-mono text-xs">06:00</td>
-                    <td className="px-5 py-4 font-mono text-xs text-slate-400">--:--</td>
-                    <td className="px-5 py-4 font-medium">452</td>
-                    <td className="px-5 py-4">
-                      <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border border-blue-200">ĐANG TRỰC</span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-4 font-bold text-slate-800">Trần Thị B</td>
-                    <td className="px-5 py-4">Đêm</td>
-                    <td className="px-5 py-4 font-mono text-xs">22:00</td>
-                    <td className="px-5 py-4 font-mono text-xs">06:00</td>
-                    <td className="px-5 py-4 font-medium">318</td>
-                    <td className="px-5 py-4">
-                      <span className="bg-slate-100 text-slate-500 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border border-slate-200">HOÀN THÀNH</span>
-                    </td>
-                  </tr>
+                  {shiftHistory.map((sh, i) => (
+                    <tr key={i} className={`hover:bg-slate-50 transition-colors ${sh.isCurrent ? 'bg-blue-50/20' : ''}`}>
+                      <td className="px-5 py-4 font-bold text-slate-800">{sh.staff}</td>
+                      <td className="px-5 py-4">{sh.shift}</td>
+                      <td className="px-5 py-4 font-mono text-xs">{sh.start}</td>
+                      <td className={`px-5 py-4 font-mono text-xs ${sh.end === '--:--' ? 'text-slate-400' : ''}`}>{sh.end}</td>
+                      <td className="px-5 py-4 font-medium">{sh.vehicles}</td>
+                      <td className="px-5 py-4">
+                        {sh.status === 'ĐANG TRỰC' ? (
+                          <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border border-blue-200">ĐANG TRỰC</span>
+                        ) : (
+                          <span className="bg-slate-100 text-slate-500 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border border-slate-200">HOÀN THÀNH</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -173,8 +283,8 @@ export const StaffSettings = () => {
                   <Switch defaultChecked />
                 </div>
 
-                <button className="w-full bg-[#0f172a] hover:bg-slate-800 text-white font-bold py-2.5 rounded-lg text-xs tracking-wide transition-colors mt-auto">
-                  LƯU THAY ĐỔI
+                <button onClick={handleSaveConfig} disabled={isSaving} className="w-full bg-[#0f172a] hover:bg-slate-800 text-white font-bold py-2.5 rounded-lg text-xs tracking-wide transition-colors mt-auto flex items-center justify-center gap-2 disabled:opacity-70">
+                  {isSaving && <LoadingOutlined spin />} LƯU THAY ĐỔI
                 </button>
               </div>
             </div>

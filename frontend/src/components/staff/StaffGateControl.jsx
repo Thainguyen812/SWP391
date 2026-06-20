@@ -6,12 +6,14 @@ import {
   VideoCameraOutlined,
   ExclamationCircleFilled
 } from '@ant-design/icons';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { notification, Modal, Dropdown } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffGateControl = () => {
   const navigate = useNavigate();
+  const { addActivityLog, activeVehicles, currentVehicle, setCurrentVehicle } = useGlobalContext();
   const [isEmergency, setIsEmergency] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('Tất cả');
@@ -22,38 +24,30 @@ export const StaffGateControl = () => {
     "[INFO] Hệ thống: Sẵn sàng."
   ]);
 
-  const [gates, setGates] = useState([
-    {
-      id: "L-IN-01",
-      type: "Ô TÔ VIP",
-      typeColor: "bg-slate-200 text-slate-700",
-      plate: "30F - 999.88",
-      barrier: "MỞ",
-      barrierColor: "text-emerald-500",
-      mode: "Tự động",
-      actions: ["lock", "wrench"]
-    },
-    {
-      id: "L-IN-02",
-      type: "VÃNG LAI",
-      typeColor: "bg-slate-200 text-slate-700",
-      plate: "29A - 456.12",
-      barrier: "ĐÓNG",
-      barrierColor: "text-red-500",
-      mode: "Tự động",
-      actions: ["lock", "wrench"]
-    },
-    {
-      id: "L-OUT-01",
-      type: "XE TẢI",
-      typeColor: "bg-slate-200 text-slate-700",
-      plate: "51D - 123.45",
-      barrier: "ĐANG CHỜ",
-      barrierColor: "text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded",
-      mode: "Thủ công",
-      actions: ["approve", "reject"]
+  const [gates, setGates] = useState([]);
+
+  useEffect(() => {
+    if (activeVehicles && activeVehicles.length > 0) {
+      const initialGates = activeVehicles.map(v => {
+        let mode = v.status === 'Chờ thanh toán' ? 'Thủ công' : 'Tự động';
+        let barrier = v.status === 'Chờ thanh toán' ? 'ĐANG CHỜ' : (v.status === 'Cảnh báo' || v.status === 'Lỗi thẻ' ? 'ĐÓNG' : 'MỞ');
+        let barrierColor = barrier === 'MỞ' ? 'text-emerald-500' : (barrier === 'ĐÓNG' ? 'text-red-500' : 'text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded');
+        
+        return {
+          id: v.gate.replace('Cổng', 'L').replace(' ', '-').toUpperCase(),
+          type: v.type.toUpperCase(),
+          typeColor: "bg-slate-200 text-slate-700",
+          plate: v.plate,
+          barrier: barrier,
+          barrierColor: barrierColor,
+          mode: mode,
+          actions: mode === 'Thủ công' ? ["approve", "reject"] : ["lock", "wrench"],
+          vehicleId: v.id
+        };
+      });
+      setGates(initialGates);
     }
-  ]);
+  }, [activeVehicles]);
 
   const addLog = (msg, type = 'INFO') => {
     let colorClass = "text-slate-300";
@@ -64,32 +58,64 @@ export const StaffGateControl = () => {
   };
 
   const handleApprove = (id, plate) => {
-    setGates(prev => prev.map(g => {
-      if (g.id === id) {
-        return { ...g, barrier: "MỞ", barrierColor: "text-emerald-500", actions: ["lock", "wrench"] };
+    Modal.confirm({
+      title: 'Xác nhận mở cổng',
+      content: `Mở cổng ${id} cho xe ${plate}?`,
+      okText: 'Mở cổng',
+      cancelText: 'Hủy',
+      onOk() {
+        setGates(prev => prev.map(g => {
+          if (g.id === id) {
+            return { ...g, barrier: "MỞ", barrierColor: "text-emerald-500", actions: ["lock", "wrench"] };
+          }
+          return g;
+        }));
+        addLog(`${id}: Phê duyệt thủ công, Barrier MỞ cho xe ${plate}`, 'OK');
+        
+        // Update Global Context
+        addActivityLog({
+          plate: plate,
+          model: "Mở Thủ Công",
+          type: "VÃNG LAI",
+          gate: id,
+          action: "Mở Thủ Công",
+          time: "Vừa xong",
+          status: "Thành Công",
+          typeColor: "text-blue-600",
+          statusColor: "bg-emerald-100 text-emerald-700",
+          actionColor: "text-emerald-600"
+        });
+
+        notification.success({
+          message: 'Đã phê duyệt',
+          description: `Barrier đã được mở cho xe ${plate}.`,
+          placement: 'topRight'
+        });
       }
-      return g;
-    }));
-    addLog(`${id}: Phê duyệt thủ công, Barrier MỞ cho xe ${plate}`, 'OK');
-    notification.success({
-      message: 'Đã phê duyệt',
-      description: `Barrier đã được mở cho xe ${plate}.`,
-      placement: 'topRight'
     });
   };
 
   const handleReject = (id, plate) => {
-    setGates(prev => prev.map(g => {
-      if (g.id === id) {
-        return { ...g, barrier: "ĐÓNG", barrierColor: "text-red-500", actions: ["lock", "wrench"] };
+    Modal.confirm({
+      title: 'Từ chối mở cổng',
+      content: `Bạn chắc chắn muốn từ chối xe ${plate} đi qua cổng ${id}?`,
+      okText: 'Từ chối',
+      cancelText: 'Hủy',
+      okButtonProps: { danger: true },
+      onOk() {
+        setGates(prev => prev.map(g => {
+          if (g.id === id) {
+            return { ...g, barrier: "ĐÓNG", barrierColor: "text-red-500", actions: ["lock", "wrench"] };
+          }
+          return g;
+        }));
+        addLog(`${id}: Từ chối mở cổng cho xe ${plate}`, 'WARN');
+        notification.error({
+          message: 'Từ chối mở cổng',
+          description: `Đã từ chối xe ${plate} qua cổng.`,
+          placement: 'topRight'
+        });
       }
-      return g;
-    }));
-    addLog(`${id}: Từ chối mở cổng cho xe ${plate}`, 'WARN');
-    notification.error({
-      message: 'Từ chối mở cổng',
-      description: `Đã từ chối xe ${plate} qua cổng.`,
-      placement: 'topRight'
     });
   };
 
@@ -98,22 +124,33 @@ export const StaffGateControl = () => {
     if (!gate) return;
     
     const isLocked = gate.mode === "Khóa";
-    if (isLocked) {
-       addLog(`${id}: Mở khóa làn`, 'INFO');
-    } else {
-       addLog(`${id}: Đã khóa làn khẩn cấp`, 'ERROR');
-    }
-
-    setGates(prev => prev.map(g => {
-      if (g.id === id) {
+    
+    Modal.confirm({
+      title: isLocked ? 'Xác nhận mở khóa làn' : 'Xác nhận khóa làn',
+      content: isLocked ? `Bạn muốn mở khóa làn ${id}?` : `Bạn có chắc chắn muốn khóa khẩn cấp làn ${id}?`,
+      okText: 'Xác nhận',
+      cancelText: 'Hủy',
+      okButtonProps: { danger: !isLocked },
+      onOk() {
         if (isLocked) {
-           return { ...g, barrier: "ĐÓNG", barrierColor: "text-red-500", mode: "Tự động" };
+           addLog(`${id}: Mở khóa làn`, 'INFO');
         } else {
-           return { ...g, barrier: "ĐÓNG", barrierColor: "text-red-500", mode: "Khóa" };
+           addLog(`${id}: Đã khóa làn khẩn cấp`, 'ERROR');
         }
+
+        setGates(prev => prev.map(g => {
+          if (g.id === id) {
+            if (isLocked) {
+               return { ...g, barrier: "ĐÓNG", barrierColor: "text-red-500", mode: "Tự động" };
+            } else {
+               return { ...g, barrier: "ĐÓNG", barrierColor: "text-red-500", mode: "Khóa" };
+            }
+          }
+          return g;
+        }));
+        notification.success({message: isLocked ? 'Đã mở khóa' : 'Đã khóa', placement: 'topRight'});
       }
-      return g;
-    }));
+    });
   };
 
   const handleMaintenance = (id) => {
@@ -157,7 +194,7 @@ export const StaffGateControl = () => {
   };
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto w-full">
+    <div className="p-6 w-full">
       {/* Top Stats & Emergency */}
       <div className="grid grid-cols-4 gap-6 mb-6">
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
@@ -274,8 +311,13 @@ export const StaffGateControl = () => {
                     gate.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
                     gate.id.toLowerCase().includes(searchQuery.toLowerCase())
                   )
-                  .map((gate, i) => (
-                  <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors last:border-0">
+                  .map((gate, i) => {
+                    const isSelected = currentVehicle?.id === gate.vehicleId;
+                    return (
+                  <tr 
+                    key={i} 
+                    className={`border-b hover:bg-slate-50 transition-colors last:border-0 ${isSelected ? 'bg-blue-50/50 border-blue-200 shadow-sm' : 'border-slate-100'}`}
+                  >
                     <td className="p-4 font-bold text-slate-800">{gate.id}</td>
                     <td className="p-4">
                       <span className={`text-[9px] font-bold px-2 py-1 rounded uppercase ${gate.typeColor}`}>
@@ -329,7 +371,8 @@ export const StaffGateControl = () => {
                       </div>
                     </td>
                   </tr>
-                ))}
+                    );
+                })}
               </tbody>
             </table>
           </div>
@@ -356,21 +399,18 @@ export const StaffGateControl = () => {
               <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
             </div>
             <div className="p-2 flex flex-col gap-2 bg-slate-50">
-              <div className="relative rounded overflow-hidden aspect-[16/9] bg-slate-900 border border-slate-200">
-                <img src="https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80" alt="Cam 1" className="w-full h-full object-cover opacity-80" />
-                <div className="absolute top-2 left-2 bg-black/70 text-white text-[9px] font-bold px-2 py-1 rounded backdrop-blur-sm flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
-                  CAM 01 - CỔNG VÀO 1
+              {activeVehicles && activeVehicles.slice(0, 2).map((vehicle, index) => (
+                <div key={vehicle.id} className={`relative rounded overflow-hidden aspect-[16/9] bg-slate-900 border border-slate-200 cursor-pointer transition-all ${currentVehicle?.id === vehicle.id ? 'border-blue-500 shadow-md ring-2 ring-blue-500' : ''}`} onClick={() => setCurrentVehicle(vehicle)}>
+                  <img src={vehicle.image || "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80"} alt={`Cam ${index + 1}`} className="w-full h-full object-cover opacity-80" />
+                  <div className="absolute top-2 left-2 bg-black/70 text-white text-[9px] font-bold px-2 py-1 rounded backdrop-blur-sm flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></div>
+                    CAM 0{index + 1} - {vehicle.gate.toUpperCase()}
+                  </div>
+                  <div className="absolute bottom-2 left-2 bg-black/70 text-white text-[10px] font-bold px-2 py-1 rounded backdrop-blur-sm flex items-center gap-1.5">
+                    {vehicle.plate}
+                  </div>
                 </div>
-              </div>
-              
-              <div className="relative rounded overflow-hidden aspect-[16/9] bg-slate-900 border border-slate-200">
-                <img src="https://images.unsplash.com/photo-1600661653561-629509216228?auto=format&fit=crop&w=600&q=80" alt="Cam 4" className="w-full h-full object-cover opacity-80" />
-                <div className="absolute top-2 left-2 bg-black/70 text-white text-[9px] font-bold px-2 py-1 rounded backdrop-blur-sm flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
-                  CAM 04 - CỔNG RA 1
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   WarningOutlined, 
   CheckCircleOutlined,
@@ -6,11 +6,13 @@ import {
   InfoCircleOutlined,
   ExpandAltOutlined
 } from '@ant-design/icons';
-import { notification } from 'antd';
+import { notification, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffMonitoring = () => {
   const navigate = useNavigate();
+  const { activeVehicles } = useGlobalContext();
   const [alerts, setAlerts] = useState([
     { id: 1, type: 'Cao', time: '08:44:05', title: 'Phát hiện xe không biển số', desc: 'Cổng ra 1 • Yêu cầu kiểm tra thủ công', actionable: true },
     { id: 2, type: 'Trung bình', time: '08:30:12', title: 'Cảnh báo đỗ sai vị trí', desc: 'Tầng hầm B1, Khu C • Đỗ lấn vạch', actionable: true },
@@ -18,85 +20,76 @@ export const StaffMonitoring = () => {
     { id: 4, type: 'Thấp', time: '07:55:22', title: 'Thay đổi ca trực', desc: 'Quản trị viên • Nhận ca sáng', actionable: false }
   ]);
 
-  const [cameras, setCameras] = useState([
-    {
-      id: 1,
-      name: 'Cổng vào 1',
-      location: 'LPR Camera - Lối vào chính',
-      status: 'NORMAL',
-      statusText: 'Nhận diện BSX ổn định',
-      time: '08:45:12',
-      image: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80'
-    },
-    {
-      id: 2,
-      name: 'Cổng vào 2',
-      location: 'LPR Camera - Lối vào phụ',
-      status: 'NORMAL',
-      statusText: 'Trạng thái bình thường',
-      time: '08:45:12',
-      image: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80'
-    },
-    {
-      id: 3,
-      name: 'Cổng ra 1',
-      location: 'LPR Camera - Lối ra chính',
-      status: 'WARNING',
-      statusText: 'CẢNH BÁO: Không thể đọc BSX',
-      time: '08:45:12',
-      image: 'https://images.unsplash.com/photo-1621416953228-868f04179e87?auto=format&fit=crop&w=600&q=80'
-    },
-    {
-      id: 4,
-      name: 'Cổng ra 2',
-      location: 'LPR Camera - Lối ra phụ',
-      status: 'NORMAL',
-      statusText: 'Giao thông thông suốt',
-      time: '08:45:12',
-      image: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=600&q=80'
-    },
-    {
-      id: 5,
-      name: 'Tầng hầm B1',
-      location: 'Camera Toàn cảnh - Khu A B1',
-      status: 'NORMAL',
-      statusText: 'Quan sát bình thường',
-      time: '08:45:12',
-      image: 'https://images.unsplash.com/photo-1510443697925-eb43fb60341e?auto=format&fit=crop&w=600&q=80'
+  const [cameras, setCameras] = useState([]);
+
+  useEffect(() => {
+    if (activeVehicles && activeVehicles.length > 0) {
+      const liveCams = activeVehicles.slice(0, 5).map((v, i) => ({
+        id: i + 1,
+        name: v.gate,
+        location: `LPR Camera - ${v.gate}`,
+        status: v.status === 'Cảnh báo' || v.status === 'Lỗi thẻ' ? 'WARNING' : 'NORMAL',
+        statusText: v.status === 'Cảnh báo' || v.status === 'Lỗi thẻ' ? `CẢNH BÁO: ${v.status}` : 'Nhận diện BSX ổn định',
+        time: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit', second:'2-digit'}),
+        image: v.image || 'https://images.unsplash.com/photo-1510443697925-eb43fb60341e?auto=format&fit=crop&w=600&q=80',
+        plate: v.plate
+      }));
+      setCameras(liveCams);
     }
-  ]);
+  }, [activeVehicles]);
 
   const handleFixCamera = (id) => {
-    notification.success({
-      message: 'Xử lý thành công',
-      description: 'Đã thiết lập lại thuật toán nhận diện cho Camera.',
-      placement: 'topRight'
+    Modal.confirm({
+      title: 'Khôi phục Camera',
+      content: 'Hệ thống sẽ thử khởi động lại bộ đọc OCR và hiệu chỉnh tiêu cự camera.',
+      okText: 'Chẩn đoán',
+      cancelText: 'Hủy',
+      onOk() {
+        notification.success({
+          message: 'Xử lý thành công',
+          description: 'Đã thiết lập lại thuật toán nhận diện cho Camera.',
+          placement: 'topRight'
+        });
+        setCameras(prev => prev.map(c => 
+          c.id === id ? { ...c, status: 'NORMAL', statusText: 'Đã khôi phục nhận diện' } : c
+        ));
+      }
     });
-    setCameras(prev => prev.map(c => 
-      c.id === id ? { ...c, status: 'NORMAL', statusText: 'Đã khôi phục nhận diện' } : c
-    ));
   };
 
   const handleIgnore = (id) => {
-    setAlerts(prev => prev.filter(a => a.id !== id));
-    notification.info({ message: 'Đã bỏ qua cảnh báo', placement: 'topRight' });
+    Modal.confirm({
+      title: 'Xác nhận',
+      content: 'Bỏ qua cảnh báo này?',
+      okText: 'Bỏ qua',
+      cancelText: 'Hủy',
+      okButtonProps: { danger: true },
+      onOk() {
+        setAlerts(prev => prev.filter(a => a.id !== id));
+        notification.info({ message: 'Đã bỏ qua cảnh báo', placement: 'topRight' });
+      }
+    });
   };
 
   const handleProcess = (id) => {
-    setAlerts(prev => prev.filter(a => a.id !== id));
-    notification.success({ message: 'Đang xử lý cảnh báo', description: 'Đã tiếp nhận yêu cầu và điều phối An ninh.', placement: 'topRight' });
+    Modal.confirm({
+      title: 'Xác nhận',
+      content: 'Tiếp nhận yêu cầu điều phối An ninh?',
+      okText: 'Tiếp nhận',
+      cancelText: 'Hủy',
+      okButtonProps: { className: 'bg-emerald-600' },
+      onOk() {
+        setAlerts(prev => prev.filter(a => a.id !== id));
+        notification.success({ message: 'Đang xử lý cảnh báo', description: 'Đã tiếp nhận yêu cầu và điều phối An ninh.', placement: 'topRight' });
+      }
+    });
   };
 
   const newAlertsCount = alerts.filter(a => a.type === 'Cao' || a.type === 'Trung bình').length;
   const [isSystemActive, setIsSystemActive] = useState(true);
   return (
-    <div className="p-6 max-w-[1400px] mx-auto w-full">
-      {/* Page Header */}
-      <div className="flex justify-between items-end mb-6 pb-4 border-b border-slate-200">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800 m-0 mb-1">Trung tâm Giám sát Thời gian thực</h2>
-          <p className="text-slate-500 text-sm m-0">Hệ thống Camera & Phân tích thông minh</p>
-        </div>
+    <div className="p-6 w-full">
+      <div className="flex justify-end mb-6">
         <div className="flex gap-3">
           <button 
             onClick={() => setIsSystemActive(!isSystemActive)}

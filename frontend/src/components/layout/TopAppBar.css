@@ -1,7 +1,7 @@
 @reference "../../index.css";
 
 .top-app-bar {
-  @apply w-full h-[72px] bg-white dark:bg-[#1e293b] border-b border-[#e9e7e9] dark:border-[#334155] flex items-center justify-between px-6 flex-shrink-0 transition-colors;
+  @apply w-full h-16 bg-white dark:bg-[#1e293b] border-b border-[#e9e7e9] dark:border-[#334155] flex items-center justify-between px-6 flex-shrink-0 transition-colors;
 }
 
 .search-container {

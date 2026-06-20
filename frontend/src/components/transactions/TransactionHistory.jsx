@@ -15,14 +15,53 @@ import {
   CreditCardOutlined,
   WalletOutlined
 } from '@ant-design/icons';
+import { DatePicker, notification, Spin } from 'antd';
+import dayjs from 'dayjs';
+import { useGlobalContext } from '../../context/GlobalContext';
 
 export const TransactionHistory = () => {
   const [activePage, setActivePage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleFilter = () => {
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      notification.success({message: 'Đã tải xong dữ liệu', placement: 'topRight'});
+    }, 800);
+  };
+
+  const { transactions, shiftStats, searchValue } = useGlobalContext();
+
+  const handleExport = () => {
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      notification.success({message: 'Xuất báo cáo thành công', description: 'File báo cáo đã được lưu vào máy dưới dạng Excel/CSV.', placement: 'topRight'});
+    }, 1500);
+  };
+
+  const ITEMS_PER_PAGE = 10;
+  
+  const filteredTransactions = transactions.filter(trx => {
+    if (!searchValue) return true;
+    const lowerSearch = searchValue.toLowerCase();
+    return trx.plate?.toLowerCase().includes(lowerSearch) || trx.id?.toLowerCase().includes(lowerSearch);
+  });
+  
+  const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE) || 1;
+  const currentData = filteredTransactions.slice((activePage - 1) * ITEMS_PER_PAGE, activePage * ITEMS_PER_PAGE);
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setActivePage(newPage);
+    }
+  };
 
   const stats = [
     {
       title: "Doanh thu ca trực",
-      value: "12.450.000 đ",
+      value: `${shiftStats.revenue.toLocaleString()} đ`,
       trend: "+15%",
       trendColor: "bg-emerald-100 text-emerald-700",
       icon: <WalletOutlined className="text-blue-500 text-xl" />,
@@ -30,7 +69,7 @@ export const TransactionHistory = () => {
     },
     {
       title: "Giao dịch thành công",
-      value: "482",
+      value: `${shiftStats.transactions}`,
       trend: "Ổn định",
       trendColor: "bg-slate-100 text-slate-600",
       icon: <CheckCircleFilled className="text-emerald-500 text-xl" />,
@@ -46,92 +85,13 @@ export const TransactionHistory = () => {
     }
   ];
 
-  const transactions = [
-    {
-      id: "#TRX-8829",
-      plate: "29A-123.45",
-      type: "car",
-      inTime: "08:15",
-      inDate: "24/05",
-      outTime: "10:30",
-      outDate: "24/05",
-      duration: "2h 15m",
-      amount: "45,000 đ",
-      paymentMethod: "Ví UrbanPark",
-      paymentIcon: <WalletOutlined className="text-blue-600" />,
-      status: "Thành công",
-      statusColor: "bg-emerald-100 text-emerald-700",
-      hasError: false
-    },
-    {
-      id: "#TRX-8830",
-      plate: "51G-999.01",
-      type: "moto",
-      inTime: "09:00",
-      inDate: "24/05",
-      outTime: "--:--",
-      outDate: "",
-      duration: "Đang đỗ",
-      amount: "0 đ",
-      paymentMethod: "Tiền mặt",
-      paymentIcon: <WalletOutlined className="text-slate-600" />,
-      status: "Đang xử lý",
-      statusColor: "bg-slate-100 text-slate-600",
-      hasError: false
-    },
-    {
-      id: "#TRX-8831",
-      plate: "30H-556.78",
-      type: "car",
-      inTime: "07:45",
-      inDate: "24/05",
-      outTime: "09:15",
-      outDate: "24/05",
-      duration: "1h 30m",
-      amount: "30,000 đ",
-      paymentMethod: "Thẻ VIP",
-      paymentIcon: <CheckCircleFilled className="text-slate-800" />,
-      status: "Thành công",
-      statusColor: "bg-emerald-100 text-emerald-700",
-      hasError: false
-    },
-    {
-      id: "#TRX-8832",
-      plate: "15A-888.88",
-      type: "car",
-      inTime: "10:00",
-      inDate: "24/05",
-      outTime: "10:15",
-      outDate: "24/05",
-      duration: "15m",
-      amount: "15,000 đ",
-      paymentMethod: "Thẻ NH",
-      paymentIcon: <CreditCardOutlined className="text-blue-500" />,
-      status: "Thất bại",
-      statusColor: "bg-red-100 text-red-600",
-      hasError: true
-    }
-  ];
-
   return (
     <div className="flex-1 flex flex-col min-h-[calc(100vh-64px)] w-full relative">
       <main className="flex-1 p-6 overflow-auto">
-        <div className="max-w-[1400px] mx-auto">
+        <div className="w-full">
           {/* Header Area (in main content area) */}
           <div className="flex justify-between items-center mb-6">
-            <div className="text-sm text-slate-500">
-              <span className="hover:text-slate-700 cursor-pointer">Trang chủ</span>
-              <span className="mx-2">&gt;</span>
-              <span className="font-bold text-slate-800">Lịch sử giao dịch</span>
-            </div>
-            <div className="relative hidden md:block">
-              <SearchOutlined className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Tìm kiếm biển số hoặc mã..." 
-                className="pl-9 pr-4 py-2 border border-slate-200 rounded-full text-sm w-[280px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
-              />
-            </div>
+            <div className="flex-1"></div>
           </div>
           
           {/* Stats Cards */}
@@ -173,22 +133,20 @@ export const TransactionHistory = () => {
             </div>
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Khoảng thời gian</label>
-              <div className="relative">
-                <input 
-                  type="text" 
-                  defaultValue="Hôm nay, 24/05/2024" 
-                  className="w-full border border-slate-200 rounded-lg pl-10 pr-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-slate-50/50 hover:bg-white transition-colors cursor-pointer"
-                  readOnly
+              <div className="relative w-full">
+                <DatePicker.RangePicker 
+                  className="w-full border border-slate-200 rounded-lg py-2.5 text-sm focus:outline-none focus:border-blue-500 bg-slate-50/50 hover:bg-white transition-colors cursor-pointer"
+                  defaultValue={[dayjs('2024-05-24', 'YYYY-MM-DD'), dayjs('2024-05-24', 'YYYY-MM-DD')]}
+                  format="DD/MM/YYYY"
                 />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">📅</span>
               </div>
             </div>
             <div className="flex gap-3 mt-4 md:mt-0">
-              <button className="bg-slate-800 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors flex items-center gap-2 shadow-sm">
+              <button onClick={handleFilter} className="bg-slate-800 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors flex items-center gap-2 shadow-sm">
                 <FilterOutlined /> Áp dụng lọc
               </button>
-              <button className="bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors flex items-center justify-center shadow-sm">
-                <ReloadOutlined />
+              <button onClick={handleFilter} className="bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors flex items-center justify-center shadow-sm">
+                <ReloadOutlined className={isLoading ? "animate-spin" : ""} />
               </button>
             </div>
           </div>
@@ -211,7 +169,7 @@ export const TransactionHistory = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {transactions.map((trx, index) => (
+                  {currentData.length > 0 ? currentData.map((trx, index) => (
                     <tr key={index} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-5 font-bold text-slate-800">{trx.id}</td>
                       <td className="px-6 py-5">
@@ -254,7 +212,13 @@ export const TransactionHistory = () => {
                         )}
                       </td>
                     </tr>
-                  ))}
+                  )) : (
+                    <tr>
+                      <td colSpan="9" className="px-6 py-10 text-center text-slate-500">
+                        Không tìm thấy giao dịch nào phù hợp với "{searchValue}"
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -262,25 +226,29 @@ export const TransactionHistory = () => {
             {/* Pagination & Footer */}
             <div className="border-t border-slate-200 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white">
               <div className="text-sm text-slate-500">
-                Hiển thị <span className="font-bold text-slate-700">1-10</span> trong số <span className="font-bold text-slate-700">482</span> giao dịch
+                Hiển thị <span className="font-bold text-slate-700">{filteredTransactions.length > 0 ? (activePage - 1) * ITEMS_PER_PAGE + 1 : 0}-{Math.min(activePage * ITEMS_PER_PAGE, filteredTransactions.length)}</span> trong số <span className="font-bold text-slate-700">{filteredTransactions.length}</span> giao dịch
               </div>
               
               <div className="flex items-center gap-1">
-                <button className="w-8 h-8 flex items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">&lt;</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded bg-slate-800 text-white font-medium">1</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded text-slate-600 hover:bg-slate-100 transition-colors font-medium">2</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded text-slate-600 hover:bg-slate-100 transition-colors font-medium">3</button>
-                <span className="w-8 h-8 flex items-center justify-center text-slate-400">...</span>
-                <button className="w-8 h-8 flex items-center justify-center rounded text-slate-600 hover:bg-slate-100 transition-colors font-medium">48</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">&gt;</button>
+                <button onClick={() => handlePageChange(activePage - 1)} disabled={activePage === 1} className="w-8 h-8 flex items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors disabled:opacity-50">&lt;</button>
+                {[...Array(totalPages)].map((_, i) => (
+                  <button 
+                    key={i} 
+                    onClick={() => handlePageChange(i + 1)} 
+                    className={`w-8 h-8 flex items-center justify-center rounded font-medium transition-colors ${activePage === i + 1 ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+                <button onClick={() => handlePageChange(activePage + 1)} disabled={activePage === totalPages} className="w-8 h-8 flex items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors disabled:opacity-50">&gt;</button>
               </div>
             </div>
           </div>
 
           {/* Actions Footer */}
           <div className="flex justify-end mb-8">
-            <button className="bg-white border border-slate-200 text-slate-700 px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm">
-              <DownloadOutlined /> Xuất báo cáo CSV / PDF
+            <button onClick={handleExport} disabled={isLoading} className="bg-white border border-slate-200 text-slate-700 px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50">
+              {isLoading ? <Spin size="small" /> : <DownloadOutlined />} Xuất báo cáo CSV / PDF
             </button>
           </div>
 

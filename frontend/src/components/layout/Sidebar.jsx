@@ -43,9 +43,9 @@ export const Sidebar = ({ onOpenAddBranch }) => {
         <div className="sidebar-logo-icon">
           P
         </div>
-        <div className="sidebar-logo-text-wrapper">
-          <span className="sidebar-logo-title">UrbanPark</span>
-          <span className="sidebar-logo-subtitle">Hệ thống đỗ xe thông minh</span>
+        <div className="sidebar-logo-text-wrapper flex flex-col gap-1">
+          <h1 className="text-2xl font-bold text-white m-0 tracking-wide">Urban</h1>
+          <h2 className="text-2xl font-bold text-white m-0">Park System</h2>
         </div>
       </div>
 
