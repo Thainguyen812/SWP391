@@ -29,7 +29,6 @@ public class SecurityConfig {
         this.jwtAuthFilter = jwtAuthFilter;
     }
 
-
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -50,13 +49,20 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html"
-                        ).permitAll()
+                                "/swagger-ui.html")
+                        .permitAll()
+
+                        // Phân quyền (Role-based): Sử dụng .hasAnyRole("STAFF", "MANAGER", "ADMIN")
+                        // đảm bảo rằng chỉ những người dùng có chức danh phù hợp mới được quyền thay
+                        // đổi trạng thái phiên đỗ xe (tránh việc khách hàng tự "hack" trạng thái xe về
+                        // COMPLETED).
+                        .requestMatchers("/api/blacklisted-cards/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
 
                         // Tất cả các request còn lại đều phải quẹt thẻ thành công
                         .anyRequest().authenticated());
 
-        // 4. Chèn máy quét thẻ JwtAuthFilter của bạn vào chạy trước bộ lọc mặc định của Spring
+        // 4. Chèn máy quét thẻ JwtAuthFilter của bạn vào chạy trước bộ lọc mặc định của
+        // Spring
         http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
