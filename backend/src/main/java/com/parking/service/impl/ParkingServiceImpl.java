@@ -635,4 +635,29 @@ if (session.getSessionStatus()
         return transaction;
     }
 
+    @Override
+    @Transactional
+    public void cleanupTestData() {
+        List<com.parking.model.ParkingSession> sessions = parkingSessionRepository.findAll();
+        for (com.parking.model.ParkingSession ps : sessions) {
+            if ("30A-99999".equals(ps.getLicensePlate()) || "29A-88888".equals(ps.getLicensePlate())) {
+                if (ps.getSessionStatus() == com.parking.model.ParkingSession.SessionStatus.ACTIVE || ps.getSessionStatus() == com.parking.model.ParkingSession.SessionStatus.PASSED_CONFIRMED) {
+                    if (ps.getAssignedZoneId() != null) {
+                        zoneRepository.findById(ps.getAssignedZoneId()).ifPresent(zone -> {
+                            if (zone.getCurrentOccupied() > 0) {
+                                zone.setCurrentOccupied(zone.getCurrentOccupied() - 1);
+                                zoneRepository.save(zone);
+                            }
+                        });
+                    }
+                }
+                parkingSessionRepository.delete(ps);
+            }
+        }
+
+        cardRepository.findByCardCode("000001").ifPresent(card -> {
+            card.setStatus(com.parking.model.Card.CardStatus.AVAILABLE);
+            cardRepository.save(card);
+        });
+    }
 }
