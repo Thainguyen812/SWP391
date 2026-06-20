@@ -9,7 +9,7 @@ export const TopAppBarSection = () => {
   const searchId = useId();
   const location = useLocation();
   const navigate = useNavigate();
-  const { searchValue, setSearchValue } = useGlobalContext();
+  const { searchValue, setSearchValue, currentUser } = useGlobalContext();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
 
