@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ApiCollectionEntity>
+   <description>API resource api collection</description>
+   <name>api_auth_refresh</name>
+   <tag></tag>
+   <folderType>WEBELEMENT</folderType>
+   <collectionType>OPENAPI_3_0</collectionType>
+</ApiCollectionEntity>
