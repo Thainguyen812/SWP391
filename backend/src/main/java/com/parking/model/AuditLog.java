@@ -1,6 +1,8 @@
 package com.parking.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -22,9 +24,11 @@ public class AuditLog {
     @Column(name = "entity_id")
     private UUID entityId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "old_value")
     private String oldValue;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "new_value")
     private String newValue;
 
