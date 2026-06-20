@@ -7,6 +7,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+import com.parking.dto.VipRegistrationRequest;
+
+
 @RestController
 @RequestMapping("/api/v1/vip")
 public class VipController {
@@ -35,4 +38,12 @@ public class VipController {
 
         return vipService.reject(id);
     }
+
+    @PostMapping("/register")
+    public VipSubscription register(
+            @RequestBody VipRegistrationRequest request) {
+
+        return vipService.register(request);
+    }
+
 }
