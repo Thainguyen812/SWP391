@@ -13,7 +13,6 @@ import {
   MapPin, 
   Check, 
   LogIn, 
-  LogOut as LogOutIcon, 
   DollarSign, 
   Shield, 
   Lock, 
@@ -26,25 +25,48 @@ import {
   UploadCloud, 
   RefreshCw,
   Download,
-  PlusCircle,
   Plus,
   Bike,
   Sparkles,
   Info,
   Trash2,
   Send,
-  Compass,
-  Map,
-  BadgeAlert,
   ChevronDown,
   ChevronUp,
   Headphones,
   Mail,
-  Paperclip,
-  Activity
+  Activity,
+  Users,
+  Wrench,
+  AlertTriangle,
+  Flame,
+  CheckCircle2,
+  Monitor,
+  Printer,
+  Compass,
+  User,
+  Layers,
+  History
 } from 'lucide-react';
 
+import { 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  Legend
+} from 'recharts';
+
 import { VipApprovalPanel } from './VipApprovalPanel';
+import { ParkingMonitorView } from './ParkingMonitorView';
 
 interface DashboardProps {
   user: {
@@ -57,714 +79,750 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
-interface Vehicle {
-  id: string;
+// Types for Manager Dashboard
+interface ParkedVehicle {
   plate: string;
-  type: string;
-  location: string;
-  status: 'DANG_DO' | 'DA_OUT' | 'BAO_VE_MAX';
+  type: 'OTO' | 'XEMAY' | 'VIP';
+  zone: 'Khu A (Tầng 1)' | 'Khu B (Tầng 2)' | 'Khu C (Hầm B1)';
+  slot: string;
   entryTime: string;
-  isLocked: boolean;
-  brand?: string;
-  detailType?: string;
-  image?: string;
+  ownerName?: string;
+  phone?: string;
 }
 
-interface Activity {
+interface StaffMember {
   id: string;
+  name: string;
+  avatar: string;
+  role: string;
+  gate: string;
+  swipes: number;
+  status: 'ONLINE' | 'OFFLINE';
+  leaveHours?: string;
+  keyLabel?: string;
+  reason?: string;
+}
+
+interface SystemNotice {
+  id: string;
+  type: 'ERROR' | 'WARNING' | 'SUCCESS';
+  title: string;
+  desc: string;
   time: string;
-  event: 'Xe vào' | 'Xe ra' | 'Đăng ký VIP' | 'Mua vé ngày';
-  plate: string;
-  cost: string;
+  actionText?: string;
+  actionState?: 'IDLE' | 'PENDING' | 'RESOLVED';
 }
 
-interface VipSubscription {
-  id: string;
-  vehicle_plate: string;
-  type: string;
-  startDate: string;
-  endDate: string;
-  status: 'PENDING' | 'ACTIVE' | 'REJECTED';
+interface BlacklistedVehicle {
+  plate: string;
+  reason: string;
+  dateAdded: string;
 }
+
+const TopDownCarSVG = ({ color }: { color: string }) => {
+  return (
+    <svg viewBox="0 0 100 50" className="w-full h-8 select-none pointer-events-none drop-shadow-md">
+      {/* Wheels */}
+      <rect x="15" y="1" width="14" height="6" rx="2" fill="#1e293b" />
+      <rect x="70" y="1" width="14" height="6" rx="2" fill="#1e293b" />
+      <rect x="15" y="43" width="14" height="6" rx="2" fill="#1e293b" />
+      <rect x="70" y="43" width="14" height="6" rx="2" fill="#1e293b" />
+      
+      {/* Car body */}
+      <rect x="8" y="5" width="84" height="40" rx="10" fill={color} />
+      
+      {/* Roof outline */}
+      <rect x="25" y="10" width="46" height="30" rx="6" fill="#111827" opacity="0.15" />
+      
+      {/* Windshields */}
+      <path d="M 28,12 L 34,9 L 34,41 L 28,38 Z" fill="#e2e8f0" opacity="0.8" />
+      <path d="M 68,12 L 62,9 L 62,41 L 68,38 Z" fill="#e2e8f0" opacity="0.8" />
+      
+      {/* Headlights */}
+      <rect x="91" y="9" width="3" height="6" rx="1.5" fill="#fef08a" />
+      <rect x="91" y="35" width="3" height="6" rx="1.5" fill="#fef08a" />
+      
+      {/* Taillights */}
+      <rect x="7" y="10" width="3" height="5" rx="1" fill="#ef4444" />
+      <rect x="7" y="35" width="3" height="5" rx="1" fill="#ef4444" />
+    </svg>
+  );
+};
 
 export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: DashboardProps) {
-  // Navigation / Sidebar active menu
-  const [activeMenu, setActiveMenu] = useState<'home' | 'vehicles' | 'vip' | 'vip_approval' | 'billing' | 'settings' | 'support'>('billing');
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [notificationCount, setNotificationCount] = useState(2);
-  const [showNotifications, setShowNotifications] = useState(false);
-
-  // States with Local Storage persistence
-  const [balance, setBalance] = useState<number>(() => {
-    const saved = localStorage.getItem('urbanpark_driver_balance');
-    return saved ? parseFloat(saved) : 45.50;
-  });
-
-  const [vehicles, setVehicles] = useState<Vehicle[]>(() => {
-    const saved = localStorage.getItem('urbanpark_driver_vehicles');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed.map((item: any) => ({
-          ...item,
-          brand: item.brand || (item.type === 'Ô tô' ? 'Toyota Camry' : 'Honda SH'),
-          detailType: item.detailType || (item.type === 'Ô tô' ? 'Ô tô 4 chỗ' : 'Xe máy'),
-          image: item.image || (item.plate.startsWith('30') ? 'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=600&auto=format&fit=crop&q=80' : undefined)
-        }));
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    return [
-      { 
-        id: 'V-1', 
-        plate: '30A-123.45', 
-        type: 'Ô tô', 
-        brand: 'Toyota Camry', 
-        detailType: 'Ô tô 4 chỗ', 
-        location: 'Khu A • Tầng 2', 
-        status: 'DANG_DO', 
-        entryTime: 'Hôm nay, 08:32', 
-        isLocked: false,
-        image: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=600&auto=format&fit=crop&q=80'
-      },
-      { 
-        id: 'V-2', 
-        plate: '30G-123.45', 
-        type: 'Ô tô', 
-        brand: 'Toyota Camry', 
-        detailType: 'Ô tô 4 chỗ', 
-        location: 'Khu A • Tầng 2', 
-        status: 'DANG_DO', 
-        entryTime: 'Hôm nay, 08:32', 
-        isLocked: false,
-        image: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=600&auto=format&fit=crop&q=80'
-      },
-      { 
-        id: 'V-3', 
-        plate: '29M1-678.90', 
-        type: 'Xe máy', 
-        brand: 'Honda SH', 
-        detailType: 'Xe máy', 
-        location: 'Khu B • Tầng B1', 
-        status: 'DANG_DO', 
-        entryTime: 'Mới đăng ký', 
-        isLocked: false,
-        image: undefined
-      }
-    ];
-  });
-
-  const [activities, setActivities] = useState<Activity[]>(() => {
-    const saved = localStorage.getItem('urbanpark_driver_activities');
-    if (saved) return JSON.parse(saved);
-    return [
-      { id: 'ACT-1', time: 'Hôm nay, 08:32', event: 'Xe vào', plate: '30A-123.45', cost: '--' },
-      { id: 'ACT-2', time: 'Hôm qua, 18:45', event: 'Xe ra', plate: '30A-123.45', cost: '-$4.50' },
-      { id: 'ACT-3', time: '12/10/2023, 08:15', event: 'Xe vào', plate: '30A-123.45', cost: '--' }
-    ];
-  });
-
-  const [vipSubscriptions, setVipSubscriptions] = useState<VipSubscription[]>(() => {
-    const saved = localStorage.getItem('urbanpark_vip_subscriptions');
-    if (saved) return JSON.parse(saved);
-    return [
-      { id: 'VIP-2026-01', vehicle_plate: '30A-123.45', type: 'Thẻ Vàng (Thẻ Tháng Gold)', startDate: '01/06/2026', endDate: '01/12/2026', status: 'ACTIVE' }
-    ];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('urbanpark_driver_balance', balance.toString());
-  }, [balance]);
-
-  useEffect(() => {
-    localStorage.setItem('urbanpark_driver_vehicles', JSON.stringify(vehicles));
-  }, [vehicles]);
-
-  useEffect(() => {
-    localStorage.setItem('urbanpark_driver_activities', JSON.stringify(activities));
-  }, [activities]);
-
-  useEffect(() => {
-    localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(vipSubscriptions));
-  }, [vipSubscriptions]);
-
-  // Toast message management
-  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
+  // Navigation
+  const [activeMenu, setActiveMenu] = useState<'overview' | 'monitoring' | 'revenue' | 'staff' | 'customers' | 'technical' | 'security' | 'system_log'>('overview');
   
+  // App settings
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('urbanpark_manager_dark_mode');
+    return saved === 'true';
+  });
+  
+  // Active facility tab ('all' | 'cs1' | 'cs2')
+  const [activeFacility, setActiveFacility] = useState<'all' | 'cs1' | 'cs2'>('all');
+  
+  // Search query from top header
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Interactive UI trigger states
+  const [currentTime, setCurrentTime] = useState('24/10/2023 14:30');
+  const [showNotificationsList, setShowNotificationsList] = useState(false);
+  const [notificationsCount, setNotificationsCount] = useState(2);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [isLprRunning, setIsLprRunning] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
+  const [showAddStaffModal, setShowAddStaffModal] = useState(false);
+  const [emergencyLockdown, setEmergencyLockdown] = useState(false);
+
+  // Real-time monitoring floor & facility selectors
+  const [monitoringFacility, setMonitoringFacility] = useState('Cơ sở chính (HQ)');
+  const [monitoringFloor, setMonitoringFloor] = useState('Tầng hầm B1');
+  const [showFacilityDropdown, setShowFacilityDropdown] = useState(false);
+  const [showFloorDropdown, setShowFloorDropdown] = useState(false);
+
+  // Modern recent movements activity feed (matching screenshot values)
+  const [recentActivities, setRecentActivities] = useState<any[]>([
+    { id: 'act-1', plate: '51A-892.44', type: 'Sedan', gate: 'Cổng vào 1', time: '10:42:15', action: 'Vào' },
+    { id: 'act-2', plate: '29C-123.99', type: 'SUV', gate: 'Cổng ra 2', time: '10:40:05', action: 'Ra' },
+    { id: 'act-3', plate: '30F-999.99', type: 'Sang trọng', gate: 'VIP Làn 1', time: '10:38:22', action: 'Vào', vip: true },
+    { id: 'act-4', plate: '60A-112.33', type: 'Hatchback', gate: 'Cổng vào 2', time: '10:35:10', action: 'Vào' }
+  ]);
+
+  // Integrated blueprint Interactive Slots
+  const [blueprintSlots, setBlueprintSlots] = useState<any[]>(() => {
+    return [
+      { id: 'B1-01', label: 'A01', status: 'CÒN' },
+      { id: 'B1-02', label: 'A02', status: 'CÒN' },
+      { id: 'B1-03', label: 'A03', status: 'CÒN' },
+      { id: 'B1-04', label: 'A04', status: 'ĐÃ ĐỖ', vehicleType: 'Sedan', plate: '30E-245.89', entryTime: '10:12:00' },
+      { id: 'B1-05', label: 'A05', status: 'CÒN' },
+      { id: 'B1-06', label: 'A06', status: 'XE VIP', vehicleType: 'Sang trọng', plate: '30F-999.78', entryTime: '08:30:00' },
+      { id: 'B1-07', label: 'A07', status: 'CÒN' },
+      { id: 'B1-08', label: 'A08', status: 'ĐÃ ĐỖ', vehicleType: 'SUV', plate: '29A-888.88', entryTime: '09:12:00', isElectric: true },
+      { id: 'B1-09', label: 'A09', status: 'BẢO TRÌ' },
+      { id: 'B1-10', label: 'A10', status: 'CÒN' },
+      { id: 'B1-11', label: 'A11', status: 'CÒN' },
+      
+      // Middle slots
+      { id: 'B1-12', label: 'B01', status: 'CÒN' },
+      { id: 'B1-13', label: 'B02', status: 'ĐÃ ĐỖ', vehicleType: 'Sedan', plate: '30F-555.22', entryTime: '09:40:00' },
+      { id: 'B1-14', label: 'B03', status: 'CÒN' },
+      { id: 'B1-15', label: 'B04', status: 'XE VIP', vehicleType: 'Sang trọng', plate: '30F-999.99', entryTime: '10:38:22' },
+      { id: 'B1-16', label: 'B05', status: 'CÒN' },
+      { id: 'B1-17', label: 'B06', status: 'CÒN' },
+      { id: 'B1-18', label: 'B07', status: 'ĐÃ ĐỖ', vehicleType: 'SUV', plate: '29C-123.99', entryTime: '10:05:00' },
+      { id: 'B1-19', label: 'B08', status: 'BẢO TRÌ' },
+
+      // Bottom slots
+      { id: 'B1-20', label: 'C01', status: 'CÒN' },
+      { id: 'B1-21', label: 'C02', status: 'CÒN' },
+      { id: 'B1-22', label: 'C03', status: 'ĐÃ ĐỖ', vehicleType: 'Hatchback', plate: '60A-112.33', entryTime: '10:35:10' },
+      { id: 'B1-23', label: 'C04', status: 'CÒN' },
+      { id: 'B1-24', label: 'C05', status: 'ĐÃ ĐỖ', vehicleType: 'Sedan', plate: '51A-892.44', entryTime: '10:42:15' },
+      { id: 'B1-25', label: 'C06', status: 'CÒN' },
+      { id: 'B1-26', label: 'C07', status: 'CÒN' },
+      { id: 'B1-27', label: 'C08', status: 'XE VIP', vehicleType: 'Sang trọng', plate: '30K-111.44', entryTime: '09:55:00' }
+    ];
+  });
+
+  // Check-in and out interactive modal managers
+  const [selectedSlotForCheckIn, setSelectedSlotForCheckIn] = useState<any | null>(null);
+  const [checkInPlate, setCheckInPlate] = useState('');
+  const [checkInVehicleType, setCheckInVehicleType] = useState<'Sedan' | 'SUV' | 'Hatchback' | 'Sang trọng'>('Sedan');
+  const [checkInIsVip, setCheckInIsVip] = useState(false);
+
+  // Detailed selected slot state info card overlay
+  const [selectedSlotDetails, setSelectedSlotDetails] = useState<any | null>(null);
+
+  // Dynamic system toast
+  const [toast, setToast] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
   const triggerToast = (text: string, type: 'success' | 'info' | 'error' = 'success') => {
-    setToastMessage({ text, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4000);
+    setToast({ text, type });
+    setTimeout(() => { setToast(null); }, 4000);
   };
 
-  // ----------------------------------------------------
-  // --- SIREN ALARM SYNTHESIZER ---
-  // ----------------------------------------------------
-  const [isSirenMuted, setIsSirenMuted] = useState(false);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const oscillator1Ref = useRef<OscillatorNode | null>(null);
-  const oscillator2Ref = useRef<OscillatorNode | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
-  const [isSirenPlaying, setIsSirenPlaying] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const startSirenWave = () => {
-    if (isSirenMuted) return;
-    try {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioCtxRef.current;
-      if (ctx.state === 'suspended') {
-        ctx.resume();
-      }
-      stopSirenWave();
-
-      // Create synthetic oscillators
-      const osc1 = ctx.createOscillator();
-      const osc2 = ctx.createOscillator();
-      const masterGain = ctx.createGain();
-
-      osc1.type = 'sawtooth';
-      osc2.type = 'sine';
-
-      osc1.frequency.setValueAtTime(380, ctx.currentTime);
-      osc2.frequency.setValueAtTime(440, ctx.currentTime);
-
-      const lfo = ctx.createOscillator();
-      lfo.type = 'sine';
-      lfo.frequency.setValueAtTime(2.0, ctx.currentTime); // 2Hz sweep rhythm
-
-      const lfoGain = ctx.createGain();
-      lfoGain.gain.setValueAtTime(140, ctx.currentTime);
-
-      lfo.connect(lfoGain);
-      lfoGain.connect(osc1.frequency);
-      lfoGain.connect(osc2.frequency);
-
-      osc1.connect(masterGain);
-      osc2.connect(masterGain);
-      masterGain.connect(ctx.destination);
-
-      masterGain.gain.setValueAtTime(0.12, ctx.currentTime);
-
-      lfo.start();
-      osc1.start();
-      osc2.start();
-
-      oscillator1Ref.current = osc1;
-      oscillator2Ref.current = osc2;
-      gainNodeRef.current = masterGain;
-      setIsSirenPlaying(true);
-    } catch (e) {
-      console.warn("Audio context bypass error:", e);
-    }
-  };
-
-  const stopSirenWave = () => {
-    try {
-      if (oscillator1Ref.current) {
-        oscillator1Ref.current.stop();
-        oscillator1Ref.current.disconnect();
-        oscillator1Ref.current = null;
-      }
-      if (oscillator2Ref.current) {
-        oscillator2Ref.current.stop();
-        oscillator2Ref.current.disconnect();
-        oscillator2Ref.current = null;
-      }
-      if (gainNodeRef.current) {
-        gainNodeRef.current.disconnect();
-        gainNodeRef.current = null;
-      }
-      setIsSirenPlaying(false);
-    } catch (e) {
-      // already stopped
-    }
-  };
-
+  // Live Timer Mocking
   useEffect(() => {
-    return () => {
-      stopSirenWave();
-    };
+    const interval = setInterval(() => {
+      const now = new Date();
+      const formatNum = (n: number) => n.toString().padStart(2, '0');
+      setCurrentTime(`${formatNum(now.getDate())}/${formatNum(now.getMonth() + 1)}/${now.getFullYear()} ${formatNum(now.getHours())}:${formatNum(now.getMinutes())}`);
+    }, 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  // ----------------------------------------------------
-  // --- INTEGRATED INTERACTIVE SIMULATORS ---
-  // ----------------------------------------------------
-  const [activeVehiclePlate, setActiveVehiclePlate] = useState('30A-123.45');
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [isFindCarOpen, setIsFindCarOpen] = useState(false);
-  const [theftAttemptVehicle, setTheftAttemptVehicle] = useState<string | null>(null);
+  // Save dark mode state
+  useEffect(() => {
+    localStorage.setItem('urbanpark_manager_dark_mode', isDarkMode.toString());
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
 
-  // Active vehicle state helper
-  const activeVehicle = vehicles.find(v => v.plate === activeVehiclePlate) || vehicles[0];
+  // Databases initialized with rich mock data
+  const [vehicles, setVehicles] = useState<ParkedVehicle[]>(() => {
+    const saved = localStorage.getItem('urbanpark_manager_parked');
+    if (saved) return JSON.parse(saved);
+    const initial: ParkedVehicle[] = [
+      { plate: '30F-999.78', type: 'VIP', zone: 'Khu A (Tầng 1)', slot: 'A10', entryTime: '24/10/2023 08:30', ownerName: 'Nguyễn Tiến Đạt', phone: '0901234567' },
+      { plate: '29A-888.88', type: 'OTO', zone: 'Khu A (Tầng 1)', slot: 'A12', entryTime: '24/10/2023 09:12', ownerName: 'Lê Hoàng Hải', phone: '0978222111' },
+      { plate: '30A-123.45', type: 'OTO', zone: 'Khu B (Tầng 2)', slot: 'B04', entryTime: '24/10/2023 11:45', ownerName: 'Bùi Minh Phương', phone: '0902222222' },
+      { plate: '29M1-678.90', type: 'XEMAY', zone: 'Khu C (Hầm B1)', slot: 'C22', entryTime: '24/10/2023 12:05', ownerName: 'Lê Văn Cường', phone: '0903333333' },
+      { plate: '30E-245.89', type: 'OTO', zone: 'Khu A (Tầng 1)', slot: 'A03', entryTime: '24/10/2023 13:10', ownerName: 'Phạm Minh Toàn', phone: '0983777555' },
+      { plate: '30K-111.44', type: 'VIP', zone: 'Khu B (Tầng 2)', slot: 'B18', entryTime: '24/10/2023 13:40', ownerName: 'Nguyễn Thị Hoa', phone: '0912444333' },
+      { plate: '29Y5-958.82', type: 'XEMAY', zone: 'Khu C (Hầm B1)', slot: 'C05', entryTime: '24/10/2023 14:02', ownerName: 'Vũ Quốc Trung', phone: '0945999888' },
+    ];
+    localStorage.setItem('urbanpark_manager_parked', JSON.stringify(initial));
+    return initial;
+  });
 
-  const handleToggleLock = (vehicleId: string) => {
-    setVehicles(prev => prev.map(v => {
-      if (v.id === vehicleId) {
-        const nextLock = !v.isLocked;
-        triggerToast(`Đã ${nextLock ? 'bật hệ thống bảo vệ' : 'tắt chế độ khóa bảo vệ'} xe ${v.plate}`, nextLock ? 'success' : 'info');
+  // Keep synced
+  useEffect(() => {
+    localStorage.setItem('urbanpark_manager_parked', JSON.stringify(vehicles));
+  }, [vehicles]);
+
+  // System Logs Database
+  const [logs, setLogs] = useState<any[]>(() => {
+    const saved = localStorage.getItem('urbanpark_manager_logs');
+    if (saved) return JSON.parse(saved);
+    const initial = [
+      { id: 'LOG-001', time: '14:28:10', type: 'SUCCESS', message: 'Xe VIP [30F-999.78] checkout an toàn qua cổng Ra 01. Chi phí: 0 VNĐ (Vé tháng VIP).' },
+      { id: 'LOG-002', time: '14:20:15', type: 'SUCCESS', message: 'Cấp thẻ từ mới cho nhân viên quét ca: Lê Văn C.' },
+      { id: 'LOG-003', time: '14:15:22', type: 'WARNING', message: 'Hệ thống nhận diện (LPR) vạch cảnh báo biển số lấm bẩn tại Cổng Vào 02.' },
+      { id: 'LOG-004', time: '13:58:40', type: 'SUCCESS', message: 'Xe vãng lai [30A-123.45] check-in thành công tại Cổng Vào 01. Vị trí cấp: B04.' },
+      { id: 'LOG-005', time: '13:10:02', type: 'SUCCESS', message: 'Xe [30E-245.89] check-in thành công tại Cổng Vào 02. Vị trí cấp: A03.' },
+      { id: 'LOG-006', time: '13:00:15', type: 'INFO', message: 'Hệ thống tự động đồng bộ giờ NTP bốt đỗ xe toàn khu.' }
+    ];
+    localStorage.setItem('urbanpark_manager_logs', JSON.stringify(initial));
+    return initial;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('urbanpark_manager_logs', JSON.stringify(logs));
+  }, [logs]);
+
+  // HR Staff List and live performance metrics (Screenshot 5 Replication)
+  const [staff, setStaff] = useState<StaffMember[]>([
+    { id: 'STF-01', name: 'Trần Thị Bé', avatar: 'B', role: 'Giám sát Cổng vào 1', gate: 'Cổng Vào 01', swipes: 342, status: 'ONLINE', leaveHours: '06:00 - 14:00', keyLabel: '8892' },
+    { id: 'STF-02', name: 'Lê Văn Cường', avatar: 'C', role: 'Nhân viên Cổng ra 2', gate: 'Cổng Ra 02', swipes: 315, status: 'ONLINE', leaveHours: '06:00 - 14:00', keyLabel: '4415' },
+    { id: 'STF-03', name: 'Phạm Đức Duy', avatar: 'D', role: 'Đội trưởng Tuần tra', gate: 'Tuần tra hầm B1', swipes: 289, status: 'OFFLINE', leaveHours: 'Ca tiếp: 14:00', keyLabel: '1188', reason: 'Nghỉ ca' },
+    { id: 'STF-04', name: 'Hoàng Yến', avatar: 'Y', role: 'Hỗ trợ Khách hàng', gate: 'Bốt Trung Tâm', swipes: 154, status: 'OFFLINE', leaveHours: 'Ốm (1 ngày)', reason: 'Ốm (1 ngày)' }
+  ]);
+
+  // System Notices in the right-bottom box
+  const [notices, setNotices] = useState<SystemNotice[]>([
+    { 
+      id: 'NTC-01', 
+      type: 'ERROR', 
+      title: 'Mất kết nối Camera LPR Cổng 03', 
+      desc: 'Hệ thống không nhận được tín hiệu từ Camera C03 trong 5 phút qua. Yêu cầu kiểm tra kỹ thuật ngay lập tức.', 
+      time: '10 phút trước', 
+      actionText: 'Chỉ định kỹ thuật',
+      actionState: 'IDLE'
+    },
+    { 
+      id: 'NTC-02', 
+      type: 'WARNING', 
+      title: 'Cảnh báo đầy bãi - Khu vực Tầng hầm 1', 
+      desc: 'Công suất hiện tại đạt 95%. Hệ thống tự động chuyển hướng xe mới xuống Tầng hầm 2.', 
+      time: '45 phút trước' 
+    },
+    { 
+      id: 'NTC-03', 
+      type: 'SUCCESS', 
+      title: 'Cập nhật phần mềm Barrier v2.1 hoàn tất', 
+      desc: 'Tất cả các cổng kiểm soát đã được đồng bộ phiên bản mới nhất.', 
+      time: '2 giờ trước' 
+    }
+  ]);
+
+  // Hardware switches status for Technical Config
+  const [gateBarriers, setGateBarriers] = useState([
+    { gateId: 'GATE-IN-01', name: 'Cổng Vào 01 (LPR-C01)', open: false, isOperating: false },
+    { gateId: 'GATE-IN-02', name: 'Cổng Vào 02 (LPR-C02)', open: false, isOperating: false },
+    { gateId: 'GATE-OUT-01', name: 'Cổng Ra 01 (LPR-C03)', open: true, isOperating: false },
+    { gateId: 'GATE-OUT-02', name: 'Cổng Ra 02 (LPR-C04)', open: false, isOperating: false }
+  ]);
+
+  // Blacklist Database
+  const [blacklist, setBlacklist] = useState<BlacklistedVehicle[]>([
+    { plate: '19A-999.11', reason: 'Xe liên quan đến vụ tranh chấp tài sản chưa giải quyết', dateAdded: '12/10/2023' },
+    { plate: '30F-443.12', reason: 'Nghi ngờ giả mạo phôi thẻ từ VIP tháng nhiều lần', dateAdded: '20/10/2023' }
+  ]);
+
+  // Simulated live billing ledger for Revenue tab
+  const [transactions, setTransactions] = useState([
+    { id: '#TRX-8924', time: '14:32:05 Hôm nay', plate: '30G-123.45', type: 'Ô tô - Vãng lai', cost: '25,000đ', paymentMethod: 'VNPAY', status: 'THÀNH CÔNG', invoiceNo: 'VAT-8924', note: '' },
+    { id: '#TRX-8923', time: '14:28:11 Hôm nay', plate: '29A-999.99', type: 'Vé tháng (VIP)', cost: '0đ', paymentMethod: 'Thẻ từ Auto', status: 'ĐÃ GHI NHẬN', invoiceNo: 'VAT-8923', note: '' },
+    { id: '#TRX-8922', time: '14:15:00 Hôm nay', plate: '15B-678.90', type: 'Xe máy', cost: '5,000đ', paymentMethod: 'Lỗi kết nối', status: 'CẦN XỬ LÝ', invoiceNo: 'VAT-8922', note: 'Lỗi kết nối' },
+    { id: '#TRX-8921', time: '14:10:22 Hôm nay', plate: '30E-555.22', type: 'Ô tô - Vãng lai', cost: '35,000đ', paymentMethod: 'Tiền mặt', status: 'THÀNH CÔNG', invoiceNo: 'VAT-8921', note: '' }
+  ]);
+
+  // Customer Management Database
+  interface Customer {
+    id: string;
+    name: string;
+    phone: string;
+    plate: string;
+    cardType: 'VIP' | 'Tháng' | 'Guest';
+    status: 'ACTIVE' | 'EXPIRED' | 'IN_PARK';
+    expiryDate: string;
+  }
+
+  const [customerList, setCustomerList] = useState<Customer[]>(() => {
+    const saved = localStorage.getItem('urbanpark_customers_list');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (err) {
+        console.error("Failed parsing custom customers list:", err);
+      }
+    }
+    return [
+      { id: 'CUST-001', name: 'Nguyễn Văn An', phone: '090 123 4567', plate: '51F-123.45', cardType: 'VIP', status: 'ACTIVE', expiryDate: '31/12/2024' },
+      { id: 'CUST-002', name: 'Trần Thị Bích', phone: '091 987 6543', plate: '30A-987.65', cardType: 'Tháng', status: 'ACTIVE', expiryDate: '15/11/2023' },
+      { id: 'CUST-003', name: 'Lê Hữu Trí', phone: '093 765 4321', plate: '43C-112.22', cardType: 'Tháng', status: 'EXPIRED', expiryDate: '01/10/2023' },
+      { id: 'CUST-004', name: 'Vãng lai (Ticket #99281)', phone: '-', plate: '60B-555.44', cardType: 'Guest', status: 'IN_PARK', expiryDate: 'N/A' }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('urbanpark_customers_list', JSON.stringify(customerList));
+  }, [customerList]);
+
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerFilter, setCustomerFilter] = useState<'Tất cả' | 'Tháng' | 'VIP'>('Tất cả');
+  const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
+  const [customerTab, setCustomerTab] = useState<'list' | 'approvals'>('list');
+  const [staffSearch, setStaffSearch] = useState('');
+  const [staffFilter, setStaffFilter] = useState<'Tất cả' | 'Đang trực' | 'Nghỉ phép'>('Tất cả');
+
+  // Security Panel States
+  const [enable2FA, setEnable2FA] = useState(true);
+  const [desktopTimeout, setDesktopTimeout] = useState('30 Phút');
+  const [mobileTimeout, setMobileTimeout] = useState('4 Giờ');
+  const [passwordMinLength, setPasswordMinLength] = useState(12);
+  const [requireSpecialChar, setRequireSpecialChar] = useState(true);
+  const [requireNumber, setRequireNumber] = useState(true);
+
+  // System Audit Logs States
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditModuleFilter, setAuditModuleFilter] = useState('Tất cả');
+  const [auditStatusFilter, setAuditStatusFilter] = useState('Tất cả');
+  const [selectedLogId, setSelectedLogId] = useState<string | null>('AUD-003');
+
+  // Facilities data filter multipliers (for total responsiveness when tabs are clicked)
+  const statsMultiplier = activeFacility === 'cs1' ? 0.45 : activeFacility === 'cs2' ? 0.55 : 1.0;
+  
+  const formattedRevenue = (45.2 * statsMultiplier).toFixed(1);
+  const formattedCarsCount = Math.round(1248 * statsMultiplier).toLocaleString();
+  const formattedFullCapacityPercent = activeFacility === 'cs1' ? 78 : activeFacility === 'cs2' ? 91 : 85;
+
+  // LPR Automatic Vehicle Simulation runner (adds / removes cars interactively)
+  const [mockLprPlateInput, setMockLprPlateInput] = useState('');
+  const [mockLprType, setMockLprType] = useState<'OTO' | 'XEMAY' | 'VIP'>('OTO');
+
+  const executeLprCheckIn = (customPlate?: string) => {
+    let chosenPlate = (customPlate || mockLprPlateInput).trim().toUpperCase();
+    if (!chosenPlate) {
+      // Generate realistic Vietnamese random license plate
+      const firstNum = Math.floor(29 + Math.random() * 3); // 29, 30, 31
+      const alpha = String.fromCharCode(65 + Math.floor(Math.random() * 26)); // A-Z
+      const sub = Math.floor(100 + Math.random() * 900); // 100-999
+      const end = Math.floor(10 + Math.random() * 90); // 10-99
+      chosenPlate = `${firstNum}${alpha}-${sub}.${end}`;
+    }
+
+    // Is it blacklisted?
+    const isBad = blacklist.find(b => b.plate.replace(/\s+/g, '') === chosenPlate.replace(/\s+/g, ''));
+    if (isBad) {
+      triggerToast(`⚠️ CẢNH BÁO AN NINH! Xe trong danh sách đen phát hiện tại cổng: ${chosenPlate}. Lý do: ${isBad.reason}`, 'error');
+      // Append red system alert
+      const newNotice: SystemNotice = {
+        id: `NTC-${Date.now()}`,
+        type: 'ERROR',
+        title: `Phát hiện xe đen: ${chosenPlate}`,
+        desc: `Cảnh báo tức thì tại barriers! Lý do: ${isBad.reason}`,
+        time: 'Vừa xong'
+      };
+      setNotices([newNotice, ...notices]);
+      // Play sound
+      const newLog = {
+        id: `LOG-${Date.now()}`,
+        time: new Date().toLocaleTimeString(),
+        type: 'ERROR',
+        message: `🚨 BÁO ĐỘNG ĐỎ: Xe trong danh sách kiểm soát [${chosenPlate}] tìm cách check-in.`
+      };
+      setLogs([newLog, ...logs]);
+      return;
+    }
+
+    // Generate random slot
+    const slotIdx = Math.floor(1 + Math.random() * 30);
+    const zones = ['Khu A (Tầng 1)', 'Khu B (Tầng 2)', 'Khu C (Hầm B1)'] as const;
+    const randomZone = zones[mockLprType === 'OTO' ? 0 : mockLprType === 'VIP' ? 1 : 2];
+    const generatedSlot = `${randomZone.includes('Hầm') ? 'C' : randomZone.includes('Tầng 2') ? 'B' : 'A'}${slotIdx.toString().padStart(2, '0')}`;
+
+    // Add vehicular entry 
+    const newVehicle: ParkedVehicle = {
+      plate: chosenPlate,
+      type: mockLprType,
+      zone: randomZone,
+      slot: generatedSlot,
+      entryTime: currentTime,
+      ownerName: mockLprType === 'VIP' ? 'Khách hàng VIP' : 'Khách vãng lai',
+      phone: '090*******'
+    };
+
+    setVehicles([newVehicle, ...vehicles]);
+    triggerToast(`Đã nhận diện & mở barie cho xe ${chosenPlate} vào vị trí đỗ [${generatedSlot}] thành công!`, 'success');
+
+    // Add log entry
+    const newLog = {
+      id: `LOG-${Date.now()}`,
+      time: new Date().toLocaleTimeString(),
+      type: 'SUCCESS',
+      message: `Cổng Vào 01 nhận diện [${chosenPlate}] (${mockLprType === 'VIP' ? 'Vé VIP' : 'Vé Thường'}). Cấp vị trí: ${generatedSlot}.`
+    };
+    setLogs([newLog, ...logs]);
+    
+    // Increment notifications count
+    setNotificationsCount(prev => prev + 1);
+
+    setMockLprPlateInput('');
+  };
+
+  const executeLprCheckOut = (plateToRelease: string) => {
+    const isVIP = vehicles.find(v => v.plate === plateToRelease)?.type === 'VIP';
+    const releaseCost = isVIP ? '0 VNĐ (Thẻ VIP)' : '10,000 VNĐ';
+
+    setVehicles(vehicles.filter(v => v.plate !== plateToRelease));
+    
+    // Add transaction log
+    const nextTxId = `TXN-${Math.floor(100 + Math.random() * 900)}`;
+    const newTx = {
+      id: nextTxId,
+      plate: plateToRelease,
+      type: isVIP ? 'Vé VIP' : 'Vé Ngày',
+      gate: 'Cổng Ra 01',
+      time: new Date().toLocaleTimeString().substring(0, 5) + ' Hôm nay',
+      cost: releaseCost,
+      originalCost: isVIP ? '0 VNĐ' : '10,000 VNĐ',
+      paymentMethod: isVIP ? 'Thẻ từ Auto' : 'VNPAY',
+      invoiceNo: `VAT-${Math.floor(100000 + Math.random() * 900000)}`,
+      status: 'THÀNH CÔNG',
+      note: ''
+    };
+
+    setTransactions([newTx, ...transactions]);
+    triggerToast(`Đã xuất bến thành công cho xe ${plateToRelease}! Hóa đơn ${releaseCost}.`, 'success');
+
+    // Logging
+    const newLog = {
+      id: `LOG-${Date.now()}`,
+      time: new Date().toLocaleTimeString(),
+      type: 'SUCCESS',
+      message: `Xe [${plateToRelease}] check-out khỏi bãi qua Cổng Ra 01. Giao dịch: ${releaseCost}.`
+    };
+    setLogs([newLog, ...logs]);
+  };
+
+  const handleManualCheckIn = () => {
+    if (!checkInPlate.trim()) {
+      triggerToast('Vui lòng nhập biển số xe hợp lệ!', 'error');
+      return;
+    }
+    const updatedSlots = blueprintSlots.map(s => {
+      if (s.id === selectedSlotForCheckIn.id) {
         return {
-          ...v,
-          isLocked: nextLock,
-          status: nextLock ? 'BAO_VE_MAX' : v.status === 'BAO_VE_MAX' ? 'DANG_DO' : v.status
+          ...s,
+          status: checkInIsVip ? 'XE VIP' : 'ĐÃ ĐỖ',
+          vehicleType: checkInVehicleType,
+          plate: checkInPlate.trim().toUpperCase(),
+          entryTime: new Date().toLocaleTimeString().substring(0, 5)
         };
       }
-      return v;
-    }));
+      return s;
+    });
+    setBlueprintSlots(updatedSlots);
+    
+    // Add live activity movement
+    const newActivity = {
+      id: `act-${Date.now()}`,
+      plate: checkInPlate.trim().toUpperCase(),
+      type: checkInVehicleType,
+      gate: 'Cổng Vào 1',
+      time: new Date().toLocaleTimeString().substring(0, 8),
+      action: 'Vào',
+      vip: checkInIsVip
+    };
+    setRecentActivities([newActivity, ...recentActivities]);
+
+    // Sync to vehicles list
+    const newVehicle: ParkedVehicle = {
+      plate: checkInPlate.trim().toUpperCase(),
+      type: checkInIsVip ? 'VIP' : checkInVehicleType === 'Sang trọng' ? 'VIP' : 'OTO',
+      zone: (monitoringFloor === 'Tầng hầm B1' ? 'Khu C (Hầm B1)' : 'Khu A (Tầng 1)') as any,
+      slot: selectedSlotForCheckIn.label,
+      entryTime: new Date().toLocaleTimeString().substring(0, 5),
+      ownerName: checkInIsVip ? 'Khách hàng VIP' : 'Khách vãng lai',
+      phone: '090*******'
+    };
+    setVehicles([newVehicle, ...vehicles]);
+
+    triggerToast(`Đã đỗ xe ${checkInPlate.toUpperCase()} thành công tại ô ${selectedSlotForCheckIn.label}!`, 'success');
+    setSelectedSlotForCheckIn(null);
+    setCheckInPlate('');
   };
 
-  // Simulate a physical scan of car exit while locked
-  const triggerTheftSimulation = (plateToSteal: string) => {
-    const target = vehicles.find(v => v.plate === plateToSteal);
-    if (!target) return;
+  const handleManualCheckOut = (slotId: string, label: string) => {
+    const targetSlot = blueprintSlots.find(s => s.id === slotId);
+    if (!targetSlot || (targetSlot.status !== 'ĐÃ ĐỖ' && targetSlot.status !== 'XE VIP')) return;
 
-    if (target.isLocked) {
-      // TRIGGER THEFT EMERGENCY
-      setTheftAttemptVehicle(plateToSteal);
-      startSirenWave();
-      triggerToast(`🚨 CẢNH BÁO: Phát hiện hành vi di chuyển trái phép xe ${plateToSteal}!`, 'error');
+    const releasedPlate = targetSlot.plate;
+    const isVip = targetSlot.status === 'XE VIP';
+    
+    const updatedSlots = blueprintSlots.map(s => {
+      if (s.id === slotId) {
+        return {
+          id: s.id,
+          label: s.label,
+          status: 'CÒN'
+        };
+      }
+      return s;
+    });
+    setBlueprintSlots(updatedSlots);
 
-      // Add to activities
-      const rightNow = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-      setActivities(prev => [
-        {
-          id: `ACT-${Date.now()}`,
-          time: `Hôm nay, ${rightNow}`,
-          event: 'Xe ra',
-          plate: plateToSteal,
-          cost: 'BỊ CHẶN LẠI (THẾT CÒI)'
-        },
-        ...prev
-      ]);
-    } else {
-      // Normal Exit Flow
-      triggerToast(`Xe ${plateToSteal} đã rời bãi thành công (Không bị khóa bảo vệ)!`, 'success');
-      setVehicles(prev => prev.map(v => {
-        if (v.plate === plateToSteal) {
-          return { ...v, status: 'DA_OUT', location: 'Đã ra khỏi bãi' };
+    // Add live activity movement
+    const newActivity = {
+      id: `act-${Date.now()}`,
+      plate: releasedPlate,
+      type: targetSlot.vehicleType || 'Sedan',
+      gate: 'Cổng Ra 1',
+      time: new Date().toLocaleTimeString().substring(0, 8),
+      action: 'Ra',
+      vip: isVip
+    };
+    setRecentActivities([newActivity, ...recentActivities]);
+
+    // Sync with regular vehicles state
+    setVehicles(vehicles.filter(v => v.plate !== releasedPlate));
+
+    triggerToast(`Đã xuất bến cho xe ${releasedPlate} từ ô đỗ ${label}! Phí thanh toán: ${isVip ? '0 VNĐ (VIP)' : '10.000 VNĐ'}`, 'success');
+    setSelectedSlotDetails(null);
+  };
+
+  const handleManualActionNotice = (noticeId: string) => {
+    setNotices(prev => prev.map(notice => {
+      if (notice.id === noticeId) {
+        return { ...notice, actionState: 'PENDING' };
+      }
+      return notice;
+    }));
+    triggerToast('Đang kết nối tổng đài để chỉ định kỹ thuật viên khẩn cấp...', 'info');
+
+    setTimeout(() => {
+      setNotices(prev => prev.map(notice => {
+        if (notice.id === noticeId) {
+          return { ...notice, actionState: 'RESOLVED', desc: 'Đã hoàn tất khôi phục kết nối. Kỹ thuật viên Nguyễn Hoàng Minh đã sửa chữa phần cứng camera.' };
         }
-        return v;
+        return notice;
       }));
-
-      const rightNow = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-      setActivities(prev => [
-        {
-          id: `ACT-${Date.now()}`,
-          time: `Hôm nay, ${rightNow}`,
-          event: 'Xe ra',
-          plate: plateToSteal,
-          cost: '-$4.50'
-        },
-        ...prev
-      ]);
-      setBalance(prev => Math.max(0, prev - 4.50));
-    }
+      triggerToast('Kỹ thuật viên đã xử lý lỗi Camera C03 thành công! Trạng thái kết nối: Hoạt động', 'success');
+      
+      const newLog = {
+        id: `LOG-${Date.now()}`,
+        time: new Date().toLocaleTimeString(),
+        type: 'SUCCESS',
+        message: 'Trạng thái Camera LPR Cổng 03 đã khôi phục. Đồng bộ luồng hình ảnh về phòng giám sát.'
+      };
+      setLogs([newLog, ...logs]);
+    }, 2500);
   };
 
-  // ----------------------------------------------------
-  // --- BILL REUNION / CHIP FLOW IN-APP ---
-  // ----------------------------------------------------
-  const handleQuickPayment = () => {
-    if (balance < 4.50) {
-      triggerToast('Tài khoản không đủ số dư để thanh toán! Vui lòng nạp thêm.', 'error');
-      return;
-    }
-    setBalance(prev => prev - 4.50);
-    triggerToast('Thanh toán thành công $4.50 phí đỗ xe qua Ví UrbanPark.', 'success');
-    setIsPaymentModalOpen(false);
-
-    // Update session state
-    setVehicles(prev => prev.map(v => {
-      if (v.plate === activeVehiclePlate) {
-        return { ...v, status: 'DA_OUT', location: 'Đã thanh toán (Sẵn sàng ra)' };
-      }
-      return v;
-    }));
-  };
-
-  // ----------------------------------------------------
-  // --- SUBMISSION FOR VIP PASS (WITH VNPAY SANDBOX) ---
-  // ----------------------------------------------------
-  const [selectedVipPlate, setSelectedVipPlate] = useState('30A-123.45');
-  const [customPlateInput, setCustomPlateInput] = useState('');
-  const [vipPackageType, setVipPackageType] = useState('Thẻ Tháng VIP');
-  const [billingMethod, setBillingMethod] = useState('Ví UrbanPark');
-  const [isVnpaySandboxOpen, setIsVnpaySandboxOpen] = useState(false);
-  const [vnpayOtpInput, setVnpayOtpInput] = useState('');
-  const [uploadedPhotos, setUploadedPhotos] = useState<{ carPlate: string | null; idCard: string | null }>({ carPlate: null, idCard: null });
-  const [uploadStatus, setUploadStatus] = useState<Record<string, string>>({});
-
-  const handleVipCheckout = () => {
-    const isMonthly = vipPackageType === 'Thẻ Tháng VIP';
-    const priceUSD = isMonthly ? 40.00 : 2.00;
-    const priceVNDStr = isMonthly ? '1,000,000đ' : '50,000đ';
-    const packLabel = isMonthly ? 'Thẻ Tháng VIP' : 'Vé Ngày';
-
-    if (billingMethod === 'Ví UrbanPark') {
-      if (balance < priceUSD) {
-        triggerToast(`Số dư ví không đủ để thanh toán ${priceVNDStr} (Khoảng $${priceUSD.toFixed(2)})! Vui lòng nạp thêm tiền.`, 'error');
-        return;
-      }
-      setBalance(prev => Math.max(0, prev - priceUSD));
-    }
-
-    const newSub: VipSubscription = {
-      id: `VIP-${Date.now().toString().slice(-4)}`,
-      vehicle_plate: selectedVipPlate,
-      type: packLabel,
-      startDate: isMonthly ? '01/11' : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
-      endDate: isMonthly ? '30/11' : new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
-      status: 'ACTIVE'
-    };
-
-    setVipSubscriptions(prev => [newSub, ...prev]);
-
-    // Add activity record
-    const timeNow = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    const newAct: Activity = {
-      id: `ACT-${Date.now()}`,
-      time: `Hôm nay, ${timeNow}`,
-      event: isMonthly ? 'Đăng ký VIP' : 'Mua vé ngày',
-      plate: selectedVipPlate,
-      cost: billingMethod === 'Ví UrbanPark' ? `-$${priceUSD.toFixed(2)}` : 'Trực tiếp'
-    };
-    setActivities(prev => [newAct, ...prev]);
-
-    triggerToast(`🎉 Kích hoạt ${packLabel} thành công cho xe ${selectedVipPlate}!`, 'success');
-  };
-
-  const simulatePhotoUpload = (doc: 'carPlate' | 'idCard') => {
-    setUploadStatus(prev => ({ ...prev, [doc]: 'UPLOADING' }));
+  const handleExportSystemReport = () => {
+    setIsGeneratingReport(true);
+    triggerToast('Đang biên dịch tệp báo cáo vận hành toàn diện...', 'info');
+    
     setTimeout(() => {
-      setUploadedPhotos(prev => ({
-        ...prev,
-        [doc]: doc === 'carPlate' 
-          ? 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=300&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=300&auto=format&fit=crop&q=80'
-      }));
-      setUploadStatus(prev => ({ ...prev, [doc]: 'DONE' }));
-      triggerToast('Đã tải lên minh chứng tài liệu thành công!', 'success');
-    }, 1200);
+      setIsGeneratingReport(false);
+      triggerToast('Đã tải xuống thành công báo cáo: UrbanPark_CS01_24_10_2023.xml (PDF Format)', 'success');
+    }, 1500);
   };
 
-  const handleOpenVnpaySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!uploadedPhotos.carPlate || !uploadedPhotos.idCard) {
-      triggerToast('Vui lòng tải lên đầy đủ hình ảnh Đăng ký xe và CMND/CCCD để kiểm duyệt!', 'error');
-      return;
-    }
-    setIsVnpaySandboxOpen(true);
-  };
+  // Recharts Chart Mock Data
+  const chartRevenueData = [
+    { name: 'T2', amount: 35 },
+    { name: 'T3', amount: 50 },
+    { name: 'T4', amount: 45 },
+    { name: 'T5', amount: 58 },
+    { name: 'T6', amount: 40 },
+    { name: 'T7', amount: 52 },
+    { name: 'CN', amount: 62 }
+  ].map(item => ({
+    ...item,
+    amount: Math.round(item.amount * statsMultiplier)
+  }));
 
-  const handleConfirmVnpay = () => {
-    if (vnpayOtpInput !== '1234' && vnpayOtpInput !== '123456') {
-      triggerToast('OTP không chính xác! Hãy sử dụng OTP kiểm thử: 1234', 'error');
-      return;
-    }
-
-    // Cost calculations
-    const price = vipPackageType.includes('$45.00') ? 45.00 : 120.00;
-    
-    // Add pass
-    const plateToRegister = selectedVipPlate === 'custom' ? customPlateInput.toUpperCase() : selectedVipPlate;
-    const newSub: VipSubscription = {
-      id: `VIP-${Date.now().toString().slice(-4)}`,
-      vehicle_plate: plateToRegister,
-      type: vipPackageType,
-      startDate: new Date().toLocaleDateString('vi-VN'),
-      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('vi-VN'),
-      status: 'ACTIVE'
-    };
-
-    setVipSubscriptions(prev => [newSub, ...prev]);
-    setBalance(prev => Math.max(0, prev + 10.00)); // cash back simulated
-    triggerToast(`Đăng ký Vé tháng thành công cho xe ${plateToRegister}!`, 'success');
-    setIsVnpaySandboxOpen(false);
-    setUploadedPhotos({ carPlate: null, idCard: null });
-    setUploadStatus({});
-    setVnpayOtpInput('');
-  };
-
-  // Add new vehicle state helper
-  const [newVehiclePlate, setNewVehiclePlate] = useState('');
-  const [newVehicleType, setNewVehicleType] = useState('Ô tô');
-
-  // Modals and advanced forms
-  const [isAddVehicleModalOpen, setIsAddVehicleModalOpen] = useState(false);
-  const [selectedDetailVehicle, setSelectedDetailVehicle] = useState<Vehicle | null>(null);
-  
-  // Form states inside the custom Modal
-  const [addFormPlate, setAddFormPlate] = useState('');
-  const [addFormType, setAddFormType] = useState('Ô tô');
-  const [addFormBrand, setAddFormBrand] = useState('');
-  const [addFormDetailType, setAddFormDetailType] = useState('');
-
-  const handleAddVehicle = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newVehiclePlate.trim()) {
-      triggerToast('Biển số xe không thể trống!', 'error');
-      return;
-    }
-    const newCar: Vehicle = {
-      id: `V-${Date.now()}`,
-      plate: newVehiclePlate.toUpperCase().trim(),
-      type: newVehicleType,
-      location: 'Chưa vào bãi',
-      status: 'DA_OUT',
-      entryTime: '--',
-      isLocked: false
-    };
-    setVehicles(prev => [...prev, newCar]);
-    setNewVehiclePlate('');
-    triggerToast(`Đã đăng ký xe ${newCar.plate} vào danh sách của bạn.`, 'success');
-  };
-
-  const handleModalCreateVehicle = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!addFormPlate.trim()) {
-      triggerToast('Vui lòng nhập biển số xe!', 'error');
-      return;
-    }
-    
-    const plateUpper = addFormPlate.toUpperCase().trim();
-    
-    // Check duplicate
-    const duplicate = vehicles.some(v => v.plate === plateUpper);
-    if (duplicate) {
-      triggerToast(`Biển số xe ${plateUpper} đã tồn tại trong danh sách!`, 'error');
-      return;
-    }
-
-    const finalBrand = addFormBrand.trim() || (addFormType === 'Ô tô' ? 'Toyota Camry' : 'Honda SH');
-    const finalDetailType = addFormDetailType.trim() || (addFormType === 'Ô tô' ? 'Ô tô 4 chỗ' : 'Xe máy');
-    
-    const newCar: Vehicle = {
-      id: `V-${Date.now()}`,
-      plate: plateUpper,
-      type: addFormType,
-      brand: finalBrand,
-      detailType: finalDetailType,
-      location: addFormType === 'Ô tô' ? 'Khu A • Tầng 2' : 'Khu C • Tầng 1',
-      status: 'DANG_DO',
-      entryTime: 'Mới đăng ký',
-      isLocked: false,
-      image: addFormType === 'Ô tô'
-        ? 'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=600&auto=format&fit=crop&q=80'
-        : undefined
-    };
-
-    setVehicles(prev => [...prev, newCar]);
-    setAddFormPlate('');
-    setAddFormBrand('');
-    setAddFormDetailType('');
-    setIsAddVehicleModalOpen(false);
-    triggerToast(`Đăng ký thành công phương tiện ${newCar.plate}!`, 'success');
-  };
-
-  // Chatbot state for support tab
-  const [chatMessages, setChatMessages] = useState([
-    { sender: 'bot', text: 'Chào anh Nguyễn Văn! Tôi là trợ lý UrbanPark Shield AI. Anh cần hỗ trợ thông tin gì về vé tháng, hệ thống chống trộm hoặc thanh toán?' }
-  ]);
-  const [userChatInput, setUserChatInput] = useState('');
-  const [billingTimeFilter, setBillingTimeFilter] = useState('Tháng này');
-  const [billingTypeFilter, setBillingTypeFilter] = useState('Tất cả');
-
-  // Interactive profile settings states
-  const [profileName, setProfileName] = useState('Nguyễn Văn A');
-  const [profileEmail, setProfileEmail] = useState('nguyenvana@example.com');
-  const [profilePhone, setProfilePhone] = useState('0901234567');
-  const [profileAddress, setProfileAddress] = useState('123 Đường Lê Lợi, Quận 1, TP.HCM');
-
-  // Notification option states
-  const [notifyInOutEmail, setNotifyInOutEmail] = useState(true);
-  const [notifyInOutSms, setNotifyInOutSms] = useState(true);
-  const [notifyReceiptEmail, setNotifyReceiptEmail] = useState(true);
-  const [notifyReceiptSms, setNotifyReceiptSms] = useState(false);
-
-  // Security password and 2FA states
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [enableTwoFactor, setEnableTwoFactor] = useState(false);
-
-  // Bank list
-  const [bankAccounts, setBankAccounts] = useState([
-    { id: 'bank-1', name: 'Vietcombank', accountNumber: '**** 1234', badge: 'Gb' }
-  ]);
-
-  // Support center states
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
-  const [ticketTopic, setTicketTopic] = useState('');
-  const [ticketContent, setTicketContent] = useState('');
-  const [isDragging, setIsDragging] = useState(false);
-  const [attachedFileName, setAttachedFileName] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const sendChatMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userChatInput.trim()) return;
-
-    const userText = userChatInput;
-    setChatMessages(prev => [...prev, { sender: 'user', text: userText }]);
-    setUserChatInput('');
-
-    setTimeout(() => {
-      let botResponse = 'Hệ thống đã nhận thông tin. Yêu cầu hỗ trợ đã được chuyển tiếp đến Ban quản lý bốt gác để hỗ trợ anh trực tiếp.';
-      if (userText.toLowerCase().includes('khóa') || userText.toLowerCase().includes('trộm')) {
-        botResponse = 'Hệ thống bảo vệ an ninh chống trộm hoạt động bằng cách đóng các chốt chặn cơ khí của Barie ngay lập tức nếu phát hiện xe trong trạng thái "BẬT KHÓA" di chuyển ra bốt AI Camera. Anh có thể bật/tắt an toàn từ tab "Xe của tôi".';
-      } else if (userText.toLowerCase().includes('vnpay') || userText.toLowerCase().includes('thanh toán')) {
-        botResponse = 'UrbanPark tích hợp cổng VNPAY an toàn. Phí gửi xe sẽ được khấu trừ tự động hoặc thanh toán nhanh thông qua nút bấm "Thanh Toán Ngay" trên giao diện chính.';
-      }
-      setChatMessages(prev => [...prev, { sender: 'bot', text: botResponse }]);
-    }, 1000);
-  };
+  const pieVehicleData = [
+    { name: 'Ô tô', value: Math.round(748 * statsMultiplier), color: '#0f172a' },
+    { name: 'Xe vãng lai', value: Math.round(312 * statsMultiplier), color: '#3b82f6' },
+    { name: 'Xe VIP', value: Math.round(188 * statsMultiplier), color: '#10b981' }
+  ];
 
   return (
-    <div id="urbanpark-user-root" className={`min-h-screen font-sans antialiased text-slate-800 transition-colors ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-[#f8fafc]'}`}>
+    <div id="manager-urbanpark-root" className={`min-h-screen font-sans antialiased text-slate-800 dark:text-slate-100 transition-colors ${isDarkMode ? 'bg-[#030712] text-slate-150' : 'bg-[#f1f5f9] text-slate-850'}`}>
       
-      {/* 1. TOAST SYSTEM */}
-      {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 p-4 rounded-2xl shadow-2xl flex items-center gap-3 border animate-slide-in text-white"
-          style={{
-            backgroundColor: toastMessage.type === 'error' ? '#ef4444' : toastMessage.type === 'info' ? '#3b82f6' : '#10b981',
-            borderColor: 'rgba(255,255,255,0.1)'
-          }}
-        >
-          <div className="p-1 bg-white/20 rounded-lg">
-            <Check className="w-4 h-4" />
+      {/* Dynamic Toast Notifications */}
+      {toast && (
+        <div className="fixed top-6 right-6 z-50 p-4 rounded-2xl shadow-xl flex items-center gap-3 border animate-slide-in text-white transition-all bg-slate-900 border-slate-700 dark:bg-slate-950 dark:border-slate-800">
+          <div className={`p-1.5 rounded-lg ${toast.type === 'error' ? 'bg-rose-500/20 text-rose-400' : toast.type === 'info' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+            <CheckCircle2 className="w-5 h-5" />
           </div>
-          <span className="text-xs font-bold tracking-tight">{toastMessage.text}</span>
+          <span className="text-xs font-bold font-sans">{toast.text}</span>
         </div>
       )}
 
-      {/* 2. SIREN DETECTED MODAL */}
-      <AnimatePresence>
-        {theftAttemptVehicle && (
+      {/* EMERGENCY LOCKDOWN OVERLAY ALERT UI */}
+      {emergencyLockdown && (
+        <div className="fixed inset-0 bg-red-650/95 dark:bg-red-950/95 z-55 backdrop-blur-md flex flex-col items-center justify-center p-6 text-white text-center space-y-6">
           <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-55 bg-rose-950/90 backdrop-blur-md flex items-center justify-center p-4 text-white"
+            animate={{ scale: [1, 1.15, 1], opacity: [0.9, 1, 0.9] }}
+            transition={{ repeat: Infinity, duration: 1.5 }}
+            className="w-24 h-24 bg-red-800 rounded-full flex items-center justify-center border-4 border-white shadow-xl shadow-red-500/50"
           >
-            <div className="bg-slate-900 border-4 border-rose-500 rounded-3xl p-8 max-w-lg w-full text-center space-y-6 shadow-2xl relative overflow-hidden">
-              <div className="absolute inset-0 bg-rose-500/5 animate-pulse pointer-events-none" />
-              
-              <div className="w-20 h-20 bg-rose-600 rounded-full flex items-center justify-center mx-auto animate-bounce shadow-lg shadow-rose-500/50">
-                <ShieldAlert className="w-10 h-10 text-white" />
-              </div>
-
-              <div className="space-y-2">
-                <span className="text-xs font-mono font-bold tracking-widest text-rose-400 bg-rose-500/10 px-3 py-1 rounded-full uppercase border border-rose-500/20 inline-block">
-                  CẢNH BÁO TRỘM XE KHẨN CẤP
-                </span>
-                <h2 className="text-2xl font-black uppercase tracking-tight">PHÁT HIỆN SỰ CỐ AN NINH!</h2>
-                <p className="text-slate-300 text-sm leading-relaxed">
-                  Phương tiện của bạn mang biển số <strong className="text-yellow-300 font-black">{theftAttemptVehicle}</strong> đang ở trạng thái <strong className="text-rose-400">KHÓA BẢO VỆ CHỐNG TRỘM</strong> nhưng đã kích hoạt quét OCR AI tại Bốt Kiểm Soát Xuất Bãi!
-                </p>
-              </div>
-
-              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-left">
-                <div className="flex justify-between items-center pb-2 border-b border-rose-950 mb-2">
-                  <span className="text-[10px] text-rose-400 font-mono tracking-widest">HỆ THỐNG PHẢN ỨNG TỰ ĐỘNG</span>
-                  <span className="text-[10px] text-slate-500 font-mono">LIVE FEED</span>
-                </div>
-                <p className="text-xs text-rose-200">
-                  ⚠️ <strong>Hành động:</strong> Barie chắn sắt đã tự động đóng ngắt hành trình phản hồi trong vòng <strong>480ms</strong>. Lực lượng bảo vệ bốt trực bãi đỗ đã được huy động để chặn xe. Còi hú khẩn cấp đã kích hoạt.
-                </p>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <button
-                  onClick={() => {
-                    stopSirenWave();
-                    setTheftAttemptVehicle(null);
-                    triggerToast('Đã khôi phục an ninh bình thường!', 'success');
-                  }}
-                  className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 active:scale-98 text-white text-xs font-extrabold uppercase rounded-xl transition-all shadow-md cursor-pointer"
-                >
-                  XÁC NHẬN & TẮT BÁO ĐỘNG
-                </button>
-                <button
-                  onClick={() => setIsSirenMuted(!isSirenMuted)}
-                  className="px-4 py-3 border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  {isSirenMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-rose-400 animate-pulse" />}
-                  <span>{isSirenMuted ? 'Mở âm thanh' : 'Tắt còi'}</span>
-                </button>
-              </div>
-            </div>
+            <ShieldAlert className="w-12 h-12 text-white animate-pulse" />
           </motion.div>
-        )}
-      </AnimatePresence>
+          
+          <div className="space-y-2 max-w-xl">
+            <h2 className="text-4xl font-extrabold uppercase tracking-tight">KÍCH HOẠT PHONG TỎA KHẨN CẤP!</h2>
+            <p className="text-slate-200 text-sm font-semibold tracking-wide leading-relaxed">
+              CHẾ ĐỘ AN NINH KIỂM SOÁT BAO VỆ MAX ĐÃ ĐƯỢC CHỈ ĐỊNH. HỆ THỐNG ĐÃ TỰ ĐỘNG KHÓA CỨNG TOÀN BỘ CỔNG PHƯƠNG TIỆN BARIE HẠ TRÌNH. CÒI BÁO ĐỘNG QUÉT TOÀN KHU ĐANG HOẠT ĐỘNG.
+            </p>
+          </div>
 
-      {/* 3. LAYOUT CONTAINER WITH INTEGRATED DESIGN */}
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row min-h-screen">
+          <div className="flex gap-4">
+            <button 
+              onClick={() => {
+                setEmergencyLockdown(false);
+                triggerToast('Đã dừng chế độ phong tỏa khẩn cấp thiết lập an toàn!', 'success');
+              }}
+              className="px-8 py-3 bg-white text-red-900 hover:bg-slate-100 font-extrabold text-xs rounded-xl shadow-lg uppercase tracking-wider scale-98 active:scale-95 transition-all"
+            >
+              Hủy chế độ phong tỏa
+            </button>
+            <button 
+              onClick={() => triggerToast('Đang gửi tín hiệu yêu cầu hỗ trợ lực lượng phản ứng cơ động 113...', 'info')}
+              className="px-6 py-3 bg-slate-900 border border-slate-700 text-white font-extrabold text-xs rounded-xl uppercase hover:bg-slate-800 transition-colors"
+            >
+              Liên hệ An ninh khu vực
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MAIN CONTAINER LAYOUT */}
+      <div className="flex flex-col lg:flex-row min-h-screen">
         
-        {/* SIDEBAR NAVIGATION PANEL (MATCHING IMAGE 100%) */}
-        <aside id="sidebar-portal" className="w-full md:w-68 shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between p-6">
-          <div className="space-y-8">
+        {/* SIDEBAR PANEL (MATCHING THE SCREENSHOT EXACTLY!) */}
+        <aside className="w-full lg:w-[260px] shrink-0 bg-[#090f1d] text-white flex flex-col justify-between p-6 border-r border-[#152033] shadow-lg relative z-20">
+          <div className="space-y-6">
             
-            {/* Brand Header */}
-            <div id="brand-area" className="flex flex-col gap-1 pl-2 font-sans">
-              <span className="text-2xl font-extrabold text-[#0052cc] tracking-tight block">
-                UrbanPark
-              </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                DRIVER PORTAL
-              </span>
+            {/* BRAND LOGO DESIGN (UrbanPark + blue round icon 'P') */}
+            <div className="flex items-center gap-3.5 pb-4 border-b border-[#14233c]">
+              <div className="p-2.5 bg-blue-600 rounded-xl shadow-md border border-blue-500/20 flex items-center justify-center shrink-0">
+                <span className="font-sans font-black text-white text-[19px] leading-tight">P</span>
+              </div>
+              <div className="leading-tight block">
+                <h2 className="text-[19px] font-black tracking-tight text-white font-sans">UrbanPark</h2>
+                <span className="text-[10px] text-slate-400 font-bold block tracking-tight">HS thống đỗ xe thông minh</span>
+              </div>
             </div>
 
-            {/* Menu Items (matching coordinates and strings) */}
-            <nav className="space-y-1.5" id="nav-items-group">
+            {/* Sidebar menu items mapping the requested lists */}
+            <nav className="space-y-2">
               {[
-                { id: 'home', label: 'Trang chủ', icon: <Home className="w-4 h-4" /> },
-                { id: 'vehicles', label: 'Xe của tôi', icon: <Car className="w-4 h-4" /> },
-                { id: 'vip', label: 'Đăng ký hàng tháng', icon: <Calendar className="w-4 h-4" /> },
-                ...(user.role === 'MANAGER' || user.role === 'ADMIN' || user.role === 'STAFF' ? [
-                  { id: 'vip_approval', label: 'Phê duyệt VIP 🌟', icon: <FileText className="w-4 h-4" /> }
-                ] : []),
-                { id: 'billing', label: 'Lịch sử thanh toán', icon: <CreditCard className="w-4 h-4" /> },
-                { id: 'settings', label: 'Cài đặt tài khoản', icon: <Settings className="w-4 h-4" /> },
-              ].map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveMenu(item.id as any)}
-                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-xs font-bold transition-all duration-200 ${
-                    activeMenu === item.id 
-                      ? 'bg-[#0052cc] text-white shadow-md shadow-blue-500/10' 
-                      : 'text-slate-550 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-850 hover:text-slate-800'
-                  }`}
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </button>
-              ))}
+                { id: 'overview', label: 'Tổng quan', icon: <Home className="w-4 h-4" /> },
+                { id: 'monitoring', label: 'Giám sát bãi xe', icon: <Car className="w-4 h-4" /> },
+                { id: 'revenue', label: 'Doanh thu', icon: <CreditCard className="w-4 h-4" />, managerOnly: true },
+                { id: 'staff', label: 'Quản lý nhân sự', icon: <Users className="w-4 h-4" />, managerOnly: true },
+                { id: 'customers', label: 'Khách hàng', icon: <Sparkles className="w-4 h-4" /> },
+                { id: 'technical', label: 'Cấu hình kỹ thuật', icon: <Wrench className="w-4 h-4" />, managerOnly: true },
+                { id: 'security', label: 'Bảo mật', icon: <Shield className="w-4 h-4" />, managerOnly: true },
+                { id: 'system_log', label: 'Nhật ký HS thống', icon: <FileText className="w-4 h-4" />, managerOnly: true }
+              ].filter(item => !item.managerOnly || (user?.role === 'MANAGER' || user?.role === 'ADMIN')).map(item => {
+                const isRestricted = item.managerOnly && (user?.role !== 'MANAGER' && user?.role !== 'ADMIN');
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveMenu(item.id as any);
+                      setSearchQuery('');
+                      if (isRestricted) {
+                        triggerToast(`Tính năng "${item.label}" yêu cầu tài khoản MANAGER!`, 'error');
+                      }
+                    }}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold tracking-tight transition-all text-left cursor-pointer ${
+                      activeMenu === item.id 
+                        ? 'bg-blue-600/15 text-blue-400 border-l-4 border-blue-500 shadow-md shadow-blue-500/5' 
+                        : 'text-slate-400 hover:bg-slate-800/40 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`${activeMenu === item.id ? 'text-blue-400' : 'text-slate-400'}`}>
+                        {item.icon}
+                      </span>
+                      <span>{item.label}</span>
+                    </div>
+                    {item.managerOnly && (
+                      <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded leading-none shrink-0 ${
+                        isRestricted 
+                          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/10' 
+                          : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10'
+                      }`}>
+                        {isRestricted ? '🔒 MGR' : 'MGR'}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </nav>
           </div>
 
-          {/* Bottom Sidebar Items */}
-          <div className="space-y-3 pt-6 border-t border-slate-100 dark:border-slate-800">
+          {/* BOTTOM RAIL BUTTONS */}
+          <div className="space-y-3 pt-6 border-t border-[#14233c] mt-8">
+            {/* Added facility trigger */}
             <button 
               onClick={() => {
-                setActiveMenu('support');
-                triggerToast('Trung tâm hỗ trợ và giải đáp thắc mắc.', 'info');
+                const name = prompt('Nhập tên cơ sở mới đỗ xe:');
+                if (name) {
+                  triggerToast(`Đã ghi nhận yêu cầu cấp phép bốt cho chi nhánh: ${name}! Quy trình đang kiểm duyệt...`, 'info');
+                }
               }}
-              className={`w-full flex items-center gap-3.5 px-4 py-2.5 text-xs font-bold transition-all duration-200 rounded-xl cursor-pointer ${
-                activeMenu === 'support'
-                  ? 'bg-[#0052cc] text-white shadow-md shadow-blue-500/10' 
-                  : 'text-slate-550 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-850 hover:text-slate-800'
-              }`}
-              id="sidebar-support-button"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs transition-all duration-200 rounded-xl cursor-pointer shadow-md active:scale-95"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>Thêm cơ sở mới</span>
+            </button>
+
+            <button 
+              onClick={() => {
+                setActiveMenu('technical');
+                triggerToast('Chuyển hướng đến mục Hướng Dẫn Kỹ Thuật!', 'info');
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-400 hover:bg-slate-800/40 hover:text-white rounded-xl transition-all cursor-pointer"
             >
               <HelpCircle className="w-4 h-4" />
               <span>Hỗ trợ</span>
             </button>
+
             <button 
               onClick={onLogout}
-              className="w-full flex items-center gap-3.5 px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-xl transition-all cursor-pointer"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-950/20 rounded-xl transition-all cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
               <span>Đăng xuất</span>
@@ -772,1856 +830,1820 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
           </div>
         </aside>
 
-        {/* MAIN PANEL CONTENT (COMPLEMENTED WITH HOME STATS AND DETAILS) */}
-        <div id="main-panel-hub" className="flex-1 flex flex-col min-w-0 bg-[#f8fafc] dark:bg-[#0b1329]/20">
-          
-          {/* HEADER TOP STAT BAR (MATCHING THE SCREENSHOT EXACTLY) */}
-          <header className="px-6 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-xs select-none relative z-20">
-            {/* Left side empty spacer */}
-            <div className="hidden sm:block w-32" />
+        {/* WORKSPACE AREA */}
+        <main className="flex-1 flex flex-col min-w-0">
 
-            {/* Centered pill for active menu item */}
-            <div className="flex items-center justify-center sm:absolute sm:left-1/2 sm:transform sm:-translate-x-1/2">
-              {activeMenu !== 'home' && (
-                <div className="bg-[#EBECEF] dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-10 py-2 rounded-lg text-xs font-bold tracking-tight border border-slate-200/50 shadow-2xs">
-                  {activeMenu === 'vehicles' && 'Phương tiện của tôi'}
-                  {activeMenu === 'vip' && 'Đăng ký dịch vụ'}
-                  {activeMenu === 'vip_approval' && 'Phê duyệt VIP'}
-                  {activeMenu === 'billing' && 'Lịch sử thanh toán'}
-                  {activeMenu === 'settings' && 'Cài đặt tài khoản'}
-                  {activeMenu === 'support' && 'Hỗ trợ khách hàng'}
-                </div>
-              )}
-            </div>
-
-            {/* Right details */}
-            <div className="flex items-center gap-3 ml-auto">
-              {/* Balance Widget pill button */}
-              <button 
-                onClick={() => {
-                  setBalance(prev => prev + 10.00);
-                  triggerToast('Tài khoản Sandbox: Đã tự động nạp thêm $10.00 thành công!', 'success');
-                }}
-                className="px-4 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md text-xs font-bold text-slate-700 dark:text-slate-300 hover:shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-subtle"
-                title="Click để nạp thêm tiền thử nghiệm"
-              >
-                {activeMenu === 'home' ? (
-                  <span className="text-slate-700 dark:text-slate-200 font-bold font-sans">Balance: ${balance.toFixed(2)}</span>
-                ) : (
-                  <>
-                    <span className="text-slate-450 dark:text-slate-400 font-medium font-sans">Số dư:</span>
-                    <span className="text-slate-850 dark:text-white font-bold font-sans">${balance.toFixed(2)}</span>
-                  </>
-                )}
-              </button>
-
-              {/* Notification icon */}
-              <div className="relative">
-                <button 
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="p-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full text-slate-500 transition-colors cursor-pointer"
-                >
-                  <Bell className="w-4 h-4" />
-                  {notificationCount > 0 && (
-                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900" />
-                  )}
-                </button>
-
-                {/* Dropdown notifications */}
-                <AnimatePresence>
-                  {showNotifications && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 mt-3 w-80 bg-white dark:bg-slate-850 rounded-2xl shadow-xl border border-slate-150 p-4 space-y-3 z-30"
-                    >
-                      <div className="flex justify-between items-center pb-2 border-b">
-                        <span className="text-xs font-bold text-slate-600">Thanh thông báo</span>
-                        <button onClick={() => setNotificationCount(0)} className="text-[10px] text-blue-500 hover:underline">Đã đọc hết</button>
-                      </div>
-                      <div className="space-y-2 text-xs">
-                        <div className="p-2 hover:bg-slate-50 rounded-lg">
-                          <strong className="block text-blue-600">Đăng ký thành công!</strong>
-                          <span className="text-slate-400 text-[10px]">Đăng ký vé tháng bãi xe ô tô được duyệt tự động.</span>
-                        </div>
-                        <div className="p-2 hover:bg-slate-50 rounded-lg">
-                          <strong className="block text-emerald-600">Bảo vệ kích hoạt</strong>
-                          <span className="text-slate-400 text-[10px]">Xe 30F-999.78 đã bật radar an ninh bảo mật cấp độ cao nhất.</span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Help Circle Info icon */}
-              <button 
-                onClick={() => {
-                  triggerToast('Tài liệu hướng dẫn portal của tài xế đã sẵn sàng trong tab Hỗ Trợ.', 'info');
-                  setActiveMenu('settings');
-                }}
-                className="p-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full text-slate-500 transition-colors"
-                title="Trợ giúp"
-              >
-                <HelpCircle className="w-4 h-4" />
-              </button>
-
-              {/* Circular Avatar of Nguyen Van */}
-              <div 
-                className="w-8 h-8 rounded-full border-2 border-blue-500 overflow-hidden shadow-xs cursor-pointer select-none"
-                onClick={() => setActiveMenu('settings')}
-              >
-                <img 
-                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80" 
-                  alt="Avatar"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            </div>
-          </header>
-
-          {/* MAIN SPACE BODY */}
-          <div className="p-6 md:p-8 space-y-8 flex-1 overflow-y-auto">
-            
-            {/* SUB-VIEW 1: HOME (MATCHING IMAGE SPECIFICATIONS PERFECTLY!) */}
-            {activeMenu === 'home' && (
-              <div className="space-y-6 animate-fade-in" id="home-sub-view">
-                
-                {/* Greeting banner */}
-                <div className="space-y-1 block select-none">
-                  <h1 className="text-4xl font-black tracking-tight text-slate-900 dark:text-white font-sans">
-                    Chào mừng trở lại, {profileName}
+          {/* TOP NAVBAR (COMPREHENSIVELY REPLICATED FROM SCREENSHOT) */}
+          <header className={`px-6 py-4 border-b flex items-center justify-between gap-4 select-none relative z-10 transition-colors ${isDarkMode ? 'bg-[#0f172a] border-slate-800' : 'bg-white border-slate-200'}`}>
+            {activeMenu === 'monitoring' ? (
+              <>
+                {/* Real-time Monitoring view header: left aligned title */}
+                <div>
+                  <h1 className="text-lg font-extrabold tracking-tight text-slate-800 dark:text-white font-sans flex items-center gap-2">
+                    Giám sát bãi xe thời gian thực
                   </h1>
-                  <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold font-sans">
-                    Tổng quan hoạt động và trạng thái xe của bạn hôm nay.
-                  </p>
                 </div>
 
-                {/* Key Cards Side-by-Side (matching the grid structures in screenshot) */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                  
-                  {/* Left Card - Trạng Thái Hiện Tại (col-span 7) */}
-                  <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs flex flex-col justify-between relative overflow-hidden min-h-[224px]">
-                    
-                    {/* Premium Light Blue Curve on Right from Image (curved decoration segment matching 100%) */}
-                    <div className="absolute right-0 top-0 bottom-0 w-[42%] bg-[#EAF0F9] dark:bg-slate-800/40 rounded-r-3xl rounded-l-[110px] pointer-events-none z-0" />
-
-                    <div className="relative z-10 flex justify-between items-start pb-4 border-b border-slate-100 dark:border-slate-850">
-                      <div className="space-y-1">
-                        <h3 className="text-base font-black text-slate-900 dark:text-white font-sans">Trạng Thái Hiện Tại</h3>
-                        <p className="text-xs text-slate-400 font-medium font-sans">
-                          {activeVehicle.status === 'DA_OUT' ? 'Xe đang ở ngoài bãi đỗ' : 'Xe đang đỗ trong cơ sở'}
-                        </p>
-                      </div>
-                      
-                      {/* Active green badge matched exactly in position and theme */}
-                      <span className="px-3.5 py-1 bg-[#DCFCE7] dark:bg-[#0c3a2f] text-[#15803D] dark:text-[#36b37e] rounded-full text-[10px] font-black tracking-wide font-sans flex items-center gap-1.5 uppercase shadow-3xs">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#15803D] dark:bg-emerald-400 animate-pulse" />
-                        <span>ĐANG ĐỖ</span>
-                      </span>
-                    </div>
-
-                    {/* Double Sub-cards grid mapped exactly */}
-                    <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                      {/* Sub-card 1: Biển Số */}
-                      <div className="bg-white/85 dark:bg-slate-900/65 backdrop-blur-xs border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-1 shadow-subtle">
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-black tracking-wider block font-sans uppercase">BIỂN SỐ NHẬN DIỆN</span>
-                        <strong className="text-xl font-extrabold text-slate-850 dark:text-slate-100 font-mono tracking-widest block uppercase">
-                          {activeVehicle.plate}
-                        </strong>
-                      </div>
-
-                      {/* Sub-card 2: Vị trí ước tính */}
-                      <div className="bg-white/85 dark:bg-slate-900/65 backdrop-blur-xs border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-1 shadow-subtle">
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-black tracking-wider block font-sans uppercase">VỊ TRÍ ƯỚC TÍNH</span>
-                        <span className="text-xs font-black text-slate-850 dark:text-slate-200 flex items-center gap-1.5 font-sans leading-none">
-                          <MapPin className="w-4 h-4 text-[#0052cc] dark:text-blue-500 shrink-0" />
-                          <span>{activeVehicle.location === 'Chưa đỗ' ? 'Khu A • Tầng 2' : activeVehicle.location}</span>
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Bottom hidden engine helpers & interactive simulator triggers */}
-                    <div className="relative z-10 mt-4 pt-3 border-t border-dashed border-slate-100 dark:border-slate-850 flex items-center justify-between text-[11px] text-slate-400 select-none">
-                      <div className="flex gap-1.5 overflow-x-auto select-none py-0.5">
-                        {vehicles.map(v => (
-                          <button
-                            key={v.id}
-                            onClick={() => {
-                              setActiveVehiclePlate(v.plate);
-                              triggerToast(`Theo dõi xe: ${v.plate}`, 'info');
-                            }}
-                            className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded-md border transition-all ${
-                              activeVehiclePlate === v.plate 
-                                ? 'bg-[#0052cc] text-white border-blue-500' 
-                                : 'bg-slate-50 dark:bg-slate-800 text-slate-500 hover:bg-slate-100'
-                            }`}
-                          >
-                            {v.plate}
-                          </button>
-                        ))}
-                      </div>
-                      <button 
-                        onClick={() => triggerTheftSimulation(activeVehicle.plate)}
-                        className="text-xs text-rose-500 hover:underline font-bold flex items-center gap-1 cursor-pointer"
-                      >
-                        ⚡ Test trộm &rarr;
-                      </button>
-                    </div>
-
+                {/* Right side controls matching screenshot exactly */}
+                <div className="flex items-center gap-4 ml-auto">
+                  {/* System Status */}
+                  <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 font-medium">
+                    <span className="text-slate-400">Hệ thống:</span>
+                    <span className="flex items-center gap-1 font-bold text-slate-800 dark:text-white">
+                      Hoạt động
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                    </span>
                   </div>
 
-                  {/* Right Actions Cards panel (col-span 5) */}
-                  <div className="lg:col-span-5 flex flex-col gap-4">
-                    
-                    {/* Blue Button: Thanh Toán Ngay (Centered text, coin/credit card icon match exact style) */}
+                  <div className="h-4 w-px bg-slate-200 dark:bg-slate-800" />
+
+                  {/* Notification Bell Icon */}
+                  <div className="relative">
                     <button 
-                      onClick={() => setIsPaymentModalOpen(true)}
-                      className="w-full bg-[#1b6ee6] hover:bg-[#0052cc] dark:bg-blue-600 dark:hover:bg-blue-700 text-white py-5 rounded-3xl flex items-center justify-center gap-3.5 shadow-xs hover:shadow-md transition-all active:scale-[0.98] cursor-pointer"
+                      onClick={() => {
+                        setShowNotificationsList(!showNotificationsList);
+                        setNotificationsCount(0);
+                      }}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors relative"
                     >
-                      <CreditCard className="w-5 h-5 text-white stroke-[2.5]" />
-                      <span className="text-base font-black tracking-tight font-sans">Thanh Toán Ngay</span>
+                      <Bell className="w-4 h-4" />
+                      {notificationsCount > 0 && (
+                        <span className="absolute top-0 right-0 w-1.5 h-1.5 rounded-full bg-red-500" />
+                      )}
                     </button>
 
-                    {/* Double interactive actions buttons below */}
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Search / Find Vehicle */}
-                      <button 
-                        onClick={() => setIsFindCarOpen(true)}
-                        className="bg-white hover:bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl hover:shadow-xs transition-all duration-150 flex flex-col items-center text-center justify-center gap-3.5 cursor-pointer h-36"
-                      >
-                        <div className="p-3 bg-blue-50/50 dark:bg-slate-800 text-[#0052cc] dark:text-blue-400 rounded-full">
-                          <Compass className="w-5 h-5 stroke-[2.5]" />
-                        </div>
-                        <div className="leading-tight">
-                          <strong className="text-xs font-black text-slate-800 dark:text-slate-200 block font-sans">Tìm Xe</strong>
-                          <strong className="text-xs font-black text-slate-800 dark:text-slate-200 block font-sans">Của Tôi</strong>
-                        </div>
-                      </button>
-
-                      {/* Renew / Extend monthly subscriptions */}
-                      <button 
-                        onClick={() => {
-                          setActiveMenu('vip');
-                          triggerToast('Chuyển hướng đến bảng đăng ký dịch vụ của của xe.', 'info');
-                        }}
-                        className="bg-white hover:bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl hover:shadow-xs transition-all duration-150 flex flex-col items-center text-center justify-center gap-3.5 cursor-pointer h-36"
-                      >
-                        <div className="p-3 bg-blue-50/50 dark:bg-slate-800 text-[#0052cc] dark:text-blue-400 rounded-full">
-                          <CreditCard className="w-5 h-5 stroke-[2.5]" />
-                        </div>
-                        <div className="leading-tight">
-                          <strong className="text-xs font-black text-slate-800 dark:text-slate-200 block font-sans">Gia Hạn</strong>
-                          <strong className="text-xs font-black text-slate-800 dark:text-slate-200 block font-sans">Vé Tháng</strong>
-                        </div>
-                      </button>
-                    </div>
-
-                  </div>
-
-                </div>
-
-                {/* VISUAL CAR SEARCH / RADAR EXPANDABLE WIDGET */}
-                <AnimatePresence>
-                  {isFindCarOpen && (
-                    <motion.div 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="bg-white dark:bg-slate-900 border border-blue-100 rounded-2xl p-5 shadow-xs space-y-4"
-                    >
-                      <div className="flex justify-between items-center pb-2 border-b">
-                        <div className="flex items-center gap-2">
-                          <Compass className="w-5 h-5 text-blue-600 animate-spin" style={{ animationDuration: '6s' }} />
-                          <h3 className="text-sm font-bold">Bản Đồ Bãi Xe Nội Khu - Vị Trí Xe</h3>
-                        </div>
-                        <button 
-                          onClick={() => setIsFindCarOpen(false)}
-                          className="text-xs text-slate-400 hover:text-slate-600"
+                    {/* Notification Alert Popover */}
+                    <AnimatePresence>
+                      {showNotificationsList && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          className={`absolute right-0 mt-3 w-80 rounded-2xl shadow-2xl p-4 space-y-3 z-30 border ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
                         >
-                          Đóng mô đun
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
-                        <div className="space-y-2 col-span-1 text-xs">
-                          <p>🎯 Xe của bạn <strong>{activeVehicle.plate}</strong> được xác định đang đỗ tại:</p>
-                          <div className="bg-blue-50 p-3 rounded-lg border">
-                            <strong className="text-blue-700 block text-xs">{activeVehicle.location}</strong>
-                            <span className="text-[10px] text-slate-400">Thời gian đỗ: {activeVehicle.entryTime}</span>
+                          <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+                            <span className="text-xs font-black">Thông báo khẩn</span>
+                            <button onClick={() => setShowNotificationsList(false)} className="text-[10px] text-blue-500 hover:underline">Đóng</button>
                           </div>
-                          <p className="text-[11px] text-slate-400">Radar camera ghi nhận xe đã khóa chống trộm bảo mật.</p>
-                        </div>
-                        
-                        {/* Beautiful Visual grid drawing of the parking slots */}
-                        <div className="col-span-3 bg-slate-50 p-4 rounded-xl border border-dashed text-center">
-                          <span className="text-[10px] font-bold text-slate-400 block mb-2 font-mono">CHỨNG MINH THỰC ĐỊA ZONE A - TẦNG KHU VỰC</span>
-                          
-                          <div className="grid grid-cols-5 gap-2 max-w-md mx-auto">
-                            {Array.from({ length: 15 }).map((_, i) => {
-                              const slotNo = i + 1;
-                              const isActiveSeat = slotNo === 15;
-                              return (
-                                <div 
-                                  key={slotNo}
-                                  className={`p-2 rounded-lg border text-[9px] font-mono font-bold flex flex-col items-center justify-center h-12 transition-all ${
-                                    isActiveSeat 
-                                      ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-2 ring-blue-500/30' 
-                                      : slotNo % 3 === 0 
-                                        ? 'bg-slate-200 text-slate-400 border-slate-300' 
-                                        : 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                  }`}
-                                >
-                                  <span>O-{slotNo}</span>
-                                  <span className="text-[8px] scale-90">
-                                    {isActiveSeat ? 'MY CAR' : slotNo % 3 === 0 ? 'FULL' : 'EMPTY'}
-                                  </span>
-                                </div>
-                              );
-                            })}
+                          <div className="space-y-2 text-xs">
+                            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/40 space-y-1">
+                              <strong className="text-rose-500 font-bold">Mất tín hiệu camera C03</strong>
+                              <p className="text-[10.5px] text-slate-400">Thiết bị camera Cổng Ra 03 tự ngắt kết nối vào khoảng 10 phút trước.</p>
+                            </div>
+                            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/40 space-y-1">
+                              <strong className="text-blue-500 font-bold font-sans">Đồng bộ phiên bản mới v2.1</strong>
+                              <p className="text-[10.5px] text-slate-400">Các bốt cổng đã cập nhật lệnh nâng barie tự động mượt mà.</p>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* PAYING QUICK MODAL */}
-                <AnimatePresence>
-                  {isPaymentModalOpen && (
-                    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md border"
-                      >
-                        <h3 className="text-base font-bold pb-2 border-b">Thanh Toán Phí Gửi Xe Qua Ví UrbanPark</h3>
-                        <div className="py-4 space-y-3 font-sans text-xs">
-                          <div className="flex justify-between">
-                            <span className="text-slate-400">Biển số thanh toán:</span>
-                            <strong className="font-mono text-slate-700">{activeVehicle.plate}</strong>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-450 text-slate-400">Vị trí đỗ hiện nay:</span>
-                            <span className="font-semibold">{activeVehicle.location}</span>
-                          </div>
-                          <div className="flex justify-between border-t border-dashed pt-2">
-                            <span className="text-slate-400">Thời gian vào bãi:</span>
-                            <span>{activeVehicle.entryTime}</span>
-                          </div>
-                          <div className="flex justify-between pb-2 border-b border-dashed">
-                            <span className="text-slate-400 font-bold">ĐƠN GIÁ VÃNG LAI:</span>
-                            <strong className="text-red-500 font-black">$4.50</strong>
-                          </div>
-                          <div className="flex justify-between pt-1">
-                            <span className="text-slate-450 font-bold">Số dư tài khoản:</span>
-                            <strong className="text-slate-800">${balance.toFixed(2)}</strong>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2 justify-end pt-2">
-                          <button 
-                            onClick={() => setIsPaymentModalOpen(false)}
-                            className="px-4 py-2 border rounded-xl text-xs hover:bg-slate-50 cursor-pointer"
-                          >
-                            Hủy bỏ
-                          </button>
-                          <button 
-                            onClick={handleQuickPayment}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
-                          >
-                            Xác Nhận Trừ Ví ($4.50)
-                          </button>
-                        </div>
-                      </motion.div>
-                    </div>
-                  )}
-                </AnimatePresence>
-
-                {/* Hoạt Động Gần Đây (MATCHING RECENT ACTIVITY IN SCREENSHOT) */}
-                <div className="space-y-3" id="recent-activity-section">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-                      Hoạt Động Gần Đây
-                    </h3>
-                    <button 
-                      onClick={() => triggerToast('Lịch sử đã tổng hợp hết giao dịch hiện thời!', 'info')}
-                      className="text-xs text-blue-600 hover:underline font-bold"
-                    >
-                      Xem tất cả
-                    </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
 
-                  {/* Clean responsive table as illustrated in the mockup (Vietnamese headers) */}
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-2xl overflow-hidden shadow-xs">
-                    <table className="w-full text-left font-sans text-xs">
-                      <thead>
-                        <tr className="bg-slate-50/50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-bold">
-                          <th className="p-4">Thời Gian</th>
-                          <th className="p-4">Sự Kiện</th>
-                          <th className="p-4">Biển Số</th>
-                          <th className="p-4 text-right">Phí</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {activities.map((act) => (
-                          <tr 
-                            key={act.id}
-                            className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors"
-                          >
-                            <td className="p-4 font-mono font-medium text-slate-500 dark:text-slate-300">
-                              {act.time}
-                            </td>
-                            <td className="p-4">
-                              <span className={`inline-flex items-center gap-2 font-bold font-sans text-xs ${
-                                act.event === 'Xe vào' ? 'text-emerald-600' : 'text-rose-600'
-                              }`}>
-                                {act.event === 'Xe vào' ? (
-                                  <LogIn className="w-4 h-4 text-emerald-500 stroke-[2.5]" />
-                                ) : (
-                                  <LogOut className="w-4 h-4 text-rose-500 stroke-[2.5]" />
-                                )}
-                                <span className="text-slate-700 dark:text-slate-300 font-medium">{act.event}</span>
-                              </span>
-                            </td>
-                            <td className="p-4 font-mono font-bold text-slate-700 dark:text-slate-100 tracking-wider">
-                              {act.plate}
-                            </td>
-                            <td className={`p-4 text-right font-mono font-bold ${
-                              act.cost.startsWith('-$') ? 'text-rose-500' : 'text-slate-400'
-                            }`}>
-                              {act.cost}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Simulator action directly under recent activity */}
-                  <div className="bg-slate-50 dark:bg-slate-800 border-2 border-dashed rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-center gap-3">
-                    <div className="text-xs">
-                      <span className="font-bold text-slate-700 dark:text-slate-300 block">Thử Nghiệm Tự Động Hóa Xe Vào/Ra</span>
-                      <p className="text-[11.5px] text-slate-400 font-normal">Sắp đặt hành trình mô phỏng sự kiện đi qua bốt nhận dạng biển số.</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => {
-                          const timeNow = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-                          const newAct: Activity = {
-                            id: `ACT-${Date.now()}`,
-                            time: `Hôm nay, ${timeNow}`,
-                            event: 'Xe vào',
-                            plate: activeVehiclePlate,
-                            cost: '--'
-                          };
-                          setActivities(prev => [newAct, ...prev]);
-
-                          setVehicles(prev => prev.map(v => {
-                            if (v.plate === activeVehiclePlate) {
-                              return { ...v, status: 'DANG_DO', location: 'Khu A • Tầng 2', entryTime: `Hôm nay, ${timeNow}` };
-                            }
-                            return v;
-                          }));
-                          triggerToast(`Đã nhận dạng xe ${activeVehiclePlate} đi qua BỐT VÀO lúc ${timeNow}!`, 'success');
-                        }}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg cursor-pointer"
-                      >
-                        Mô phỏng Xe Vào bãi 🟢
-                      </button>
-                      <button 
-                        onClick={() => triggerTheftSimulation(activeVehiclePlate)}
-                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold rounded-lg cursor-pointer"
-                      >
-                        Mô phỏng Xe Ra bãi 🔴
-                      </button>
-                    </div>
-                  </div>
-
-                </div>
-
-              </div>
-            )}
-
-            {/* SUB-VIEW 2: XE CỦA TÔI (MY VEHICLES SECTION) */}
-            {activeMenu === 'vehicles' && (
-              <div className="space-y-6 animate-fade-in" id="vehicles-sub-view">
-                
-                {/* Heading section with "+ Thêm xe mới" right-aligned */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="space-y-1 block">
-                    <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white font-sans">Phương tiện của tôi</h2>
-                    <p className="text-slate-500 dark:text-slate-400 text-xs font-sans">Quản lý các phương tiện đã đăng ký để ra vào hệ thống UrbanPark.</p>
-                  </div>
-                  <button
+                  {/* Settings Icon (Toggles Dark Mode in this replication) */}
+                  <button 
                     onClick={() => {
-                      setAddFormType('Ô tô');
-                      setAddFormPlate('');
-                      setAddFormBrand('');
-                      setAddFormDetailType('');
-                      setIsAddVehicleModalOpen(true);
+                      setIsDarkMode(!isDarkMode);
+                      triggerToast(`Đã chuyển sang chế độ ${!isDarkMode ? 'Tối' : 'Sáng'}!`, 'info');
                     }}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-[#0B1528] hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer font-sans"
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                    title="Cấu hình hệ thống"
                   >
-                    <Plus className="w-4 h-4" />
-                    <span>Thêm xe mới</span>
+                    <Settings className="w-4 h-4" />
+                  </button>
+
+                  {/* Profile Avatar Icon */}
+                  <button 
+                    onClick={() => triggerToast(`Đang truy cập tài khoản: ${user.name}`, 'info')}
+                    className="w-7 h-7 rounded-full bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-300 transition-colors"
+                  >
+                    <User className="w-4 h-4" />
                   </button>
                 </div>
+              </>
+            ) : (
+              <>
+                {/* LEFT SEARCH BAR */}
+                <div className="relative w-full max-w-xs">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input 
+                    type="text"
+                    placeholder="Tìm số xe, vé, nhân viên..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className={`w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-[#030712] border border-slate-200 dark:border-slate-800 focus:border-blue-500 rounded-xl text-xs font-medium outline-hidden transition-all placeholder:text-slate-400`}
+                  />
+                </div>
 
-                {/* Vehicles Grid layout reproducing the custom cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {vehicles.map(v => {
-                    const hasVip = vipSubscriptions.some(sub => sub.vehicle_plate === v.plate && sub.status === 'ACTIVE');
+                {/* SEGMENT BRANCH TABS ("Cơ sở 01", "Cơ sở 02", "Toàn hệ thống") */}
+                <div className="flex bg-slate-100 dark:bg-[#030712] p-1 rounded-2xl gap-1 items-center shrink-0">
+                  {[
+                    { id: 'cs1', label: 'Cơ sở 01' },
+                    { id: 'cs2', label: 'Cơ sở 02' },
+                    { id: 'all', label: 'Toàn hệ thống' }
+                  ].map(tab => {
+                    const isActive = activeFacility === tab.id;
                     return (
-                      <div 
-                        key={v.id}
-                        className={`bg-white dark:bg-slate-900 border ${
-                          v.isLocked ? 'border-rose-400 dark:border-rose-900/50 shadow-md shadow-rose-100/50 dark:shadow-none' : 'border-slate-200 dark:border-slate-800'
-                        } rounded-2xl overflow-hidden flex flex-col justify-between min-h-[352px] transition-all hover:shadow-md hover:border-slate-350 dark:hover:border-slate-700`}
+                      <button
+                        key={tab.id}
+                        onClick={() => {
+                          setActiveFacility(tab.id as any);
+                          triggerToast(`Đang hiển thị thông tin: ${tab.label}`, 'info');
+                        }}
+                        className={`px-4 py-1.5 rounded-xl text-xs font-bold tracking-tight transition-all cursor-pointer ${
+                          isActive 
+                            ? 'bg-blue-600 text-white shadow-sm font-extrabold' 
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
                       >
-                        {/* Upper image/icon section */}
-                        {v.image ? (
-                          <div className="relative h-44 bg-slate-100 dark:bg-slate-950 overflow-hidden">
-                            <img 
-                              referrerPolicy="no-referrer"
-                              src={v.image} 
-                              alt={v.brand || v.plate} 
-                              className="w-full h-full object-cover"
-                            />
-                            {/* Blinking green active badge */}
-                            <div className="absolute top-3 right-3 bg-white dark:bg-slate-900 border border-slate-250/20 dark:border-slate-800/50 shadow-xs py-1 px-3 rounded-full text-[9px] font-black tracking-wider flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              <span>{v.plate === '30G-123.45' ? 'HOẠT ĐỘNG NG' : 'HOẠT ĐỘNG'}</span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="relative h-44 bg-[#F5F6F8] dark:bg-slate-800/40 p-6 flex items-center justify-center border-b border-slate-100 dark:border-slate-800/80">
-                            {/* Standard bike SVG representation in gray */}
-                            <div className="w-20 h-20 text-slate-300 dark:text-slate-650 flex items-center justify-center">
-                              <svg className="w-16 h-16 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                <circle cx="5" cy="18" r="3" />
-                                <circle cx="19" cy="18" r="3" />
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18V9h4.5M12 12h5m-8.5-3H5v2" />
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9L9 6H5" />
-                              </svg>
-                            </div>
-
-                            {/* Blinking green active badge */}
-                            <div className="absolute top-3 right-3 bg-white dark:bg-slate-900 border border-slate-250/20 dark:border-slate-800 shadow-xs py-1 px-3 rounded-full text-[9px] font-black tracking-wider flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              <span>HOẠT ĐỘNG</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Lower informative section */}
-                        <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                          <div>
-                            {/* Plate row with type icon */}
-                            <div className="flex justify-between items-center">
-                              <span className="font-sans text-xl font-black tracking-tight text-slate-800 dark:text-white">
-                                {v.plate}
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                {hasVip && (
-                                  <span className="px-1.5 py-0.5 bg-yellow-400/20 text-yellow-800 dark:text-yellow-450 text-[8px] font-black tracking-wide rounded border border-yellow-300">VIP</span>
-                                )}
-                                {v.type === 'Ô tô' ? (
-                                  <Car className="w-4 h-4 text-slate-400" />
-                                ) : (
-                                  <Bike className="w-4 h-4 text-slate-400" />
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Subtitle brand name */}
-                            <p className="text-xs text-slate-450 dark:text-slate-500 font-medium mt-0.5 font-sans">
-                              {v.brand || (v.type === 'Ô tô' ? 'Toyota Camry' : 'Honda SH')}
-                            </p>
-                          </div>
-
-                          {/* Horizontal divider */}
-                          <div className="border-t border-slate-100 dark:border-slate-800" />
-
-                          {/* Double column data */}
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <span className="text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider block font-sans">LOẠI XE</span>
-                              <span className="text-xs font-semibold text-slate-750 dark:text-slate-300 block mt-0.5 font-sans">
-                                {v.detailType || (v.type === 'Ô tô' ? 'Ô tô 4 chỗ' : 'Xe máy')}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider block font-sans">NGÀY ĐĂNG KÝ</span>
-                              <span className="text-xs font-semibold text-slate-750 dark:text-slate-300 block mt-0.5 font-sans">
-                                {v.detailType || (v.type === 'Ô tô' ? 'Ô tô 4 chỗ' : 'Xe máy')}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Action detail button */}
-                          <button
-                            onClick={() => setSelectedDetailVehicle(v)}
-                            className="w-full py-2 bg-[#F2F2F4] hover:bg-[#E4E4E6] dark:bg-slate-800 dark:hover:bg-slate-750 text-xs font-bold text-slate-700 dark:text-slate-300 rounded-lg tracking-tight transition-all active:scale-98 cursor-pointer text-center font-sans"
-                          >
-                            Chi tiết
-                          </button>
-                        </div>
-                      </div>
+                        {tab.label}
+                      </button>
                     );
                   })}
+                </div>
 
-                  {/* Card 3: Thêm xe mới (Dashed Card) */}
-                  <div 
-                    onClick={() => {
-                      setAddFormType('Ô tô');
-                      setAddFormPlate('');
-                      setAddFormBrand('');
-                      setAddFormDetailType('');
-                      setIsAddVehicleModalOpen(true);
-                    }}
-                    className="border-2 border-dashed border-slate-200 hover:border-blue-500/50 dark:border-slate-800 dark:hover:border-blue-500/40 bg-white/40 dark:bg-slate-900/10 hover:bg-slate-50/50 dark:hover:bg-slate-850/50 rounded-2xl flex flex-col items-center justify-center p-8 text-center cursor-pointer min-h-[352px] transition-all duration-200 group creative-card"
+                {/* RIGHT BUTTONS GROUP */}
+                <div className="flex items-center gap-4 ml-auto">
+                  {/* SYSTEM HEALTH STATUS BADGE */}
+                  <button 
+                    onClick={() => triggerToast(`Tất cả các máy chủ UrbanPark đều hoạt động ổn định. Ping: 24ms`, 'success')}
+                    className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 text-xs font-black tracking-tight"
                   >
-                    <div className="w-12 h-12 bg-[#EBECEF] dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 dark:text-slate-400 mb-4 shadow-subtle group-hover:scale-105 transition-transform">
-                      <Plus className="w-6 h-6 text-slate-600 dark:text-slate-300" />
-                    </div>
-                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1 font-sans">Thêm xe mới</h3>
-                    <p className="text-[11px] text-slate-450 dark:text-slate-500 max-w-[200px] leading-relaxed font-sans">
-                      Đăng ký xe mới để sử dụng dịch vụ bãi đỗ tự động.
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Trạng thái Hệ thống</span>
+                  </button>
+
+                  {/* NOTIFICATION BELL */}
+                  <div className="relative">
+                    <button 
+                      onClick={() => {
+                        setShowNotificationsList(!showNotificationsList);
+                        setNotificationsCount(0);
+                      }}
+                      className="p-2.5 rounded-xl border transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 border-slate-250 dark:border-slate-800 text-slate-550 dark:text-slate-400 relative"
+                    >
+                      <Bell className="w-4 h-4" />
+                      {notificationsCount > 0 && (
+                        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500" />
+                      )}
+                    </button>
+
+                    {/* Dropdown notification alerts */}
+                    <AnimatePresence>
+                      {showNotificationsList && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          className={`absolute right-0 mt-3 w-80 rounded-2xl shadow-2xl p-4 space-y-3 z-30 border ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-800'}`}
+                        >
+                          <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+                            <span className="text-xs font-black">Thông báo khẩn</span>
+                            <button onClick={() => setShowNotificationsList(false)} className="text-[10px] text-blue-500 hover:underline">Đóng</button>
+                          </div>
+                          <div className="space-y-2 text-xs">
+                            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/40 space-y-1">
+                              <strong className="text-rose-500 font-bold">Mất tín hiệu camera C03</strong>
+                              <p className="text-[10.5px] text-slate-400">Thiết bị camera Cổng Ra 03 tự ngắt kết nối vào khoảng 10 phút trước.</p>
+                            </div>
+                            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/40 space-y-1">
+                              <strong className="text-blue-500 font-bold font-sans">Đồng bộ phiên bản mới v2.1</strong>
+                              <p className="text-[10.5px] text-slate-400">Các bốt cổng đã cập nhật lệnh nâng barie tự động mượt mà.</p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Settings Icon (Toggles Dark Mode in this replication) */}
+                  <button 
+                    onClick={() => {
+                      setIsDarkMode(!isDarkMode);
+                      triggerToast(`Đã chuyển sang chế độ ${!isDarkMode ? 'Tối' : 'Sáng'}!`, 'info');
+                    }}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                    title="Cấu hình hệ thống"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </button>
+
+                  {/* Profile Avatar Icon */}
+                  <button 
+                    onClick={() => triggerToast(`Đang truy cập tài khoản: ${user.name}`, 'info')}
+                    className="w-7 h-7 rounded-full bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-300 transition-colors"
+                  >
+                    <User className="w-4 h-4" />
+                  </button>
+                </div>
+              </>
+            )}
+          </header>
+
+          {/* ACTIVE CONTENT WORKSPACE */}
+          <div className="p-6 lg:p-8 flex-1 overflow-y-auto space-y-8">
+            
+            {['revenue', 'staff', 'technical', 'security', 'system_log'].includes(activeMenu) && (user?.role !== 'MANAGER' && user?.role !== 'ADMIN') ? (
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-xl mx-auto space-y-6 animate-fade-in">
+                <div className="p-5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full animate-bounce">
+                  <Shield className="w-12 h-12 stroke-[1.5]" />
+                </div>
+                
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white font-sans">
+                    Quyền Truy Cập Bị Hạn Chế
+                  </h2>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed font-semibold">
+                    Chức năng <span className="font-extrabold text-rose-550 dark:text-rose-455">"{
+                      activeMenu === 'revenue' ? 'Doanh thu' :
+                      activeMenu === 'staff' ? 'Quản lý nhân sự' :
+                      activeMenu === 'technical' ? 'Cấu hình kỹ thuật' :
+                      activeMenu === 'security' ? 'Bảo mật' :
+                      activeMenu === 'system_log' ? 'Nhật ký HS thống' : activeMenu
+                    }"</span> yêu cầu quyền tài khoản <span className="text-blue-500 font-extrabold text-sm uppercase">MANAGER</span> hoặc <span className="text-blue-500 font-bold">ADMIN</span>.
+                  </p>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Tài khoản hiện tại của bạn là <strong className="text-slate-600 dark:text-slate-300">"{user?.role}" ({user?.name})</strong> không có đầy đủ thẩm quyền trực tiếp.
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-slate-900/45 p-5 rounded-2xl border border-slate-200 dark:border-slate-800/80 text-left w-full space-y-3.5">
+                  <span className="font-bold text-slate-400 text-[10px] uppercase tracking-wider block">💡 Cách kiểm tra nhanh quyền MANAGER:</span>
+                  <p className="text-[12px] text-slate-600 dark:text-slate-350 leading-relaxed font-medium">
+                    Vui lòng nhấn nút đăng xuất dưới đây và nhấp đăng nhập tiếp bằng tài khoản demo <span className="text-blue-500 font-bold">MANAGER (0909999999 / 123456)</span> có sẵn ở cổng đăng nhập để mở khóa đầy đủ tính năng.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
+                  <button
+                    onClick={onLogout}
+                    className="px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold tracking-wide transition-all shadow-md active:scale-95 cursor-pointer"
+                  >
+                    Đăng xuất ngay
+                  </button>
+                  <button
+                    onClick={() => setActiveMenu('overview')}
+                    className="px-5 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold tracking-wide transition-all active:scale-95 cursor-pointer"
+                  >
+                    Quay lại Tổng quan
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* SUB-VIEW 1: TỔNG QUAN SYSTEM-WIDE DASHBOARD (REPLICATING SCREENSHOT MATCH) */}
+                {activeMenu === 'overview' && (
+              <div className="space-y-6 animate-fade-in" id="overview-dashboard-view">
+                
+                {/* SECTION TITLE ROW */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 select-none">
+                  <div className="space-y-1 block">
+                    <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-sans">
+                      Tổng quan {activeFacility === 'all' ? 'HS thống' : activeFacility === 'cs1' ? 'Cơ sở 01' : 'Cơ sở 02'}
+                    </h1>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold font-sans">
+                      Dữ liệu cập nhật theo thời gian thực: {currentTime}
                     </p>
                   </div>
-                </div>
 
-                {/* Alarm Simulation Area preserved for safety (neatly rendered below) */}
-                <div className="p-6 rounded-3xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-xs">
-                  <div className="flex items-center gap-3 pb-2 border-b border-slate-200 dark:border-slate-800">
-                    <ShieldAlert className="w-5 h-5 text-rose-500 animate-pulse" />
-                    <div>
-                      <strong className="text-sm font-black text-slate-800 dark:text-white block font-sans">Hệ Thống Mô Phỏng - Radar &amp; Bốt Guard AI</strong>
-                      <span className="text-[10px] text-slate-400 block font-mono">Giả lập camera AI quét biển, đóng/mở gạt barie và phát còi cảnh báo đột nhập</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-450 leading-relaxed font-sans">
-                    Chọn một xe và mô phỏng xe lăn bánh vào/ra qua Bốt để Camera AI ghi nhận trực tiếp. Nếu xe đang bật <strong>Bảo vệ chống trộm (Khóa đỏ)</strong>, mô phỏng hành vi ra bãi sẽ ngay lập tức kích hoạt rào thép &amp; còi hú kịch khung.
-                  </p>
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                    <select 
-                      value={activeVehiclePlate}
-                      onChange={e => setActiveVehiclePlate(e.target.value)}
-                      className="px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono outline-hidden font-bold text-xs text-slate-800 dark:text-white shrink-0 w-full sm:w-auto"
+                  {/* DATE ADJUST AND EXPORT REPORT TRIGGER BUTTONS */}
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => triggerToast('Dữ liệu đang được lọc tự động theo ngày hôm nay!', 'info')}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-1.5 transition-colors hover:bg-slate-50`}
                     >
-                      {vehicles.map(v2 => (
-                        <option key={v2.id} value={v2.plate}>
-                          {v2.plate} ({v2.brand}) • {v2.isLocked ? '🔒 KHÓA MẠNH' : '🔓 TỰ DO'}
-                        </option>
-                      ))}
-                    </select>
-
-                    <div className="flex flex-wrap items-center gap-2 flex-1">
-                      <button 
-                        onClick={() => {
-                          const timeNow = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-                          const newAct: Activity = {
-                            id: `ACT-${Date.now()}`,
-                            time: `Hôm nay, ${timeNow}`,
-                            event: 'Xe vào',
-                            plate: activeVehiclePlate,
-                            cost: '--'
-                          };
-                          setActivities(prev => [newAct, ...prev]);
-
-                          setVehicles(prev => prev.map(v => {
-                            if (v.plate === activeVehiclePlate) {
-                              return { ...v, status: 'DANG_DO', location: 'Khu A • Ô số 15', entryTime: `Hôm nay, ${timeNow}` };
-                            }
-                            return v;
-                          }));
-                          triggerToast(`Đã nhận dạng xe ${activeVehiclePlate} đi qua BỐT VÀO lúc ${timeNow}! Barie tự động nâng rảnh tay.`, 'success');
-                        }}
-                        className="px-4 py-2 bg-[#0B1528] hover:bg-slate-850 text-white font-extrabold text-xs rounded-xl cursor-pointer transition-all active:scale-97 font-sans"
-                      >
-                        Mô phỏng Xe Vào bãi 🟢
-                      </button>
-                      <button 
-                        onClick={() => {
-                          const sessionMatch = vehicles.find(v => v.plate === activeVehiclePlate);
-                          if (sessionMatch?.isLocked) {
-                            triggerTheftSimulation(activeVehiclePlate);
-                          } else {
-                            const timeNow = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-                            const newAct: Activity = {
-                              id: `ACT-${Date.now()}`,
-                              time: `Hôm nay, ${timeNow}`,
-                              event: 'Xe ra',
-                              plate: activeVehiclePlate,
-                              cost: '-$4.50'
-                            };
-                            setActivities(prev => [newAct, ...prev]);
-                            setVehicles(prev => prev.map(v => {
-                              if (v.plate === activeVehiclePlate) {
-                                return { ...v, status: 'DA_OUT', location: 'Ngoài khu', entryTime: '--' };
-                              }
-                              return v;
-                            }));
-                            setBalance(prev => Math.max(0, prev - 4.50));
-                            triggerToast(`Đã nhận diện biển số ${activeVehiclePlate} ra bốt lúc ${timeNow}. Tài khoản tự động trừ $4.50.`, 'info');
-                          }
-                        }}
-                        className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-extrabold text-xs rounded-xl cursor-pointer transition-all active:scale-97 font-sans"
-                      >
-                        Mô phỏng Xe Ra bãi 🔴
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            )}
-
-            {/* SUB-VIEW 3: ĐĂNG KÝ HÀNG THÁNG (MONTHLY PASS & DOC PROOFS) */}
-            {activeMenu === 'vip' && (
-              <div className="space-y-6 animate-fade-in" id="vip-sub-view">
-                {/* Header Title */}
-                <div className="space-y-1 block pb-2">
-                  <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-sans">Đăng ký dịch vụ</h2>
-                  <p className="text-slate-550 dark:text-slate-400 text-xs font-medium font-sans">
-                    Thiết lập thẻ tháng hoặc thẻ ngày cho phương tiện của bạn.
-                  </p>
-                </div>
-
-                {/* Steps workflow layout */}
-                <div className="flex items-center justify-between max-w-xl mx-auto py-4 relative">
-                  {/* Connector lines behind */}
-                  <div className="absolute top-[30px] left-4 right-4 h-[2px] bg-slate-100 dark:bg-slate-800 -z-10" />
-                  
-                  {/* Step 1 */}
-                  <div className="flex flex-col items-center relative z-10">
-                    <div className="w-8 h-8 rounded-full bg-[#0052cc] text-white flex items-center justify-center font-bold text-sm shadow-xs">
-                      ✓
-                    </div>
-                    <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-300 mt-2 whitespace-nowrap font-sans">1. Chọn xe</span>
-                  </div>
-                  
-                  {/* Step 2 */}
-                  <div className="flex flex-col items-center relative z-10">
-                    <div className="w-8 h-8 rounded-full bg-slate-950 dark:bg-slate-100 text-white dark:text-slate-950 flex items-center justify-center font-bold text-sm shadow-xs">
-                      2
-                    </div>
-                    <span className="text-[11px] font-extrabold text-slate-950 dark:text-white mt-2 whitespace-nowrap font-sans font-medium">2. Chọn gói</span>
-                  </div>
-                  
-                  {/* Step 3 */}
-                  <div className="flex flex-col items-center relative z-10">
-                    <div className="w-8 h-8 rounded-full bg-[#f4f5f7] dark:bg-slate-900 text-slate-400 border border-slate-200 dark:border-slate-800 flex items-center justify-center font-bold text-sm">
-                      3
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mt-2 whitespace-nowrap font-sans">3. Thanh toán</span>
-                  </div>
-                </div>
-
-                {/* Main 2-column core structure */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  
-                  {/* Left Column (spans 2 columns) */}
-                  <div className="lg:col-span-2 space-y-6">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Hôm nay</span>
+                    </button>
                     
-                    {/* Panel 1: Phương tiện áp dụng */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-850 p-6 rounded-3xl space-y-4">
-                      <div className="flex items-center gap-2">
-                        <Car className="w-5 h-5 text-[#0052cc]" />
-                        <h3 className="text-sm font-black text-slate-905 dark:text-white uppercase tracking-wider font-sans">
-                          Phương tiện áp dụng
-                        </h3>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {vehicles.map((v) => {
-                          const isSelected = selectedVipPlate === v.plate;
-                          const displayCategory = v.detailType 
-                            ? v.detailType.toUpperCase() 
-                            : (v.type === 'Ô tô' ? 'SEDAN - TRẮNG' : 'XE MÁY');
-                          
-                          return (
-                            <div
-                              key={v.id}
-                              onClick={() => setSelectedVipPlate(v.plate)}
-                              className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex justify-between items-center bg-white dark:bg-slate-900/60 ${
-                                isSelected 
-                                  ? 'border-blue-600 shadow-xs' 
-                                  : 'border-slate-200 dark:border-slate-805 hover:border-slate-300 dark:hover:border-slate-705'
-                              }`}
-                            >
-                              <div className="space-y-0.5">
-                                <span className="text-[9px] font-black tracking-widest text-slate-405 dark:text-slate-500 uppercase font-sans block">
-                                  {displayCategory}
-                                </span>
-                                <div className="text-sm font-black text-slate-900 dark:text-white font-mono tracking-wider">
-                                  {v.plate}
-                                </div>
-                              </div>
-                              
-                              {/* Custom high contrast radio check circle */}
-                              <div className="flex items-center justify-center shrink-0 ml-3">
-                                {isSelected ? (
-                                  <div className="w-4.5 h-4.5 rounded-full bg-blue-600 flex items-center justify-center">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                                  </div>
-                                ) : (
-                                  <div className="w-4.5 h-4.5 rounded-full border border-slate-300 dark:border-slate-700 bg-transparent" />
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAddFormType('Ô tô');
-                          setAddFormPlate('');
-                          setAddFormBrand('');
-                          setAddFormDetailType('Ô tô 4 chỗ');
-                          setIsAddVehicleModalOpen(true);
-                        }}
-                        className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1.5 cursor-pointer pt-1"
-                      >
-                        <span className="text-sm font-black">+</span> Thêm xe mới
-                      </button>
-                    </div>
-
-                    {/* Panel 2: Gói dịch vụ */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-850 p-6 rounded-3xl space-y-4">
-                      <div className="flex items-center gap-3">
-                        <Sparkles className="w-5 h-5 text-[#0052cc]" />
-                        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider font-sans">
-                          Gói dịch vụ
-                        </h3>
-                      </div>
-
-                      <div className="space-y-4">
-                        {/* Option 1: Vé Ngày */}
-                        <div
-                          onClick={() => setVipPackageType('Vé Ngày')}
-                          className={`p-5 rounded-2xl border cursor-pointer transition-all flex items-start gap-4 relative bg-white dark:bg-slate-900/60 ${
-                            vipPackageType === 'Vé Ngày'
-                              ? 'border-slate-905 dark:border-slate-100 ring-[1.5px] ring-slate-950 dark:ring-slate-100 shadow-sm'
-                              : 'border-slate-200 dark:border-slate-800 hover:border-slate-300'
-                          }`}
-                        >
-                          {/* Radio circle */}
-                          <div className="pt-0.5">
-                            {vipPackageType === 'Vé Ngày' ? (
-                              <div className="w-4.5 h-4.5 rounded-full bg-[#0052cc] flex items-center justify-center shrink-0">
-                                <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                              </div>
-                            ) : (
-                              <div className="w-4.5 h-4.5 rounded-full border border-slate-300 dark:border-slate-700 bg-transparent shrink-0" />
-                            )}
-                          </div>
-                          
-                          {/* Main Text Content */}
-                          <div className="flex-1 space-y-1">
-                            <div className="flex justify-between items-center w-full">
-                              <span className="text-sm font-black text-slate-900 dark:text-white font-sans">Vé Ngày</span>
-                              <span className="text-sm font-black text-slate-900 dark:text-white font-mono">50,000đ</span>
-                            </div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                              Giá trị trong 24 giờ kể từ thời điểm đăng ký.
-                            </p>
-                            <div className="pt-2">
-                              <span className="inline-block px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-md text-[9px] font-black uppercase tracking-wider font-sans">
-                                RA VÀO NHIỀU LẦN
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Option 2: Thẻ Tháng VIP */}
-                        <div
-                          onClick={() => setVipPackageType('Thẻ Tháng VIP')}
-                          className={`p-5 rounded-2xl border cursor-pointer transition-all flex items-start gap-4 relative bg-white dark:bg-slate-900/65 ${
-                            vipPackageType === 'Thẻ Tháng VIP'
-                              ? 'border-slate-905 dark:border-slate-100 ring-[1.5px] ring-slate-950 dark:ring-slate-100 shadow-md'
-                              : 'border-slate-200 dark:border-slate-800 hover:border-slate-300'
-                          }`}
-                        >
-                          {/* Popular Tag badged pinned to border edge */}
-                          <div className="absolute -top-[11px] right-6 bg-slate-950 text-white dark:bg-white dark:text-slate-950 text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md border border-slate-800 dark:border-slate-200 shadow-xs flex items-center gap-1">
-                            ★ PHỔ BIẾN
-                          </div>
-
-                          {/* Radio circle */}
-                          <div className="pt-0.5">
-                            {vipPackageType === 'Thẻ Tháng VIP' ? (
-                              <div className="w-4.5 h-4.5 rounded-full bg-[#0052cc] flex items-center justify-center shrink-0">
-                                <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                              </div>
-                            ) : (
-                              <div className="w-4.5 h-4.5 rounded-full border border-slate-300 dark:border-slate-700 bg-transparent shrink-0" />
-                            )}
-                          </div>
-                          
-                          {/* Main Text Content */}
-                          <div className="flex-1 space-y-1">
-                            <div className="flex justify-between items-center w-full">
-                              <span className="text-sm font-black text-slate-900 dark:text-white font-sans">Thẻ Tháng VIP</span>
-                              <span className="text-sm font-black text-slate-900 dark:text-white font-mono">1,000,000đ</span>
-                            </div>
-                            <p className="text-[11px] text-slate-550 dark:text-slate-400">
-                              Giải pháp tối ưu cho cư dân và nhân viên văn phòng.
-                            </p>
-                            
-                            {/* Checklist features nested */}
-                            <div className="pt-3.5 space-y-2 text-xs text-slate-650 dark:text-slate-350 font-bold font-sans">
-                              <div className="flex items-center gap-2">
-                                <span className="text-emerald-500 font-extrabold">✓</span>
-                                <span>Chỗ đỗ xe cố định (Tầng B1)</span>
-                              </div>
-                              <div className="flex items-center gap-2 font-medium">
-                                <span className="text-[#0052cc] font-extrabold">✓</span>
-                                <span>Rửa xe miễn phí 1 lần/tháng</span>
-                              </div>
-                              <div className="flex items-center gap-2 font-medium">
-                                <span className="text-[#0052cc] font-extrabold">✓</span>
-                                <span>Hỗ trợ 24/7</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                      </div>
-                    </div>
-
+                    <button 
+                      onClick={handleExportSystemReport}
+                      disabled={isGeneratingReport}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 disabled:opacity-80"
+                    >
+                      {isGeneratingReport ? (
+                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                      )}
+                      <span>Xuất báo cáo</span>
+                    </button>
                   </div>
+                </div>
 
-                  {/* Right Column: Tổng quan đơn hàng */}
-                  <div className="lg:col-span-1">
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-4">
-                      <h3 className="text-sm font-black tracking-tight text-slate-950 dark:text-white font-sans">
-                        Tổng quan đơn hàng
+                {/* KEY STATISTICS GRID (4 COLUMNS - EXACT PIXEL REPLICATION IN GRAPHICS!) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch select-none">
+                  
+                  {/* CARD 1: TỔNG DOANH THU / LƯỢT XE VÀO/RA */}
+                  <div className={`p-5 rounded-2xl border transition-all ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/60 shadow-xs hover:shadow-md'}`}>
+                    <div className="flex justify-between items-start">
+                      <span className="text-[10px] font-extrabold uppercase text-slate-400 dark:text-slate-500 tracking-wider">
+                        {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? 'LƯỢT XE VÀO/RA' : 'TỔNG DOANH THU'}
+                      </span>
+                      <div className="p-2 rounded-lg bg-blue-100 dark:bg-slate-800/40 text-blue-600 dark:text-blue-400">
+                        {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? <Activity className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+                      </div>
+                    </div>
+                    <div className="mt-3 space-y-1">
+                      <h3 className="text-3xl font-black font-sans leading-none tracking-tight">
+                        {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? '1,420' : formattedRevenue} <span className="text-lg">{user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? 'lượt' : 'Tr'}</span>
                       </h3>
-                      
-                      <div className="border-t border-slate-100 dark:border-slate-850/60 my-2" />
-                      
-                      <div className="space-y-3.5 text-xs text-slate-600 dark:text-slate-350 font-sans">
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-400 dark:text-slate-500">Phương tiện</span>
-                          <strong className="text-slate-850 dark:text-white font-mono font-bold tracking-wider">
-                            {selectedVipPlate}
-                          </strong>
-                        </div>
-                        
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-400 dark:text-slate-500">Gói dịch vụ</span>
-                          <strong className="text-slate-850 dark:text-white font-bold">
-                            {vipPackageType === 'Thẻ Tháng VIP' ? 'ThP Tháng VIP' : 'Vé Ngày'}
-                          </strong>
-                        </div>
-                        
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-400 dark:text-slate-500">Thời hạn</span>
-                          <strong className="text-slate-850 dark:text-white font-bold">
-                            {vipPackageType === 'Thẻ Tháng VIP' ? '01/11 - 30/11' : 'Trong vòng 24 giờ'}
-                          </strong>
-                        </div>
-                        
-                        <div className="border-t border-slate-100 dark:border-slate-850/80 pt-3.5 flex justify-between items-center">
-                          <span className="text-[11px] font-bold uppercase text-slate-405 dark:text-slate-500 tracking-wider">
-                            TỔNG THANH TOÁN
-                          </span>
-                          <strong className="text-base font-black text-slate-900 dark:text-white font-sans">
-                            {vipPackageType === 'Thẻ Tháng VIP' ? '1,000,000đ' : '50,000đ'}
-                          </strong>
-                        </div>
-                      </div>
-                      
-                      {/* Payment Method Select Dropdown */}
-                      <div className="space-y-1 bg-transparent pt-2">
-                        <label className="text-[10px] font-black text-slate-450 dark:text-slate-500 uppercase tracking-widest block font-sans">
-                          Phương thức thanh toán
-                        </label>
-                        <select 
-                          value={billingMethod}
-                          onChange={(e) => setBillingMethod(e.target.value)}
-                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl font-bold text-slate-800 dark:text-white text-xs outline-hidden focus:border-blue-500 cursor-pointer"
-                        >
-                          <option value="Ví UrbanPark">
-                            Ví UrbanPark (Số dư: ${balance.toFixed(2)})
-                          </option>
-                          <option value="Thẻ tín dụng">Thẻ tín dụng Quốc tế</option>
-                        </select>
-                      </div>
-                      
-                      {/* Confirm & Checkout Button */}
-                      <button
-                        type="button"
-                        onClick={handleVipCheckout}
-                        className="w-full py-3 bg-[#0B1528] hover:bg-slate-800 text-white font-extrabold uppercase rounded-xl tracking-wider text-[11px] shadow-sm transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer mt-4"
-                      >
-                        <Lock className="w-3.5 h-3.5 text-slate-450" />
-                        <span>Xác nhận &amp; Thanh toán</span>
-                      </button>
-                      
-                      <p className="text-[10px] text-center text-slate-400 dark:text-slate-500 leading-relaxed font-sans mt-2">
-                        Bằng việc xác nhận, bạn đồng ý với{' '}
-                        <a href="#" className="font-bold text-blue-600 hover:underline">
-                          Điều khoản dịch vụ.
-                        </a>
+                      <p className="text-[11px] font-bold text-emerald-500 flex items-center gap-1.5">
+                        <Activity className="w-3.5 h-3.5" />
+                        <span>{user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? '+8% so với hôm qua' : '+12% so với hôm qua'}</span>
                       </p>
                     </div>
                   </div>
 
+                  {/* CARD 2: XE ĐANG ĐỖ */}
+                  <div className={`p-5 rounded-2xl border transition-all ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/60 shadow-xs hover:shadow-md'}`}>
+                    <div className="flex justify-between items-start">
+                      <span className="text-[10px] font-extrabold uppercase text-slate-400 dark:text-slate-500 tracking-wider">XE ĐANG ĐỖ</span>
+                      <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/40 text-slate-600">
+                        <Car className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      <h3 className="text-3xl font-black font-sans leading-none tracking-tight">
+                        {formattedCarsCount}
+                      </h3>
+                      {/* Linear slider/bar replica */}
+                      <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-slate-900 dark:bg-slate-200" 
+                          style={{ width: `${formattedFullCapacityPercent}%` }} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CARD 3: HIỆU SUẤT LẤP ĐẦY */}
+                  <div className={`p-5 rounded-2xl border transition-all ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/60 shadow-xs hover:shadow-md'}`}>
+                    <div className="flex justify-between items-start">
+                      <span className="text-[10px] font-extrabold uppercase text-slate-400 dark:text-slate-500 tracking-wider">HIỆU SUẤT LẤP ĐẦY</span>
+                      <div className="p-2 rounded-lg bg-emerald-50/50 dark:bg-slate-800/40 text-emerald-600 dark:text-emerald-400">
+                        <Activity className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3 space-y-1">
+                      <h3 className="text-3xl font-black font-sans leading-none tracking-tight">
+                        {formattedFullCapacityPercent}%
+                      </h3>
+                      <p className="text-[11.5px] font-bold text-slate-500 dark:text-slate-400">
+                        Tối ưu: 80-90%
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* CARD 4: SỰ CỐ CẦN XỬ LÝ (STYLISH RED WARNING CARD) */}
+                  <div className={`p-5 rounded-2xl border transition-all bg-white dark:bg-slate-905 border-rose-200/70 dark:border-rose-950 flex flex-col justify-between`}>
+                    <div className="flex justify-between items-start">
+                      <span className="text-[10px] font-extrabold uppercase text-rose-500 dark:text-rose-400 tracking-wider flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                        SỰ CỐ CẦN XỬ LÝ
+                      </span>
+                      <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400">
+                        <AlertTriangle className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="mt-3 flex justify-between items-end">
+                      <h3 className="text-3.5xl font-black font-mono leading-none tracking-tight text-rose-600 dark:text-rose-400">
+                        {notices.filter(n => n.type === 'ERROR' && n.actionState !== 'RESOLVED').length.toString().padStart(2, '0')}
+                      </h3>
+                      <button 
+                        onClick={() => {
+                          setActiveMenu('security');
+                          triggerToast('Mở trung tâm an ninh vận hành bãi đỗ!', 'info');
+                        }}
+                        className="text-xs font-black text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                      >
+                        Xem chi tiết
+                      </button>
+                    </div>
+                  </div>
+
                 </div>
 
-                {/* FOOTER */}
-                <div className="border-t border-slate-100 dark:border-slate-850 pt-6 mt-12 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-400 dark:text-slate-500 font-sans">
-                  <span className="font-black text-slate-750 dark:text-slate-300 text-sm">UrbanPark</span>
-                  <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 font-semibold font-sans">
-                    <a href="#" className="hover:text-slate-650 transition-colors">Chính sách bảo mật</a>
-                    <a href="#" className="hover:text-slate-650 transition-colors">Điều khoản dịch vụ</a>
-                    <a href="#" className="hover:text-slate-650 transition-colors">Khả năng tiếp cận</a>
-                    <a href="#" className="hover:text-slate-650 transition-colors">Liên hệ hỗ trợ</a>
+                {/* ROW 2: SPLINE AREA REVENUE CHART & VEHICLES LEGEND (DIAL REPLICAS) */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                  
+                  {/* LEFT COLUMN: AREA SPLINE REVENUE (col-span-8) */}
+                  <div className={`lg:col-span-8 p-6 rounded-2xl border ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/65 shadow-xs'}`}>
+                    <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-800 mb-6 font-sans">
+                      <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest leading-none">
+                        {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? 'Lưu lượng xe 7 ngày qua' : 'Doanh thu 7 ngày qua'}
+                      </h3>
+                      <button onClick={() => triggerToast(user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? 'Lịch sử lưu lượng xe đã được cập nhật!' : 'Lịch sử doanh thu đã được lọc mới nhất!', 'success')} className="p-1 text-slate-400 hover:text-slate-700">
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="h-64 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartRevenueData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#2563eb" stopOpacity={0.25}/>
+                              <stop offset="95%" stopColor="#2563eb" stopOpacity={0.01}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#334155' : '#e2e8f0'} />
+                          <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                          <YAxis stroke="#94a3b8" fontSize={11} tickFormatter={(v) => user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? `${v * 15} lượt` : `${v}M`} tickLine={false} />
+                          <Tooltip formatter={(value) => user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? [`${Number(value) * 15} lượt xe`, 'Lượng xe vào/ra'] : [`${value}M VNĐ`, 'Doanh thu']} />
+                          <Area type="monotone" dataKey="amount" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-normal whitespace-nowrap">
-                    © 2024 UrbanPark Infrastructure. Bảo lưu mọi quyền.
-                  </span>
+
+                  {/* RIGHT COLUMN: VEHICLES DISTRIBUTION CARD DIALS (col-span-4) */}
+                  <div className={`lg:col-span-4 p-6 rounded-2xl border flex flex-col justify-between ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/65 shadow-xs'}`}>
+                    <div className="pb-3 border-b border-slate-100 dark:border-slate-800 font-sans">
+                      <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest leading-none">
+                        Phân bổ phương tiện
+                      </h3>
+                    </div>
+
+                    <div className="flex-1 flex flex-col items-center justify-center relative py-4 select-none">
+                      <PieChart width={220} height={160}>
+                        <Pie
+                          data={pieVehicleData}
+                          cx="50%"
+                          cy="90%"
+                          startAngle={180}
+                          endAngle={0}
+                          innerRadius={65}
+                          outerRadius={90}
+                          paddingAngle={3}
+                          dataKey="value"
+                        >
+                          {pieVehicleData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                      
+                      {/* Big concentric title matched precisely inside the ring space! */}
+                      <div className="absolute bottom-[23px] text-center">
+                        <strong className="text-2xl font-black block tracking-tight leading-none text-slate-850 dark:text-white">
+                          {formattedCarsCount}
+                        </strong>
+                        <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-widest">TỔNG SỐ XE</span>
+                      </div>
+                    </div>
+
+                    {/* VEHICLE DISTRIBUTION PERCENTAGES LEGENDS */}
+                    <div className="space-y-2 pt-4 border-t border-slate-105 dark:border-slate-800 text-[11px] font-sans">
+                      <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-950/20 p-2 rounded-xl">
+                        <div className="flex items-center gap-2 font-bold">
+                          <span className="w-3 h-3 rounded bg-slate-900 border border-slate-700 block" />
+                          <span>⚙️ Ô tô</span>
+                        </div>
+                        <span className="font-extrabold text-slate-700 dark:text-slate-350">60%</span>
+                      </div>
+                      <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-950/20 p-2 rounded-xl">
+                        <div className="flex items-center gap-2 font-bold">
+                          <span className="w-3 h-3 rounded bg-blue-500 block" />
+                          <span>🌐 Xe vãng lai</span>
+                        </div>
+                        <span className="font-extrabold text-slate-700 dark:text-slate-350">25%</span>
+                      </div>
+                      <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-950/20 p-2 rounded-xl">
+                        <div className="flex items-center gap-2 font-bold">
+                          <span className="w-3 h-3 rounded bg-[#10b981] block" />
+                          <span>🌟 Xe VIP</span>
+                        </div>
+                        <span className="font-extrabold text-slate-700 dark:text-slate-350">15%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* ROW 3: STAFF SHIFTS LIST & SYSTEM ALERTS CONSOLE BOX (7:5 ratio) */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch select-none">
+                  
+                  {/* LEFT STAFF CARDS LIST (col-span-7) */}
+                  <div className={`lg:col-span-7 p-6 rounded-2xl border ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/65 shadow-xs'} flex flex-col justify-between`}>
+                    <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800 mb-4 font-sans">
+                      <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest">
+                        {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? 'Trạng thái bốt kiểm soát & Cổng' : 'Nhân viên xuất sắc ca hiện tại'}
+                      </h3>
+                      <button 
+                        onClick={() => {
+                          if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN') {
+                            setActiveMenu('monitoring');
+                            triggerToast('Đã mở màn hình giám sát bốt gác thời gian thực!', 'info');
+                          } else {
+                            setActiveMenu('staff');
+                            triggerToast('Lọc toàn bộ dữ liệu nhân viên bốt gác!', 'info');
+                          }
+                        }}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-black cursor-pointer"
+                      >
+                        {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? 'Giám sát ngay' : 'Xem tất cả'}
+                      </button>
+                    </div>
+
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {staff.slice(0, 3).map((member, index) => (
+                        <div key={member.id} className="py-3.5 flex items-center justify-between gap-4 font-sans">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white font-black text-xs flex items-center justify-center border border-slate-200/60 shadow-3xs">
+                              {member.avatar}
+                            </div>
+                            <div className="leading-tight">
+                              <h4 className="text-xs font-black text-slate-800 dark:text-white flex items-center gap-1.5">
+                                {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? member.gate : member.name}
+                                {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? (
+                                  <span className="inline-flex items-center rounded-md bg-emerald-50 dark:bg-[#062419] px-1.5 py-0.5 text-[8px] font-black text-emerald-700 dark:text-emerald-400 ring-1 ring-inset ring-emerald-600/10 dark:ring-emerald-500/20 uppercase tracking-widest">
+                                    Hoạt động
+                                  </span>
+                                ) : (
+                                  index === 0 && (
+                                    <span className="inline-flex items-center rounded-md bg-emerald-50 dark:bg-[#062419] px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-400 ring-1 ring-inset ring-emerald-600/10 dark:ring-emerald-500/20 uppercase tracking-wide">
+                                      ⭐ TOP 1
+                                    </span>
+                                  )
+                                )}
+                              </h4>
+                              <span className="text-[10px] text-slate-400 font-bold block">
+                                {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? `Người trực: ${member.name}` : member.gate}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="text-right font-sans">
+                            <strong className="text-xs font-black text-slate-800 dark:text-slate-200 block">{member.swipes} lượt</strong>
+                            <span className="text-[9px] text-[#22c55e] font-extrabold uppercase tracking-wider">
+                              {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? 'Giao dịch quẹt thẻ' : 'Đang đỗ ra/vào'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* RIGHT SYSTEM ALERTS NOTICES PANEL (col-span-5) */}
+                  <div className={`lg:col-span-5 p-6 rounded-2xl border ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-rose-200/50'}`}>
+                    <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800 mb-4 font-sans">
+                      <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest leading-none flex items-center gap-1.5">
+                        <span>Thông báo hS thống</span>
+                      </h3>
+                      <span className="inline-flex items-center rounded-md bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 text-[9.5px] font-black text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/10 uppercase tracking-widest">
+                        2 QUAN THƯỜNG
+                      </span>
+                    </div>
+
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                      {notices.map(notice => {
+                        const isErr = notice.type === 'ERROR';
+                        const isWarn = notice.type === 'WARNING';
+                        return (
+                          <div 
+                            key={notice.id} 
+                            className={`p-4 rounded-xl border font-sans space-y-2 transition-all ${
+                              isErr 
+                                ? notice.actionState === 'RESOLVED' 
+                                  ? 'bg-emerald-50/10 dark:bg-emerald-950/10 border-emerald-500/20'
+                                  : 'bg-rose-50/50 dark:bg-[#1a0e12] border-rose-200 dark:border-rose-950/80 shadow-3xs'
+                                : isWarn 
+                                  ? 'bg-amber-50/40 dark:bg-[#1c160e] border-amber-200 dark:border-amber-950' 
+                                  : 'bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start gap-4">
+                              <div className="flex items-start gap-2.5">
+                                <div className={`p-1.5 rounded-lg shrink-0 ${isErr ? 'bg-rose-500/10 text-rose-500' : isWarn ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'}`}>
+                                  <AlertTriangle className="w-3.5 h-3.5 stroke-[2.5]" />
+                                </div>
+                                <div className="space-y-0.5 leading-tight">
+                                  <h4 className="text-xs font-black text-slate-850 dark:text-slate-100">{notice.title}</h4>
+                                  <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">{notice.desc}</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-1 text-[10px] font-bold font-sans">
+                              <span className="text-slate-400 tracking-wider uppercase">{notice.time}</span>
+                              {notice.actionText && notice.actionState !== 'RESOLVED' && (
+                                <button
+                                  onClick={() => handleManualActionNotice(notice.id)}
+                                  disabled={notice.actionState === 'PENDING'}
+                                  className="text-xs text-[#2563eb] hover:underline font-extrabold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                >
+                                  {notice.actionState === 'PENDING' ? 'Đang chuyển...' : notice.actionText}
+                                </button>
+                              )}
+                              {notice.actionState === 'RESOLVED' && (
+                                <span className="text-emerald-500 flex items-center gap-1 font-extrabold">
+                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                  <span>Đã phục hồi</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+            {activeMenu === 'monitoring' && (
+              <ParkingMonitorView 
+                blueprintSlots={blueprintSlots}
+                setBlueprintSlots={setBlueprintSlots}
+                recentActivities={recentActivities}
+                setRecentActivities={setRecentActivities}
+                vehicles={vehicles}
+                setVehicles={setVehicles}
+                triggerToast={triggerToast}
+                isDarkMode={isDarkMode}
+                setActiveMenu={setActiveMenu}
+                handleManualCheckIn={handleManualCheckIn}
+                handleManualCheckOut={handleManualCheckOut}
+                checkInPlate={checkInPlate}
+                setCheckInPlate={setCheckInPlate}
+                checkInVehicleType={checkInVehicleType}
+                setCheckInVehicleType={setCheckInVehicleType}
+                checkInIsVip={checkInIsVip}
+                setCheckInIsVip={setCheckInIsVip}
+                selectedSlotForCheckIn={selectedSlotForCheckIn}
+                setSelectedSlotForCheckIn={setSelectedSlotForCheckIn}
+                selectedSlotDetails={selectedSlotDetails}
+                setSelectedSlotDetails={setSelectedSlotDetails}
+                monitoringFacility={monitoringFacility}
+                setMonitoringFacility={setMonitoringFacility}
+                monitoringFloor={monitoringFloor}
+                setMonitoringFloor={setMonitoringFloor}
+                showFacilityDropdown={showFacilityDropdown}
+                setShowFacilityDropdown={setShowFacilityDropdown}
+                showFloorDropdown={showFloorDropdown}
+                setShowFloorDropdown={setShowFloorDropdown}
+              />
+            )}
+            {(activeMenu as string) === 'monitoring_DEPRECATED' && (
+              <div className="space-y-6 animate-fade-in" id="monitoring-sub-view">
+                
+                {/* SYSTEM LEVEL QUICK BAR FILTERS */}
+                <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-50 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-150 dark:border-slate-800">
+                  <div className="flex flex-wrap items-center gap-3">
+                    
+                    {/* FACILITY DROPDOWN SELECTOR */}
+                    <div className="relative">
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">Cơ sở chi nhánh</label>
+                      <button 
+                        onClick={() => {
+                          setShowFacilityDropdown(!showFacilityDropdown);
+                          setShowFloorDropdown(false);
+                        }}
+                        className={`px-4 py-2 bg-white dark:bg-slate-950 border rounded-xl text-xs font-black flex items-center gap-2 select-none min-w-[180px] justify-between shadow-xs transition-colors ${
+                          showFacilityDropdown ? 'border-blue-500' : 'border-slate-200 dark:border-slate-850'
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                          {monitoringFacility}
+                        </span>
+                        <ChevronDown className="w-3 h-3 text-slate-400" />
+                      </button>
+                      
+                      <AnimatePresence>
+                        {showFacilityDropdown && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 5 }}
+                            className="absolute left-0 mt-1.5 w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl shadow-xl z-30 overflow-hidden"
+                          >
+                            {['Cơ sở chính (HQ)', 'Cơ sở Bắc Từ Liêm', 'Cơ sở Quận 1 (HCMC)'].map(fac => (
+                              <button
+                                key={fac}
+                                onClick={() => {
+                                  setMonitoringFacility(fac);
+                                  setShowFacilityDropdown(false);
+                                  triggerToast(`Chuyển khu vực quản lý sang: ${fac}`, 'info');
+                                }}
+                                className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-900 font-bold text-slate-700 dark:text-slate-300 transition-colors block"
+                              >
+                                {fac}
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* MOVEMENT FLOOR LEVEL SELECTOR */}
+                    <div className="relative">
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">Phân khu đỗ xe</label>
+                      <button 
+                        onClick={() => {
+                          setShowFloorDropdown(!showFloorDropdown);
+                          setShowFacilityDropdown(false);
+                        }}
+                        className={`px-4 py-2 bg-white dark:bg-slate-950 border rounded-xl text-xs font-black flex items-center gap-2 select-none min-w-[140px] justify-between shadow-xs transition-colors ${
+                          showFloorDropdown ? 'border-blue-500' : 'border-slate-200 dark:border-slate-850'
+                        }`}
+                      >
+                        <span>{monitoringFloor}</span>
+                        <ChevronDown className="w-3 h-3 text-slate-400" />
+                      </button>
+                      
+                      <AnimatePresence>
+                        {showFloorDropdown && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 5 }}
+                            className="absolute left-0 mt-1.5 w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl shadow-xl z-30 overflow-hidden"
+                          >
+                            {['Tầng hầm B1', 'Tầng hầm B2', 'Tầng trệt G'].map(flr => (
+                              <button
+                                key={flr}
+                                onClick={() => {
+                                  setMonitoringFloor(flr);
+                                  setShowFloorDropdown(false);
+                                  triggerToast(`Bộ lọc sơ đồ hầm đỗ: ${flr}`, 'success');
+                                }}
+                                className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-900 font-bold text-slate-700 dark:text-slate-300 transition-colors block"
+                              >
+                                {flr}
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                  </div>
+
+                  {/* QUICK SUMMARY BULLET METRICS */}
+                  <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-550 dark:text-slate-400">
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-850">
+                      <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-700" />
+                      <span>Tổng: <strong>24 ô</strong></span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span>Trống: <strong>{blueprintSlots.filter(s => s.status === 'CÒN').length} ô</strong></span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg">
+                      <span className="w-2 h-2 rounded-full bg-blue-500" />
+                      <span>Đẫ đỗ: <strong>{blueprintSlots.filter(s => s.status === 'ĐÃ ĐỖ' || s.status === 'XE VIP').length} ô</strong></span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg">
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                      <span>Bảo trì: <strong>{blueprintSlots.filter(s => s.status === 'BẢO TRÌ').length} ô</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* TWO-COLUMN MONITOR SCREEN WORKSPACE */}
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                  
+                  {/* LEFT 8 SHIELDS: SMART BLUEPRINT MATRIX GEOMETRY MAP */}
+                  <div className={`xl:col-span-8 p-6 rounded-2xl border ${isDarkMode ? 'bg-[#0b0f19] border-slate-800' : 'bg-white border-slate-200/70 shadow-sm'} space-y-4`}>
+                    
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800/80">
+                      <div>
+                        <strong className="text-xs font-black uppercase text-slate-400 tracking-wider block">Bản đồ số bàn giao bến đỗ {monitoringFloor}</strong>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Tự động đồng bộ với hệ thống thông báo cổng vào-ra (Nhấn vào ô để tương tác nhanh)</span>
+                      </div>
+                      
+                      <button 
+                        onClick={() => {
+                          const resetSlots = blueprintSlots.map(s => ({
+                            id: s.id,
+                            label: s.label,
+                            status: s.status === 'BẢO TRÌ' ? 'BẢO TRÌ' : 'CÒN'
+                          }));
+                          setBlueprintSlots(resetSlots);
+                          setVehicles([]);
+                          triggerToast('Đã dọn dẹp trống toàn bộ ô đỗ tầng hầm', 'info');
+                        }}
+                        className="px-3 py-1.5 text-[10.5px] font-black text-rose-500 bg-rose-50 dark:bg-rose-950/20 hover:bg-rose-100 dark:hover:bg-rose-950/40 rounded-xl transition-all select-none"
+                      >
+                        Reset trống bến
+                      </button>
+                    </div>
+
+                    {/* BLUEPRINT SUBSECTION GRID BY LONES */}
+                    <div className="space-y-6 pt-2">
+                      
+                      {/* ZONE A PARKING LANES */}
+                      <div>
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5 mb-2.5">
+                          <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 rounded text-[9px]">LÀN A</span>
+                          <span>Bốt xe Ô tô Du lịch (Sedan, Wagon, Coupes)</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                          {blueprintSlots.filter(s => s.id.includes('B1-01') || s.id.includes('B1-02') || s.id.includes('B1-03') || s.id.includes('B1-04') || s.id.includes('B1-05') || s.id.includes('B1-06') || s.id.includes('B1-07') || s.id.includes('B1-08') || s.id.includes('B1-09') || s.id.includes('B1-10') || s.id.includes('B1-11')).map(slot => {
+                            const isOccupied = slot.status === 'ĐÃ ĐỖ' || slot.status === 'XE VIP';
+                            const isVip = slot.status === 'XE VIP';
+                            const isMaint = slot.status === 'BẢO TRÌ';
+                            return (
+                              <button 
+                                key={slot.id}
+                                onClick={() => {
+                                  if (isMaint) {
+                                    triggerToast(`Ô ${slot.label} đang được kỹ thuật bảo hành hệ thống cảm biến!`, 'error');
+                                  } else if (isOccupied) {
+                                    setSelectedSlotDetails(slot);
+                                    setSelectedSlotForCheckIn(null);
+                                  } else {
+                                    setSelectedSlotForCheckIn(slot);
+                                    setSelectedSlotDetails(null);
+                                    setCheckInPlate('');
+                                  }
+                                }}
+                                className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all cursor-pointer relative select-none min-h-[90px] outline-hidden ${
+                                  isOccupied 
+                                    ? isVip 
+                                      ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400 hover:ring-2 hover:ring-yellow-400/20 shadow-xs' 
+                                      : 'bg-blue-600/10 border-blue-600/30 text-blue-600 dark:text-blue-400 hover:ring-2 hover:ring-blue-500/20 shadow-xs'
+                                    : isMaint
+                                      ? 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400 cursor-not-allowed opacity-80'
+                                      : 'bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-900 border-slate-200 dark:border-slate-850 hover:border-blue-500 hover:scale-102 text-slate-500'
+                                }`}
+                              >
+                                <span className="text-[10px] font-black opacity-60 leading-none">{slot.label}</span>
+                                <div className="my-2 select-none h-6 flex items-center justify-center">
+                                  {isOccupied ? (
+                                    <strong className="text-xs font-mono font-black tracking-tight leading-none text-slate-700 dark:text-white uppercase px-1 py-0.5 rounded-md bg-slate-100/80 dark:bg-slate-900">{slot.plate}</strong>
+                                  ) : isMaint ? (
+                                    <span className="text-[9px] font-extrabold uppercase text-amber-500">Maint</span>
+                                  ) : (
+                                    <span className="text-[9px] font-black uppercase text-emerald-500 tracking-wide font-sans flex items-center gap-1">
+                                      <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                                      TRỐNG
+                                    </span>
+                                  )}
+                                </div>
+                                {isOccupied && (
+                                  <span className={`text-[8px] font-black uppercase tracking-wider leading-none ${isVip ? 'text-yellow-500' : 'text-blue-500'}`}>
+                                    {isVip ? '★ VIP Card' : slot.vehicleType || 'Sedan'}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* PHYSICAL LANE CARRIAGEWAY ACCENT */}
+                      <div className="relative py-2 font-sans overflow-hidden select-none">
+                        <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                          <div className="w-full border-t-2 border-dashed border-slate-150 dark:border-slate-800" />
+                        </div>
+                        <div className="relative flex justify-center text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-none">
+                          <span className="bg-white dark:bg-[#0b0f19] px-4 font-mono flex items-center gap-2">
+                            <span>◀ Làn di chuyển chính - Lối Vào ⬆</span>
+                            <span className="text-[8px]">•</span>
+                            <span>Lối Ra ⬇ ▶</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* ZONE B PARKING LANES */}
+                      <div>
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5 mb-2.5">
+                          <span className="px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-950 text-yellow-600 dark:text-yellow-400 rounded text-[9px]">LÀN B</span>
+                          <span>Hạ tầng đỗ xe có cổng sạc thông minh (EV Charging Ready)</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                          {blueprintSlots.filter(s => s.id.includes('B1-12') || s.id.includes('B1-13') || s.id.includes('B1-14') || s.id.includes('B1-15') || s.id.includes('B1-16') || s.id.includes('B1-17') || s.id.includes('B1-18') || s.id.includes('B1-19')).map(slot => {
+                            const isOccupied = slot.status === 'ĐÃ ĐỖ' || slot.status === 'XE VIP';
+                            const isVip = slot.status === 'XE VIP';
+                            const isMaint = slot.status === 'BẢO TRÌ';
+                            return (
+                              <button 
+                                key={slot.id}
+                                onClick={() => {
+                                  if (isMaint) {
+                                    triggerToast(`Ô ${slot.label} đang được bảo dưỡng an toàn sạc pin!`, 'error');
+                                  } else if (isOccupied) {
+                                    setSelectedSlotDetails(slot);
+                                    setSelectedSlotForCheckIn(null);
+                                  } else {
+                                    setSelectedSlotForCheckIn(slot);
+                                    setSelectedSlotDetails(null);
+                                    setCheckInPlate('');
+                                  }
+                                }}
+                                className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all cursor-pointer relative select-none min-h-[90px] outline-hidden ${
+                                  isOccupied 
+                                    ? isVip 
+                                      ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400 hover:ring-2 hover:ring-yellow-400/20 shadow-xs' 
+                                      : 'bg-blue-600/10 border-blue-600/30 text-blue-600 dark:text-blue-400 hover:ring-2 hover:ring-blue-500/20 shadow-xs'
+                                    : isMaint
+                                      ? 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400 cursor-not-allowed opacity-80'
+                                      : 'bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-900 border-slate-200 dark:border-slate-850 hover:border-blue-500 hover:scale-102 text-slate-550'
+                                }`}
+                              >
+                                <span className="absolute top-1 right-2 text-[7px] font-black bg-emerald-500/10 text-emerald-600 rounded px-1 scale-85">⚡ CHARGE</span>
+                                <span className="text-[10px] font-black opacity-60 leading-none">{slot.label}</span>
+                                <div className="my-2 select-none h-6 flex items-center justify-center">
+                                  {isOccupied ? (
+                                    <strong className="text-xs font-mono font-black tracking-tight leading-none text-slate-700 dark:text-white uppercase px-1 py-0.5 rounded-md bg-slate-100/80 dark:bg-slate-900">{slot.plate}</strong>
+                                  ) : isMaint ? (
+                                    <span className="text-[9px] font-extrabold uppercase text-amber-500">Maint</span>
+                                  ) : (
+                                    <span className="text-[9px] font-black uppercase text-emerald-500 tracking-wide font-sans flex items-center gap-1">
+                                      <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                                      TRỐNG
+                                    </span>
+                                  )}
+                                </div>
+                                {isOccupied && (
+                                  <span className={`text-[8px] font-black uppercase tracking-wider leading-none ${isVip ? 'text-yellow-500' : 'text-blue-500'}`}>
+                                    {isVip ? '★ VIP Card' : slot.vehicleType || 'Sedan'}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* ZONE C PARKING LANES */}
+                      <div>
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5 mb-2.5">
+                          <span className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 rounded text-[9px]">LÀN C</span>
+                          <span>Bốt xe Chuyên dụng & Đa dụng cỡ lớn (SUV, Vans, Pick-ups)</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                          {blueprintSlots.filter(s => s.id.includes('B1-20') || s.id.includes('B1-21') || s.id.includes('B1-22') || s.id.includes('B1-23') || s.id.includes('B1-24') || s.id.includes('B1-25') || s.id.includes('B1-26') || s.id.includes('B1-27')).map(slot => {
+                            const isOccupied = slot.status === 'ĐÃ ĐỖ' || slot.status === 'XE VIP';
+                            const isVip = slot.status === 'XE VIP';
+                            const isMaint = slot.status === 'BẢO TRÌ';
+                            return (
+                              <button 
+                                key={slot.id}
+                                onClick={() => {
+                                  if (isMaint) {
+                                    triggerToast(`Ô ${slot.label} đang được bảo dưỡng lắp đặt lại camera thông minh!`, 'error');
+                                  } else if (isOccupied) {
+                                    setSelectedSlotDetails(slot);
+                                    setSelectedSlotForCheckIn(null);
+                                  } else {
+                                    setSelectedSlotForCheckIn(slot);
+                                    setSelectedSlotDetails(null);
+                                    setCheckInPlate('');
+                                  }
+                                }}
+                                className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all cursor-pointer relative select-none min-h-[90px] outline-hidden ${
+                                  isOccupied 
+                                    ? isVip 
+                                      ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400 hover:ring-2 hover:ring-yellow-400/20 shadow-xs' 
+                                      : 'bg-blue-600/10 border-blue-600/30 text-blue-600 dark:text-blue-400 hover:ring-2 hover:ring-blue-500/20 shadow-xs'
+                                    : isMaint
+                                      ? 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400 cursor-not-allowed opacity-80'
+                                      : 'bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-900 border-slate-200 dark:border-slate-850 hover:border-blue-500 hover:scale-102 text-slate-500'
+                                }`}
+                              >
+                                <span className="text-[10px] font-black opacity-60 leading-none">{slot.label}</span>
+                                <div className="my-2 select-none h-6 flex items-center justify-center">
+                                  {isOccupied ? (
+                                    <strong className="text-xs font-mono font-black tracking-tight leading-none text-slate-700 dark:text-white uppercase px-1 py-0.5 rounded-md bg-slate-100/80 dark:bg-slate-900">{slot.plate}</strong>
+                                  ) : isMaint ? (
+                                    <span className="text-[9px] font-extrabold uppercase text-amber-500">Maint</span>
+                                  ) : (
+                                    <span className="text-[9px] font-black uppercase text-emerald-500 tracking-wide font-sans flex items-center gap-1">
+                                      <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                                      TRỐNG
+                                    </span>
+                                  )}
+                                </div>
+                                {isOccupied && (
+                                  <span className={`text-[8px] font-black uppercase tracking-wider leading-none ${isVip ? 'text-yellow-500' : 'text-blue-500'}`}>
+                                    {isVip ? '★ VIP Card' : slot.vehicleType || 'SUV'}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* INTERACTIVE CONTROLS OVERLAY FOR CHECKIN/OUT */}
+                    <AnimatePresence mode="wait">
+                      {selectedSlotForCheckIn && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="pt-4 border-t border-slate-100 dark:border-slate-800 mt-4 space-y-3"
+                        >
+                          <div className="flex bg-blue-500/5 dark:bg-blue-500/10 p-4 rounded-xl border border-blue-500/20 text-left">
+                            <Plus className="w-5 h-5 text-blue-500 mr-2 shrink-0 mt-0.5" />
+                            <div className="w-full text-xs space-y-3">
+                              <div className="flex justify-between items-center">
+                                <strong className="text-blue-600 dark:text-blue-400 font-extrabold text-sm">KÍCH HOẠT ĐỖ XE THỦ CÔNG TẠI Ô [{selectedSlotForCheckIn.label}]</strong>
+                                <button onClick={() => setSelectedSlotForCheckIn(null)} className="text-slate-400 hover:text-red-500 font-bold">Hủy bỏ</button>
+                              </div>
+                              <p className="text-slate-550 dark:text-slate-300">Vui lòng nhập thông tin xe thực tế đỗ tại vị trí đỗ này để lập biên bản.</p>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end pt-1">
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Biển số kiểm soát</label>
+                                  <input 
+                                    type="text"
+                                    placeholder="Ví dụ: 30A-999.88"
+                                    value={checkInPlate}
+                                    onChange={(e) => setCheckInPlate(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-205 dark:border-slate-850 rounded-xl font-mono text-xs uppercase font-extrabold focus:border-blue-500 outline-none"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Hạng mục dòng xe</label>
+                                  <div className="flex bg-white dark:bg-slate-950 rounded-xl border border-slate-205 dark:border-slate-850 p-0.5">
+                                    {(['Sedan', 'SUV', 'Sang trọng'] as const).map(type => (
+                                      <button
+                                        key={type}
+                                        type="button"
+                                        onClick={() => setCheckInVehicleType(type)}
+                                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-extrabold transition-all ${
+                                          checkInVehicleType === type 
+                                            ? 'bg-blue-600 text-white shadow-xs' 
+                                            : 'text-slate-500 hover:text-slate-800'
+                                        }`}
+                                      >
+                                        {type}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                  {/* VIP TICKET CHIP TOGGLE */}
+                                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                                    <input 
+                                      type="checkbox"
+                                      checked={checkInIsVip}
+                                      onChange={(e) => setCheckInIsVip(e.target.checked)}
+                                      className="rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                                    />
+                                    <span className="text-[11px] font-black text-slate-600 dark:text-slate-300">Nhãn VIP Membership</span>
+                                  </label>
+
+                                  <button 
+                                    onClick={handleManualCheckIn}
+                                    className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black tracking-wide uppercase hover:bg-blue-700 transition-colors"
+                                  >
+                                    Đỗ Xe Ngay
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {selectedSlotDetails && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="pt-4 border-t border-slate-100 dark:border-slate-800 mt-4 space-y-3"
+                        >
+                          <div className="flex bg-yellow-500/5 dark:bg-yellow-500/10 p-4 rounded-xl border border-yellow-500/20 text-left">
+                            <Info className="w-5 h-5 text-yellow-500 mr-2 shrink-0 mt-0.5" />
+                            <div className="w-full text-xs space-y-3">
+                              <div className="flex justify-between items-center">
+                                <strong className="text-yellow-600 dark:text-yellow-400 font-extrabold text-sm">CHI TIẾT PHIÊN XE ĐANG ĐỖ: Ô ĐỖ [{selectedSlotDetails.label}]</strong>
+                                <button onClick={() => setSelectedSlotDetails(null)} className="text-slate-400 hover:text-red-500 font-bold">Đóng chi tiết</button>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1 font-sans">
+                                <div>
+                                  <span className="text-[10px] text-slate-400 block uppercase">Biển kiểm soát xe</span>
+                                  <strong className="text-sm font-mono font-black text-slate-800 dark:text-white uppercase">{selectedSlotDetails.plate}</strong>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-slate-400 block uppercase font-bold text-slate-400">Kiểu dáng xe</span>
+                                  <strong className="text-xs text-slate-700 dark:text-slate-200 block font-bold">{selectedSlotDetails.vehicleType || 'Sedan'}</strong>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-slate-400 block uppercase">Giờ đỗ bến chính</span>
+                                  <strong className="text-xs text-slate-705 dark:text-slate-200 block font-bold">{selectedSlotDetails.entryTime || '10:12 AM'} (Vừa xong)</strong>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-slate-400 block uppercase">Cảm biến sạc EV</span>
+                                  <strong className="text-xs text-emerald-500 block font-extrabold">Đang ổn định ✔</strong>
+                                </div>
+                              </div>
+
+                              <div className="pt-2 flex justify-end gap-2">
+                                <button 
+                                  onClick={() => handleManualCheckOut(selectedSlotDetails.id, selectedSlotDetails.label)}
+                                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black tracking-wide uppercase transition-colors"
+                                >
+                                  Lệnh xuất barie (Xe ra khỏi bãi)
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                  </div>
+
+                  {/* RIGHT 4 SHIELDS: HARDWARE OCR CAMERA & DOCK LOG timeline */}
+                  <div className="xl:col-span-4 space-y-6">
+                    
+                    {/* CCTV LIVE VIEW OCR MONITOR DEVICE */}
+                    <div className="p-4 rounded-2xl bg-black border border-slate-900 overflow-hidden relative text-left">
+                      
+                      {/* SCANNING GRID LINES */}
+                      <div className="absolute inset-x-0 top-0 h-0.5 bg-cyan-500/25 animate-bounce shadow-cyan-500 shadow-md z-10" />
+                      
+                      <div className="flex justify-between items-center text-[9px] font-mono tracking-widest text-emerald-500 font-bold mb-2.5">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                          CAM_GATE_01_LPR_OCR : LIVE FEED
+                        </span>
+                        <span>FHD 1080P • 30FPS</span>
+                      </div>
+
+                      {/* DISPLAY DIGITAL PLATTER SCREEN */}
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-900/40 text-center font-mono py-6 space-y-3 relative overflow-hidden">
+                        
+                        <div className="absolute inset-0 bg-[radial-gradient(#052e16_1px,transparent_1px)] [background-size:16px_16px] opacity-15" />
+                        
+                        <div className="space-y-1 relative z-10">
+                          <span className="text-[10px] text-zinc-500 block uppercase tracking-wide">Nhận diện chuyển động</span>
+                          {isLprRunning ? (
+                            <motion.div 
+                              animate={{ opacity: [1, 0.4, 1] }}
+                              transition={{ repeat: Infinity, duration: 0.5 }}
+                              className="text-base text-yellow-400 font-black tracking-widest"
+                            >
+                              PARSING OCR BARCODE...
+                            </motion.div>
+                          ) : (
+                            <strong className="text-xl font-extrabold tracking-widest text-cyan-400 block pr-1">
+                              {mockLprPlateInput ? mockLprPlateInput.toUpperCase() : 'NO VEHICLE DETECTED'}
+                            </strong>
+                          )}
+                        </div>
+
+                        {/* MOCK PLATE FRAME */}
+                        <div className="mx-auto max-w-[160px] p-2 py-3 bg-white border-2 border-slate-800 rounded-lg shadow-inner relative z-10 select-none">
+                          <div className="absolute top-1 left-1.5 text-[6.5px] scale-80 font-black tracking-tight leading-none text-slate-500 block">VN REGISTRY</div>
+                          <span className="text-slate-900 font-mono text-sm tracking-widest font-black uppercase text-center block pt-1.5">
+                            {mockLprPlateInput ? mockLprPlateInput.toUpperCase() : '30A-888.88'}
+                          </span>
+                        </div>
+
+                      </div>
+
+                      {/* AUTO TRIGGER BUTTONS */}
+                      <div className="text-[10px] font-bold text-slate-400 block pt-3">Simulate Random Vehicle Entrance Scans:</div>
+                      <div className="grid grid-cols-2 gap-2 pt-2">
+                        {[
+                          { plate: '30G-888.88', desc: 'Mercedes S450 (VIP)', type: 'VIP' },
+                          { plate: '29D1-333.33', desc: 'Honda SH', type: 'XEMAY' },
+                          { plate: '30H-567.89', desc: 'Hyundai SantaFe', type: 'OTO' },
+                          { plate: '51F-111.22', desc: 'Audi R8 Super', type: 'VIP' }
+                        ].map(pre => (
+                          <button
+                            key={pre.plate}
+                            onClick={() => {
+                              setMockLprPlateInput(pre.plate);
+                              setMockLprType(pre.type as any);
+                              setIsLprRunning(true);
+                              triggerToast(`Đang nạp phân tích biển số: ${pre.plate}`, 'info');
+                              setTimeout(() => {
+                                setIsLprRunning(false);
+                                executeLprCheckIn(pre.plate);
+                              }, 1200);
+                            }}
+                            className="p-2 border border-slate-800 bg-[#0d121f] text-left hover:bg-slate-900 transition-colors rounded-xl font-mono text-[9px] block"
+                          >
+                            <span className="text-cyan-400 font-extrabold text-[10px] block">{pre.plate}</span>
+                            <span className="text-zinc-500 text-[8px] font-bold block truncate">{pre.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                    </div>
+
+                    {/* LIVE ACTIVE DOCK LOG TIMELINE */}
+                    <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#0b0f19] border-slate-800' : 'bg-white border-slate-205'} space-y-3 text-left`}>
+                      <div className="flex justify-between items-center pb-1">
+                        <strong className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Hành trình Giao dịch Mới ({recentActivities.length})</strong>
+                        <button 
+                          onClick={() => {
+                            setRecentActivities([
+                              { id: 'act-1', plate: '51A-892.44', type: 'Sedan', gate: 'Cổng vào 1', time: '10:42:15', action: 'Vào' },
+                              { id: 'act-2', plate: '29C-123.99', type: 'SUV', gate: 'Cổng ra 2', time: '10:40:05', action: 'Ra' }
+                            ]);
+                            triggerToast('Đã dọn dẹp trống lịch sử hoạt động', 'info');
+                          }}
+                          className="text-[9px] text-blue-500 font-bold hover:underline"
+                        >
+                          Xóa
+                        </button>
+                      </div>
+
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                        <AnimatePresence initial={false}>
+                          {recentActivities.map(act => {
+                            const isEntry = act.action === 'Vào' || act.action === 'IN';
+                            return (
+                              <motion.div 
+                                key={act.id}
+                                initial={{ opacity: 0, x: 10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -10 }}
+                                className="flex justify-between items-center p-2.5 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-100 dark:border-slate-800/80"
+                              >
+                                <div className="flex items-center gap-2">
+                                  {isEntry ? (
+                                    <div className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-[10px] font-black">
+                                      IN
+                                    </div>
+                                  ) : (
+                                    <div className="w-6 h-6 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center text-[10px] font-black">
+                                      OUT
+                                    </div>
+                                  )}
+                                  <div>
+                                    <strong className="text-xs font-mono font-black text-slate-800 dark:text-white uppercase block leading-none">{act.plate}</strong>
+                                    <span className="text-[10px] text-slate-400 font-bold block mt-1">{act.type} • {act.gate}</span>
+                                  </div>
+                                </div>
+                                
+                                <div className="text-right">
+                                  <span className="text-[10px] font-mono text-slate-400 font-bold block">{act.time}</span>
+                                  {act.vip && (
+                                    <span className="inline-block text-[7.5px] bg-amber-500/10 text-amber-600 rounded px-1 font-black uppercase tracking-wider mt-0.5 scale-90">VIP CARD</span>
+                                  )}
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </AnimatePresence>
+                      </div>
+
+                    </div>
+
+                  </div>
+
                 </div>
 
               </div>
             )}
 
-                {/* MODAL: ĐĂNG KÝ PHƯƠNG TIỆN MỚI */}
-                <AnimatePresence>
-                  {isAddVehicleModalOpen && (
-                    <div className="fixed inset-0 z-55 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white rounded-3xl p-6 shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-800 space-y-4"
-                      >
-                        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-850">
-                          <h3 className="text-sm font-black tracking-tight text-slate-900 dark:text-white font-sans">Đăng ký phương tiện</h3>
-                          <button 
-                            type="button" 
-                            onClick={() => setIsAddVehicleModalOpen(false)}
-                            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors font-bold text-xs animate-none cursor-pointer"
-                          >
-                            ✕
-                          </button>
-                        </div>
-
-                        <form onSubmit={handleModalCreateVehicle} className="space-y-4">
-                          {/* Plate Number */}
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-sans">Biển số xe</label>
-                            <input 
-                              type="text" 
-                              value={addFormPlate}
-                              onChange={e => setAddFormPlate(e.target.value)}
-                              placeholder="Ví dụ: 30G-123.45"
-                              className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-250/60 dark:border-slate-800 rounded-xl font-bold font-mono tracking-widest text-[#0B1528] dark:text-white uppercase outline-hidden focus:border-blue-500 text-xs"
-                              required
-                            />
-                          </div>
-
-                          {/* Brand Model name */}
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-sans">Thương hiệu / Dòng xe</label>
-                            <input 
-                              type="text" 
-                              value={addFormBrand}
-                              onChange={e => setAddFormBrand(e.target.value)}
-                              placeholder="Ví dụ: Toyota Camry, Honda SH..."
-                              className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-250/60 dark:border-slate-800 rounded-xl font-bold text-slate-800 dark:text-white text-xs outline-hidden focus:border-blue-500"
-                            />
-                          </div>
-
-                          {/* Standard Categories Selection */}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-sans">Phân loại</label>
-                              <select 
-                                value={addFormType}
-                                onChange={e => {
-                                  setAddFormType(e.target.value);
-                                  // automatically sync detail classification default
-                                  if (e.target.value === 'Ô tô') {
-                                    setAddFormDetailType('Ô tô 4 chỗ');
-                                  } else {
-                                    setAddFormDetailType('Xe máy');
-                                  }
-                                }}
-                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-250/60 dark:border-slate-800 rounded-xl font-bold text-slate-800 dark:text-white text-xs outline-hidden focus:border-blue-500 cursor-pointer"
-                              >
-                                <option value="Ô tô">🚗 Ô tô</option>
-                                <option value="Xe máy">🏍️ Xe máy</option>
-                              </select>
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-sans">Phân khúc</label>
-                              <select 
-                                value={addFormDetailType}
-                                onChange={e => setAddFormDetailType(e.target.value)}
-                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-250/60 dark:border-slate-800 rounded-xl font-bold text-slate-800 dark:text-white text-xs outline-hidden focus:border-blue-500 cursor-pointer"
-                              >
-                                {addFormType === 'Ô tô' ? (
-                                  <>
-                                    <option value="Ô tô 4 chỗ">Ô tô 4 chỗ</option>
-                                    <option value="Ô tô 7 chỗ">Ô tô 7 chỗ</option>
-                                    <option value="Bán tải">Bán tải</option>
-                                    <option value="SUV Hạng Sang">SUV Hạng Sang</option>
-                                  </>
-                                ) : (
-                                  <>
-                                    <option value="Xe máy">Xe tay ga (SH, Vespa...)</option>
-                                    <option value="Xe số">Xe số phổ thông</option>
-                                    <option value="Mô tô">Mô tô PKL</option>
-                                  </>
-                                )}
-                              </select>
-                            </div>
-                          </div>
-
-                          <div className="flex gap-2 pt-2">
-                            <button 
-                              type="button"
-                              onClick={() => setIsAddVehicleModalOpen(false)}
-                              className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer text-center"
-                            >
-                              Hủy
-                            </button>
-                            <button 
-                              type="submit"
-                              className="flex-1 py-2.5 bg-[#0B1528] hover:bg-slate-800 text-white font-extrabold rounded-xl text-xs uppercase tracking-wide cursor-pointer text-center"
-                            >
-                              Đăng ký
-                            </button>
-                          </div>
-                        </form>
-                      </motion.div>
-                    </div>
-                  )}
-                </AnimatePresence>
-
-                {/* MODAL: CHI TIẾT PHƯƠNG TIỆN & CHỐNG TRỘM RADAR */}
-                <AnimatePresence>
-                  {selectedDetailVehicle && (
-                    <div className="fixed inset-0 z-55 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white rounded-3xl p-6 shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-800 space-y-4 relative overflow-hidden"
-                      >
-                        {/* Status Badge */}
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-sans">Thông tin biển số</span>
-                            <h3 className="text-xl font-black text-slate-900 dark:text-white font-sans mt-0.5">{selectedDetailVehicle.plate}</h3>
-                          </div>
-                          
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-tight ${
-                              selectedDetailVehicle.status === 'DA_OUT' 
-                                ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' 
-                                : selectedDetailVehicle.status === 'BAO_VE_MAX' 
-                                  ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 animate-pulse font-black' 
-                                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold'
-                            }`}>
-                              {selectedDetailVehicle.status === 'DA_OUT' ? 'Ngoại khu' : selectedDetailVehicle.status === 'BAO_VE_MAX' ? 'BẢO VỆ MAX 🔒' : 'ĐANG ĐỖ 🟢'}
-                            </span>
-                            <button 
-                              type="button" 
-                              onClick={() => setSelectedDetailVehicle(null)}
-                              className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-bold text-xs cursor-pointer"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Image preview */}
-                        {selectedDetailVehicle.image ? (
-                          <div className="h-40 rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800">
-                            <img 
-                              referrerPolicy="no-referrer"
-                              src={selectedDetailVehicle.image} 
-                              alt="car" 
-                              className="w-full h-full object-cover" 
-                            />
-                          </div>
-                        ) : (
-                          <div className="h-40 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-slate-400">
-                            <Bike className="w-10 h-10 stroke-[1.5] text-slate-350" />
-                            <span className="text-[10px] font-medium tracking-tight mt-1">Phương tiện gắn máy (SH/Vespa)</span>
-                          </div>
-                        )}
-
-                        {/* Metadata blocks */}
-                        <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-150/40 dark:border-slate-800/60 text-xs">
-                          <div>
-                            <span className="text-slate-400 block text-[10px] font-medium font-sans">Hãng xe/Model</span>
-                            <strong className="text-slate-700 dark:text-slate-200 font-bold font-sans">{selectedDetailVehicle.brand || 'Honda SH'}</strong>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 block text-[10px] font-medium font-sans">Bố trí bãi đỗ</span>
-                            <strong className="text-slate-700 dark:text-slate-200 font-bold font-sans">{selectedDetailVehicle.location || 'Chưa vào bãi'}</strong>
-                          </div>
-                          <div className="pt-2 border-t border-slate-200/50 dark:border-slate-850">
-                            <span className="text-slate-400 block text-[10px] font-medium font-sans">Dịch vụ tháng</span>
-                            <strong className="text-slate-700 dark:text-slate-200 font-bold font-sans">
-                              {vipSubscriptions.some(s => s.vehicle_plate === selectedDetailVehicle.plate && s.status === 'ACTIVE') ? 'Vé VIP 🌟' : 'Khách thường'}
-                            </strong>
-                          </div>
-                          <div className="pt-2 border-t border-slate-200/50 dark:border-slate-850">
-                            <span className="text-slate-400 block text-[10px] font-medium font-sans">Thời điểm vào bãi</span>
-                            <strong className="text-slate-700 dark:text-slate-200 font-bold font-sans">{selectedDetailVehicle.entryTime || '--'}</strong>
-                          </div>
-                        </div>
-
-                        {/* Lock / Protect module */}
-                        <div className="p-4 rounded-2xl border border-rose-100 dark:border-rose-950/30 bg-rose-50/[0.02] space-y-3">
-                          <div className="flex justify-between items-center gap-2">
-                            <div className="space-y-0.5 flex-1">
-                              <span className="text-[9px] font-extrabold text-rose-500 uppercase tracking-widest block font-mono">AN NINH TRỘM CHUYÊN SÂU</span>
-                              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">Khóa cứng bánh quay &amp; còi động cơ báo động tại cổng.</p>
-                            </div>
-                            
-                            <button 
-                              onClick={() => {
-                                handleToggleLock(selectedDetailVehicle.id);
-                                // Sync local state in modal instantly
-                                setSelectedDetailVehicle(prev => prev ? { ...prev, isLocked: !prev.isLocked } : null);
-                              }}
-                              className={`p-2.5 rounded-xl transition-all cursor-pointer ${
-                                selectedDetailVehicle.isLocked 
-                                  ? 'bg-rose-600 text-white hover:bg-rose-700' 
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
-                              }`}
-                            >
-                              {selectedDetailVehicle.isLocked ? <Lock className="w-4.5 h-4.5 text-rose-300" /> : <Unlock className="w-4.5 h-4.5 text-slate-400" />}
-                            </button>
-                          </div>
-
-                          {selectedDetailVehicle.isLocked && (
-                            <div className="bg-rose-500/10 border border-rose-200/30 p-2.5 rounded-xl text-center">
-                              <span className="text-[10px] font-extrabold text-rose-600 dark:text-rose-400 uppercase tracking-wider block animate-pulse">🔒 ĐỒNG BỘ CHỐNG CƯỚP ĐANG BẬT</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  // Close modal first and run simulation
-                                  const tempPlate = selectedDetailVehicle.plate;
-                                  setSelectedDetailVehicle(null);
-                                  triggerTheftSimulation(tempPlate);
-                                }}
-                                className="mt-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[9px] font-black tracking-tight cursor-pointer uppercase font-sans inline-block"
-                              >
-                                Thử Đột Nhập Thử Nghiệm 🚨
-                              </button>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Close and Delete buttons */}
-                        <div className="flex items-center gap-2 pt-1">
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              const confirmDel = window.confirm(`Bạn có chắc chắn muốn xóa phương tiện ${selectedDetailVehicle.plate} khỏi danh sách?`);
-                              if (confirmDel) {
-                                setVehicles(prev => prev.filter(v => v.id !== selectedDetailVehicle.id));
-                                setSelectedDetailVehicle(null);
-                                triggerToast(`Đã gỡ bỏ xe ${selectedDetailVehicle.plate} khỏi tài khoản!`, 'info');
-                              }
-                            }}
-                            className="p-2.5 bg-red-50 hover:bg-red-100 text-red-650 dark:bg-red-950/20 dark:hover:bg-red-900/30 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
-                            title="Xóa xe khỏi danh sách"
-                          >
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => setSelectedDetailVehicle(null)}
-                            className="flex-1 py-2.5 bg-[#0B1528] hover:bg-slate-800 text-white font-extrabold rounded-xl text-xs uppercase cursor-pointer text-center font-sans"
-                          >
-                            Đóng
-                          </button>
-                        </div>
-                      </motion.div>
-                    </div>
-                  )}
-                </AnimatePresence>
-
-            {/* SUB-VIEW 4: BILLING HISTORY (RECEIPTS AND FEES) */}
-            {activeMenu === 'billing' && (
-              <div className="space-y-6 animate-fade-in" id="billing-sub-view">
+            {/* SUB-VIEW 3: DOANH THU & VAT DIGITAL E-RECEIPTS (Screenshot 3 Replication) */}
+            {activeMenu === 'revenue' && (
+              <div className="space-y-6 animate-fade-in" id="revenue-sub-view">
                 
-                {/* Title and Subtitle */}
-                <div className="space-y-1 block">
-                  <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-sans">Lịch sử thanh toán</h2>
-                  <p className="text-slate-500 dark:text-slate-400 text-xs font-medium font-sans">Xem lịch sử thanh toán và đăng ký gói tháng</p>
+                {/* HEADER ROW WITH FACILITIES AND SELECTORS */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div>
+                    <h2 className="text-2xl font-black font-sans text-slate-900 dark:text-white flex items-center gap-2">
+                      Báo cáo Doanh thu
+                    </h2>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs">Phân tích dòng tiền và hiệu suất hệ thống toàn diện</p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {/* Month selector */}
+                    <div className="relative">
+                      <select 
+                        defaultValue="10/2023"
+                        className={`px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold shadow-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        onChange={() => triggerToast("Đã thay đổi bộ lọc chu kỳ báo cáo", "info")}
+                      >
+                        <option value="10/2023">Tháng 10, 2023</option>
+                        <option value="11/2023">Tháng 11, 2023</option>
+                        <option value="12/2023">Tháng 12, 2023</option>
+                        <option value="all">Cả năm 2023</option>
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        triggerToast("Đang kết xuất báo cáo dòng tiền PDF dạng kế toán...", "success");
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Xuất báo cáo</span>
+                    </button>
+                  </div>
                 </div>
 
-                {/* KPI stats & Filters Block */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* STATS OVERVIEW CARDS (HOM NAY, THANG NAY, DU KIEN NAM 2023) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 select-none font-sans">
                   
-                  {/* Left stats: Tháng này */}
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl flex flex-col justify-center space-y-3">
-                    <span className="text-xs font-black text-slate-900 dark:text-slate-200 uppercase tracking-wider font-sans block">
-                      Tháng này
-                    </span>
-                    <strong className="text-4xl font-black text-[#0052cc] dark:text-blue-500 leading-none tracking-tight font-sans block shrink-0">
-                      $128.50
-                    </strong>
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-[#E1FBF2] dark:bg-[#0c3a2f] text-[#00875A] dark:text-[#36b37e] rounded-full w-fit text-[11px] font-black tracking-wide font-sans">
-                      <span>↘</span>
-                      <span>-12% so với tháng trước</span>
+                  {/* CARD 1: HÔM NAY */}
+                  <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/60 shadow-xs'}`}>
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">HÔM NAY</span>
+                        <h3 className="text-3xl font-black tracking-tight text-slate-800 dark:text-white">18.4M</h3>
+                      </div>
+                      <div className="p-2 bg-blue-50 dark:bg-slate-800 rounded-xl text-blue-600">
+                        <Calendar className="w-5 h-5" />
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30">
+                        <ChevronUp className="w-3 h-3 text-emerald-500 shrink-0" />
+                        <span>+12.5% so với hôm qua</span>
+                      </span>
                     </div>
                   </div>
 
-                  {/* Right filters: Bộ lọc */}
-                  <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl space-y-4">
-                    <span className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase text-slate-900 tracking-wider font-sans block">
-                      Bộ lọc
-                    </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Filter 1: Thời gian */}
-                      <div className="space-y-1 bg-transparent">
-                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-sans">
-                          Thời gian
-                        </label>
-                        <select 
-                          value={billingTimeFilter}
-                          onChange={(e) => {
-                            setBillingTimeFilter(e.target.value);
-                            triggerToast(`Đã lọc thời gian: ${e.target.value}`, 'info');
-                          }}
-                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl font-bold text-slate-800 dark:text-white text-xs outline-hidden focus:border-blue-500 cursor-pointer"
-                        >
-                          <option value="Tháng này">Tháng này</option>
-                          <option value="Tháng trước">Tháng trước</option>
-                          <option value="Một năm">Một năm</option>
-                        </select>
+                  {/* CARD 2: THÁNG NÀY */}
+                  <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/60 shadow-xs'}`}>
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">THÁNG NÀY</span>
+                        <h3 className="text-3xl font-black tracking-tight text-slate-800 dark:text-white">452M</h3>
                       </div>
-                      
-                      {/* Filter 2: Loại giao dịch */}
-                      <div className="space-y-1 bg-transparent">
-                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-sans">
-                          Loại giao dịch
-                        </label>
-                        <select 
-                          value={billingTypeFilter}
-                          onChange={(e) => {
-                            setBillingTypeFilter(e.target.value);
-                            triggerToast(`Đã lọc loại giao dịch: ${e.target.value}`, 'info');
-                          }}
-                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl font-bold text-slate-800 dark:text-white text-xs outline-hidden focus:border-blue-500 cursor-pointer"
-                        >
-                          <option value="Tất cả">Tất cả</option>
-                          <option value="Vé ngày">Vé ngày</option>
-                          <option value="Vé tháng">Vé tháng</option>
-                          <option value="Nạp ví">Nạp ví</option>
-                        </select>
+                      <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-500 dark:text-slate-400">
+                        <Layers className="w-5 h-5" />
                       </div>
+                    </div>
+                    <div className="mt-4">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/30">
+                        <ChevronDown className="w-3 h-3 text-rose-500 shrink-0" />
+                        <span>-2.1% so với tháng trước</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* CARD 3: DỰ KIẾN NĂM 2023 */}
+                  <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/60 shadow-xs'}`}>
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">DỰ KIẾN NĂM 2023</span>
+                        <h3 className="text-3xl font-black tracking-tight text-slate-800 dark:text-white">5.4B</h3>
+                      </div>
+                      <div className="p-2 bg-[#f0f9ff] dark:bg-slate-800 rounded-xl text-blue-500">
+                        <CreditCard className="w-5 h-5" />
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/30">
+                        <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                        <span>Đạt 92% KPI</span>
+                      </span>
                     </div>
                   </div>
 
                 </div>
 
-                {/* Giao dịch list table */}
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs">
+                {/* RECENTS TRANSACTION LEDGER (REPLICATED CARD WITH FILTERS & PAGINATOR) */}
+                <div className={`p-6 bg-white dark:bg-slate-905 border rounded-2xl ${isDarkMode ? 'border-slate-800' : 'border-slate-200/60 shadow-xs'} space-y-4`}>
+                  
+                  {/* LEDGER BAR FOR TRANSACTION SEARCH AND CONTROLS */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <strong className="text-base font-black tracking-tight text-slate-850 dark:text-white font-sans">
+                      Giao dịch gần đây
+                    </strong>
+                    
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <div className="relative flex-1 sm:w-60">
+                        <Search className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input 
+                          type="text" 
+                          placeholder="Mã GD, Biển số..." 
+                          className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-slate-50 dark:bg-slate-950/50 font-medium focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                          onChange={(e) => {
+                            // Can filter simulated transactions list locally
+                            setCustomerSearch(e.target.value);
+                          }}
+                        />
+                      </div>
+                      <button 
+                        onClick={() => triggerToast("Mở bộ lọc nâng cao", "info")}
+                        className="px-3 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/40 rounded-xl text-xs font-bold flex items-center gap-1.5"
+                      >
+                        <Layers className="w-3.5 h-3.5 text-slate-450" />
+                        <span>Lọc</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* HIGH RESOLUTION TRANSACTION TABLE */}
                   <div className="overflow-x-auto">
                     <table className="w-full text-left font-sans text-xs">
                       <thead>
-                        <tr className="bg-[#f8f9fa] dark:bg-slate-950 border-b border-slate-100 dark:border-slate-850 text-slate-450 dark:text-slate-500 font-extrabold tracking-wider uppercase">
-                          <th className="p-4 pl-6 text-[10px] font-black">Mã GD</th>
-                          <th className="p-4 text-[10px] font-black">Ngày thực hiện</th>
-                          <th className="p-4 text-[10px] font-black">Loại dịch vụ</th>
-                          <th className="p-4 text-[10px] font-black">Biển số xe</th>
-                          <th className="p-4 text-[10px] font-black font-sans">Số tiền</th>
-                          <th className="p-4 text-[10px] font-black">Trạng thái</th>
-                          <th className="p-4 pr-6 text-[10px] font-black">Hành động</th>
+                        <tr className="border-b border-slate-100 dark:border-slate-850 text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+                          <th className="py-3 px-3">MÃ GD</th>
+                          <th className="py-3 px-3">THỜI GIAN</th>
+                          <th className="py-3 px-2">BIỂN SỐ</th>
+                          <th className="py-3 px-3">LOẠI VÉ</th>
+                          <th className="py-3 px-3">SỐ TIỀN</th>
+                          <th className="py-3 px-3">PHƯƠNG THỨC</th>
+                          <th className="py-3 px-3">TRẠNG THÁI</th>
+                          <th className="py-3 px-3 text-right">THAO TÁC</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-850 text-slate-700 dark:text-slate-300 font-sans">
-                        {[
-                          { id: 'TXN-9821', date: '24/10/2023 14:30', type: 'Vé ngày', plate: '29A-123.45', amount: '$5.50', status: 'Thành công' },
-                          { id: 'TXN-9820', date: '22/10/2023 09:15', type: 'Vé tháng', plate: '30G-789.01', amount: '$120.00', status: 'Thành công' },
-                          { id: 'TXN-9819', date: '20/10/2023 18:45', type: 'Nạp ví', plate: '-', amount: '$50.00', status: 'Đang xử lý' },
-                          { id: 'TXN-9818', date: '18/10/2023 08:00', type: 'Vé ngày', plate: '29A-123.45', amount: '$3.00', status: 'Thất bại' }
-                        ]
-                        .filter(item => {
-                          if (billingTypeFilter !== 'Tất cả' && item.type !== billingTypeFilter) {
-                            return false;
-                          }
-                          return true;
-                        })
-                        .map((item) => (
-                          <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/50 transition-colors">
-                            <td className="p-4 pl-6 font-mono font-bold text-slate-900 dark:text-white">
-                              {item.id}
-                            </td>
-                            <td className="p-4 text-slate-500 dark:text-slate-400 font-medium">
-                              {item.date}
-                            </td>
-                            <td className="p-4 text-slate-700 dark:text-slate-300 font-semibold font-sans">
-                              {item.type}
-                            </td>
-                            <td className="p-4">
-                              {item.plate === '-' ? (
-                                <span className="font-mono text-slate-400 ml-4 font-bold">-</span>
-                              ) : (
-                                <span className="font-mono bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 px-2 py-0.5 rounded font-bold tracking-wide text-xs inline-block shadow-3xs uppercase">
-                                  {item.plate}
-                                </span>
-                              )}
-                            </td>
-                            <td className="p-4 font-mono font-bold text-slate-800 dark:text-slate-100 text-sm">
-                              {item.amount}
-                            </td>
-                            <td className="p-4">
-                              {item.status === 'Thành công' && (
-                                <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#E1FBF2] text-[#00875A] dark:bg-[#0c3a2f] dark:text-[#36b37e] rounded-full text-[11px] font-black tracking-wide">
-                                  Thành công
-                                </span>
-                              )}
-                              {item.status === 'Đang xử lý' && (
-                                <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#EAF0F9] text-[#0052cc] dark:bg-[#0c243a] dark:text-[#368be0] rounded-full text-[11px] font-black tracking-wide">
-                                  Đang xử lý
-                                </span>
-                              )}
-                              {item.status === 'Thất bại' && (
-                                <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#FFEBEB] text-[#DE350B] dark:bg-[#3d120a] dark:text-[#ff5230] rounded-full text-[11px] font-black tracking-wide">
-                                  Thất bại
-                                </span>
-                              )}
-                            </td>
-                            <td className="p-4 pr-6">
-                              {item.status === 'Thành công' && (
-                                <button 
-                                  onClick={() => {
-                                    triggerToast(`📥 Đang kết xuất hóa đơn ${item.id}...`, 'info');
-                                    setTimeout(() => {
-                                      triggerToast(`🎉 Đã tải hóa đơn ${item.id}.pdf thành công!`, 'success');
-                                    }, 1500);
-                                  }}
-                                  className="flex items-center gap-1.5 text-[#0052cc] hover:text-blue-850 dark:text-blue-400 dark:hover:text-blue-300 hover:underline font-extrabold cursor-pointer text-xs"
-                                >
-                                  <Download className="w-3.5 h-3.5" />
-                                  <span>Tải Hđ</span>
-                                </button>
-                              )}
-                              {item.status === 'Đang xử lý' && (
-                                <span className="text-slate-400 dark:text-slate-500 font-bold font-sans text-xs select-none">
-                                  Đang chờ
-                                </span>
-                              )}
-                              {item.status === 'Thất bại' && (
-                                <button 
-                                  onClick={() => {
-                                    triggerToast(`🔄 Đang thử lại giao dịch ${item.id}...`, 'info');
-                                    setTimeout(() => {
-                                      if (balance >= 3.00) {
-                                        setBalance(prev => prev - 3.00);
-                                        triggerToast(`🎉 Thanh toán thành công $3.00 cho ${item.id}! Trạng thái được cập nhật.`, 'success');
-                                      } else {
-                                        triggerToast(`❌ Thử lại thất bại: Số dư tài khoản không đủ để đóng $3.00!`, 'error');
-                                      }
-                                    }, 1500);
-                                  }}
-                                  className="flex items-center gap-1.5 text-[#0052cc] hover:text-blue-850 dark:text-blue-400 dark:hover:text-blue-300 hover:underline font-extrabold cursor-pointer text-xs uppercase"
-                                >
-                                  <RefreshCw className="w-3.5 h-3.5" />
-                                  <span>Thử lại</span>
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
+                        {transactions
+                          .filter(item => {
+                            if (!customerSearch) return true;
+                            const query = customerSearch.toLowerCase();
+                            return item.id.toLowerCase().includes(query) || item.plate.toLowerCase().includes(query);
+                          })
+                          .map(item => {
+                            const isSuccess = item.status === 'THÀNH CÔNG';
+                            const isGhiNhan = item.status === 'ĐÃ GHI NHẬN';
+                            const isCanXuLy = item.status === 'CẦN XỬ LÝ';
+                            
+                            return (
+                              <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/10 transition-colors">
+                                <td className="py-3 px-3 font-mono font-black text-slate-650 dark:text-slate-350">{item.id}</td>
+                                <td className="py-3 px-3 text-slate-500 dark:text-slate-400 font-medium">{item.time}</td>
+                                <td className="py-3 px-2">
+                                  <span className={`inline-block px-2.5 py-1 font-mono font-black rounded-lg uppercase tracking-wider text-[11px] ${
+                                    isGhiNhan 
+                                      ? 'bg-slate-950 dark:bg-slate-900 border border-slate-800 text-yellow-500' 
+                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-850 dark:text-slate-200 border border-slate-200/50 dark:border-slate-750'
+                                  }`}>
+                                    {item.plate}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-slate-700 dark:text-slate-300 font-bold">{item.type}</td>
+                                <td className="py-3 px-3 text-slate-900 dark:text-white font-extrabold text-sm">{item.cost}</td>
+                                <td className="py-3 px-3">
+                                  {item.paymentMethod === 'Lỗi kết nối' ? (
+                                    <span className="flex items-center gap-1 text-rose-500 font-bold">
+                                      <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0 animate-pulse" />
+                                      <span>Lỗi kết nối</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-505 dark:text-slate-400 font-medium">{item.paymentMethod}</span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                                    isSuccess 
+                                      ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30' 
+                                      : isCanXuLy 
+                                      ? 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-450 border-rose-100 dark:border-rose-900/30' 
+                                      : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-150 dark:border-slate-800'
+                                  }`}>
+                                    ● {item.status}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-right">
+                                  {isCanXuLy ? (
+                                    <button 
+                                      onClick={() => {
+                                        setTransactions(prev => prev.map(t => t.id === item.id ? { ...t, status: 'THÀNH CÔNG', paymentMethod: 'QR-Pay Khắc Phục' } : t));
+                                        triggerToast(`Đã xử lý thông luồng thủ công cho giao dịch ${item.id}`, "success");
+                                      }}
+                                      className="px-2.5 py-1 text-[10px] font-black tracking-wide text-white bg-blue-600 hover:bg-blue-700 rounded-lg uppercase"
+                                    >
+                                      Xử lý
+                                    </button>
+                                  ) : (
+                                    <button 
+                                      onClick={() => {
+                                        setSelectedReceipt(item);
+                                        triggerToast(`Hiển thị hóa đơn ${item.id}`, "info");
+                                      }}
+                                      className="px-2 py-1 text-slate-455 hover:text-blue-600 dark:hover:text-blue-400 font-extrabold hover:underline"
+                                    >
+                                      In/Chi tiết
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                       </tbody>
                     </table>
                   </div>
 
-                  {/* Table footer / Pagination controls */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-slate-850 gap-4">
-                    <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 font-sans">
-                      Hiển thị 1-4 trong số 42 giao dịch
-                    </span>
-                    <div className="flex gap-2 text-xs">
-                      <button 
-                        disabled
-                        className="px-4 py-2 bg-slate-50 dark:bg-slate-800/10 text-slate-400 dark:text-slate-600 border border-slate-100 dark:border-slate-850 rounded-xl font-bold cursor-not-allowed select-none"
-                      >
-                        Trang trước
-                      </button>
-                      <button 
-                        onClick={() => triggerToast('Tài khoản Sandbox: Chuyển sang lịch sử trang tiếp theo...', 'info')}
-                        className="px-4 py-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl font-bold text-slate-800 dark:text-slate-200 transition-all cursor-pointer"
-                      >
-                        Trang sau
-                      </button>
+                  {/* ACCURATE PAGINATION BAR FOOTER IN REVENUE CARD */}
+                  <div className="flex flex-col sm:flex-row justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-850 gap-4 select-none font-sans text-xs">
+                    <span className="text-slate-500 font-medium">Hiển thị 1 - {transactions.length} trên 248 giao dịch</span>
+                    <div className="flex items-center gap-1.5">
+                      <button className="p-1 px-2.5 border rounded-lg bg-white dark:bg-slate-950 font-semibold hover:bg-slate-50">&lt;</button>
+                      <button className="px-3 py-1 font-extrabold bg-blue-600 text-white rounded-lg">1</button>
+                      <button className="px-3 py-1 font-bold border hover:bg-slate-50 rounded-lg" onClick={() => triggerToast("Mở trang 2", "info")}>2</button>
+                      <button className="px-3 py-1 font-bold border hover:bg-slate-50 rounded-lg" onClick={() => triggerToast("Mở trang 3", "info")}>3</button>
+                      <span className="text-slate-400">...</span>
+                      <button className="p-1 px-2.5 border rounded-lg bg-white dark:bg-slate-950 font-semibold hover:bg-slate-50">&gt;</button>
                     </div>
                   </div>
 
                 </div>
 
-                {/* FOOTER */}
-                <div className="flex flex-col sm:flex-row items-center justify-between py-6 px-1 border-t border-slate-150 dark:border-slate-800 text-slate-500 text-[11px] gap-4">
-                  <span className="font-black text-slate-750 dark:text-slate-300 text-sm">UrbanPark</span>
-                  <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 font-semibold font-sans">
-                    <a href="#" className="hover:text-slate-650 transition-colors">Chính sách bảo mật</a>
-                    <a href="#" className="hover:text-slate-650 transition-colors">Điều khoản dịch vụ</a>
-                    <a href="#" className="hover:text-slate-650 transition-colors">Khả năng tiếp cận</a>
-                    <a href="#" className="hover:text-slate-650 transition-colors">Liên hệ hỗ trợ</a>
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-normal whitespace-nowrap">
-                    © 2024 UrbanPark Infrastructure. Bảo lưu mọi quyền.
-                  </span>
-                </div>
-
               </div>
             )}
 
-            {/* SUB-VIEW: VIP APPROVAL (MANAGER CONSOLE) */}
-            {activeMenu === 'vip_approval' && (
-              <div className="animate-fade-in" id="vip-approval-sub-view">
-                <VipApprovalPanel 
-                  isDarkMode={isDarkMode} 
-                  triggerToast={triggerToast} 
-                />
-              </div>
-            )}
-
-            {/* SUB-VIEW 5: SETTINGS & SUPPORT (CHATBOT & ACCESSIBILITY) */}
-            {activeMenu === 'settings' && (
-              <div className="space-y-6 animate-fade-in" id="settings-sub-view">
+            {/* SUB-VIEW 4: QUAN LY NHAN SỰ RASTER (Screenshot 5 Replication) */}
+            {activeMenu === 'staff' && (
+              <div className="space-y-6 animate-fade-in text-left" id="staff-sub-view">
                 
-                {/* Heading section with "Lưu thay đổi" right-aligned */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="space-y-1 block select-none">
-                    <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-sans">Cài đặt tài khoản</h2>
-                    <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold font-sans">
-                      Quản lý thông tin cá nhân, bảo mật và tùy chọn thanh toán.
+                {/* HEADER SUBTITLE AND CONTROLS */}
+                <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+                  <div>
+                    <h2 className="text-2.5xl font-black font-sans text-slate-900 dark:text-white">
+                      Quản lý Nhân sự & Ca trực
+                    </h2>
+                    <p className="text-slate-550 dark:text-slate-400 text-xs font-bold font-sans">
+                      Cơ sở: Trung tâm thương mại Vincom Center (Cơ sở 01)
                     </p>
                   </div>
-                  <button
-                    onClick={() => {
-                      triggerToast('Đang lưu thiết lập của bạn...', 'info');
-                      setTimeout(() => {
-                        triggerToast('Cấu hình tài khoản đã được cập nhật thành công!', 'success');
-                      }, 800);
-                    }}
-                    className="px-6 py-2.5 bg-slate-900 hover:bg-slate-850 dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-lg text-xs font-black tracking-tight shadow-md transition-all cursor-pointer whitespace-nowrap active:scale-95"
-                  >
-                    Lưu thay đổi
-                  </button>
+
+                  <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto font-sans">
+                    {/* Search bar inside staff page banner */}
+                    <div className="relative flex-1 sm:w-60 min-w-[200px]">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input 
+                        type="text" 
+                        placeholder="Tìm nhân viên..." 
+                        value={staffSearch}
+                        onChange={(e) => setStaffSearch(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-850 rounded-xl text-xs bg-white dark:bg-slate-950 font-medium focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <button 
+                      onClick={() => {
+                        triggerToast("Đang lập kế hoạch tự động cho tuần tới...", "info");
+                      }}
+                      className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/40 rounded-xl text-xs font-bold flex items-center gap-1.5"
+                    >
+                      <Clock className="w-3.5 h-3.5 text-slate-455" />
+                      <span>Sắp xếp ca</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowAddStaffModal(true);
+                      }}
+                      className="px-4 py-2 bg-slate-955 hover:bg-slate-900 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 text-xs font-black rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Thêm nhân viên</span>
+                    </button>
+                  </div>
                 </div>
 
-                {/* Main 2-Column Grid Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                {/* TABS SELECTORS */}
+                <div className="flex items-center gap-2 select-none border-b border-slate-100 dark:border-slate-850 pb-1 font-sans text-xs">
+                  {(['Tất cả', 'Đang trực', 'Nghỉ phép'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setStaffFilter(tab)}
+                      className={`px-4 py-1.5 rounded-lg font-bold transition-colors ${
+                        staffFilter === tab 
+                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white' 
+                          : 'text-slate-400 hover:text-slate-650'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+
+                {/* TWO COLUMN GRID LAYOUT (LEFT LISTING, RIGHT SIDEBAR ASSIGNMENTS) */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start font-sans">
                   
-                  {/* LEFT PANEL: Inputs & Notification preferences (col-span 8) */}
-                  <div className="lg:col-span-8 flex flex-col gap-6">
-                    
-                    {/* CARD 1: Thông tin cá nhân */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-6">
-                      <strong className="text-sm font-black text-slate-800 dark:text-slate-200 block border-b border-slate-100 dark:border-slate-850 pb-3 uppercase tracking-wider font-sans">
-                        Thông tin cá nhân
-                      </strong>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
-                        {/* Họ và tên */}
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-sans">
-                            Họ và tên
-                          </label>
-                          <input 
-                            type="text" 
-                            value={profileName}
-                            onChange={(e) => setProfileName(e.target.value)}
-                            className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-[#0052cc] rounded-xl font-bold text-slate-800 dark:text-white transition-all outline-hidden font-sans"
-                          />
-                        </div>
-
-                        {/* Email */}
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-sans">
-                            Email
-                          </label>
-                          <input 
-                            type="email" 
-                            value={profileEmail}
-                            onChange={(e) => setProfileEmail(e.target.value)}
-                            className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-[#0052cc] rounded-xl font-bold text-slate-800 dark:text-white transition-all outline-hidden font-sans"
-                          />
-                        </div>
-
-                        {/* Số điện thoại (with absolute inline verification badge) */}
-                        <div className="space-y-1.5 relative">
-                          <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-sans">
-                            Số điện thoại
-                          </label>
-                          <div className="relative">
-                            <input 
-                              type="text" 
-                              value={profilePhone}
-                              onChange={(e) => setProfilePhone(e.target.value)}
-                              className="w-full pl-4 pr-28 py-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-[#0052cc] rounded-xl font-bold text-slate-800 dark:text-white transition-all outline-hidden font-mono tracking-wide"
-                            />
-                            {/* Verified check badge inside input box aligned right */}
-                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-[#DCFCE7] dark:bg-[#0c3a2f] text-[#15803D] dark:text-[#36b37e] rounded-full text-[9px] font-black tracking-wide flex items-center gap-1 uppercase select-none pointer-events-none">
-                              <span className="w-1.5 h-1.5 bg-[#15803D] dark:bg-emerald-400 rounded-full" />
-                              <span>đang hoạt động</span>
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Địa chỉ */}
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-sans">
-                            Địa chỉ
-                          </label>
-                          <input 
-                            type="text" 
-                            value={profileAddress}
-                            onChange={(e) => setProfileAddress(e.target.value)}
-                            className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-[#0052cc] rounded-xl font-bold text-slate-800 dark:text-white transition-all outline-hidden font-sans"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* CARD 2: Tùy chọn thông báo */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-6">
-                      <strong className="text-sm font-black text-slate-800 dark:text-slate-200 block border-b border-slate-100 dark:border-slate-850 pb-3 uppercase tracking-wider font-sans">
-                        Tùy chọn thông báo
-                      </strong>
-                      
-                      <div className="divide-y divide-slate-100 dark:divide-slate-850 text-xs font-sans">
-                        {/* Notify In/Out */}
-                        <div className="py-4 first:pt-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                          <div className="space-y-0.5">
-                            <h4 className="font-extrabold text-[#091E42] dark:text-slate-200 font-sans text-xs">Sự kiện vào/ra bãi xe</h4>
-                            <p className="text-slate-450 dark:text-slate-500 text-[11px] font-sans">Nhận thông báo khi xe đi qua cổng kiểm soát.</p>
-                          </div>
+                  {/* LEFT STAFF GRID COLUMN (SPAN 8) */}
+                  <div className="lg:col-span-8 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {staff
+                        .filter(member => {
+                          const query = staffSearch.toLowerCase();
+                          const matchesSearch = member.name.toLowerCase().includes(query) || member.role.toLowerCase().includes(query);
                           
-                          <div className="flex gap-4 items-center">
-                            {/* Email Checkbox */}
-                            <label className="flex items-center gap-2 cursor-pointer select-none">
-                              <input 
-                                type="checkbox" 
-                                checked={notifyInOutEmail}
-                                onChange={(e) => setNotifyInOutEmail(e.target.checked)}
-                                className="w-4 h-4 text-[#0052cc] border-slate-300 dark:border-slate-750 rounded-sm cursor-pointer"
-                              />
-                              <span className="font-bold text-slate-700 dark:text-slate-300">Email</span>
-                            </label>
-                            
-                            {/* SMS Checkbox */}
-                            <label className="flex items-center gap-2 cursor-pointer select-none">
-                              <input 
-                                type="checkbox" 
-                                checked={notifyInOutSms}
-                                onChange={(e) => setNotifyInOutSms(e.target.checked)}
-                                className="w-4 h-4 text-[#0052cc] border-slate-300 dark:border-slate-750 rounded-sm cursor-pointer"
-                              />
-                              <span className="font-bold text-slate-700 dark:text-slate-300">SMS</span>
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* Receipts */}
-                        <div className="py-4 last:pb-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                          <div className="space-y-0.5">
-                            <h4 className="font-extrabold text-[#091E42] dark:text-slate-200 font-sans text-xs">Biên lai thanh toán</h4>
-                            <p className="text-slate-450 dark:text-slate-500 text-[11px] font-sans">Nhận biên lai sau mỗi lần giao dịch trừ tiền.</p>
-                          </div>
-                          
-                          <div className="flex gap-4 items-center">
-                            {/* Email Checkbox */}
-                            <label className="flex items-center gap-2 cursor-pointer select-none">
-                              <input 
-                                type="checkbox" 
-                                checked={notifyReceiptEmail}
-                                onChange={(e) => setNotifyReceiptEmail(e.target.checked)}
-                                className="w-4 h-4 text-[#0052cc] border-slate-300 dark:border-slate-750 rounded-sm cursor-pointer"
-                              />
-                              <span className="font-bold text-slate-700 dark:text-slate-300">Email</span>
-                            </label>
-                            
-                            {/* SMS Checkbox */}
-                            <label className="flex items-center gap-2 cursor-pointer select-none">
-                              <input 
-                                type="checkbox" 
-                                checked={notifyReceiptSms}
-                                onChange={(e) => setNotifyReceiptSms(e.target.checked)}
-                                className="w-4 h-4 text-[#0052cc] border-slate-300 dark:border-slate-750 rounded-sm cursor-pointer"
-                              />
-                              <span className="font-bold text-slate-700 dark:text-slate-300 font-sans">SMS</span>
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* RIGHT PANEL: UrbanPark Wallet & Security passwords (col-span 4) */}
-                  <div className="lg:col-span-4 flex flex-col gap-6">
-                    
-                    {/* CARD 3: VÍ URBANPARK */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-6">
-                      <strong className="text-xs font-black text-slate-400 dark:text-slate-500 tracking-wider block font-sans uppercase">
-                        Ví UrbanPark
-                      </strong>
-
-                      {/* Black Credit-Card design holder */}
-                      <div className="bg-radial from-[#0d162d] to-[#040813] border border-slate-800/80 rounded-2xl p-5 text-white shadow-md relative overflow-hidden select-none">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
-                        
-                        <div className="space-y-1 relative z-10">
-                          <span className="text-[9px] text-[#A3B8CC] font-black uppercase tracking-wider font-sans block opacity-85">Số dư khả dụng</span>
-                          <strong className="text-3xl font-black font-sans tracking-tight block">
-                            ${balance.toFixed(2)}
-                          </strong>
-                        </div>
-
-                        {/* Premium CTA Deposit directly inside the credit card layout matching perfectly */}
-                        <button 
-                          onClick={() => {
-                            setBalance(prev => prev + 10.00);
-                            triggerToast('Sandbox Wallet: Nạp thêm $10.00 thành công!', 'success');
-                          }}
-                          className="w-full text-center bg-[#0052cc] hover:bg-blue-600 text-white font-black text-xs py-2.5 rounded-lg tracking-tight mt-6 block transition-colors shadow-2xs active:scale-[0.98] cursor-pointer"
-                        >
-                          Nạp tiền ngay
-                        </button>
-                      </div>
-
-                      {/* Bank connections section */}
-                      <div className="space-y-3.5">
-                        <strong className="text-[10px] font-black text-[#8993A4] dark:text-slate-500 tracking-wide block uppercase font-sans">
-                          LIÊN KẾT NGÂN HÀNG
-                        </strong>
-                        
-                        {/* Connected accounts list */}
-                        <div className="space-y-2">
-                          {bankAccounts.map((ac) => (
-                            <div key={ac.id} className="flex items-center justify-between p-3.5 bg-slate-50/50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850 rounded-xl">
-                              <div className="flex items-center gap-3">
-                                <div className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-400">
-                                  <CreditCard className="w-4 h-4 text-slate-400 stroke-[2]" />
+                          if (!matchesSearch) return false;
+                          if (staffFilter === 'Tất cả') return true;
+                          if (staffFilter === 'Đang trực') return member.status === 'ONLINE';
+                          if (staffFilter === 'Nghỉ phép') return member.status === 'OFFLINE';
+                          return true;
+                        })
+                        .map(member => {
+                          const isOnline = member.status === 'ONLINE';
+                          return (
+                            <div 
+                              key={member.id} 
+                              className={`p-5 rounded-2xl border flex flex-col justify-between space-y-3.5 transition-all ${
+                                isDarkMode 
+                                  ? 'bg-slate-905 border-slate-850 hover:border-slate-750' 
+                                  : 'bg-white border-slate-200 hover:border-slate-300 shadow-xs'
+                              }`}
+                            >
+                              <div className="flex justify-between items-start">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-12 h-12 rounded-full overflow-hidden border border-slate-205 dark:border-slate-800 flex items-center justify-center bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-white font-extrabold text-sm shadow-xs shrink-0">
+                                    {member.name === 'Trần Thị Bé' ? (
+                                      <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80" alt="Avatar" className="w-full h-full object-cover" />
+                                    ) : member.name === 'Lê Văn Cường' ? (
+                                      <img src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80" alt="Avatar" className="w-full h-full object-cover text-xs" />
+                                    ) : member.name === 'Phạm Đức Duy' ? (
+                                      <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80" alt="Avatar" className="w-full h-full object-cover" />
+                                    ) : member.name === 'Hoàng Yến' ? (
+                                      <img src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80" alt="Avatar" className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span>{member.avatar}</span>
+                                    )}
+                                  </div>
+                                  
+                                  <div>
+                                    <h4 className="text-[13.5px] font-black text-slate-850 dark:text-white tracking-tight flex items-center gap-1.5">
+                                      {member.name}
+                                    </h4>
+                                    <p className="text-[10px] uppercase tracking-widest text-slate-450 font-bold mt-0.5">{member.role}</p>
+                                  </div>
                                 </div>
-                                <div className="leading-tight">
-                                  <h5 className="text-[11px] font-black text-slate-800 dark:text-slate-200 font-sans">{ac.name}</h5>
-                                  <span className="text-[10px] font-mono font-bold text-slate-450 dark:text-slate-500 tracking-tight">{ac.accountNumber}</span>
+
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wide border flex items-center gap-1.5 ${
+                                  isOnline 
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-100/60 dark:border-emerald-900/30' 
+                                    : 'bg-slate-50 dark:bg-slate-900 text-slate-450 dark:text-slate-400 border-slate-150 dark:border-slate-800'
+                                }`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                                  <span>{isOnline ? 'Đăng trực' : 'Nghỉ phép'}</span>
+                                </span>
+                              </div>
+
+                              <div className="space-y-1.5 text-xs pb-3 border-b border-dashed border-slate-100 dark:border-slate-850">
+                                <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-950/30 px-2.5 py-1 rounded-lg">
+                                  <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Trạm / Cổng</span>
+                                  <strong className="text-slate-700 dark:text-slate-200 text-xs">{member.gate}</strong>
+                                </div>
+
+                                {member.reason ? (
+                                  <div className="flex justify-between items-center text-rose-500 dark:text-rose-400 font-bold px-2.5 py-1">
+                                    <span>Lý do vắng mặt:</span>
+                                    <span>{member.reason}</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex justify-between items-center px-2.5 py-1 text-slate-500 dark:text-slate-400">
+                                    <span>Ca trực hiện hành:</span>
+                                    <span className="font-extrabold text-blue-600 dark:text-blue-400">{member.leaveHours || 'N/A'}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Card action controls footer */}
+                              <div className="flex items-center justify-between text-[11px] pt-1">
+                                <span className="flex items-center gap-1 font-mono text-slate-400 font-bold">
+                                  <Shield className="w-3 h-3 text-slate-400 shrink-0" />
+                                  <span>ID: ...{member.keyLabel || 'N/A'}</span>
+                                </span>
+
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => {
+                                      const nextGate = prompt(`Nhập tên bốt/cặp trạm trực mới cho ${member.name}:`, member.gate);
+                                      if (nextGate && nextGate.trim()) {
+                                        setStaff(staff.map(s => s.id === member.id ? { ...s, gate: nextGate.trim() } : s));
+                                        triggerToast(`Đã điều phối địa điểm đồn trú cho ${member.name} sang: ${nextGate.trim()}`, "success");
+                                      }
+                                    }}
+                                    className="text-blue-600 dark:text-blue-400 hover:underline font-extrabold"
+                                  >
+                                    Đổi ca/trạm
+                                  </button>
+                                  <span className="text-slate-200">|</span>
+                                  <button
+                                    onClick={() => {
+                                      if (confirm(`Bạn muốn ghi nhận xin nghỉ phép của nhân sự ${member.name}?`)) {
+                                        setStaff(staff.map(s => s.id === member.id ? { ...s, status: 'OFFLINE', reason: 'Nghỉ phép gia đình' } : s));
+                                        triggerToast(`Ký duyệt nghỉ phép cho ${member.name} hôm nay.`, "error");
+                                      }
+                                    }}
+                                    className="text-rose-500 hover:underline font-extrabold"
+                                  >
+                                    Báo nghỉ
+                                  </button>
                                 </div>
                               </div>
-                              <span className="text-[10px] font-black text-rose-500 font-mono tracking-wide uppercase select-none opacity-80">
-                                {ac.badge}
-                              </span>
                             </div>
-                          ))}
-                        </div>
+                          );
+                        })}
+                    </div>
+                  </div>
 
-                        {/* Add simulated account */}
-                        <button
-                          onClick={() => {
-                            const num = Math.floor(1000 + Math.random() * 9000);
-                            setBankAccounts(prev => [...prev, {
-                              id: `bank-${Date.now()}`,
-                              name: 'Techcombank',
-                              accountNumber: `**** ${num}`,
-                              badge: 'TCB'
-                            }]);
-                            triggerToast('Sandbox: Đang đồng bộ bốt liên kết phương thức thanh toán mới...', 'info');
-                            setTimeout(() => {
-                              triggerToast('Đã thêm phương thức liên kết Techcombank thành công!', 'success');
-                            }, 800);
-                          }}
-                          className="w-full py-2.5 bg-none border border-dashed border-slate-200 dark:border-slate-800 hover:border-[#0052cc] rounded-xl text-xs font-bold text-[#0052cc] hover:bg-slate-50/40 dark:hover:bg-slate-950/10 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  {/* RIGHT COLUMN SIDEBAR WIDGETS (SPAN 4) */}
+                  <div className="lg:col-span-4 space-y-6">
+                    
+                    {/* SHIFTS CONFIGURATIONS PLANNER (Phân ca hôm nay) */}
+                    <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-905 border-slate-850' : 'bg-white border-slate-200/80 shadow-xs'} space-y-4`}>
+                      <div className="flex justify-between items-center">
+                        <strong className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Phân ca hôm nay (14/11)</strong>
+                        <button 
+                          onClick={() => triggerToast("Mở biểu đồ tuần đầy đủ", "info")}
+                          className="text-[11px] text-[#2563eb] font-bold hover:underline"
                         >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Thêm phương thức mới</span>
+                          Chi tiết tuần &rarr;
                         </button>
                       </div>
 
+                      <div className="space-y-3.5 text-xs text-left">
+                        {/* Headers */}
+                        <div className="grid grid-cols-3 text-[10px] text-slate-405 font-bold uppercase pb-1.5 border-b border-slate-100 dark:border-slate-850">
+                          <div>TRẠM / CỔNG</div>
+                          <div>CA SÁNG <span className="text-[8px] font-medium block">06:00-14:00</span></div>
+                          <div>CA CHIỀU <span className="text-[8px] font-medium block">14:00-22:00</span></div>
+                        </div>
+
+                        {/* Row 1 */}
+                        <div className="grid grid-cols-3 py-2 border-b border-dashed border-slate-100 dark:border-slate-850 items-center">
+                          <strong className="text-slate-800 dark:text-slate-200">Cổng vào 1</strong>
+                          <span className="text-slate-700 dark:text-slate-400 font-medium flex items-center gap-1">
+                            <span className="w-1 h-1 rounded-full bg-emerald-500" /> T.T. Bé
+                          </span>
+                          <span className="text-slate-550 dark:text-slate-450">P.A. Duy</span>
+                        </div>
+
+                        {/* Row 2 */}
+                        <div className="grid grid-cols-3 py-2 border-b border-dashed border-slate-100 dark:border-slate-850 items-center">
+                          <strong className="text-slate-800 dark:text-slate-200">Cổng ra 1</strong>
+                          <span className="text-slate-550 dark:text-slate-450">N.V. An</span>
+                          <span className="text-slate-550 dark:text-slate-450">L.T. Hoa</span>
+                        </div>
+
+                        {/* Row 3 */}
+                        <div className="grid grid-cols-3 py-2 border-b border-dashed border-slate-100 dark:border-slate-850 items-center">
+                          <strong className="text-slate-800 dark:text-slate-200">Cổng ra 2 (VIP)</strong>
+                          <span className="text-slate-700 dark:text-slate-400 font-medium flex items-center gap-1">
+                            <span className="w-1 h-1 rounded-full bg-emerald-500" /> L.V. Cường
+                          </span>
+                          <span className="text-amber-500 bg-amber-500/10 dark:bg-amber-500/5 px-1.5 py-0.5 rounded font-bold uppercase text-[9px] text-center">Trống ca</span>
+                        </div>
+
+                        {/* Row 4 */}
+                        <div className="grid grid-cols-3 py-1 items-center">
+                          <strong className="text-slate-800 dark:text-slate-200">Tuần tra hầm B1</strong>
+                          <span className="text-slate-550 dark:text-slate-450">K.T. Long</span>
+                          <span className="text-slate-550 dark:text-slate-450">A.M. Quân</span>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* CARD 4: BẢO MẬT */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-6">
-                      <strong className="text-sm font-black text-slate-800 dark:text-slate-200 block border-b border-slate-100 dark:border-slate-850 pb-3 uppercase tracking-wider font-sans">
-                        Bảo mật
-                      </strong>
-
-                      {/* Password reset form */}
-                      <div className="space-y-4">
-                        <h4 className="font-extrabold text-[#091E42] dark:text-slate-200 text-xs font-sans">Đổi mật khẩu</h4>
-                        
-                        <div className="space-y-3 font-sans text-xs">
-                          <input 
-                            type="password" 
-                            placeholder="Mật khẩu hiện tại" 
-                            value={currentPassword}
-                            onChange={(e) => setCurrentPassword(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-[#0052cc] rounded-xl outline-hidden text-[11px] font-sans"
-                          />
-                          <input 
-                            type="password" 
-                            placeholder="Mật khẩu mới" 
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-[#0052cc] rounded-xl outline-hidden text-[11px] font-sans"
-                          />
-                        </div>
-                        <button
-                          onClick={() => {
-                            if (!currentPassword || !newPassword) {
-                              triggerToast('Vui lòng nhập đầy đủ mật khẩu hiện tại và mật khẩu mới.', 'error');
-                              return;
-                            }
-                            triggerToast('Đang kiểm tra mật khẩu...', 'info');
-                            setTimeout(() => {
-                              setCurrentPassword('');
-                              setNewPassword('');
-                              triggerToast('Mật khẩu của bạn đã được cập nhật thành công!', 'success');
-                            }, 800);
-                          }}
-                          className="text-xs font-black text-[#0052cc] hover:text-blue-600 hover:underline cursor-pointer tracking-tight font-sans block"
-                        >
-                          Cập nhật mật khẩu
-                        </button>
+                    {/* SHIFT HANDOVER DIALOG LEDGER (Bàn giao ca gần nhất) */}
+                    <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-905 border-slate-850' : 'bg-white border-slate-200/80 shadow-xs'} space-y-4`}>
+                      <div className="flex justify-between items-center">
+                        <strong className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-blue-500" />
+                          <span>Bàn giao ca gần nhất</span>
+                        </strong>
+                        <span className="text-[10px] text-slate-400 font-bold">Hôm nay, 06:05</span>
                       </div>
 
-                      {/* Two-Factor Toggle */}
-                      <div className="pt-4 border-t border-slate-100 dark:border-slate-850 space-y-3 font-sans">
-                        <div className="flex justify-between items-center gap-4">
-                          <h4 className="font-extrabold text-[#091E42] dark:text-slate-200 text-xs font-sans">Xác thực 2 lớp (2FA)</h4>
-                          
-                          {/* Beautiful Interactive Switch toggle */}
-                          <button
-                            onClick={() => {
-                              setEnableTwoFactor(!enableTwoFactor);
-                              triggerToast(enableTwoFactor ? 'Đã tắt bảo vệ xác thực 2 lớp.' : 'Đã bật bảo mật 2 lớp 2FA qua mã điện thoại.', 'info');
-                            }}
-                            className={`w-11 h-6 rounded-full flex items-center p-0.5 transition-colors duration-200 outline-hidden border border-transparent ${
-                              enableTwoFactor ? 'bg-[#0052cc]' : 'bg-slate-200 dark:bg-slate-800'
-                            }`}
-                          >
-                            <span className={`w-5 h-5 rounded-full bg-white shadow-xs transform transition-transform duration-200 ${
-                              enableTwoFactor ? 'translate-x-5' : 'translate-x-0'
-                            }`} />
-                          </button>
+                      {/* Visual sender -> receiver */}
+                      <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-850 text-xs">
+                        <div className="text-center">
+                          <p className="text-[9px] text-slate-400 uppercase font-black tracking-wider mb-1">NGƯỜI GIAO (Ca Đêm)</p>
+                          <strong className="text-slate-800 dark:text-white">Hoàng Kim</strong>
                         </div>
                         
-                        <p className="text-slate-450 dark:text-slate-500 text-[10.5px] leading-relaxed font-sans">
-                          Bảo vệ tài khoản của bạn bằng cách yêu cầu mã xác nhận phụ khi đăng nhập từ thiết bị lạ.
-                        </p>
+                        <div className="p-1 px-2.5 bg-blue-50 dark:bg-slate-900 border text-blue-600 rounded-lg font-bold font-mono text-[11px] select-none animate-pulse">
+                          &larr;&rarr;
+                        </div>
+
+                        <div className="text-center">
+                          <p className="text-[9px] text-slate-400 uppercase font-black tracking-wider mb-1">NGƯỜI NHẬN (Ca Sáng)</p>
+                          <strong className="text-slate-800 dark:text-white">Trần Thị Bé</strong>
+                        </div>
+                      </div>
+
+                      {/* Handover comments content block */}
+                      <div className="space-y-2 block text-xs">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">GHI CHÚ BÀN GIAO:</span>
+                        <div className="p-3 bg-blue-50/30 dark:bg-slate-950/20 border border-blue-50 dark:border-slate-850/50 rounded-xl leading-relaxed text-slate-650 dark:text-slate-300 space-y-2.5 text-left text-[11px]">
+                          <p>• Hệ thống barrier Cổng ra 1 thỉnh thoảng phản hồi chậm, đã báo kỹ thuật.</p>
+                          <p>• Tiền mặt bàn giao trong két: <strong className="text-slate-900 dark:text-white">1,250,000 VND</strong>.</p>
+                          <p>• Có 2 xe VIP gửi qua đêm (Biển số: <strong className="text-blue-600 dark:text-blue-400 font-mono">30G-123.45</strong>, <strong className="font-mono text-emerald-600">51H-987.65</strong>).</p>
+                        </div>
+                      </div>
+
+                      {/* Verification status indicators */}
+                      <div className="grid grid-cols-2 gap-2 text-[10px] select-none">
+                        <span className="px-2 py-1.5 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-650 dark:text-emerald-400 rounded-lg font-extrabold flex items-center justify-center gap-1 border border-emerald-100/40 dark:border-emerald-950/20">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                          <span>Đã xác nhận (HKja_8413)</span>
+                        </span>
+                        <span className="px-2 py-1.5 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-650 dark:text-emerald-400 rounded-lg font-extrabold flex items-center justify-center gap-1 border border-emerald-100/40 dark:border-emerald-950/20">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                          <span>Đã ký nhận (TTB_8412)</span>
+                        </span>
                       </div>
 
                     </div>
@@ -2629,460 +2651,788 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                   </div>
 
                 </div>
+
+                {/* MODAL ADD STAFF DIALOG (CONSERVED ORIGINAL CORE FORM) */}
+                <AnimatePresence>
+                  {showAddStaffModal && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                      <div className={`w-full max-w-sm rounded-[24px] p-6 border text-slate-850 ${isDarkMode ? 'bg-[#0f172a] border-slate-850 text-white' : 'bg-white border-slate-200'}`}>
+                        <div className="space-y-4 block text-left font-sans text-xs">
+                          <strong className="text-base font-black tracking-tight block">Tuyển dụng thành viên ca trực</strong>
+                          
+                          <div className="space-y-3">
+                            <div className="space-y-1 block">
+                              <label className="text-[10px] font-extrabold uppercase text-slate-450">Họ và tên nhân viên</label>
+                              <input id="staff-name-input" type="text" placeholder="Nguyễn Văn X" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                            </div>
+                            <div className="space-y-1 block">
+                              <label className="text-[10px] font-extrabold uppercase text-slate-450">Bốt phân chỉ định</label>
+                              <input id="staff-gate-input" type="text" placeholder="Bốt ra/vào số 3" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 justify-end pt-2">
+                            <button
+                              onClick={() => setShowAddStaffModal(false)}
+                              className="px-4 py-2 bg-slate-100 dark:bg-slate-850 rounded-lg font-bold"
+                            >
+                              Hủy bỏ
+                            </button>
+                            <button
+                              onClick={() => {
+                                const nameEl = document.getElementById('staff-name-input') as HTMLInputElement;
+                                const gateEl = document.getElementById('staff-gate-input') as HTMLInputElement;
+                                if (nameEl && nameEl.value.trim() && gateEl && gateEl.value.trim()) {
+                                  const nameVal = nameEl.value.trim();
+                                  const gateVal = gateEl.value.trim();
+                                  const nextId = `STF-${Math.floor(10 + Math.random() * 90)}`;
+                                  const newS: StaffMember = {
+                                    id: nextId,
+                                    name: nameVal,
+                                    avatar: nameVal.split(' ').pop()?.[0] || 'X',
+                                    role: 'Nhân viên bốt gác',
+                                    gate: gateVal,
+                                    swipes: 0,
+                                    status: 'ONLINE',
+                                    leaveHours: '08:00 - 17:00',
+                                    keyLabel: Math.floor(1000 + Math.random() * 9000).toString()
+                                  };
+                                  setStaff([...staff, newS]);
+                                  setShowAddStaffModal(false);
+                                  triggerToast(`Đã chiêu mộ thành công tuyển dụng mới: ${nameVal}. Sắp xếp bốt: ${gateVal}.`, 'success');
+                                } else {
+                                  triggerToast('Vui lòng điền họ tên và bốt chỉ định.', 'error');
+                                }
+                              }}
+                              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-extrabold uppercase tracking-wide text-[10.5px]"
+                            >
+                              Đồng ý chỉ định
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </AnimatePresence>
 
               </div>
             )}
 
-            {/* SUB-VIEW 6: SUPPORT CENTER (HELP DESK) */}
-            {activeMenu === 'support' && (
-              <div className="space-y-8 animate-fade-in" id="support-sub-view">
+            {/* SUB-VIEW 5: VIP VERIFICATION PANEL INTEGRATION & CUSTOMER MANAGEMENT TABLE (Screenshot 4 Replication) */}
+            {activeMenu === 'customers' && (
+              <div className="space-y-6 animate-fade-in text-left" id="customers-sub-view">
                 
-                {/* Center Title Banner with description */}
-                <div className="text-center space-y-3 py-6 select-none max-w-2xl mx-auto">
-                  <h1 className="text-4xl font-extrabold tracking-tight text-slate-800 dark:text-white font-sans">
-                    Trung tâm Hỗ trợ
-                  </h1>
-                  <p className="text-slate-550 dark:text-slate-400 text-xs font-semibold leading-relaxed font-sans">
-                    Tìm kiếm câu trả lời nhanh chóng hoặc liên hệ trực tiếp với đội ngũ quản lý hệ thống bãi đỗ xe thông minh của chúng tôi.
-                  </p>
-                </div>
-
-                {/* Search query input centered */}
-                <div className="max-w-xl mx-auto relative select-none">
-                  <div className="relative">
-                    <Search className="w-5 h-5 text-slate-400 dark:text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
-                    <input 
-                      type="text"
-                      placeholder="Bạn cần giúp đỡ điều gì?"
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value);
-                      }}
-                      className="w-full pl-12 pr-12 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:border-[#0052cc] rounded-full text-xs font-semibold text-slate-800 dark:text-white outline-hidden hover:border-slate-300 dark:hover:border-slate-700 transition-all font-sans shadow-2xs"
-                    />
-                    {searchQuery && (
-                      <button 
-                        onClick={() => setSearchQuery('')}
-                        className="text-xs text-slate-400 hover:text-slate-600 dark:text-slate-500 hover:underline absolute right-4 top-1/2 -translate-y-1/2 font-sans font-bold"
-                      >
-                        Xóa
-                      </button>
-                    )}
+                {/* DUAL-TAB SEGMENT HEADERS */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div>
+                    <h2 className="text-2.5xl font-black font-sans text-slate-900 dark:text-white flex items-center gap-2">
+                      Quản lý khách hàng
+                    </h2>
+                    <p className="text-slate-500 dark:text-slate-400 text-xs">
+                      {customerTab === 'list' 
+                        ? 'Báo cáo chi tiết và quản lý thông tin khách hàng sở hữu thẻ' 
+                        : 'Phê duyệt thẻ thành viên VIP bằng quy trình OCR tự động'}
+                    </p>
                   </div>
-                </div>
 
-                {/* Chủ đề Hỗ trợ (Support Topics) Grid */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest font-sans select-none pl-1">
-                    Chủ đề Hỗ trợ
-                  </h3>
-                  
-                  {/* Grid 6 columns mapping layout perfectly: 3 cards row 1 (each col-span-2) and 2 cards row 2 (each col-span-3) */}
-                  <div className="grid grid-cols-1 md:grid-cols-6 gap-6 items-stretch">
+                  <div className="flex items-center gap-2 font-sans text-xs">
+                    <button
+                      onClick={() => setCustomerTab('list')}
+                      className={`px-3.5 py-2 rounded-xl font-bold border transition-all ${
+                        customerTab === 'list'
+                          ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950 border-transparent shadow-md'
+                          : 'bg-white dark:bg-slate-905 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350 hover:bg-slate-50'
+                      }`}
+                    >
+                      Danh sách khách hàng
+                    </button>
                     
-                    {/* Topic 1: Tài khoản & Bảo mật */}
-                    <div 
-                      onClick={() => {
-                        setSearchQuery('bảo mật');
-                        triggerToast('Lọc các câu hỏi liên quan đến Tài khoản & Bảo mật.', 'info');
-                      }}
-                      className="md:col-span-2 bg-white hover:bg-slate-50/50 dark:bg-slate-900 dark:hover:bg-slate-850/60 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl flex gap-4 items-start cursor-pointer transition-all shadow-2xs hover:shadow-xs hover:scale-[1.01]"
+                    <button
+                      onClick={() => setCustomerTab('approvals')}
+                      className={`px-3.5 py-2 rounded-xl font-bold border transition-all flex items-center gap-1 ${
+                        customerTab === 'approvals'
+                          ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950 border-transparent shadow-md'
+                          : 'bg-white dark:bg-slate-905 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350 hover:bg-slate-50'
+                      }`}
                     >
-                      <div className="p-3 bg-blue-50/50 dark:bg-slate-850 text-[#0052cc] rounded-xl shrink-0">
-                        <Shield className="w-5 h-5 text-[#0052cc] dark:text-blue-400" />
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="text-xs font-black text-slate-900 dark:text-white font-sans">Tài khoản & Bảo mật</h4>
-                        <p className="text-[10.5px] leading-relaxed text-slate-500 dark:text-slate-400 font-medium font-sans">
-                          Quản lý thông tin cá nhân, mật khẩu, và bảo mật hai lớp.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Topic 2: Thanh toán & Ví */}
-                    <div 
-                      onClick={() => {
-                        setSearchQuery('thanh toán');
-                        triggerToast('Lọc các câu hỏi liên quan đến ví và chi phí.', 'info');
-                      }}
-                      className="md:col-span-2 bg-white hover:bg-slate-50/50 dark:bg-slate-900 dark:hover:bg-slate-850/60 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl flex gap-4 items-start cursor-pointer transition-all shadow-2xs hover:shadow-xs hover:scale-[1.01]"
-                    >
-                      <div className="p-3 bg-blue-50/50 dark:bg-slate-850 text-[#0052cc] rounded-xl shrink-0">
-                        <CreditCard className="w-5 h-5 text-[#0052cc] dark:text-blue-400" />
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="text-xs font-black text-slate-900 dark:text-white font-sans">Thanh toán & Ví</h4>
-                        <p className="text-[10.5px] leading-relaxed text-slate-500 dark:text-slate-400 font-medium font-sans">
-                          Nạp tiền, lịch sử giao dịch, và hóa đơn điện tử.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Topic 3: Đăng ký vé tháng */}
-                    <div 
-                      onClick={() => {
-                        setSearchQuery('tháng');
-                        triggerToast('Lọc các câu hỏi liên quan đến vé tháng VIP.', 'info');
-                      }}
-                      className="md:col-span-2 bg-white hover:bg-slate-50/50 dark:bg-slate-900 dark:hover:bg-slate-850/60 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl flex gap-4 items-start cursor-pointer transition-all shadow-2xs hover:shadow-xs hover:scale-[1.01]"
-                    >
-                      <div className="p-3 bg-blue-50/50 dark:bg-slate-850 text-[#0052cc] rounded-xl shrink-0">
-                        <Calendar className="w-5 h-5 text-[#0052cc] dark:text-blue-400" />
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="text-xs font-black text-slate-900 dark:text-white font-sans">Đăng ký vé tháng</h4>
-                        <p className="text-[10.5px] leading-relaxed text-slate-500 dark:text-slate-400 font-medium font-sans">
-                          Thủ tục đăng ký, gia hạn, và thay đổi thông tin biển số xe.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Topic 4: Hướng dẫn vào/ra bãi xe */}
-                    <div 
-                      onClick={() => {
-                        setSearchQuery('vào/ra bãi xe');
-                        triggerToast('Lọc các sự kiện vào/ra và quy trình bốt.', 'info');
-                      }}
-                      className="md:col-span-3 bg-white hover:bg-slate-50/50 dark:bg-slate-900 dark:hover:bg-slate-850/60 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl flex gap-4 items-start cursor-pointer transition-all shadow-2xs hover:shadow-xs hover:scale-[1.01]"
-                    >
-                      <div className="p-3 bg-blue-50/50 dark:bg-slate-850 text-[#0052cc] rounded-xl shrink-0">
-                        <Car className="w-5 h-5 text-[#0052cc] dark:text-blue-400" />
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="text-xs font-black text-slate-900 dark:text-white font-sans">Hướng dẫn vào/ra bãi xe</h4>
-                        <p className="text-[10.5px] leading-relaxed text-slate-500 dark:text-slate-400 font-medium font-sans">
-                          Quy trình sử dụng thẻ, nhận diện biển số (LPR), và barrier.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Topic 5: Sự cố kỹ thuật */}
-                    <div 
-                      onClick={() => {
-                        setSearchQuery('sự cố');
-                        triggerToast('Lọc các câu hỏi và báo cáo lỗi kỹ thuật.', 'info');
-                      }}
-                      className="md:col-span-3 bg-white hover:bg-slate-50/50 dark:bg-slate-900 dark:hover:bg-slate-850/60 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl flex gap-4 items-start cursor-pointer transition-all shadow-2xs hover:shadow-xs hover:scale-[1.01]"
-                    >
-                      <div className="p-3 bg-red-50/50 dark:bg-[#2c131a] text-rose-600 rounded-xl shrink-0">
-                        <ShieldAlert className="w-5 h-5 text-rose-600 dark:text-rose-455" />
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="text-xs font-black text-slate-900 dark:text-white font-sans">Sự cố kỹ thuật</h4>
-                        <p className="text-[10.5px] leading-relaxed text-slate-500 dark:text-slate-400 font-medium font-sans">
-                          Báo cáo lỗi hệ thống, mất kết nối, hoặc barrier không mở.
-                        </p>
-                      </div>
-                    </div>
-
+                      <Sparkles className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                      <span>Duyệt hồ sơ VIP (OCR)</span>
+                    </button>
                   </div>
                 </div>
 
-                {/* Câu hỏi thường gặp FAQ */}
-                <div className="space-y-4 select-none">
-                  <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest font-sans pl-1">
-                    Câu hỏi thường gặp
-                  </h3>
-
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-850">
-                    {[
-                      {
-                        q: 'Làm thế nào để nạp tiền vào ví điện tử UrbanPark?',
-                        a: 'Bạn có thể nạp tiền thông qua chuyển khoản ngân hàng trực tuyến hoặc nạp nhanh thông qua ví liên kết Vietcombank, Techcombank trực tiếp ngay trang chủ Driver Portal. Hệ thống hỗ trợ xử lý tức thì, tài khoản của bạn sẽ cập nhật sau 5 giây.',
-                        topic: 'thanh toán ví'
-                      },
-                      {
-                        q: 'Cách thay đổi biển số xe cho vé tháng đang sử dụng?',
-                        a: 'Để thay đổi biển số đăng ký cho vé ngày hoặc vé tháng, vui lòng truy cập mục "Xe của tôi", chọn Sửa xe hoặc gửi yêu cầu đính kèm hình ảnh đăng kiểm qua mục "Gửi hỗ trợ" bên dưới. Quản trị viên bốt gác sẽ phê duyệt yêu cầu trong vòng 2 giờ.',
-                        topic: 'vé tháng'
-                      },
-                      {
-                        q: 'Tôi cần làm gì khi bị mất thẻ từ gửi xe?',
-                        a: 'Hãy truy cập "Xe của tôi" và bật ngay chế độ "Khóa xe khẩn cấp (An toàn tối đa)". Hệ thống nhận diện bốt camera sẽ từ chối tự động mở Barie cho xe đó ra cho dù khớp biển số. Sau đó, hãy liên hệ bốt kỹ thuật để nhận thẻ thay thế.',
-                        topic: 'sự cố'
-                      },
-                      {
-                        q: 'Hệ thống LPR không nhận diện được biển số, tôi phải làm sao?',
-                        a: 'Hãy đảm bảo biển số của bạn sạch sẽ, không bị che khuất. Tại cổng, nếu bốt camera gặp sự cố, bạn có thể bấm "Mô phỏng bốt" từ giao diện Điều khiển bốt vào/ra trên portal này để gửi yêu cầu nâng barie khẩn cấp từ xa.',
-                        topic: 'vào/ra bãi xe'
-                      },
-                      {
-                        q: 'Làm sao để xuất hóa đơn điện tử cho công ty?',
-                        a: 'Các biên lai điện tử VAT được tạo lập tức thì cho mỗi lượt gửi xe hoặc gia hạn thẻ VIP. Bạn có thể nhấn trực tiếp vào nút "Tải về" (e-Invoice) bên cạnh mỗi giao dịch trong mục "Lịch sử thanh toán" của cổng này.',
-                        topic: 'thanh toán hóa đơn'
-                      }
-                    ]
-                    .filter(faq => {
-                      if (!searchQuery) return true;
-                      const qNormalized = faq.q.toLowerCase();
-                      const aNormalized = faq.a.toLowerCase();
-                      const topicNormalized = faq.topic.toLowerCase();
-                      const searchNormalized = searchQuery.toLowerCase();
-                      return qNormalized.includes(searchNormalized) || aNormalized.includes(searchNormalized) || topicNormalized.includes(searchNormalized);
-                    })
-                    .map((faq, idx) => {
-                      const isOpen = openFaqIndex === idx;
-                      return (
-                        <div key={idx} className="transition-all">
-                          <button
-                            onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
-                            className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-slate-50/55 dark:hover:bg-slate-850/40 cursor-pointer"
-                          >
-                            <span className="text-[12.5px] font-black text-slate-800 dark:text-slate-200 font-sans tracking-tight">
-                              {faq.q}
-                            </span>
-                            {isOpen ? (
-                              <ChevronUp className="w-4 h-4 text-slate-500 stroke-[2.5]" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4 text-slate-500 stroke-[2.5]" />
-                            )}
-                          </button>
-                          
-                          <AnimatePresence initial={false}>
-                            {isOpen && (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.18 }}
-                                className="overflow-hidden"
-                              >
-                                <div className="px-6 pb-5 pt-1 text-[11.5px] leading-relaxed text-slate-500 dark:text-slate-400 font-medium font-sans border-t border-slate-50 dark:border-slate-850 bg-slate-50/40 dark:bg-slate-950/20">
-                                  {faq.a}
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
+                {/* CONDITIONAL RENDER OF CUSTOMERS SUB-TABS */}
+                {customerTab === 'list' ? (
+                  <div className={`p-6 bg-white dark:bg-slate-905 border rounded-2xl ${isDarkMode ? 'border-slate-800 animate-fade-in' : 'border-slate-200/60 shadow-xs animate-fade-in'} space-y-4`}>
+                    
+                    {/* SEARCH FILTERS AND REGISTER BAR */}
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        {/* Search keyword input */}
+                        <div className="relative flex-1 sm:w-64">
+                          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input 
+                            type="text" 
+                            placeholder="Tìm kiếm tên, biển số, SĐT..." 
+                            value={customerSearch}
+                            onChange={(e) => setCustomerSearch(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-850 rounded-xl text-xs bg-slate-50/50 dark:bg-slate-950/50 font-medium focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                          />
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
 
-                {/* Bottom Section: Support Ticket (Left side) & Contact details (Right side) */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                  
-                  {/* Left Column: Gửi yêu cầu hỗ trợ (col-span 8) */}
-                  <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-5">
-                    <strong className="text-sm font-black text-slate-800 dark:text-slate-200 block border-b border-slate-100 dark:border-slate-850 pb-3 uppercase tracking-wider font-sans">
-                      Gửi yêu cầu hỗ trợ (Support Ticket)
-                    </strong>
-
-                    <div className="space-y-4 font-sans text-xs">
-                      {/* Topic Dropdown */}
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-sans">
-                          Chủ đề hỗ trợ
-                        </label>
-                        <select 
-                          value={ticketTopic}
-                          onChange={(e) => setTicketTopic(e.target.value)}
-                          className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 focus:border-[#0052cc] rounded-xl font-bold text-slate-800 dark:text-white transition-all outline-hidden appearance-none cursor-pointer"
+                        {/* Card type filter */}
+                        <select
+                          value={customerFilter}
+                          onChange={(e) => setCustomerFilter(e.target.value as any)}
+                          className="px-2 py-2 border border-slate-200 dark:border-slate-850 rounded-xl text-xs bg-white dark:bg-slate-950 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
                         >
-                          <option value="">-- Chọn chủ đề --</option>
-                          <option value="account">Tài khoản & Bảo mật</option>
-                          <option value="billing">Thanh toán & Ví</option>
-                          <option value="vip">Đăng ký vé tháng</option>
-                          <option value="in_out">Hướng dẫn vào/ra bãi xe</option>
-                          <option value="tech_issue">Sự cố kỹ thuật</option>
+                          <option value="Tất cả">Tất cả loại thẻ</option>
+                          <option value="VIP">Thành viên VIP</option>
+                          <option value="Tháng">Vé tháng thường</option>
                         </select>
                       </div>
 
-                      {/* Content textarea */}
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-sans">
-                          Nội dung chi tiết
-                        </label>
-                        <textarea 
-                          rows={4}
-                          placeholder="Mô tả chi tiết vấn đề bạn đang gặp phải..." 
-                          value={ticketContent}
-                          onChange={(e) => setTicketContent(e.target.value)}
-                          className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-[#0052cc] rounded-xl outline-hidden text-[11.5px] font-medium text-slate-800 dark:text-white placeholder-slate-400 font-sans leading-relaxed"
-                        />
-                      </div>
-
-                      {/* File Upload drag-and-drop widget */}
-                      <div className="space-y-1.5 relative">
-                        <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block font-sans">
-                          Đính kèm (Tùy chọn)
-                        </span>
-                        
-                        {/* Hidden input file tag controlled nicely by ref hook */}
-                        <input 
-                          type="file" 
-                          ref={fileInputRef}
-                          onChange={(e) => {
-                            const files = e.target.files;
-                            if (files && files.length > 0) {
-                              setAttachedFileName(files[0].name);
-                              triggerToast(`Đã nhận file đính kèm: ${files[0].name}`, 'info');
-                            }
-                          }}
-                          className="hidden"
-                          accept="image/*,.pdf"
-                        />
-
-                        {/* Interactive Drag zone box */}
-                        <div 
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            setIsDragging(true);
-                          }}
-                          onDragEnter={(e) => {
-                            e.preventDefault();
-                            setIsDragging(true);
-                          }}
-                          onDragLeave={() => setIsDragging(false)}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            setIsDragging(false);
-                            const files = e.dataTransfer.files;
-                            if (files && files.length > 0) {
-                              setAttachedFileName(files[0].name);
-                              triggerToast(`Đã nhận file đính kèm: ${files[0].name}`, 'info');
-                            }
-                          }}
-                          onClick={() => fileInputRef.current?.click()}
-                          className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center gap-2 cursor-pointer transition-all ${
-                            isDragging 
-                              ? 'border-[#0052cc] bg-blue-50/20' 
-                              : attachedFileName 
-                                ? 'border-emerald-500 bg-emerald-50/10' 
-                                : 'border-slate-200 dark:border-slate-800 hover:border-[#0052cc]'
-                          }`}
-                        >
-                          <UploadCloud className={`w-8 h-8 ${attachedFileName ? 'text-emerald-500' : 'text-slate-400'}`} />
-                          
-                          {attachedFileName ? (
-                            <div className="space-y-1">
-                              <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                                <Check className="w-3.5 h-3.5" />
-                                Đã đính kèm file thành công
-                              </span>
-                              <strong className="text-xs text-slate-800 dark:text-slate-200 block truncate max-w-xs">{attachedFileName}</strong>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setAttachedFileName(null);
-                                }}
-                                className="text-[10px] text-red-500 hover:underline font-bold"
-                              >
-                                Gỡ bỏ file x
-                              </button>
-                            </div>
-                          ) : (
-                            <div>
-                              <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                Kéo thả file vào đây hoặc <span className="text-[#0052cc] font-black hover:underline cursor-pointer">Chọn file</span>
-                              </p>
-                              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Hỗ trợ JPG, PNG, PDF (Max 5MB)</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* CTA Submit Button right aligned */}
-                      <div className="pt-2 flex justify-end">
-                        <button
-                          onClick={() => {
-                            if (!ticketTopic) {
-                              triggerToast('Vui lòng chọn chủ đề hỗ trợ.', 'error');
-                              return;
-                            }
-                            if (!ticketContent.trim()) {
-                              triggerToast('Vui lòng nhập nội dung chi tiết yêu cầu hỗ trợ.', 'error');
-                              return;
-                            }
-                            triggerToast('Đang gửi yêu cầu hỗ trợ đến tổng đài viên...', 'info');
-                            setTimeout(() => {
-                              setTicketTopic('');
-                              setTicketContent('');
-                              setAttachedFileName(null);
-                              triggerToast('Đã gửi ticket thành công! Nhân viên tư vấn của UrbanPark sẽ phản hồi lại bạn qua Email/SĐT tối đa trong 15 phút.', 'success');
-                            }, 1000);
-                          }}
-                          className="px-6 py-2.5 bg-[#0052cc] hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-lg text-xs font-black tracking-tight shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                          <span>GỬI YÊU CẦU</span>
-                        </button>
-                      </div>
-
-                    </div>
-                  </div>
-
-                  {/* Right Column: Liên hệ trực tiếp & Tình trạng (col-span 4) */}
-                  <div className="lg:col-span-4 flex flex-col gap-6">
-                    
-                    {/* Dark Contact Card (Matching exactly in layout and typography) */}
-                    <div className="bg-[#0b1329] dark:bg-slate-950 text-white rounded-3xl p-6 shadow-md relative overflow-hidden select-none flex flex-col justify-between min-h-[300px]">
-                      {/* Abstract radial layout backdrop */}
-                      <div className="absolute right-0 top-0 w-36 h-36 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
-                      
-                      <div className="space-y-6 relative z-10">
-                        <strong className="text-sm font-black border-b border-slate-850 pb-3 block text-slate-200 tracking-wider font-sans uppercase font-sans">
-                          Liên hệ trực tiếp
-                        </strong>
-
-                        {/* Hotline contact line */}
-                        <div className="flex items-center gap-3.5">
-                          <div className="p-3 bg-white/10 text-white rounded-xl">
-                            <Headphones className="w-5 h-5 text-white stroke-[2]" />
-                          </div>
-                          <div className="leading-tight">
-                            <span className="text-[10px] text-[#8993A4] dark:text-slate-500 font-extrabold uppercase tracking-widest font-sans block">
-                              Hotline Hỗ Trợ (24/7)
-                            </span>
-                            <strong className="text-2xl font-black text-white font-sans tracking-tight">
-                              1900 6868
-                            </strong>
-                          </div>
-                        </div>
-
-                        {/* Email contact line */}
-                        <div className="flex items-center gap-3.5">
-                          <div className="p-3 bg-white/10 text-white rounded-xl">
-                            <Mail className="w-5 h-5 text-white stroke-[2]" />
-                          </div>
-                          <div className="leading-tight">
-                            <span className="text-[10px] text-[#8993A4] dark:text-slate-500 font-extrabold uppercase tracking-widest font-sans block">
-                              Email
-                            </span>
-                            <span className="text-[12.5px] font-black text-slate-200 font-sans block hover:underline cursor-pointer">
-                              support@urbanpark.vn
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* White button widget aligned bottom inside the panel */}
-                      <button 
-                        onClick={() => {
-                          setActiveMenu('settings');
-                          triggerToast('Mở trợ lý ảo AI tại mục cài đặt để trò chuyện tức thì!', 'info');
-                        }}
-                        className="w-full text-center bg-white hover:bg-slate-100 dark:bg-slate-100 dark:hover:bg-slate-200 text-slate-900 font-black text-xs py-3.5 rounded-xl tracking-tight relative z-10 transition-colors shadow-2xs cursor-pointer active:scale-95 flex items-center justify-center gap-2"
+                      <button
+                        onClick={() => setShowAddCustomerModal(true)}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5"
                       >
-                        <Send className="w-3.5 h-3.5 shrink-0 stroke-[2.5]" />
-                        <span>Trò chuyện trực tuyến</span>
+                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                        <span>Đăng ký thẻ mới</span>
                       </button>
                     </div>
 
-                    {/* Tình trạng hệ thống Card */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-xs flex items-center justify-between font-sans select-none">
-                      <div className="flex items-center gap-2.5">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                        </span>
-                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                          Tình trạng hệ thống
-                        </span>
+                    {/* TABLE OF CUSTOMERS */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left font-sans text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-100 dark:border-slate-850 text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+                            <th className="py-3 px-3">HỌ VÀ TÊN</th>
+                            <th className="py-3 px-3">BIỂN SỐ</th>
+                            <th className="py-3 px-3">LOẠI THẺ</th>
+                            <th className="py-3 px-3">HẠN SỬ DỤNG</th>
+                            <th className="py-3 px-3">TRẠNG THÁI</th>
+                            <th className="py-3 px-3 text-right">THAO TÁC</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
+                          {customerList
+                            .filter(cust => {
+                              const query = customerSearch.toLowerCase();
+                              const matchesSearch = cust.name.toLowerCase().includes(query) || cust.plate.toLowerCase().includes(query) || cust.phone.includes(query);
+                              
+                              if (!matchesSearch) return false;
+                              if (customerFilter === 'Tất cả') return true;
+                              return cust.cardType === customerFilter;
+                            })
+                            .map(cust => {
+                              const isActive = cust.status === 'ACTIVE';
+                              const isExpired = cust.status === 'EXPIRED';
+                              const isInPark = cust.status === 'IN_PARK';
+                              
+                              return (
+                                <tr key={cust.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/10 transition-colors">
+                                  <td className="py-3.5 px-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-850 dark:text-slate-200 font-extrabold text-xs flex items-center justify-center border border-slate-200/50 dark:border-slate-750">
+                                        {cust.name.split(' ').pop()?.[0] || 'U'}
+                                      </div>
+                                      <div>
+                                        <strong className="text-slate-850 dark:text-white block font-black">{cust.name}</strong>
+                                        <span className="text-[10px] text-slate-400 font-medium">{cust.phone}</span>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  
+                                  <td className="py-3.5 px-3">
+                                    <span className="inline-block px-2.5 py-1 font-mono font-black bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 text-[11px] tracking-wider uppercase">
+                                      {cust.plate}
+                                    </span>
+                                  </td>
+
+                                  <td className="py-3.5 px-3">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold ${
+                                      cust.cardType === 'VIP' 
+                                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' 
+                                        : cust.cardType === 'Tháng'
+                                        ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                                    }`}>
+                                      {cust.cardType}
+                                    </span>
+                                  </td>
+
+                                  <td className="py-3.5 px-3 font-medium text-slate-650 dark:text-slate-300">
+                                    {isExpired ? (
+                                      <span className="text-rose-500 font-extrabold flex items-center gap-1">
+                                        <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                        <span>Đã hết hạn</span>
+                                      </span>
+                                    ) : (
+                                      <span>{cust.expiryDate}</span>
+                                    )}
+                                  </td>
+
+                                  <td className="py-3.5 px-3">
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                                      isActive 
+                                        ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30' 
+                                        : isExpired
+                                        ? 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-455 border-rose-100 dark:border-rose-900/30' 
+                                        : 'bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/30'
+                                    }`}>
+                                      ● {isActive ? 'Hoạt động' : isExpired ? 'Ngừng cấp' : 'Trong bãi'}
+                                    </span>
+                                  </td>
+
+                                  <td className="py-3.5 px-3 text-right">
+                                    <div className="flex justify-end gap-3.5 text-[11px] font-bold">
+                                      <button 
+                                        onClick={() => {
+                                          const nextExpiry = prompt(`Gia hạn thêm cho khách hàng ${cust.name} (hiện tại: ${cust.expiryDate}):`, '31/12/2024');
+                                          if (nextExpiry && nextExpiry.trim()) {
+                                            setCustomerList(prev => prev.map(c => c.id === cust.id ? { ...c, expiryDate: nextExpiry.trim(), status: 'ACTIVE' } : c));
+                                            triggerToast(`Gia hạn thành công tài khoản thẻ cho ${cust.name} đến ngày ${nextExpiry.trim()}`, "success");
+                                          }
+                                        }}
+                                        className="text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                                      >
+                                        Gia hạn
+                                      </button>
+                                      
+                                      <span className="text-slate-205 dark:text-slate-800">|</span>
+
+                                      <button 
+                                        onClick={() => {
+                                          if (confirm(`Bạn muốn tước quyền sử dụng và xóa tài khoản thẻ này của khách: ${cust.plate}?`)) {
+                                            setCustomerList(prev => prev.filter(c => c.id !== cust.id));
+                                            triggerToast(`Đã thu hồi hủy thẻ ${cust.plate} thành công.`, "error");
+                                          }
+                                        }}
+                                        className="text-rose-500 hover:text-rose-600 hover:underline cursor-pointer font-extrabold"
+                                      >
+                                        Thu hồi
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* PAGINATOR FOR TABLE CUSTOMERS */}
+                    <div className="flex flex-col sm:flex-row justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-850 gap-4 select-none font-sans text-xs">
+                      <span className="text-slate-500 font-medium">Hiển thị 1 - {customerList.length} trên 2,154 khách hàng</span>
+                      <div className="flex items-center gap-1.5">
+                        <button className="p-1 px-2.5 border rounded-lg bg-white dark:bg-slate-950 font-semibold hover:bg-slate-50">&lt;</button>
+                        <button className="px-3 py-1 font-extrabold bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-lg">1</button>
+                        <button className="px-3 py-1 font-bold border hover:bg-slate-50 rounded-lg">2</button>
+                        <button className="px-3 py-1 font-bold border hover:bg-slate-50 rounded-lg">3</button>
+                        <span className="text-slate-400">...</span>
+                        <button className="p-1 px-2.5 border rounded-lg bg-white dark:bg-slate-950 font-semibold hover:bg-slate-50">&gt;</button>
                       </div>
-                      <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
-                        Bình thường
+                    </div>
+
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-blue-50/20 dark:bg-slate-950/20 border border-blue-50 dark:border-slate-800 rounded-2xl flex items-start gap-3">
+                      <Sparkles className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                      <div className="text-xs text-left text-slate-650 dark:text-slate-300">
+                        <strong className="text-slate-900 dark:text-white block font-black font-sans">Chuỗi phê duyệt thông minh (Hệ thống AI OCR)</strong>
+                        <span>Hệ thống tự động trích xuất thông tin giấy đăng ký xe (Cà vẹt) và giấy tờ tùy thân của khách hàng từ ảnh tải lên để duyệt cấp tài khoản VIP hoặc vé tháng trực tuyến mà không cần giấy tờ hành chính thủ công.</span>
+                      </div>
+                    </div>
+                    
+                    {/* VIP OCR panel component */}
+                    <VipApprovalPanel isDarkMode={isDarkMode} triggerToast={triggerToast} />
+                  </div>
+                )}
+
+                {/* MODAL REGISTER NEW CUSTOMER CARD DIALOG */}
+                <AnimatePresence>
+                  {showAddCustomerModal && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                      <div className={`w-full max-w-md rounded-[24px] p-6 border text-slate-850 ${isDarkMode ? 'bg-[#0f172a] border-slate-850 text-white' : 'bg-white border-slate-200 shadow-xl'}`}>
+                        <div className="space-y-4 block text-left font-sans text-xs">
+                          <strong className="text-base font-black tracking-tight block text-slate-900 dark:text-white">Đăng ký thông viên thẻ tháng mới</strong>
+                          
+                          <div className="space-y-3">
+                            <div className="space-y-1 block">
+                              <label className="text-[10px] font-extrabold uppercase text-slate-450">Tên chủ thẻ xe</label>
+                              <input id="cust-name" type="text" placeholder="Nguyễn Văn A" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1 block">
+                                <label className="text-[10px] font-extrabold uppercase text-slate-450">Số điện thoại</label>
+                                <input id="cust-phone" type="text" placeholder="090 ..." className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                              </div>
+                              <div className="space-y-1 block">
+                                <label className="text-[10px] font-extrabold uppercase text-slate-450">Biển kiểm soát</label>
+                                <input id="cust-plate" type="text" placeholder="30A-..." className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold uppercase" />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1 block">
+                                <label className="text-[10px] font-extrabold uppercase text-slate-450">Loại thẻ</label>
+                                <select id="cust-type" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold">
+                                  <option value="Tháng">Vé tháng thường</option>
+                                  <option value="VIP">Thành viên VIP</option>
+                                </select>
+                              </div>
+                              <div className="space-y-1 block">
+                                <label className="text-[10px] font-extrabold uppercase text-slate-450">Hạn sử dụng</label>
+                                <input id="cust-expiry" type="text" defaultValue="31/12/2024" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 justify-end pt-2">
+                            <button
+                              onClick={() => setShowAddCustomerModal(false)}
+                              className="px-4 py-2 bg-slate-100 dark:bg-slate-850 rounded-lg font-bold hover:bg-slate-200"
+                            >
+                              Hủy bỏ
+                            </button>
+                            <button
+                              onClick={() => {
+                                const nameEl = document.getElementById('cust-name') as HTMLInputElement;
+                                const phoneEl = document.getElementById('cust-phone') as HTMLInputElement;
+                                const plateEl = document.getElementById('cust-plate') as HTMLInputElement;
+                                const typeEl = document.getElementById('cust-type') as HTMLSelectElement;
+                                const expiryEl = document.getElementById('cust-expiry') as HTMLInputElement;
+
+                                if (nameEl?.value.trim() && plateEl?.value.trim() && phoneEl?.value.trim()) {
+                                  const nameVal = nameEl.value.trim();
+                                  const plateVal = plateEl.value.trim();
+                                  const phoneVal = phoneEl.value.trim();
+                                  const typeVal = typeEl.value as 'VIP' | 'Tháng';
+                                  const expiryVal = expiryEl.value.trim();
+
+                                  const newCust: Customer = {
+                                    id: `CUST-${Math.floor(100 + Math.random() * 900)}`,
+                                    name: nameVal,
+                                    phone: phoneVal,
+                                    plate: plateVal.toUpperCase(),
+                                    cardType: typeVal,
+                                    status: 'ACTIVE',
+                                    expiryDate: expiryVal
+                                  };
+
+                                  setCustomerList([...customerList, newCust]);
+                                  setShowAddCustomerModal(false);
+                                  triggerToast(`Đăng ký thành công hội viên mới: ${nameVal} [${plateVal.toUpperCase()}]`, 'success');
+                                } else {
+                                  triggerToast('Vui lòng điền họ tên, số điện thoại và biển kiểm soát.', 'error');
+                                }
+                              }}
+                              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-extrabold uppercase tracking-wide text-[10.5px]"
+                            >
+                              Phát hành thẻ
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </AnimatePresence>
+
+              </div>
+            )}
+
+            {/* SUB-VIEW 6: CẤU HÌNH KỸ THUẬT HARDWARE SWITCH CHATTER */}
+            {activeMenu === 'technical' && (
+              <div className="space-y-6 animate-fade-in" id="tech-sub-view">
+                <div>
+                  <h2 className="text-2xl font-black font-sans">Điều khiển phần cứng Barrier</h2>
+                  <p className="text-slate-550 dark:text-slate-400 text-xs font-bold">Kích hạ trình khẩn cấp, cài lực dẻo xoay bốt hoặc kiểm soát tín hiệu luồng camera.</p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch text-left font-sans text-xs">
+                  
+                  {/* Gate overrides */}
+                  <div className={`p-6 rounded-2xl border ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200'} space-y-4`}>
+                    <strong className="text-base font-black tracking-tight block">Kích hoat đóng mở Barie cưỡng bức (Manual Override)</strong>
+                    
+                    <div className="space-y-3.5">
+                      {gateBarriers.map(b => (
+                        <div key={b.gateId} className="flex justify-between items-center p-3 rounded-xl bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850">
+                          <div>
+                            <strong className="text-xs font-bold font-sans text-slate-850 dark:text-white block">{b.name}</strong>
+                            <span className="text-[10px] text-slate-400 font-bold block">{b.open ? 'BARRIER ĐANG MỞ (NÂNG)' : 'BARRIER ĐANG ĐÓNG (HẠ TRÌNH)'}</span>
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              setGateBarriers(prev => prev.map(gate => {
+                                if (gate.gateId === b.gateId) {
+                                  return { ...gate, open: !gate.open };
+                                }
+                                return gate;
+                              }));
+                              triggerToast(`Đã cưỡng bức kích hoạt ${b.open ? 'HẠ' : 'NÂNG'} Barie bốt ${b.name}!`, 'info');
+                              const newLog = {
+                                id: `LOG-${Date.now()}`,
+                                time: new Date().toLocaleTimeString(),
+                                type: 'WARNING',
+                                message: `⚠️ Cảnh báo cưỡng bức: Quản trị viên thay đổi cơ cấu nâng hành trình bốt phanh [${b.name}].`
+                              };
+                              setLogs([newLog, ...logs]);
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold tracking-wider uppercase transition-colors select-none cursor-pointer ${
+                              b.open 
+                                ? 'bg-rose-50 hover:bg-rose-100 text-rose-600' 
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            }`}
+                          >
+                            {b.open ? 'Hạ barie (Close)' : 'Nâng Barie (Open)'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Live animated mock screens */}
+                  <div className={`p-6 rounded-2xl border ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200'} space-y-4 flex flex-col justify-between`}>
+                    <strong className="text-base font-black tracking-tight block">Luồng Camera OCR cổng kiểm soát (Live Streams)</strong>
+                    
+                    <div className="grid grid-cols-2 gap-3 pb-2">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="aspect-video bg-neutral-900 rounded-xl relative overflow-hidden border border-slate-850 flex items-center justify-center text-white">
+                          <span className="text-[10px] text-slate-450 uppercase tracking-widest font-mono">Camera {i+1}</span>
+                          <span className="absolute top-2 left-2 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                            <span className="text-[9px] font-bold text-slate-400">REC</span>
+                          </span>
+                          <div className="absolute inset-0 border border-emerald-500/10 pointer-events-none animate-pulse" />
+                        </div>
+                      ))}
+                    </div>
+
+                    <button 
+                      onClick={() => triggerToast('Tất cả luồng streaming camera đạt độ trễ tuyệt hảo: 14ms', 'success')}
+                      className="w-full py-3 bg-slate-900 border border-slate-850 hover:bg-slate-800 text-white font-extrabold text-xs uppercase rounded-xl tracking-wider select-none active:scale-98 transition-colors"
+                    >
+                      Kiểm nghiệm tín hiệu Ping
+                    </button>
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
+            {/* SUB-VIEW 7: TRUNG TÂM BẢO MẬT & ĐỀ PHÒNG TRỘM XE CC */}
+            {activeMenu === 'security' && (
+              <div className="space-y-6 animate-fade-in text-left" id="security-sub-view">
+                
+                {/* HEADER ROW (Screenshot 1 Replication) */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div>
+                    <h2 className="text-2.5xl font-black font-sans text-slate-900 dark:text-white flex items-center gap-2">
+                      Bảo mật Hệ thống
+                    </h2>
+                    <p className="text-slate-550 dark:text-slate-400 text-xs">
+                      Quản lý chính sách an toàn, quyền truy cập và giám sát cảnh báo toàn cục.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 font-sans text-xs">
+                    <button
+                      onClick={() => triggerToast("Đã xuất báo cáo an ninh định kỳ!", "success")}
+                      className="px-4 py-2 bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-xl font-bold transition-all shadow-xs flex items-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Xuất Báo Cáo</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => triggerToast("Tất cả cấu hình bảo mật đã được lưu thành công!", "success")}
+                      className="px-4 py-2 bg-slate-950 dark:bg-white text-white dark:text-slate-950 hover:bg-slate-850 dark:hover:bg-slate-100 rounded-xl font-extrabold transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+                    >
+                      <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Lưu Thay Đổi</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* RED ALERT DIALOG BANNER (Screenshot 1 Replication) */}
+                <div className="p-4 bg-rose-50 dark:bg-rose-950/15 border border-rose-100 dark:border-rose-900/30 border-l-4 border-l-rose-500 rounded-r-2xl flex items-start justify-between gap-3 animate-pulse">
+                  <div className="flex items-start gap-3">
+                    <ShieldAlert className="w-5 h-5 text-rose-550 dark:text-rose-400 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-sm font-black text-rose-900 dark:text-rose-400 font-sans block">
+                        Phát hiện 3 lần đăng nhập thất bại liên tiếp
+                      </strong>
+                      <span className="text-xs text-rose-700 dark:text-rose-350 mt-1 block">
+                        Tài khoản <code className="bg-rose-100 dark:bg-rose-950 px-1 py-0.5 rounded font-bold font-mono">"nhanvien_bc02"</code> tại IP <code className="bg-rose-150 dark:bg-rose-950 px-1 py-0.5 rounded font-bold font-mono">192.168.1.45</code>. Cần xác minh ngay.
                       </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setAuditSearch('nhanvien_bc02');
+                      setAuditStatusFilter('FAILED');
+                      setActiveMenu('system_log');
+                      triggerToast("Đã lọc chi tiết sự kiện cho tài khoản 'nhanvien_bc02'", "info");
+                    }}
+                    className="text-rose-650 dark:text-rose-400 font-black hover:underline text-[10.5px] cursor-pointer shrink-0 uppercase tracking-wider bg-rose-100/50 dark:bg-rose-500/10 px-2.5 py-1.5 rounded-lg border border-rose-200/40 dark:border-rose-800/40"
+                  >
+                    XEM CHI TIẾT
+                  </button>
+                </div>
+
+                {/* TWO-COLUMN CONFIGURATION CARDS */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                  
+                  {/* LEFT SIDE: CONFIG SYSTEM POLICY CARD (col-span 7/8 in mockup) */}
+                  <div className="lg:col-span-8 p-6 bg-white dark:bg-slate-905 border border-slate-200/60 dark:border-slate-800 rounded-2xl flex flex-col justify-between space-y-6">
+                    
+                    {/* CARD TITLE & CAPTION */}
+                    <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-850 pb-3">
+                      <Shield className="w-4 h-4 text-blue-500" />
+                      <strong className="text-base font-black text-slate-850 dark:text-white font-sans">
+                        Chính sách & Đăng nhập
+                      </strong>
+                    </div>
+
+                    {/* SETTING ITEM 1: 2FA */}
+                    <div className="flex justify-between items-start gap-4 pb-4 border-b border-dashed border-slate-100 dark:border-slate-850">
+                      <div>
+                        <strong className="text-sm font-black text-slate-850 dark:text-white block">
+                          Xác thực 2 Yếu tố (2FA)
+                        </strong>
+                        <p className="text-slate-500 dark:text-slate-400 text-xs mt-1">
+                          Bắt buộc đối với toàn bộ nhân viên cấp Quản lý và Kỹ thuật viên hệ thống.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setEnable2FA(!enable2FA);
+                          triggerToast(`Đã ${!enable2FA ? 'kích hoạt' : 'vô hiệu hóa'} bắt buộc xác thực 2FA.`, 'info');
+                        }}
+                        className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 focus:outline-none shrink-0 ${
+                          enable2FA ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-800'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${enable2FA ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+
+                    {/* SETTING ITEM 2: SESSION TIMEOUTS */}
+                    <div className="space-y-3 pb-4 border-b border-dashed border-slate-100 dark:border-slate-850">
+                      <strong className="text-sm font-black text-slate-850 dark:text-white block mb-1">
+                        Thời gian chờ Phiên làm việc (Session Timeout)
+                      </strong>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1 block">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                            DESKTOP (ADMIN)
+                          </label>
+                          <select
+                            value={desktopTimeout}
+                            onChange={(e) => {
+                              setDesktopTimeout(e.target.value);
+                              triggerToast(`Thời gian chờ Desktop được đổi thành: ${e.target.value}`, 'success');
+                            }}
+                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-850 rounded-xl text-xs bg-slate-50/50 dark:bg-slate-950/50 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          >
+                            <option value="15 Phút">15 Phút</option>
+                            <option value="30 Phút">30 Phút</option>
+                            <option value="1 Giờ">1 Giờ</option>
+                            <option value="2 Giờ">2 Giờ</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1 block">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                            MOBILE (STAFF PWA)
+                          </label>
+                          <select
+                            value={mobileTimeout}
+                            onChange={(e) => {
+                              setMobileTimeout(e.target.value);
+                              triggerToast(`Thời gian chờ Mobile được đổi thành: ${e.target.value}`, 'success');
+                            }}
+                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-850 rounded-xl text-xs bg-slate-50/50 dark:bg-slate-950/50 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          >
+                            <option value="1 Giờ">1 Giờ</option>
+                            <option value="2 Giờ">2 Giờ</option>
+                            <option value="4 Giờ">4 Giờ</option>
+                            <option value="8 Giờ">8 Giờ</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SETTING ITEM 3: PASSWORD POLICIES */}
+                    <div className="space-y-4">
+                      <strong className="text-sm font-black text-slate-850 dark:text-white block mb-1">
+                        Yêu cầu Mật khẩu
+                      </strong>
+
+                      <div className="flex justify-between items-center bg-slate-50/50 dark:bg-slate-950/40 p-3 rounded-xl border border-slate-100 dark:border-slate-850/60">
+                        <span className="text-xs font-bold text-slate-650 dark:text-slate-300">
+                          Độ dài tối thiểu (ký tự)
+                        </span>
+                        
+                        <input
+                          type="number"
+                          min="6"
+                          max="32"
+                          value={passwordMinLength}
+                          onChange={(e) => {
+                            const val = Math.max(6, parseInt(e.target.value) || 12);
+                            setPasswordMinLength(val);
+                          }}
+                          className="w-16 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-right font-black text-xs text-slate-850 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+
+                      <div className="space-y-2.5 font-bold text-xs">
+                        <label className="flex items-center gap-2.5 cursor-pointer text-slate-650 dark:text-slate-350 select-none">
+                          <input
+                            type="checkbox"
+                            checked={requireSpecialChar}
+                            onChange={() => {
+                              setRequireSpecialChar(!requireSpecialChar);
+                              triggerToast(`Đã thay đổi tùy chọn ký tự đặc biệt tài khoản`, 'info');
+                            }}
+                            className="w-3.5 h-3.5 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                          />
+                          <span>Bắt buộc ký tự đặc biệt (!@#$%^&*)</span>
+                        </label>
+
+                        <label className="flex items-center gap-2.5 cursor-pointer text-slate-650 dark:text-slate-350 select-none">
+                          <input
+                            type="checkbox"
+                            checked={requireNumber}
+                            onChange={() => {
+                              setRequireNumber(!requireNumber);
+                              triggerToast(`Đã thay đổi tùy chọn chữ số bắt buộc`, 'info');
+                            }}
+                            className="w-3.5 h-3.5 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                          />
+                          <span>Bắt buộc chữ số</span>
+                        </label>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* RIGHT SIDE: RBAC & TIMELINE (col-span 4/5 in mockup) */}
+                  <div className="lg:col-span-4 flex flex-col gap-6 justify-between items-stretch">
+                    
+                    {/* CARD 1: RBAC OVERVIEW */}
+                    <div className="p-5 bg-white dark:bg-slate-905 border border-slate-200/60 dark:border-slate-800 rounded-2xl space-y-4">
+                      
+                      <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-850">
+                        <strong className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                          <Lock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                          <span>Kiểm soát Truy cập (RBAC)</span>
+                        </strong>
+                        <button
+                          onClick={() => triggerToast("Trình chỉnh sửa phân quyền nâng cấp đang khóa. Liên hệ Admin cao cấp.", "info")}
+                          className="p-1 text-slate-400 hover:text-blue-500 transition-colors"
+                        >
+                          {/* Minimalist pencil edit button icon */}
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* RBAC Header Columns */}
+                      <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase select-none">
+                        <span>VAI TRÒ</span>
+                        <span>TÀI KHOẢN</span>
+                      </div>
+
+                      <div className="space-y-2 text-xs font-bold leading-relaxed text-slate-650 dark:text-slate-350">
+                        {/* Row Super Admin */}
+                        <div className="flex justify-between items-center py-1.5 border-b border-dashed border-slate-100 dark:border-slate-850/50">
+                          <span className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block shrink-0" />
+                            <span className="text-slate-850 dark:text-white">Super Admin</span>
+                          </span>
+                          <span className="font-mono text-slate-450 dark:text-slate-450 bg-slate-50 dark:bg-slate-950/60 px-1.5 py-0.5 rounded">3</span>
+                        </div>
+                        {/* Row CSM */}
+                        <div className="flex justify-between items-center py-1.5 border-b border-dashed border-slate-100 dark:border-slate-850/50">
+                          <span className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block shrink-0" />
+                            <span className="text-slate-850 dark:text-white">Quản lý Cơ sở</span>
+                          </span>
+                          <span className="font-mono text-slate-450 dark:text-slate-450 bg-slate-50 dark:bg-slate-950/60 px-1.5 py-0.5 rounded">12</span>
+                        </div>
+                        {/* Row Accountant */}
+                        <div className="flex justify-between items-center py-1.5 border-b border-dashed border-slate-100 dark:border-slate-850/50">
+                          <span className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
+                            <span className="text-slate-850 dark:text-white">Kế toán</span>
+                          </span>
+                          <span className="font-mono text-slate-450 dark:text-slate-450 bg-slate-50 dark:bg-slate-950/60 px-1.5 py-0.5 rounded">5</span>
+                        </div>
+                        {/* Row Staff */}
+                        <div className="flex justify-between items-center py-1.5">
+                          <span className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block shrink-0" />
+                            <span className="text-slate-850 dark:text-white">Nhân viên bãi xe</span>
+                          </span>
+                          <span className="font-mono text-slate-450 dark:text-slate-450 bg-slate-50 dark:bg-slate-950/60 px-1.5 py-0.5 rounded">48</span>
+                        </div>
+                      </div>
+
+                      {/* BOTTOM RBAC DETAILS BUTTON */}
+                      <button
+                        onClick={() => triggerToast("Đang tải dữ liệu thiết lập vai trò chi tiết & Phân quyền ứng dụng PWA...", "info")}
+                        className="w-full text-center py-2.5 text-[11px] font-extrabold text-blue-600 hover:text-blue-700 hover:underline border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 rounded-xl uppercase tracking-wider block"
+                      >
+                        Quản lý phân quyền chi tiết
+                      </button>
+
+                    </div>
+
+                    {/* CARD 2: TIMELINE GENERAL SUMMARY */}
+                    <div className="p-5 bg-white dark:bg-slate-905 border border-slate-200/60 dark:border-slate-800 rounded-2xl space-y-4 flex-1 flex flex-col justify-between">
+                      <strong className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-850">
+                        <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <span>Nhật ký Gần đây</span>
+                      </strong>
+
+                      <div className="space-y-4 text-xs block text-left flex-1 py-1">
+                        
+                        {/* Timeline item 1 */}
+                        <div className="relative pl-5 border-l border-emerald-500/30 pb-1">
+                          <span className="w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full absolute -left-[5.5px] top-1 inline-block shrink-0" />
+                          <strong className="text-slate-800 dark:text-slate-200 block text-[11px]-leading-snug">
+                            Admin NguyenV đã cập nhật chính sách mật khẩu.
+                          </strong>
+                          <span className="text-[10px] text-slate-400 font-bold block mt-0.5">
+                            10:45 AM - Hôm nay
+                          </span>
+                        </div>
+
+                        {/* Timeline item 2 */}
+                        <div className="relative pl-5 border-l border-transparent">
+                          <span className="w-2.5 h-2.5 bg-rose-500 border-2 border-white dark:border-slate-900 rounded-full absolute -left-[5.5px] top-1 inline-block shrink-0 animate-ping" />
+                          <span className="w-2.5 h-2.5 bg-rose-500 border-2 border-white dark:border-slate-900 rounded-full absolute -left-[5.5px] top-1 inline-block shrink-0" />
+                          <strong className="text-slate-800 dark:text-slate-200 block text-[11px]-leading-snug text-rose-500 dark:text-rose-455">
+                            Đăng nhập thất bại (x3) tài khoản nhanvien_bc02.
+                          </strong>
+                          <span className="text-[10px] text-slate-400 font-bold block mt-0.5">
+                            09:12 AM - Hôm nay
+                          </span>
+                        </div>
+
+                      </div>
+
                     </div>
 
                   </div>
@@ -3092,17 +3442,565 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
               </div>
             )}
 
+            {/* SUB-VIEW 8: NHẬT KÝ TELEMETRY AUDIT LOGS (Screenshot 2 Replication) */}
+            {activeMenu === 'system_log' && (() => {
+              
+              {/* STATIC LOGS POOL CORRESPONDING TO SCREENSHOT 2 REPLICATION */}
+              const mockAuditLogs = [
+                {
+                  id: 'AUD-001',
+                  time: '14:23:05',
+                  date: '12/10/2023',
+                  actor: 'Nguyen Van A',
+                  actorId: 'U-8923',
+                  avatar: 'NV',
+                  action: 'Cập nhật cấu hình phí đỗ xe',
+                  desc: 'Mô-đun: /api/v1/billing/rates',
+                  ip: '192.168.1.15',
+                  device: 'Chrome / Windows',
+                  status: 'SUCCESS',
+                  payload: {
+                    timestamp: "2023-10-12T14:23:05Z",
+                    level: "INFO",
+                    actor: {
+                      type: "user",
+                      id: "U-8923",
+                      name: "Nguyen Van A"
+                    },
+                    action: "billing.update_rates",
+                    resource: "/api/v1/billing/rates",
+                    context: {
+                      ip_address: "192.168.1.15",
+                      user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/118.0.0.0",
+                      rate_multiplier: 1.25
+                    },
+                    response: {
+                      status: 200,
+                      bytes: 1420
+                    }
+                  }
+                },
+                {
+                  id: 'AUD-002',
+                  time: '14:15:22',
+                  date: '12/10/2023',
+                  actor: 'Unknown',
+                  actorId: 'admin_test',
+                  avatar: '?',
+                  action: 'Cố gắng đăng nhập sai mật khẩu (Lần 3)',
+                  desc: 'Mô-đun: /api/v1/login',
+                  ip: '203.205.23.44',
+                  device: 'Python-urllib/3.0',
+                  status: 'FAILED',
+                  payload: {
+                    timestamp: "2023-10-12T14:15:22Z",
+                    level: "WARN",
+                    actor: {
+                      type: "system",
+                      id: "admin_test"
+                    },
+                    action: "user.auth",
+                    resource: "/api/v1/login",
+                    context: {
+                      ip_address: "203.205.23.44",
+                      attempt_sequence: 3,
+                      failure_reason: "password_mismatch"
+                    },
+                    response: {
+                      status: 401,
+                      error: "Unauthorized"
+                    }
+                  }
+                },
+                {
+                  id: 'AUD-003',
+                  time: '13:45:10',
+                  date: '12/10/2023',
+                  actor: 'System Auto',
+                  actorId: 'SYS-001',
+                  avatar: 'SA',
+                  action: 'Đóng barrier khẩn cấp - Làn vào CS2',
+                  desc: 'Mô-đun: /dev/iot/barrier/lane_in_02/force_close',
+                  ip: '10.0.0.52',
+                  device: 'Edge Node',
+                  status: 'WARNING',
+                  payload: {
+                    timestamp: "2023-10-12T05:45:10Z",
+                    level: "WARN",
+                    actor: {
+                      type: "system",
+                      id: "SYS-001"
+                    },
+                    action: "barrier.force_close",
+                    resource: "Lane_In_02",
+                    context: {
+                      ip_address: "10.0.0.52",
+                      trigger_reason: "vehicle_tailgating_detected",
+                      confidence_score: 0.94
+                    },
+                    response: {
+                      status: 200,
+                      latency_ms: 142
+                    }
+                  }
+                },
+                {
+                  id: 'AUD-004',
+                  time: '11:02:40',
+                  date: '12/10/2023',
+                  actor: 'Le Van Cuong',
+                  actorId: 'U-4813',
+                  avatar: 'LC',
+                  action: 'Kích hoạt thẻ từ vãng lai',
+                  desc: 'Mô-đun: /api/v1/guest/issue_ticket',
+                  ip: '10.0.0.52',
+                  device: 'Edge Node P5',
+                  status: 'SUCCESS',
+                  payload: {
+                    timestamp: "2023-10-12T11:02:40Z",
+                    level: "INFO",
+                    actor: {
+                      type: "staff",
+                      id: "U-4813",
+                      name: "Le Van Cuong"
+                    },
+                    action: "ticket.issue",
+                    context: {
+                      terminal_id: "BOOT_01",
+                      card_rfid: "99A1054C",
+                      assigned_zone: "B1_ZONE_A"
+                    },
+                    response: {
+                      status: 200,
+                      ticket_id: "TKT-4412"
+                    }
+                  }
+                },
+                {
+                  id: 'AUD-005',
+                  time: '09:12:00',
+                  date: '12/10/2023',
+                  actor: 'Tran Thi Be',
+                  actorId: 'U-8212',
+                  avatar: 'TB',
+                  action: 'Gia hạn thẻ tháng thành công',
+                  desc: 'Mô-đun: /api/v1/customers/renew_pass',
+                  ip: '192.168.1.18',
+                  device: 'Chrome / macOS',
+                  status: 'SUCCESS',
+                  payload: {
+                    timestamp: "2023-10-12T09:12:00Z",
+                    level: "SUCCESS",
+                    actor: {
+                      type: "staff",
+                      id: "U-8212",
+                      name: "Tran Thi Be"
+                    },
+                    action: "customer.pass_renew",
+                    context: {
+                      ip_address: "192.168.1.18",
+                      plate: "29F-441.52",
+                      renew_months: 3,
+                      price_vnpay: 300000
+                    },
+                    response: {
+                      status: 200,
+                      serial_id: "S-55102"
+                    }
+                  }
+                }
+              ];
+
+              {/* FILTERED POOL CALCS */}
+              const filteredAuditLogs = mockAuditLogs.filter(log => {
+                const query = auditSearch.toLowerCase();
+                const matchesSearch = log.actor.toLowerCase().includes(query) || log.actorId.toLowerCase().includes(query) || log.action.toLowerCase().includes(query) || log.ip.includes(query);
+                
+                if (!matchesSearch) return false;
+                
+                if (auditModuleFilter !== 'Tất cả') {
+                  if (auditModuleFilter === 'Người dùng' && !log.actorId.startsWith('U-')) return false;
+                  if (auditModuleFilter === 'Barrier' && !log.desc.includes('barrier')) return false;
+                  if (auditModuleFilter === 'Thanh toán' && !log.desc.includes('billing') && !log.desc.includes('renew')) return false;
+                }
+
+                if (auditStatusFilter !== 'Tất cả') {
+                  if (auditStatusFilter === 'SUCCESS' && log.status !== 'SUCCESS') return false;
+                  if (auditStatusFilter === 'FAILED' && log.status !== 'FAILED') return false;
+                  if (auditStatusFilter === 'WARNING' && log.status !== 'WARNING') return false;
+                }
+
+                return true;
+              });
+
+              const selectedLogPayload = mockAuditLogs.find(log => log.id === selectedLogId);
+
+              return (
+                <div className="space-y-6 animate-fade-in text-left font-sans" id="audit-logs-sub-view">
+                  
+                  {/* HEADER ROW WITH CSV EXPORT BUTTON (Screenshot 2 Replication) */}
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                      <h2 className="text-2.5xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        Nhật ký hS thống (Audit Logs)
+                      </h2>
+                      <p className="text-slate-500 dark:text-slate-400 text-xs">
+                        Giám sát và theo dõi mọi hoạt động trong hệ thống quản trị.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => triggerToast("Đã trích xuất và tải xuống tập tin Audit_Logs.csv thành công!", "success")}
+                      className="px-4 py-2 bg-white dark:bg-slate-905 border border-slate-205 dark:border-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-xl font-bold transition-all shadow-xs flex items-center gap-1.5 text-xs"
+                    >
+                      {/* Minimalist export csv icon */}
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>Xuất CSV</span>
+                    </button>
+                  </div>
+
+                  {/* SEARCH FILTERS AND MODULE DROP-DOWNS (Screenshot 2 Replication) */}
+                  <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+                    {/* Search query input */}
+                    <div className="relative flex-1">
+                      <Search className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input 
+                        type="text" 
+                        placeholder="Tìm kiếm IP, User ID, hoặc hành động..." 
+                        value={auditSearch}
+                        onChange={(e) => setAuditSearch(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-850 rounded-xl text-xs bg-white dark:bg-slate-950 font-medium focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Module Filter Dropdown */}
+                    <div className="min-w-[130px]">
+                      <select
+                        value={auditModuleFilter}
+                        onChange={(e) => setAuditModuleFilter(e.target.value)}
+                        className="w-full px-2.5 py-2 border border-slate-200 dark:border-slate-850 rounded-xl text-xs bg-white dark:bg-slate-950 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="Tất cả">Tất cả Mô-đun</option>
+                        <option value="Người dùng">Mô-đun Người dùng</option>
+                        <option value="Barrier">Mô-đun Barrier (IoT)</option>
+                        <option value="Thanh toán">Mô-đun Thanh toán</option>
+                      </select>
+                    </div>
+
+                    {/* Status Filter Dropdown */}
+                    <div className="min-w-[130px]">
+                      <select
+                        value={auditStatusFilter}
+                        onChange={(e) => setAuditStatusFilter(e.target.value)}
+                        className="w-full px-2.5 py-2 border border-slate-200 dark:border-slate-850 rounded-xl text-xs bg-white dark:bg-slate-950 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="Tất cả">Tất cả Trạng thái</option>
+                        <option value="SUCCESS">Thành công</option>
+                        <option value="FAILED">Thất bại</option>
+                        <option value="WARNING">Cảnh báo</option>
+                      </select>
+                    </div>
+
+                    {/* Advanced filter toggles button */}
+                    <button
+                      onClick={() => {
+                        setAuditSearch('');
+                        setAuditModuleFilter('Tất cả');
+                        setAuditStatusFilter('Tất cả');
+                        triggerToast("Đã thiết lập lại bộ lọc trạng thái!", "info");
+                      }}
+                      className="px-4 py-2 border border-slate-200 dark:border-slate-850 text-slate-600 dark:text-slate-350 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 text-xs"
+                    >
+                      {/* Advanced filter custom slider icon */}
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                      </svg>
+                      <span>Bộ lọc nâng cao</span>
+                    </button>
+                  </div>
+
+                  {/* LOGS LIST DATA TABLE (Screenshot 2 Replication) */}
+                  <div className={`bg-white dark:bg-slate-905 border rounded-2xl ${isDarkMode ? 'border-slate-800' : 'border-slate-200/60 shadow-xs'} overflow-hidden`}>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left font-sans text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-100 dark:border-slate-850 text-slate-400 font-bold uppercase text-[10px] tracking-wider select-none">
+                            <th className="py-3 px-4">THỜI GIAN</th>
+                            <th className="py-3 px-4">NGƯỜI THỰC HIỆN</th>
+                            <th className="py-3 px-4">MÔ-ĐUN & HÀNH ĐỘNG</th>
+                            <th className="py-3 px-4">IP / THIẾT BỊ</th>
+                            <th className="py-3 px-4">KẾT QUẢ</th>
+                            <th className="py-3 px-4 text-center">CHI TIẾT</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
+                          {filteredAuditLogs.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="py-8 px-4 text-center text-slate-400 font-medium">
+                                Không tìm thấy sự kiện audit nào phù hợp bộ lọc.
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredAuditLogs.map(log => {
+                              const isSuccess = log.status === 'SUCCESS';
+                              const isFailed = log.status === 'FAILED';
+                              const isWarning = log.status === 'WARNING';
+                              const isSelected = selectedLogId === log.id;
+                              
+                              return (
+                                <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/10 transition-colors">
+                                  
+                                  {/* TIME COLUMN */}
+                                  <td className="py-3.5 px-4 font-mono font-bold text-slate-500 text-[11px]">
+                                    <span className="block">{log.time}</span>
+                                    <span className="text-[9px] text-slate-400 font-medium tracking-tight block mt-0.5">{log.date}</span>
+                                  </td>
+
+                                  {/* ACTOR COLUMN */}
+                                  <td className="py-3.5 px-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className={`w-8 h-8 rounded-full font-black text-xs flex items-center justify-center shrink-0 border uppercase ${
+                                        isWarning 
+                                          ? 'bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200/50 dark:border-amber-900/30' 
+                                          : isFailed 
+                                          ? 'bg-rose-100 dark:bg-rose-950/30 text-rose-700 dark:text-rose-455 border-rose-200/50 dark:border-rose-900/30' 
+                                          : 'bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200/50 dark:border-blue-900/30'
+                                      }`}>
+                                        {log.avatar}
+                                      </div>
+                                      <div>
+                                        <strong className="text-slate-850 dark:text-white block font-black">{log.actor}</strong>
+                                        <span className="text-[10px] text-slate-400 font-mono font-medium block mt-0.5">ID: {log.actorId}</span>
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* ACTION & MODULE COLUMN */}
+                                  <td className="py-3.5 px-4 leading-normal">
+                                    <strong className={`block font-black ${isFailed ? 'text-rose-500' : 'text-slate-850 dark:text-white'}`}>
+                                      {log.action}
+                                    </strong>
+                                    <span className="inline-block mt-1 px-1.5 py-0.5 rounded font-mono font-medium text-[9.5px] bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 text-slate-500">
+                                      {log.desc}
+                                    </span>
+                                  </td>
+
+                                  {/* IP / DEVICE COLUMN */}
+                                  <td className="py-3.5 px-4 font-mono">
+                                    <strong className="text-slate-750 dark:text-slate-300 block text-[10.5px] font-black">{log.ip}</strong>
+                                    <span className="text-[10px] text-slate-400 font-sans block mt-0.5">{log.device}</span>
+                                  </td>
+
+                                  {/* STATUS BADGE COLUMN */}
+                                  <td className="py-3.5 px-4">
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${
+                                      isSuccess 
+                                        ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30' 
+                                        : isFailed 
+                                        ? 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-455 border-rose-100 dark:border-rose-900/30'
+                                        : 'bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30'
+                                    }`}>
+                                      {isSuccess ? 'THÀNH CÔNG' : isFailed ? 'THẤT BẠI' : 'CẢNH BÁO'}
+                                    </span>
+                                  </td>
+
+                                  {/* ACTIONS TOGGLE PAYLOAD COLUMN */}
+                                  <td className="py-3.5 px-4 text-center select-none">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedLogId(isSelected ? null : log.id);
+                                        triggerToast(`Đang hiển thị payload JSON cho mã ID: ${log.id}`, 'info');
+                                      }}
+                                      className={`p-1.5 rounded-lg border font-mono font-bold transition-all duration-150 ${
+                                        isSelected 
+                                          ? 'bg-blue-600 border-transparent text-white shadow-xs' 
+                                          : 'bg-white dark:bg-slate-950 hover:bg-slate-105 border-slate-200 dark:border-slate-850 text-slate-500 dark:text-slate-400'
+                                      }`}
+                                      title="Xem chi tiết Payload JSON"
+                                    >
+                                      {"{ }"}
+                                    </button>
+                                  </td>
+
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* PAGINATION CHAT BAR (Screenshot 2 Replication) */}
+                    <div className="flex flex-col sm:flex-row justify-between items-center px-4 py-3 bg-slate-50/50 dark:bg-slate-950/20 border-t border-slate-100 dark:border-slate-850 gap-4 select-none text-xs">
+                      <span className="text-slate-450 dark:text-slate-400 font-medium font-sans">
+                        Hiển thị 1-5 trong 12,450 bản ghi
+                      </span>
+                      
+                      <div className="flex items-center gap-1.5 font-sans">
+                        <button className="p-1 px-2.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-950 font-bold hover:bg-slate-50">&lt;</button>
+                        <button className="px-3 py-1 font-extrabold bg-blue-600 text-white rounded-lg">1</button>
+                        <button className="px-3 py-1 font-bold border border-slate-201 dark:border-slate-800 hover:bg-slate-50 rounded-lg bg-white dark:bg-slate-950">2</button>
+                        <button className="px-3 py-1 font-bold border border-slate-201 dark:border-slate-800 hover:bg-slate-50 rounded-lg bg-white dark:bg-slate-950">3</button>
+                        <span className="text-slate-400 font-medium">...</span>
+                        <button className="px-3 py-1 font-bold border border-slate-201 dark:border-slate-800 hover:bg-slate-50 rounded-lg bg-white dark:bg-slate-950">249</button>
+                        <button className="p-1 px-2.5 border border-slate-200 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-950 font-bold hover:bg-slate-50">&gt;</button>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* EXPANDABLE JSON PAYLOAD CODE VIEWER (Screenshot 2 Replication) */}
+                  <AnimatePresence>
+                    {selectedLogPayload && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 15 }} 
+                        animate={{ opacity: 1, y: 0 }} 
+                        exit={{ opacity: 0, y: 15 }} 
+                        className="rounded-2xl bg-[#0b0f19] border border-slate-850/80 p-5 shadow-xl font-mono text-[11px] leading-relaxed relative text-left overflow-hidden w-full"
+                      >
+                        
+                        {/* TERMINAL HEADER & BUTTONS */}
+                        <div className="flex justify-between items-center pb-3 border-b border-slate-800 mb-4 select-none">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block" />
+                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
+                            <span className="text-slate-450 uppercase font-black text-[10px] tracking-widest pl-2">
+                              Chi tiết Payload (JSON) — ID: {selectedLogPayload.id}
+                            </span>
+                          </div>
+                          
+                          <button
+                            onClick={() => setSelectedLogId(null)}
+                            className="text-slate-500 hover:text-white font-extrabold text-xs bg-slate-850/40 p-1 px-2 rounded-md border border-slate-800 hover:bg-slate-800 transition-colors"
+                          >
+                            Đóng ✕
+                          </button>
+                        </div>
+
+                        {/* HIGHLY COMPREHENSIVE RECONSTRUCTED JSON HIGHLIGHTING */}
+                        <pre className="text-slate-300 max-h-[350px] overflow-y-auto select-text py-1 block">
+                          <code>
+                            {"{\n"}
+                            {"  "}
+                            <span className="text-blue-400">"timestamp"</span>: <span className="text-amber-300">"{selectedLogPayload.payload.timestamp}"</span>,
+                            {"\n"}
+                            {"  "}
+                            <span className="text-blue-400">"level"</span>: <span className="text-amber-300">"{selectedLogPayload.payload.level}"</span>,
+                            {"\n"}
+                            {"  "}
+                            <span className="text-blue-400">"actor"</span>: {"{\n"}
+                            {"    "}
+                            <span className="text-blue-400">"type"</span>: <span className="text-amber-300">"{selectedLogPayload.payload.actor.type}"</span>,
+                            {"\n"}
+                            {"    "}
+                            <span className="text-blue-400">"id"</span>: <span className="text-amber-300">"{selectedLogPayload.payload.actor.id}"</span>
+                            {selectedLogPayload.payload.actor.name ? (
+                              <>
+                                ,{"\n"}
+                                {"    "}
+                                <span className="text-blue-400">"name"</span>: <span className="text-amber-300">"{selectedLogPayload.payload.actor.name}"</span>
+                              </>
+                            ) : ""}
+                            {"\n"}
+                            {"  }"},
+                            {"\n"}
+                            {"  "}
+                            <span className="text-blue-400">"action"</span>: <span className="text-amber-300">"{selectedLogPayload.payload.action}"</span>,
+                            {"\n"}
+                            {"  "}
+                            <span className="text-blue-400">"resource"</span>: <span className="text-amber-300">"{selectedLogPayload.desc}"</span>,
+                            {"\n"}
+                            {"  "}
+                            <span className="text-blue-400">"context"</span>: {"{\n"}
+                            {Object.entries(selectedLogPayload.payload.context).map(([key, val], idx, arr) => {
+                              const isStr = typeof val === 'string';
+                              const isObj = typeof val === 'object';
+                              return (
+                                <span key={key}>
+                                  {"    "}
+                                  <span className="text-blue-400">"{key}"</span>:{" "}
+                                  {isObj ? (
+                                    <>
+                                      {"{\n"}
+                                      {Object.entries(val).map(([subK, subV], sIdx, sArr) => (
+                                        <span key={subK}>
+                                          {"      "}
+                                          <span className="text-blue-400">"{subK}"</span>:{" "}
+                                          {typeof subV === 'string' ? (
+                                            <span className="text-amber-300">"{subV}"</span>
+                                          ) : (
+                                            <span className="text-amber-500">{String(subV)}</span>
+                                          )}
+                                          {sIdx < sArr.length - 1 ? "," : ""}
+                                          {"\n"}
+                                        </span>
+                                      ))}
+                                      {"    }"}
+                                    </>
+                                  ) : isStr ? (
+                                    <span className="text-amber-300">"{val}"</span>
+                                  ) : (
+                                    <span className="text-amber-500">{String(val)}</span>
+                                  )}
+                                  {idx < arr.length - 1 ? "," : ""}
+                                  {"\n"}
+                                </span>
+                              );
+                            })}
+                            {"  }"},
+                            {"\n"}
+                            {"  "}
+                            <span className="text-blue-400">"response"</span>: {"{\n"}
+                            {Object.entries(selectedLogPayload.payload.response).map(([key, val], idx, arr) => {
+                              const isStr = typeof val === 'string';
+                              return (
+                                <span key={key}>
+                                  {"    "}
+                                  <span className="text-blue-400">"{key}"</span>:{" "}
+                                  {isStr ? (
+                                    <span className="text-amber-300">"{val}"</span>
+                                  ) : (
+                                    <span className="text-amber-300">{String(val)}</span>
+                                  )}
+                                  {idx < arr.length - 1 ? "," : ""}
+                                  {"\n"}
+                                </span>
+                              );
+                            })}
+                            {"  }"}
+                            {"\n"}
+                            {"}"}
+                          </code>
+                        </pre>
+
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                </div>
+              );
+            })()}
+          </>)}
           </div>
 
-          {/* FOOTER */}
-          <footer className="border-t border-slate-200 dark:border-slate-850 p-4 text-center text-[10px] font-mono tracking-wider text-slate-400 bg-white dark:bg-slate-900 select-none">
-            URBANPARK • SHIELD SECURITY ACTIVE PROTECTION FRAMEWORK © {new Date().getFullYear()}
+          {/* SYSTEM WIDE INTEGRATED FOOTER */}
+          <footer className={`px-6 py-4 border-t select-none text-xs font-sans mt-auto leading-none ${isDarkMode ? 'bg-[#0f172a] border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              <span>© 2026 UrbanPark Infrastructure Management Corporation. Toàn bộ thông tin được bảo mật.</span>
+              <div className="flex gap-4">
+                <a href="#" className="hover:underline">Điều khoản dịch vụ</a>
+                <a href="#" className="hover:underline">An ninh chính phủ</a>
+                <a href="#" className="hover:underline">Trợ giúp kỹ thuật</a>
+              </div>
+            </div>
           </footer>
 
-        </div>
+        </main>
 
       </div>
-
     </div>
   );
 }
