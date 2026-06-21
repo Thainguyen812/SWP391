@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Home, 
   Layers, 
@@ -10,40 +10,18 @@ import {
   Sparkles, 
   Compass, 
   Wrench, 
-  History 
+  History,
+  Search,
+  Check,
+  X,
+  AlertTriangle,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Filter,
+  Eye,
+  Star
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-
-// Highly polished, realistic 2D vector graphic representing a top-down view of a car
-const TopDownCarSVG = ({ color }: { color: string }) => {
-  return (
-    <svg viewBox="0 0 100 50" className="w-full h-8 select-none pointer-events-none drop-shadow-md">
-      {/* Wheels */}
-      <rect x="15" y="1" width="14" height="6" rx="2" fill="#1e293b" />
-      <rect x="70" y="1" width="14" height="6" rx="2" fill="#1e293b" />
-      <rect x="15" y="43" width="14" height="6" rx="2" fill="#1e293b" />
-      <rect x="70" y="43" width="14" height="6" rx="2" fill="#1e293b" />
-      
-      {/* Car body */}
-      <rect x="8" y="5" width="84" height="40" rx="10" fill={color} />
-      
-      {/* Roof outline */}
-      <rect x="25" y="10" width="46" height="30" rx="6" fill="#111827" opacity="0.15" />
-      
-      {/* Windshields */}
-      <path d="M 28,12 L 34,9 L 34,41 L 28,38 Z" fill="#e2e8f0" opacity="0.8" />
-      <path d="M 68,12 L 62,9 L 62,41 L 68,38 Z" fill="#e2e8f0" opacity="0.8" />
-      
-      {/* Headlights */}
-      <rect x="91" y="9" width="3" height="6" rx="1.5" fill="#fef08a" />
-      <rect x="91" y="35" width="3" height="6" rx="1.5" fill="#fef08a" />
-      
-      {/* Taillights */}
-      <rect x="7" y="10" width="3" height="5" rx="1" fill="#ef4444" />
-      <rect x="7" y="35" width="3" height="5" rx="1" fill="#ef4444" />
-    </svg>
-  );
-};
 
 interface ParkingMonitorViewProps {
   blueprintSlots: any[];
@@ -112,748 +90,709 @@ export function ParkingMonitorView({
   setShowFloorDropdown
 }: ParkingMonitorViewProps) {
 
-  // Dynamic status values matching the exact numbers shown in the screenshots
-  const totalSlotsStatic = 1500;
-  // Dynamic offset to scale based on current mock database
-  const activeOccupiedInDb = blueprintSlots.filter(s => s.status === 'ĐÃ ĐỖ' || s.status === 'XE VIP').length;
-  const activeVipInDb = blueprintSlots.filter(s => s.status === 'XE VIP').length;
+  const [activeTabFloor, setActiveTabFloor] = useState<'B1' | 'B2'>('B1');
+  const [activitySearchQuery, setActivitySearchQuery] = useState('');
+
+  // Total spots in systems (exact Screenshot 2 match)
+  const totalSlotsStatic = 500;
   
-  // Base offset to meet the exact static screenshot target (1,248 and 42)
-  const currentTotalOccupied = 1239 + activeOccupiedInDb;
-  const currentTotalVip = 39 + activeVipInDb;
-  const currentTotalVacant = totalSlotsStatic - currentTotalOccupied;
-  const occupiedPercentage = Math.round((currentTotalOccupied / totalSlotsStatic) * 100);
+  // Initial occupied is 342, vip is 12, vacant is 158.
+  // We can track the modifications based on the state of blueprintSlots relative to initial state.
+  const initialOccupiedCount = 9; // Number of initial non-vacant in manual config
+  const initialVipCount = 3; 
+
+  const currentOccupiedInDb = blueprintSlots.filter(s => s.status === 'ĐÃ ĐỖ' || s.status === 'XE VIP').length;
+  const currentVipInDb = blueprintSlots.filter(s => s.status === 'XE VIP').length;
+
+  const deltaOccupied = currentOccupiedInDb - initialOccupiedCount;
+  const deltaVip = currentVipInDb - initialVipCount;
+
+  const currentTotalOccupied = Math.max(0, 342 + deltaOccupied);
+  const currentTotalVip = Math.max(0, 12 + deltaVip);
+  const currentTotalVacant = Math.max(0, totalSlotsStatic - currentTotalOccupied);
+
+  // Static Screenshot 2 activities prepended with new ones
+  const staticActivities = [
+    { id: 'sa-1', plate: '30A-123.45', type: 'VĂNG LAI', gate: 'Cổng vào 1', time: 'Vừa xong', action: 'Vào', status: 'VĂNG LAI' },
+    { id: 'sa-2', plate: '51F-987.65', type: 'VIP', gate: 'Cổng ra 2', time: '2 phút trước', action: 'Ra', status: 'VIP' },
+    { id: 'sa-3', plate: '29C-444.11', type: 'THUÊ BAO', gate: 'Cổng vào 3', time: '5 phút trước', action: 'Vào', status: 'THUÊ BAO' },
+    { id: 'sa-4', plate: 'UNKNOWN', type: 'CẢNH BÁO LPR', gate: 'Cổng vào 1', time: '10 phút trước', action: 'ALERT', status: 'ALERT' }
+  ];
+
+  // Merge runtime dynamic activities with static screenshot ones
+  const allActivitiesDisplay = [
+    ...recentActivities.map(act => ({
+      id: act.id,
+      plate: act.plate,
+      type: act.vip ? 'VIP' : 'VĂNG LAI',
+      gate: act.gate || 'Cổng vào 1',
+      time: act.time || 'Vừa xong',
+      action: act.action || 'Vào',
+      status: act.vip ? 'VIP' : 'VĂNG LAI'
+    })),
+    ...staticActivities
+  ].filter(act => {
+    if (!activitySearchQuery) return true;
+    const q = activitySearchQuery.toLowerCase();
+    return act.plate.toLowerCase().includes(q) || act.gate.toLowerCase().includes(q) || act.type.toLowerCase().includes(q);
+  });
 
   return (
-    <div className="space-y-6 animate-fade-in text-slate-800 dark:text-slate-150" id="parking-monitor-board">
-      
-      {/* TWO-COLUMN WORKSPACE GRID */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-        
-        {/* LEFT COLUMN (COLSPAN 8): FILTERS & ARCHITECTURAL BLUEPRINT */}
-        <div className="xl:col-span-8 space-y-4">
+    <div className="space-y-6 animate-fade-in text-slate-800 dark:text-slate-100 font-sans" id="parking-monitor-board">
+
+      {/* ADMIN INTERACTIVE SIMULATION & DIAGNOSTIC PANEL */}
+      <div id="admin-simulation-pnl" className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl space-y-4 text-left">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse shrink-0" />
+            <h3 className="text-xs font-black text-slate-850 dark:text-slate-105 uppercase tracking-widest font-sans">
+              Bảng Thử Nghiệm Tình Huống Kỹ Thuật & Giả Lập Hệ Thống (Mã nguồn Bốt Vận Hành)
+            </h3>
+          </div>
+          <span className="text-[10px] bg-slate-100 dark:bg-slate-900 px-2 py-1 rounded-md text-slate-500 font-mono font-bold">
+            ADMIN KERNEL V2.1
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           
-          {/* HEADER SELECTION ROW WITH DROPDOWNS AND REAL-TIME ACTION TRIGGERS */}
-          <div className="flex flex-wrap items-center gap-3 pb-1">
-            
-            {/* Facility selector */}
-            <div className="relative">
-              <button 
+          {/* GOOD SCENARIOS (TRƯỜNG HỢP TỐT) */}
+          <div className="p-4 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-xl border border-emerald-500/10 dark:border-emerald-500/20 space-y-3">
+            <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-bold text-xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>TRƯỜNG HỢP TỐT (SUCCESS RUNS)</span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
+              Thử nghiệm hệ thống tự động hóa khi thiết bị ngoài bãi hoạt động hoàn hảo:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
                 onClick={() => {
-                  setShowFacilityDropdown(!showFacilityDropdown);
-                  setShowFloorDropdown(false);
+                  let count = 0;
+                  const updatedSlots = blueprintSlots.map(s => {
+                    if (s.status === 'CÒN' && count < 3) {
+                      count++;
+                      return {
+                        ...s,
+                        status: 'ĐÃ ĐỖ',
+                        vehicleType: 'Sedan',
+                        plate: `30F-${Math.floor(10000 + Math.random() * 90000)}`,
+                        entryTime: '15:10'
+                      };
+                    }
+                    return s;
+                  });
+                  setBlueprintSlots(updatedSlots);
+                  triggerToast('Giả lập: 3 xe ô tô quét biển LPR chuẩn và vào bầm thành công!', 'success');
                 }}
-                className={`px-4 py-2 bg-white dark:bg-slate-900 border rounded-lg text-xs font-bold flex items-center gap-2 select-none min-w-[170px] justify-between shadow-xs transition-all duration-150 cursor-pointer ${
-                  showFacilityDropdown ? 'border-blue-500 ring-2 ring-blue-500/10' : 'border-slate-200 dark:border-slate-800'
-                }`}
+                className="p-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-[10px] rounded-lg transition-all text-center cursor-pointer"
               >
-                <span className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                  <Home className="w-3.5 h-3.5 text-slate-500" />
-                  <span>{monitoringFacility}</span>
-                </span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
+                Đồng bộ LPR (3 Xe Vào)
               </button>
               
-              <AnimatePresence>
-                {showFacilityDropdown && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 5 }}
-                    className="absolute left-0 mt-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg z-30 overflow-hidden"
-                  >
-                    {['Cơ sở chính (HQ)', 'Cơ sở Bắc Từ Liêm', 'Cơ sở Quận 1 (HCMC)'].map(fac => (
-                      <button
-                        key={fac}
-                        onClick={() => {
-                          setMonitoringFacility(fac);
-                          setShowFacilityDropdown(false);
-                          triggerToast(`Chuyển sang: ${fac}`, 'info');
-                        }}
-                        className="w-full text-left px-4 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800/60 font-medium text-slate-700 dark:text-slate-300 transition-colors block cursor-pointer"
-                      >
-                        {fac}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Floor level selector */}
-            <div className="relative">
-              <button 
+              <button
+                type="button"
                 onClick={() => {
-                  setShowFloorDropdown(!showFloorDropdown);
-                  setShowFacilityDropdown(false);
-                }}
-                className={`px-4 py-2 bg-white dark:bg-slate-900 border rounded-lg text-xs font-bold flex items-center gap-2 select-none min-w-[140px] justify-between shadow-xs transition-all duration-150 cursor-pointer ${
-                  showFloorDropdown ? 'border-blue-500 ring-2 ring-blue-500/10' : 'border-slate-200 dark:border-slate-800'
-                }`}
-              >
-                <span className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-                  <Layers className="w-3.5 h-3.5 text-slate-500" />
-                  <span>{monitoringFloor}</span>
-                </span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
-              </button>
-              
-              <AnimatePresence>
-                {showFloorDropdown && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 5 }}
-                    className="absolute left-0 mt-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg z-30 overflow-hidden"
-                  >
-                    {['Tầng hầm B1', 'Tầng hầm B2', 'Tầng trệt G'].map(flr => (
-                      <button
-                        key={flr}
-                        onClick={() => {
-                          setMonitoringFloor(flr);
-                          setShowFloorDropdown(false);
-                          triggerToast(`Bộ lọc sơ đồ: ${flr}`, 'success');
-                        }}
-                        className="w-full text-left px-4 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800/60 font-medium text-slate-700 dark:text-slate-300 transition-colors block cursor-pointer"
-                      >
-                        {flr}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Simulated Live Action Controls representing functional gates */}
-            <div className="sm:ml-auto flex items-center gap-2">
-              <button 
-                onClick={() => {
-                  // Find first vacant spot in Level B1
-                  const vacant = blueprintSlots.find(s => s.status === 'CÒN');
-                  if (!vacant) {
-                    triggerToast('Hầm B1 đã chật kín, mô phỏng xe vào tự động chuyển bãi đỗ khác!', 'error');
+                  const occupied = blueprintSlots.find(s => s.status === 'ĐÃ ĐỖ');
+                  if (!occupied) {
+                    triggerToast('Không có phương tiện giả lập để thanh toán!', 'error');
                     return;
                   }
-                  const mockPlates = ['51A-892.44', '29C-123.99', '30F-999.99', '60A-112.33', '43B-777.88', '30K-959.59'];
-                  const randomPlate = mockPlates[Math.floor(Math.random() * mockPlates.length)];
-                  const isVipRandom = Math.random() > 0.6 || randomPlate === '30F-999.99';
-                  const carType = randomPlate === '29C-123.99' ? 'SUV' : 'Sedan';
+                  handleManualCheckOut(occupied.id, occupied.label);
+                  triggerToast(`Xác nhận thanh toán tự động hoàn tất cho ô ${occupied.label}!`, 'success');
+                }}
+                className="p-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-[10px] rounded-lg transition-all text-center cursor-pointer"
+              >
+                Thống toán & Giải toả ô đỗ
+              </button>
+            </div>
+          </div>
+
+          {/* BAD SCENARIOS (TRƯỜNG HỢP XẤU) */}
+          <div className="p-4 bg-rose-500/5 dark:bg-rose-500/10 rounded-xl border border-rose-500/10 dark:border-rose-500/20 space-y-3">
+            <div className="flex items-center gap-1.5 text-rose-700 dark:text-rose-400 font-bold text-xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+              <span>TRƯỜNG HỢP XẤU & SỰ CỐ (FAULT TUNING)</span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
+              Phát hiện và cảnh báo tức thời các trạng thái không an sau ngoài bến bãi:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  triggerToast('🚨 HỆ THỐNG PHÁT HIỆN: Camera LPR Cổng Vào 1 bị che khuất hoặc lỗi tín hiệu!', 'error');
+                }}
+                className="p-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-[10px] rounded-lg transition-all text-center cursor-pointer"
+              >
+                Mất tín hiệu camera LPR
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  triggerToast('⚠️ CẢNH BÁO BÓT GÁC: Cảm biến vòng từ (Loop Sensor) kẹt ở cổng 2!', 'error');
+                }}
+                className="p-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-[10px] rounded-lg transition-all text-center cursor-pointer"
+              >
+                Lỗi kẹt cảm biến vòng từ
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <div className="text-[10px] dark:text-slate-400 text-slate-500 leading-normal bg-slate-50 dark:bg-slate-950 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
+          📍 <strong>Mẹo kiểm tra phản xạ vận hành:</strong> Bằng cách giả lập <strong>"Mất tín hiệu camera LPR"</strong>, bốt trực sẽ được thông báo ngay điều hướng nhân viên bảo an kiểm tra đầu cáp quang hoặc chuyển sang chụp ảnh thủ công bằng app di động để khắc phục tức thời!
+        </div>
+      </div>
+      
+      {/* TOP FOUR STATS CARDS ROW (Exact Screenshot 2 Replication) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 select-none">
+        
+        {/* CARD 1: TỔNG CHỖ */}
+        <div className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 flex items-center gap-4 shadow-3xs">
+          <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl font-black font-mono shrink-0">
+            P
+          </div>
+          <div>
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">TỔNG CHỖ</span>
+            <h3 className="text-3xl font-black font-sans leading-tight mt-0.5">{totalSlotsStatic}</h3>
+          </div>
+        </div>
+
+        {/* CARD 2: ĐANG ĐỖ */}
+        <div className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 flex flex-col justify-between shadow-3xs relative overflow-hidden">
+          <div className="flex justify-between items-start">
+            <div>
+              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">ĐANG ĐỖ</span>
+              <h3 className="text-3xl font-black font-sans leading-tight mt-0.5">{currentTotalOccupied}</h3>
+            </div>
+            <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/20 text-rose-550 dark:text-rose-455">
+              <Activity className="w-4 h-4" />
+            </div>
+          </div>
+          {/* Visual Red/Orange Line Indicator */}
+          <div className="w-full h-1 bg-slate-100 dark:bg-slate-800 rounded-full mt-4 overflow-hidden">
+            <div className="h-full bg-rose-500" style={{ width: `${Math.round((currentTotalOccupied / totalSlotsStatic) * 100)}%` }} />
+          </div>
+        </div>
+
+        {/* CARD 3: TRỐNG */}
+        <div className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 flex flex-col justify-between shadow-3xs relative overflow-hidden">
+          <div className="flex justify-between items-start">
+            <div>
+              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">TRỐNG</span>
+              <h3 className="text-3xl font-black font-sans leading-tight mt-0.5 text-emerald-600 dark:text-emerald-400">{currentTotalVacant}</h3>
+            </div>
+            <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600">
+              <Check className="w-4 h-4 stroke-[2.5]" />
+            </div>
+          </div>
+          {/* Visual Green Line Indicator */}
+          <div className="w-full h-1 bg-slate-100 dark:bg-slate-800 rounded-full mt-4 overflow-hidden">
+            <div className="h-full bg-emerald-500" style={{ width: `${Math.round((currentTotalVacant / totalSlotsStatic) * 100)}%` }} />
+          </div>
+        </div>
+
+        {/* CARD 4: XE VIP */}
+        <div className="bg-slate-900 dark:bg-slate-950 border border-slate-800 rounded-2xl p-5 flex items-center justify-between text-white shadow-md relative overflow-hidden">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-slate-800 text-amber-400 flex items-center justify-center shrink-0">
+              <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">★ XE VIP</span>
+              <h3 className="text-2.5xl font-mono font-black tracking-tight mt-0.5">{currentTotalVip}</h3>
+            </div>
+          </div>
+          <div className="absolute right-0 bottom-0 translate-x-3 translate-y-3 opacity-5">
+            <Sparkles className="w-24 h-24 text-white" />
+          </div>
+        </div>
+
+      </div>
+
+      {/* TWO-COLUMN GRAPHICS WORKSPACE */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* LEFT COLUMN: ARCHITECTURAL PARKING BLUEPRINT MAP (COLSPAN 8) */}
+        <div className="lg:col-span-8 p-6 bg-white dark:bg-slate-905 border border-slate-205 dark:border-slate-800 rounded-2xl space-y-5 text-left">
+          
+          <div className="flex justify-between items-center pb-2 border-b border-slate-105 dark:border-slate-850">
+            <div className="flex items-center gap-3">
+              <strong className="text-base font-black text-slate-850 dark:text-white font-sans">
+                Sơ đồ tầng hầm {activeTabFloor}
+              </strong>
+              {/* Flashing LIVE dot tag */}
+              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 text-[10px] font-black border border-rose-100 dark:border-rose-900/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                <span>LIVE</span>
+              </span>
+            </div>
+
+            {/* Level B1 vs. B2 Toggles (Exact Screenshot 2) */}
+            <div className="flex border border-slate-200 dark:border-slate-800 rounded-lg p-0.5 bg-slate-50 dark:bg-slate-950 text-xs font-bold font-sans">
+              <button
+                onClick={() => {
+                  setActiveTabFloor('B1');
+                  triggerToast('Hiện sơ đồ: Tầng hầm B1', 'info');
+                }}
+                className={`px-3 py-1.5 rounded-md transition-all ${
+                  activeTabFloor === 'B1'
+                    ? 'bg-white dark:bg-slate-850 text-slate-900 dark:text-white shadow-3xs'
+                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+              >
+                Tầng B1
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTabFloor('B2');
+                  triggerToast('Hiện sơ đồ: Tầng hầm B2 (Dữ liệu giả lập)', 'info');
+                }}
+                className={`px-3 py-1.5 rounded-md transition-all ${
+                  activeTabFloor === 'B2'
+                    ? 'bg-white dark:bg-slate-850 text-slate-900 dark:text-white shadow-3xs'
+                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+              >
+                Tầng B2
+              </button>
+            </div>
+          </div>
+
+          {/* DYNAMIC INTERACTIVE PLATFORM CANVAS GRID */}
+          <div className="bg-slate-50/50 dark:bg-slate-950/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-850 p-4 min-h-[360px] flex flex-col justify-between relative overflow-hidden">
+            
+            {/* GRID BACKGROUND WATERMARK */}
+            <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] dark:bg-[radial-gradient(#334155_1.5px,transparent_1.5px)] [background-size:20px_20px] opacity-25" />
+            
+            <div className="relative z-10 space-y-6">
+              
+              {/* INTERACTIVE CONTROLS BOX FOR DEMO SIMULATIONS */}
+              <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800 shadow-2xs">
+                <span className="text-[10.5px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Click vào ô trống để Đỗ Xe, click ô có xe để Trả Xe / Thanh toán.</span>
+                </span>
+                
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      const vacant = blueprintSlots.find(s => s.status === 'CÒN');
+                      if (!vacant) {
+                        triggerToast('Hầm đã đầy chỗ!', 'error');
+                        return;
+                      }
+                      const p = prompt('Biển số xe vào bãi:', `30A-${Math.floor(10000 + Math.random() * 90000)}`);
+                      if (p) {
+                        const isVip = Math.random() > 0.7;
+                        const type = isVip ? 'Sang trọng' : 'Sedan';
+                        const updatedSlots = blueprintSlots.map(s => s.id === vacant.id ? {
+                          ...s, status: isVip ? 'XE VIP' : 'ĐÃ ĐỖ', vehicleType: type, plate: p.toUpperCase(), entryTime: '14:30'
+                        } : s);
+                        setBlueprintSlots(updatedSlots);
+                        setRecentActivities([{
+                          id: `run-${Date.now()}`, plate: p.toUpperCase(), type, gate: 'Cổng vào 1', time: 'Vừa xong', action: 'Vào', vip: isVip
+                        }, ...recentActivities]);
+                        triggerToast(`Đã xếp chỗ thành công: ${p.toUpperCase()} tại bến ${vacant.label}!`, 'success');
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[10.5px] rounded-lg transition-all shadow-xs flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3 stroke-[3]" />
+                    <span>Mô phỏng Xe Vào</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      const occupied = blueprintSlots.find(s => s.status === 'ĐÃ ĐỖ' || s.status === 'XE VIP');
+                      if (!occupied) {
+                        triggerToast('Không có xe nào đang đỗ để ra bãi!', 'error');
+                        return;
+                      }
+                      handleManualCheckOut(occupied.id, occupied.label);
+                    }}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-extrabold text-[10.5px] rounded-lg transition-all border border-slate-205 dark:border-slate-750 flex items-center gap-1"
+                  >
+                    <LogOut className="w-3 h-3" />
+                    <span>Mô phỏng Xe Ra</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* GRAPHICAL ARCHITECTURAL MAP SCHEMATIC */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                {blueprintSlots.map(slot => {
+                  const isAvailable = slot.status === 'CÒN';
+                  const isVip = slot.status === 'XE VIP';
+                  const isMaintenance = slot.status === 'BẢO TRÌ';
                   
-                  triggerToast(`Nhận diện LPR cổng vào: Phát hiện phương tiện ${randomPlate}...`, 'info');
-                  
-                  setTimeout(() => {
+                  return (
+                    <div
+                      key={slot.id}
+                      onClick={() => {
+                        if (isMaintenance) {
+                          triggerToast(`Vị trí ${slot.label} đang thuộc diện bảo trì hệ thống!`, 'error');
+                          return;
+                        }
+                        if (isAvailable) {
+                          setSelectedSlotForCheckIn(slot);
+                          setCheckInPlate(`29A-${Math.floor(10000 + Math.random() * 90000)}`);
+                        } else {
+                          setSelectedSlotDetails(slot);
+                        }
+                      }}
+                      className={`relative border rounded-xl p-3 flex flex-col justify-between aspect-[4/3] cursor-pointer transition-all hover:scale-[1.03] select-none block text-left ${
+                        isAvailable
+                          ? 'bg-white dark:bg-slate-900 border-emerald-500/30 hover:border-emerald-500 dark:hover:border-emerald-400 hover:shadow-emerald-500/10 hover:shadow-md'
+                          : isVip
+                          ? 'bg-[#1e1b4b] border-indigo-500 text-indigo-200'
+                          : isMaintenance
+                          ? 'bg-rose-50/50 dark:bg-rose-950/10 border-rose-300/40 dark:border-rose-900/40 text-slate-400 opacity-60'
+                          : 'bg-slate-50 dark:bg-slate-950/30 border-rose-500/40 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      {/* Slot Header Label */}
+                      <div className="flex justify-between items-center select-none">
+                        <strong className="text-xs font-mono font-black">{slot.label}</strong>
+                        {isVip ? (
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
+                        ) : isAvailable ? (
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 block shrink-0" />
+                        ) : isMaintenance ? (
+                          <Wrench className="w-3 h-3 text-rose-550 shrink-0" />
+                        ) : (
+                          <span className="w-2 h-2 rounded-full bg-rose-500 block shrink-0" />
+                        )}
+                      </div>
+
+                      {/* Schematic Visual vehicle / details inside box */}
+                      <div className="mt-2 block">
+                        {isAvailable ? (
+                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">TRỐNG</span>
+                        ) : isMaintenance ? (
+                          <span className="text-[9.5px] font-bold text-slate-400 block truncate">BẢO TRÌ</span>
+                        ) : (
+                          <div className="space-y-0.5 truncate block">
+                            <strong className="text-[11px] font-mono leading-none tracking-tight block uppercase text-slate-900 dark:text-white">
+                              {slot.plate}
+                            </strong>
+                            <span className="text-[9px] text-slate-400 font-bold block truncate">
+                              {slot.vehicleType}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* RIGHT COLUMN: RECENT ACTIVITIES LIST (COLSPAN 4) (Exact Screenshot 2) */}
+        <div className="lg:col-span-4 p-5 bg-white dark:bg-slate-905 border border-slate-205 dark:border-slate-800 rounded-2xl flex flex-col justify-between space-y-4 text-left">
+          
+          <div className="flex justify-between items-center pb-2 border-b border-slate-105 dark:border-slate-850">
+            <strong className="text-sm font-black text-slate-850 dark:text-white">
+              Hoạt động gần nhất
+            </strong>
+
+            <button
+              onClick={() => triggerToast("Hiển thị bộ lọc hoạt động gần nhất nâng cấp!", "info")}
+              className="p-1.5 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850/50 rounded-lg text-slate-450 hover:text-slate-800 dark:hover:text-white transition-all cursor-pointer"
+            >
+              <Filter className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Quick Search bar filter */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Lọc hoạt động..."
+              value={activitySearchQuery}
+              onChange={(e) => setActivitySearchQuery(e.target.value)}
+              className="w-full text-xs font-bold pl-8.5 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Feed Activity List Frame */}
+          <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+            <AnimatePresence initial={false}>
+              {allActivitiesDisplay.map(act => {
+                const isAlert = act.status === 'ALERT';
+                const isVip = act.status === 'VIP';
+                const isThueBao = act.status === 'THUÊ BAO';
+                const isExit = act.action === 'Ra';
+
+                return (
+                  <motion.div
+                    key={act.id}
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    className={`p-3 border rounded-xl transition-all flex items-center justify-between gap-3 text-xs leading-normal ${
+                      isAlert 
+                        ? 'bg-rose-50/60 dark:bg-rose-950/15 border-rose-250 dark:border-rose-900/30 border-l-4 border-l-rose-500 shadow-rose-200/5 dark:shadow-none' 
+                        : 'bg-slate-50/50 dark:bg-slate-950/20 border-slate-105 dark:border-slate-850/60'
+                    }`}
+                  >
+                    
+                    <div className="flex items-center gap-3">
+                      {/* Live Indicator Icon */}
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border uppercase font-black font-mono text-[10px] select-none ${
+                        isAlert
+                          ? 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-455 dark:border-rose-900/30'
+                          : isVip
+                          ? 'bg-slate-900 text-white border-slate-800'
+                          : isThueBao
+                          ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/30'
+                          : 'bg-emerald-100 text-emerald-700 border-emerald-250 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/30'
+                      }`}>
+                        {isAlert ? '⚠️' : isExit ? '←' : '→'}
+                      </div>
+
+                      <div className="leading-tight block text-left">
+                        <strong className={`font-mono text-sm uppercase block tracking-tight ${isAlert ? 'text-rose-600 font-extrabold' : 'text-slate-850 dark:text-white'}`}>
+                          {act.plate}
+                        </strong>
+                        <span className="text-[10px] text-slate-400 font-bold block mt-0.5">
+                          {act.type} • {act.gate}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-right leading-tight">
+                      <span className="text-[10px] text-slate-400 font-bold font-mono block">{act.time}</span>
+                      <span className={`inline-block text-[9px] font-black uppercase tracking-wider mt-1.5 px-1.5 py-0.5 rounded ${
+                        isAlert 
+                          ? 'bg-rose-100 text-rose-750 dark:bg-rose-500/10 dark:text-rose-455' 
+                          : isVip 
+                          ? 'bg-slate-800 text-slate-200' 
+                          : isThueBao 
+                          ? 'bg-blue-50 text-blue-650 dark:bg-blue-950/20' 
+                          : 'bg-emerald-50 text-emerald-650 dark:bg-emerald-950/20'
+                      }`}>
+                        {act.action === 'Ra' ? 'Cổng ra' : act.action === 'ALERT' ? 'CẢNH BÁO LPR' : 'Cổng vào'}
+                      </span>
+                    </div>
+
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+
+          <button
+            onClick={() => {
+              setActiveMenu('system_log');
+              triggerToast("Mở màn hình nhật ký kiểm toán hệ thống để xem dòng chảy dữ liệu...", "info");
+            }}
+            className="w-full text-center py-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950 dark:hover:bg-slate-900 text-blue-600 dark:text-blue-400 font-extrabold text-[11px] uppercase tracking-wider transition-all duration-200 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl"
+          >
+            Mở rộng nhật ký toàn bộ bốt trục
+          </button>
+
+        </div>
+
+      </div>
+
+      {/* QUICK SLOT CHECK-IN AND CHECK-OUT MODAL SCREENS OVERLAY (DYNAMIC REACTIVES) */}
+      <AnimatePresence>
+        {selectedSlotForCheckIn && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55 backdrop-blur-xs select-none">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-slate-905 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-sm w-full space-y-4 overflow-hidden relative"
+            >
+              <button 
+                onClick={() => setSelectedSlotForCheckIn(null)}
+                className="absolute top-4 right-4 text-slate-450 hover:text-slate-800 dark:hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Compass className="w-5 h-5 text-blue-500" />
+                <h3 className="text-base font-black font-sans">Đỗ xe thủ công: Cột {selectedSlotForCheckIn.label}</h3>
+              </div>
+
+              <div className="space-y-3.5 block text-left text-xs font-bold">
+                <div className="space-y-1 block">
+                  <label className="text-[10px] font-black uppercase text-slate-400 block">Biển kiểm soát</label>
+                  <input
+                    type="text"
+                    value={checkInPlate}
+                    onChange={(e) => setCheckInPlate(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm leading-tight uppercase font-black tracking-widest focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-1 block">
+                  <label className="text-[10px] font-black uppercase text-slate-400 block">Phân nhóm phương tiện</label>
+                  <select
+                    value={checkInVehicleType}
+                    onChange={(e) => setCheckInVehicleType(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="Sedan">Sedan (Ô tô)</option>
+                    <option value="SUV">SUV (Bán tải/Hatchback)</option>
+                    <option value="Sang trọng">Xe Sang trọng (Phí Cao)</option>
+                  </select>
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={checkInIsVip}
+                    onChange={() => setCheckInIsVip(!checkInIsVip)}
+                    className="w-3.5 h-3.5 text-indigo-600 rounded border-slate-350 focus:ring-indigo-500"
+                  />
+                  <span>Áp dụng diện hội viên đặc biệt (VIP)</span>
+                </label>
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  onClick={() => setSelectedSlotForCheckIn(null)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 font-extrabold text-xs rounded-xl"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  onClick={() => {
+                    if (!checkInPlate.trim()) {
+                      triggerToast('Vui lòng nhập biển kiểm soát hợp lệ!', 'error');
+                      return;
+                    }
+                    
+                    // Trigger manual check in
                     const updatedSlots = blueprintSlots.map(s => {
-                      if (s.id === vacant.id) {
+                      if (s.id === selectedSlotForCheckIn.id) {
                         return {
                           ...s,
-                          status: isVipRandom ? 'XE VIP' : 'ĐÃ ĐỖ',
-                          vehicleType: carType,
-                          plate: randomPlate,
+                          status: checkInIsVip ? 'XE VIP' : 'ĐÃ ĐỖ',
+                          vehicleType: checkInVehicleType,
+                          plate: checkInPlate.toUpperCase(),
                           entryTime: new Date().toLocaleTimeString().substring(0, 5)
                         };
                       }
                       return s;
                     });
                     setBlueprintSlots(updatedSlots);
-
-                    // Add live action log with current timestamp
-                    const nowString = new Date().toLocaleTimeString().substring(0, 8);
+                    
                     const newLog = {
-                      id: `act-${Date.now()}`,
-                      plate: randomPlate,
-                      type: isVipRandom ? 'Sang trọng (VIP)' : carType,
+                      id: `run-${Date.now()}`,
+                      plate: checkInPlate.toUpperCase(),
+                      type: checkInVehicleType,
                       gate: 'Cổng vào 1',
-                      time: nowString,
+                      time: new Date().toLocaleTimeString().substring(0, 8),
                       action: 'Vào',
-                      vip: isVipRandom
+                      vip: checkInIsVip
                     };
                     setRecentActivities([newLog, ...recentActivities]);
 
-                    // Sync vehicles register
                     setVehicles([
                       {
-                        plate: randomPlate,
-                        type: isVipRandom ? 'VIP' : 'OTO',
+                        plate: checkInPlate.toUpperCase(),
+                        type: checkInVehicleType === 'Sang trọng' ? 'VIP' : 'CON',
                         zone: 'Khu C (Hầm B1)',
-                        slot: vacant.label,
+                        slot: selectedSlotForCheckIn.label,
                         entryTime: new Date().toLocaleTimeString().substring(0, 5),
-                        ownerName: isVipRandom ? 'Khách hàng VIP' : 'Khách vãng lai',
+                        ownerName: checkInIsVip ? 'Khách hàng VIP' : 'Khách vãng lai',
                         phone: '090*******'
                       },
                       ...vehicles
                     ]);
-                    
-                    triggerToast(`Xe ${randomPlate} đỗ thành công tại bến ${vacant.label}!`, 'success');
-                  }, 800);
-                }}
-                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 select-none"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Simulate Xe Vào</span>
-              </button>
 
-              <button 
-                onClick={() => {
-                  const occupied = blueprintSlots.find(s => s.status === 'ĐÃ ĐỖ' || s.status === 'XE VIP');
-                  if (!occupied) {
-                    triggerToast('Hiện tại không có xe nào đang đỗ tại LEVEL B1!', 'error');
-                    return;
-                  }
-                  handleManualCheckOut(occupied.id, occupied.label);
-                }}
-                className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 select-none"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Simulate Xe Ra</span>
-              </button>
-            </div>
-
-          </div>
-
-          {/* THE MASTER SMART PARKING BLUEPRINT CARD */}
-          <div className={`p-6 bg-white dark:bg-slate-900 border rounded-2xl ${isDarkMode ? 'border-slate-800' : 'border-slate-200/80 shadow-sm'} space-y-4`}>
-            
-            {/* Blueprint Header */}
-            <div className="flex justify-between items-center text-xs font-semibold pb-1.5 border-b border-slate-100 dark:border-slate-800">
-              <span className="font-mono text-xs uppercase tracking-wider text-slate-400 block">SƠ ĐỒ BÃI XE KHOA HỌC: {monitoringFloor}</span>
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] text-slate-400 font-mono">Hiệu suất: Ổn định</span>
-                <button 
-                  onClick={() => {
-                    const resetSlots = blueprintSlots.map(s => ({
-                      id: s.id,
-                      label: s.label,
-                      status: s.status === 'BẢO TRÌ' ? 'BẢO TRÌ' : 'CÒN'
-                    }));
-                    setBlueprintSlots(resetSlots);
-                    setVehicles([]);
-                    triggerToast('Đã dọn dẹp trống toàn bộ ô đỗ hầm B1', 'info');
+                    triggerToast(`Đã đỗ xe ${checkInPlate.toUpperCase()} thành công tại ô ${selectedSlotForCheckIn.label}!`, 'success');
+                    setSelectedSlotForCheckIn(null);
                   }}
-                  className="text-[10px] text-blue-500 font-bold hover:underline cursor-pointer"
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md cursor-pointer"
                 >
-                  Reset Trống
+                  Xác nhận đỗ
                 </button>
               </div>
-            </div>
-
-            {/* SCHEMATIC FLOOR LAYOUT MAP */}
-            <div className="relative rounded-xl border border-slate-200/80 dark:border-slate-800 p-5 bg-[#eef2f6] dark:bg-[#0f172a] shadow-inner select-none overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] dark:bg-[radial-gradient(#334155_1.5px,transparent_1.5px)] [background-size:24px_24px] opacity-25" />
-              
-              <div className="relative z-10 space-y-6">
-                
-                {/* Blueprint Header Label */}
-                <div className="text-center font-mono opacity-80 py-1 border-b border-dashed border-slate-300 dark:border-slate-700">
-                  <h3 className="text-sm font-black tracking-[0.2em] text-[#334155] dark:text-[#475569]">SMART PARKING BLUEPRINT</h3>
-                  <span className="text-[10.5px] font-bold text-[#475569] dark:text-slate-400">{monitoringFloor} • ARCHITECTURAL CAP GRID</span>
-                </div>
-
-                {/* ZONE A: MAIN SEDAN LANES */}
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-mono font-black text-slate-400 tracking-wider block">ZONE A (DÀNH CHO Ô TÔ CON / SEDAN)</span>
-                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                    {blueprintSlots.filter(s => ['B1-01', 'B1-02', 'B1-03', 'B1-04', 'B1-05', 'B1-06', 'B1-07', 'B1-08'].some(prefix => s.id.includes(prefix))).map(slot => {
-                      const isOccupied = slot.status === 'ĐÃ ĐỖ' || slot.status === 'XE VIP';
-                      const isVip = slot.status === 'XE VIP';
-                      const isMaint = slot.status === 'BẢO TRÌ';
-                      return (
-                        <button
-                          key={slot.id}
-                          onClick={() => {
-                            if (isMaint) {
-                              triggerToast(`Vị trí ${slot.label} đang bảo trì cảm biến điện!`, 'error');
-                            } else if (isOccupied) {
-                              setSelectedSlotDetails(slot);
-                              setSelectedSlotForCheckIn(null);
-                            } else {
-                              setSelectedSlotForCheckIn(slot);
-                              setSelectedSlotDetails(null);
-                              setCheckInPlate('');
-                            }
-                          }}
-                          className={`relative border p-2 rounded-lg flex flex-col items-center justify-between min-h-[96px] transition-all cursor-pointer outline-hidden ${
-                            isOccupied 
-                              ? isVip 
-                                ? 'bg-amber-500/10 border-amber-500 hover:ring-2 hover:ring-amber-500/30' 
-                                : 'bg-blue-600/10 border-blue-600 hover:ring-2 hover:ring-blue-600/30'
-                              : isMaint
-                                ? 'bg-slate-300 dark:bg-slate-800 border-slate-400 dark:border-slate-700 opacity-60 cursor-not-allowed'
-                                : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-800 hover:border-emerald-500 hover:scale-103'
-                          }`}
-                        >
-                          <span className="text-[9px] font-mono font-black text-slate-400 leading-none">{slot.label}</span>
-                          
-                          <div className="w-full flex-1 flex items-center justify-center py-1">
-                            {isOccupied ? (
-                              <div className="w-full text-center">
-                                <TopDownCarSVG color={isVip ? '#eab308' : '#ef4444'} />
-                                <span className="text-[9px] font-mono font-black text-slate-800 dark:text-white block mt-0.5 truncate uppercase">{slot.plate}</span>
-                              </div>
-                            ) : isMaint ? (
-                              <div className="text-[9px] font-bold text-slate-500 flex flex-col items-center gap-0.5 leading-none">
-                                <Wrench className="w-3.5 h-3.5" />
-                                <span>ERR</span>
-                              </div>
-                            ) : (
-                              <div className="w-full h-8 border border-dashed border-emerald-300 dark:border-emerald-850 rounded bg-emerald-500/5 flex items-center justify-center text-[9px] font-extrabold text-[#10b981]">
-                                TRỐNG
-                              </div>
-                            )}
-                          </div>
-                          
-                          {isOccupied && (
-                            <span className={`text-[7px] font-black uppercase inline-block leading-none ${isVip ? 'text-amber-500' : 'text-blue-500'}`}>
-                              {isVip ? '★ VIP' : 'Sedan'}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* CENTRAL ROADWAY WITH REAL DIRECTION INDICATORS */}
-                <div className="relative py-2 font-mono select-none overflow-hidden h-14 bg-slate-300/30 dark:bg-slate-800/20 rounded-lg border border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 text-[10px] font-bold text-[#475569] dark:text-slate-400">
-                  <span className="flex items-center gap-1.5 leading-none">
-                    <span>◀ LỐI DI CHUYỂN CHỦ ĐẠO ◀</span>
-                    <span className="border-t border-dashed border-slate-400 dark:border-slate-600 w-8" />
-                  </span>
-                  <div className="flex flex-col items-center justify-center text-center leading-none text-[8px] opacity-45">
-                    <span>TỰ ĐỘNG CHUẨN LPR CỔNG VÀO / RA</span>
-                    <span>TƯƠNG TÁC CHẠY CHÈN REAL-TIME HẦM B1</span>
-                  </div>
-                  <span className="flex items-center gap-1.5 leading-none">
-                    <span className="border-t border-dashed border-slate-400 dark:border-slate-600 w-8" />
-                    <span>▶ LỐI RA THÔNG BARIE SỐ 1 ▶</span>
-                  </span>
-                </div>
-
-                {/* ZONE B & ZONE C: COMBO CHARGING AND HEAVY SUV SLOTS */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  
-                  {/* ZONE B - CHARGING ready */}
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-mono font-black text-slate-400 tracking-wider block">ZONE B (CÓ SẠC ĐIỆN NHANH EV⚡)</span>
-                    <div className="grid grid-cols-4 gap-2">
-                      {blueprintSlots.filter(s => ['B1-12', 'B1-13', 'B1-14', 'B1-15', 'B1-16', 'B1-17', 'B1-18', 'B1-19'].some(prefix => s.id.includes(prefix))).map(slot => {
-                        const isOccupied = slot.status === 'ĐÃ ĐỖ' || slot.status === 'XE VIP';
-                        const isVip = slot.status === 'XE VIP';
-                        const isMaint = slot.status === 'BẢO TRÌ';
-                        return (
-                          <button
-                            key={slot.id}
-                            onClick={() => {
-                              if (isMaint) {
-                                triggerToast(`Trạm sạc ${slot.label} bảo dưỡng ổ phát!`, 'error');
-                              } else if (isOccupied) {
-                                setSelectedSlotDetails(slot);
-                                setSelectedSlotForCheckIn(null);
-                              } else {
-                                setSelectedSlotForCheckIn(slot);
-                                setSelectedSlotDetails(null);
-                                setCheckInPlate('');
-                              }
-                            }}
-                            className={`relative border p-2 flex flex-col items-center justify-between min-h-[90px] rounded-lg transition-all cursor-pointer outline-hidden ${
-                              isOccupied 
-                                ? isVip 
-                                  ? 'bg-amber-500/10 border-amber-500 hover:ring-2 hover:ring-amber-500/30' 
-                                  : 'bg-blue-600/10 border-blue-600 hover:ring-2 hover:ring-blue-600/30'
-                                : isMaint
-                                  ? 'bg-slate-300 dark:bg-slate-800 border-slate-400 dark:border-slate-700 opacity-60 cursor-not-allowed'
-                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-emerald-500 hover:scale-103'
-                            }`}
-                          >
-                            <div className="w-full flex justify-between items-center text-[8.5px] font-mono leading-none">
-                              <span className="text-slate-400 font-bold">{slot.label}</span>
-                              <span className="text-emerald-500 font-black">⚡</span>
-                            </div>
-                            
-                            <div className="w-full flex-1 flex items-center justify-center py-0.5">
-                              {isOccupied ? (
-                                <div className="w-full text-center">
-                                  <TopDownCarSVG color={isVip ? '#eab308' : '#3b82f6'} />
-                                  <span className="text-[8.5px] font-mono font-black text-slate-800 dark:text-white block mt-0.5 truncate uppercase">{slot.plate}</span>
-                                </div>
-                              ) : isMaint ? (
-                                <div className="text-[8.5px] font-bold text-slate-550 flex flex-col items-center">
-                                  <Wrench className="w-3.5 h-3.5" />
-                                  <span>MNT</span>
-                                </div>
-                              ) : (
-                                <div className="w-full h-7 border border-dashed border-emerald-300 dark:border-emerald-800 rounded bg-emerald-500/5 flex items-center justify-center text-[8.5px] font-extrabold text-emerald-500">
-                                  SẠC EV
-                                </div>
-                              )}
-                            </div>
-                            
-                            {isOccupied && (
-                              <span className={`text-[6.5px] font-black uppercase text-center block leading-none ${isVip ? 'text-amber-500' : 'text-blue-500'}`}>
-                                {isVip ? '★ VIP' : 'Ev Sedan'}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* ZONE C - SUV SIZE */}
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-mono font-black text-slate-400 tracking-wider block">ZONE C (DÀNH CHO XE SUV / LỚN)</span>
-                    <div className="grid grid-cols-4 gap-2">
-                      {blueprintSlots.filter(s => ['B1-20', 'B1-21', 'B1-22', 'B1-23', 'B1-24', 'B1-25', 'B1-26', 'B1-27'].some(prefix => s.id.includes(prefix))).map(slot => {
-                        const isOccupied = slot.status === 'ĐÃ ĐỖ' || slot.status === 'XE VIP';
-                        const isVip = slot.status === 'XE VIP';
-                        const isMaint = slot.status === 'BẢO TRÌ';
-                        return (
-                          <button
-                            key={slot.id}
-                            onClick={() => {
-                              if (isMaint) {
-                                triggerToast(`Vị trí SUV ${slot.label} đang nâng cấp bảo trì cảm biến cân!`, 'error');
-                              } else if (isOccupied) {
-                                setSelectedSlotDetails(slot);
-                                setSelectedSlotForCheckIn(null);
-                              } else {
-                                setSelectedSlotForCheckIn(slot);
-                                setSelectedSlotDetails(null);
-                                setCheckInPlate('');
-                              }
-                            }}
-                            className={`relative border p-2 flex flex-col items-center justify-between min-h-[90px] rounded-lg transition-all cursor-pointer outline-hidden ${
-                              isOccupied 
-                                ? isVip 
-                                  ? 'bg-amber-500/10 border-amber-500 hover:ring-2 hover:ring-amber-500/30' 
-                                  : 'bg-blue-600/10 border-blue-600 hover:ring-2 hover:ring-blue-600/30'
-                                : isMaint
-                                  ? 'bg-slate-300 dark:bg-slate-800 border-slate-400 dark:border-slate-700 opacity-60 cursor-not-allowed'
-                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-emerald-500 hover:scale-103'
-                            }`}
-                          >
-                            <span className="text-[8.5px] font-mono text-slate-400 leading-none block self-start font-bold">{slot.label}</span>
-                            
-                            <div className="w-full flex-1 flex items-center justify-center py-0.5">
-                              {isOccupied ? (
-                                <div className="w-full text-center">
-                                  <TopDownCarSVG color={isVip ? '#eab308' : '#ec4899'} />
-                                  <span className="text-[8.5px] font-mono font-black text-slate-800 dark:text-white block mt-0.5 truncate uppercase">{slot.plate}</span>
-                                </div>
-                              ) : isMaint ? (
-                                <div className="text-[8.5px] font-bold text-slate-550 flex flex-col items-center">
-                                  <Wrench className="w-3.5 h-3.5" />
-                                  <span>MNT</span>
-                                </div>
-                              ) : (
-                                <div className="w-full h-7 border border-dashed border-emerald-350 dark:border-emerald-800 rounded bg-emerald-500/5 flex items-center justify-center text-[8.5px] font-extrabold text-[#10b981]">
-                                  TRỐNG
-                                </div>
-                              )}
-                            </div>
-                            
-                            {isOccupied && (
-                              <span className={`text-[6.5px] font-black uppercase inline-block leading-none ${isVip ? 'text-amber-500' : 'text-blue-500'}`}>
-                                {isVip ? '★ VIP Card' : 'SUV Size'}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* BOTTOM MAP META INFO SUMMARY */}
-                <div className="flex justify-between items-center opacity-60 text-[9.5px] font-mono text-slate-500 border-t border-dashed border-slate-300 dark:border-slate-700 pt-2 font-bold">
-                  <span>HIỆU SUẤT TRỐNG CÒN LẠI: {Math.round((blueprintSlots.filter(s => s.status === 'CÒN').length / blueprintSlots.length) * 100)}% ({blueprintSlots.filter(s => s.status === 'CÒN').length}/{blueprintSlots.length} ô)</span>
-                  <span className="flex items-center gap-1">
-                    <Compass className="w-3.5 h-3.5 text-slate-400 rotate-45" />
-                    <span>MẶT BẰNG HẦM B1 THỰC VẬT SCALE 1.0</span>
-                  </span>
-                </div>
-
-              </div>
-            </div>
-
-            {/* SEAMLESS LANDSCAPE FOOTER LEGEND */}
-            <div className="flex flex-wrap items-center justify-center gap-5 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] font-bold tracking-wide">
-              <div className="flex items-center gap-2">
-                <span className="w-4 h-3 rounded bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 inline-block" />
-                <span className="text-slate-600 dark:text-slate-400 uppercase">CÒN</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-4 h-3 rounded bg-blue-600 inline-block" />
-                <span className="text-slate-600 dark:text-slate-400 uppercase">ĐÃ ĐỖ</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-4 h-3 rounded bg-amber-500 inline-block" />
-                <span className="text-slate-600 dark:text-slate-400 font-bold uppercase">XE VIP</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-4 h-3 rounded bg-slate-400 inline-block animate-pulse" />
-                <span className="text-slate-600 dark:text-slate-400 uppercase">BẢO TRÌ</span>
-              </div>
-            </div>
-
+            </motion.div>
           </div>
+        )}
+      </AnimatePresence>
 
-          {/* DOCK DRAWER CONTROL COMPONENT - INLINE FLOATING DETAILS */}
-          <AnimatePresence mode="wait">
-            {selectedSlotForCheckIn && (
-              <motion.div 
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 15 }}
-                className="p-5 bg-white dark:bg-slate-900 border border-blue-500/25 rounded-2xl shadow-xl space-y-4 text-left relative overflow-hidden"
-              >
-                <div className="absolute top-0 left-0 w-2 h-full bg-blue-500" />
-                
-                <div className="flex justify-between items-center">
-                  <h4 className="text-sm font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-2 pl-2">
-                    <Plus className="w-4 h-4 text-blue-500" />
-                    <span>CẤP PHÉP ĐỖ XE THỦ CÔNG TẠI Ô [{selectedSlotForCheckIn.label}]</span>
-                  </h4>
-                  <button onClick={() => setSelectedSlotForCheckIn(null)} className="text-slate-400 hover:text-red-500 font-extrabold text-xs cursor-pointer">HỦY BỎ</button>
-                </div>
-                
-                <p className="text-slate-550 dark:text-slate-350 text-xs pl-2">Nhập thủ công thông tin phương tiện đỗ hiện diện để đồng bộ thanh toán vào cơ sở dữ liệu.</p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-1 pl-2 font-sans items-end">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block">Biển kiểm soát</label>
-                    <input 
-                      type="text"
-                      placeholder="30A-999.88"
-                      value={checkInPlate}
-                      onChange={(e) => setCheckInPlate(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-xs uppercase font-extrabold text-slate-800 dark:text-white tracking-widest outline-hidden focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-450 tracking-wider block">Dòng xe</label>
-                    <select 
-                      value={checkInVehicleType}
-                      onChange={(e: any) => setCheckInVehicleType(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300"
-                    >
-                      <option value="Sedan">Sedan (Du lịch 4-5 chỗ)</option>
-                      <option value="SUV">SUV (Tổng 7 chỗ/Bác tài)</option>
-                      <option value="Hatchback">Hatchback</option>
-                      <option value="Sang trọng">VIP Luxury VIP</option>
-                    </select>
-                  </div>
-
-                  <div className="flex items-center h-10 select-none">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="checkbox"
-                        className="w-4 h-4 rounded text-blue-500 border-slate-300"
-                        checked={checkInIsVip}
-                        onChange={(e) => setCheckInIsVip(e.target.checked)}
-                      />
-                      <span className="text-xs font-bold text-slate-650 dark:text-slate-350 flex items-center gap-1">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-                        <span>Thành viên VIP</span>
-                      </span>
-                    </label>
-                  </div>
-
-                  <div>
-                    <button 
-                      onClick={handleManualCheckIn}
-                      className="w-full py-2 bg-blue-605 hover:bg-blue-700 bg-blue-600 text-white font-extrabold text-xs uppercase tracking-wide rounded-xl shadow-xs cursor-pointer transition-all active:scale-95"
-                    >
-                      Xác Nhận Đỗ
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {selectedSlotDetails && (
-              <motion.div 
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 15 }}
-                className="p-5 bg-white dark:bg-slate-900 border border-amber-500/25 rounded-2xl shadow-xl space-y-4 text-left relative overflow-hidden"
-              >
-                <div className="absolute top-0 left-0 w-2 h-full bg-amber-500" />
-                
-                <div className="flex justify-between items-center pl-2">
-                  <h4 className="text-sm font-black text-amber-600 dark:text-amber-4000 dark:text-amber-400 uppercase tracking-wider flex items-center gap-2">
-                    <Info className="w-4 h-4 text-amber-500" />
-                    <span>CHI TIẾT PHIÊN XE ĐANG ĐỖ: Ô ĐỖ [{selectedSlotDetails.label}]</span>
-                  </h4>
-                  <button onClick={() => setSelectedSlotDetails(null)} className="text-slate-400 hover:text-red-500 font-extrabold text-xs cursor-pointer">ĐÓNG</button>
-                </div>
-                
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-1 pl-2 text-xs">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase tracking-wide font-bold">Biển kiểm soát xe</span>
-                    <strong className="text-sm font-mono font-black text-[#1e293b] dark:text-white uppercase tracking-widest">{selectedSlotDetails.plate}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase tracking-wide font-bold">Kiểu mẫu dáng xe</span>
-                    <strong className="text-xs text-slate-700 dark:text-slate-200 block font-bold">{selectedSlotDetails.vehicleType || 'Sedan'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase tracking-wide font-bold">Giờ cập bến đỗ</span>
-                    <strong className="text-xs text-slate-700 dark:text-slate-200 block font-bold">{selectedSlotDetails.entryTime || 'Mới đây'} (Vừa đỗ)</strong>
-                  </div>
-                  <div className="flex items-center justify-end">
-                    <button 
-                      onClick={() => handleManualCheckOut(selectedSlotDetails.id, selectedSlotDetails.label)}
-                      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer active:scale-95"
-                    >
-                      Lệnh xuất barie (Xe ra khỏi bãi)
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-        </div>
-
-        {/* RIGHT COLUMN (COLSPAN 4): SUMMARY STATS & REPLICATED RECENT IN/OUT ACTIVITY TIMELINE (100% VISUALLY MATCHING OVERVIEW) */}
-        <div className="xl:col-span-4 space-y-6">
-          
-          {/* STATS DECK 1: TRẠNG THÁI BÃI (REPLICATED 100% IN ACCORDANCE WITH THE IMAGE SPECIFICATIONS) */}
-          <div className={`p-6 bg-white dark:bg-slate-900 border rounded-2xl ${isDarkMode ? 'border-slate-800' : 'border-slate-200/80 shadow-sm'} space-y-5 text-left`}>
-            
-            <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-100 tracking-tight font-sans">Trạng thái bãi</h3>
-              <Activity className="w-4 h-4 text-slate-400" />
-            </div>
-
-            <div className="space-y-4 text-xs font-sans">
-              
-              {/* Option 1: Tổng số chỗ */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center font-bold">
-                  <span className="text-slate-500 dark:text-slate-400">Tổng số chỗ</span>
-                  <span className="text-slate-800 dark:text-white font-black text-sm">1,500</span>
-                </div>
-                <div className="h-0.5 w-full bg-slate-900 dark:bg-slate-700 rounded-full" />
-              </div>
-
-              {/* Option 2: Hiện đang đỗ */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center font-bold">
-                  <span className="text-slate-500 dark:text-slate-400">Hiện đang đỗ ({occupiedPercentage}%)</span>
-                  <span className="text-rose-500 font-black text-sm">{currentTotalOccupied}</span>
-                </div>
-                {/* Visual red track indicator */}
-                <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-rose-500 rounded-full transition-all duration-300" 
-                    style={{ width: `${occupiedPercentage}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Option 3: Còn trống */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center font-bold">
-                  <span className="text-slate-500 dark:text-slate-400">Còn trống</span>
-                  <span className="text-emerald-500 font-black text-sm">{currentTotalVacant}</span>
-                </div>
-                {/* Visual green track indicator */}
-                <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                    style={{ width: `${100 - occupiedPercentage}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Option 4: Xe VIP hiện diện */}
-              <div className="pt-2">
-                <div className="flex justify-between items-center bg-amber-500/5 dark:bg-amber-500/10 p-3.5 rounded-xl border border-amber-500/10 font-bold">
-                  <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1.5 uppercase tracking-wider text-[10px] font-black">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Xe VIP hiện diện</span>
-                  </span>
-                  <span className="text-slate-900 dark:text-white font-black text-sm">{currentTotalVip}</span>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* DOCK TIMELINE CARD 2: HOẠT ĐỘNG VÀO/RA (100% REPLICATED ACCORDING TO SCREENSHOT ROWS) */}
-          <div className={`p-6 bg-white dark:bg-slate-900 border rounded-2xl ${isDarkMode ? 'border-slate-800' : 'border-slate-200/80 shadow-sm'} space-y-4 text-left`}>
-            
-            <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-100 font-sans tracking-tight">Hoạt động vào/ra</h3>
-              <History className="w-4 h-4 text-slate-400" />
-            </div>
-
-            {/* Structured horizontal timeline rows */}
-            <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
-              <AnimatePresence initial={false}>
-                {recentActivities.map(act => {
-                  const isEntry = act.action === 'Vào' || act.action === 'IN';
-                  const isVip = act.vip;
-                  return (
-                    <motion.div 
-                      key={act.id}
-                      initial={{ opacity: 0, x: 10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -10 }}
-                      className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-950/20 rounded-xl border border-slate-100 dark:border-slate-805/40"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        {isVip ? (
-                          <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center text-sm font-black shrink-0 select-none">
-                            ★
-                          </div>
-                        ) : isEntry ? (
-                          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-[10px] font-black shrink-0 select-none">
-                            IN
-                          </div>
-                        ) : (
-                          <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center text-[10px] font-black shrink-0 select-none">
-                            OUT
-                          </div>
-                        )}
-                        <div className="leading-tight">
-                          <strong className="text-xs font-mono font-black text-slate-800 dark:text-white uppercase block leading-none">{act.plate}</strong>
-                          <span className="text-[10px] text-slate-400 font-bold block mt-1">{act.type} • {act.gate}</span>
-                        </div>
-                      </div>
-                      
-                      <div className="text-right leading-tight">
-                        <span className="text-[10px] font-mono text-slate-400 font-bold block">{act.time}</span>
-                        <span className={`inline-block text-[9px] font-black uppercase tracking-wider mt-1 ${isVip ? 'text-amber-500' : isEntry ? 'text-emerald-500' : 'text-slate-400'}`}>
-                          {isEntry ? 'Vào' : 'Ra'}
-                        </span>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            </div>
-
-            {/* Seamless Action Link to view Full Audit trail */}
-            <button 
-              onClick={() => {
-                setActiveMenu('system_log');
-                triggerToast('Bộ chọn: Hiển thị toàn bộ lịch trình nhật ký hệ thống!', 'info');
-              }}
-              className="w-full text-center py-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-850 dark:hover:bg-slate-800 text-blue-600 dark:text-blue-400 font-extrabold text-xs transition-all duration-200 rounded-xl cursor-pointer"
+      <AnimatePresence>
+        {selectedSlotDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55 backdrop-blur-xs select-none">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-slate-905 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl max-w-sm w-full space-y-4 overflow-hidden relative"
             >
-              Xem tất cả lịch sử
-            </button>
+              <button 
+                onClick={() => setSelectedSlotDetails(null)}
+                className="absolute top-4 right-4 text-slate-450 hover:text-slate-800 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
 
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Eye className="w-5 h-5 text-blue-500" />
+                <h3 className="text-base font-black font-sans text-slate-850 dark:text-white">Chi tiết vị trí {selectedSlotDetails.label}</h3>
+              </div>
+
+              <div className="space-y-3 block text-left text-xs font-bold text-slate-600 dark:text-slate-350">
+                <div className="flex justify-between border-b pb-1.5 border-dashed">
+                  <span>BIỂN SỐ XE</span>
+                  <span className="font-mono text-sm font-black text-slate-900 dark:text-white tracking-widest">{selectedSlotDetails.plate}</span>
+                </div>
+                <div className="flex justify-between border-b pb-1.5 border-dashed">
+                  <span>LOẠI PHƯƠNG TIỆN</span>
+                  <span className="text-slate-900 dark:text-white font-black">{selectedSlotDetails.vehicleType || 'Sedan'}</span>
+                </div>
+                <div className="flex justify-between border-b pb-1.5 border-dashed">
+                  <span>HẠNG KHÁCH HÀNG</span>
+                  <span className={`font-black ${selectedSlotDetails.status === 'XE VIP' ? 'text-amber-500' : 'text-blue-500'}`}>
+                    {selectedSlotDetails.status === 'XE VIP' ? 'HỘI VIÊN VIP' : 'VÃNG LAI'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>THỜI ĐIỂM VÀO</span>
+                  <span className="font-mono text-slate-900 dark:text-white font-black">{selectedSlotDetails.entryTime || '10:12'}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setSelectedSlotDetails(null)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-755 text-xs font-extrabold rounded-xl"
+                >
+                  Đóng cửa sổ
+                </button>
+                <button
+                  onClick={() => {
+                    handleManualCheckOut(selectedSlotDetails.id, selectedSlotDetails.label);
+                    setSelectedSlotDetails(null);
+                  }}
+                  className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-md"
+                >
+                  LPR Xuất Bãi
+                </button>
+              </div>
+            </motion.div>
           </div>
-
-        </div>
-
-      </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

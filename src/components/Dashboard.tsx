@@ -746,25 +746,22 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
             {/* Sidebar menu items mapping the requested lists */}
             <nav className="space-y-2">
               {[
-                { id: 'overview', label: 'Tổng quan', icon: <Home className="w-4 h-4" /> },
-                { id: 'monitoring', label: 'Giám sát bãi xe', icon: <Car className="w-4 h-4" /> },
-                { id: 'revenue', label: 'Doanh thu', icon: <CreditCard className="w-4 h-4" />, managerOnly: true },
-                { id: 'staff', label: 'Quản lý nhân sự', icon: <Users className="w-4 h-4" />, managerOnly: true },
-                { id: 'customers', label: 'Khách hàng', icon: <Sparkles className="w-4 h-4" /> },
-                { id: 'technical', label: 'Cấu hình kỹ thuật', icon: <Wrench className="w-4 h-4" />, managerOnly: true },
-                { id: 'security', label: 'Bảo mật', icon: <Shield className="w-4 h-4" />, managerOnly: true },
-                { id: 'system_log', label: 'Nhật ký HS thống', icon: <FileText className="w-4 h-4" />, managerOnly: true }
-              ].filter(item => !item.managerOnly || (user?.role === 'MANAGER' || user?.role === 'ADMIN')).map(item => {
-                const isRestricted = item.managerOnly && (user?.role !== 'MANAGER' && user?.role !== 'ADMIN');
+                { id: 'overview', label: 'Tổng quan', icon: <Home className="w-4.5 h-4.5" /> },
+                { id: 'monitoring', label: 'Giám sát bãi xe', icon: <Car className="w-4.5 h-4.5" /> },
+                { id: 'revenue', label: 'Doanh thu & Báo cáo', icon: <CreditCard className="w-4.5 h-4.5" /> },
+                { id: 'staff', label: 'Quản lý nhân sự', icon: <Users className="w-4.5 h-4.5" /> },
+                { id: 'customers', label: 'Khách hàng', icon: <Sparkles className="w-4.5 h-4.5" /> },
+                { id: 'technical', label: 'Cấu hình kỹ thuật', icon: <Wrench className="w-4.5 h-4.5" /> },
+                { id: 'security', label: 'Bảo mật', icon: <Shield className="w-4.5 h-4.5" /> },
+                { id: 'system_log', label: 'Nhật ký hệ thống', icon: <FileText className="w-4.5 h-4.5" /> }
+              ].map(item => {
                 return (
                   <button
                     key={item.id}
                     onClick={() => {
                       setActiveMenu(item.id as any);
                       setSearchQuery('');
-                      if (isRestricted) {
-                        triggerToast(`Tính năng "${item.label}" yêu cầu tài khoản MANAGER!`, 'error');
-                      }
+                      triggerToast(`Mở trang: ${item.label}`, 'info');
                     }}
                     className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold tracking-tight transition-all text-left cursor-pointer ${
                       activeMenu === item.id 
@@ -778,15 +775,6 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                       </span>
                       <span>{item.label}</span>
                     </div>
-                    {item.managerOnly && (
-                      <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded leading-none shrink-0 ${
-                        isRestricted 
-                          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/10' 
-                          : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/10'
-                      }`}>
-                        {isRestricted ? '🔒 MGR' : 'MGR'}
-                      </span>
-                    )}
                   </button>
                 );
               })}
@@ -1043,7 +1031,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
           {/* ACTIVE CONTENT WORKSPACE */}
           <div className="p-6 lg:p-8 flex-1 overflow-y-auto space-y-8">
             
-            {['revenue', 'staff', 'technical', 'security', 'system_log'].includes(activeMenu) && (user?.role !== 'MANAGER' && user?.role !== 'ADMIN') ? (
+            {['revenue', 'staff', 'technical', 'security', 'system_log'].includes(activeMenu) && user?.role !== 'ADMIN' ? (
               <div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-xl mx-auto space-y-6 animate-fade-in">
                 <div className="p-5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full animate-bounce">
                   <Shield className="w-12 h-12 stroke-[1.5]" />
@@ -1053,24 +1041,24 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                   <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white font-sans">
                     Quyền Truy Cập Bị Hạn Chế
                   </h2>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed font-semibold">
+                  <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed font-semibold leading-relaxed">
                     Chức năng <span className="font-extrabold text-rose-550 dark:text-rose-455">"{
-                      activeMenu === 'revenue' ? 'Doanh thu' :
+                      activeMenu === 'revenue' ? 'Doanh thu & Báo cáo' :
                       activeMenu === 'staff' ? 'Quản lý nhân sự' :
                       activeMenu === 'technical' ? 'Cấu hình kỹ thuật' :
                       activeMenu === 'security' ? 'Bảo mật' :
-                      activeMenu === 'system_log' ? 'Nhật ký HS thống' : activeMenu
-                    }"</span> yêu cầu quyền tài khoản <span className="text-blue-500 font-extrabold text-sm uppercase">MANAGER</span> hoặc <span className="text-blue-500 font-bold">ADMIN</span>.
+                      activeMenu === 'system_log' ? 'Nhật ký hệ thống' : activeMenu
+                    }"</span> yêu cầu quyền tài khoản <span className="text-blue-500 font-extrabold text-sm uppercase">ADMIN</span>.
                   </p>
-                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  <p className="text-xs text-slate-400 max-w-md mx-auto font-sans">
                     Tài khoản hiện tại của bạn là <strong className="text-slate-600 dark:text-slate-300">"{user?.role}" ({user?.name})</strong> không có đầy đủ thẩm quyền trực tiếp.
                   </p>
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-900/45 p-5 rounded-2xl border border-slate-200 dark:border-slate-800/80 text-left w-full space-y-3.5">
-                  <span className="font-bold text-slate-400 text-[10px] uppercase tracking-wider block">💡 Cách kiểm tra nhanh quyền MANAGER:</span>
-                  <p className="text-[12px] text-slate-600 dark:text-slate-350 leading-relaxed font-medium">
-                    Vui lòng nhấn nút đăng xuất dưới đây và nhấp đăng nhập tiếp bằng tài khoản demo <span className="text-blue-500 font-bold">MANAGER (0909999999 / 123456)</span> có sẵn ở cổng đăng nhập để mở khóa đầy đủ tính năng.
+                  <span className="font-bold text-slate-400 text-[10px] uppercase tracking-wider block">💡 Cách kiểm tra nhanh quyền ADMIN:</span>
+                  <p className="text-[12px] text-slate-600 dark:text-slate-350 leading-relaxed font-semibold">
+                    Vui lòng sử dụng tính năng đăng xuất hoặc truy cập quản lý hệ thống bằng tài khoản phù hợp để dùng tính năng.
                   </p>
                 </div>
 
@@ -1082,7 +1070,10 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                     Đăng xuất ngay
                   </button>
                   <button
-                    onClick={() => setActiveMenu('overview')}
+                    onClick={() => {
+                      setActiveMenu('overview');
+                      triggerToast('Quay lại Tổng quan', 'info');
+                    }}
                     className="px-5 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold tracking-wide transition-all active:scale-95 cursor-pointer"
                   >
                     Quay lại Tổng quan
@@ -1091,369 +1082,242 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
               </div>
             ) : (
               <>
-                {/* SUB-VIEW 1: TỔNG QUAN SYSTEM-WIDE DASHBOARD (REPLICATING SCREENSHOT MATCH) */}
                 {activeMenu === 'overview' && (
-              <div className="space-y-6 animate-fade-in" id="overview-dashboard-view">
-                
-                {/* SECTION TITLE ROW */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 select-none">
-                  <div className="space-y-1 block">
-                    <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-sans">
-                      Tổng quan {activeFacility === 'all' ? 'HS thống' : activeFacility === 'cs1' ? 'Cơ sở 01' : 'Cơ sở 02'}
-                    </h1>
-                    <p className="text-slate-500 dark:text-slate-400 text-xs font-semibold font-sans">
-                      Dữ liệu cập nhật theo thời gian thực: {currentTime}
-                    </p>
-                  </div>
-
-                  {/* DATE ADJUST AND EXPORT REPORT TRIGGER BUTTONS */}
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => triggerToast('Dữ liệu đang được lọc tự động theo ngày hôm nay!', 'info')}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-1.5 transition-colors hover:bg-slate-50`}
-                    >
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>Hôm nay</span>
-                    </button>
+                  <div className="space-y-6 animate-fade-in text-slate-850 dark:text-slate-100" id="facility-overview-view">
                     
-                    <button 
-                      onClick={handleExportSystemReport}
-                      disabled={isGeneratingReport}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 disabled:opacity-80"
-                    >
-                      {isGeneratingReport ? (
-                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        <Download className="w-3.5 h-3.5 stroke-[2.5]" />
-                      )}
-                      <span>Xuất báo cáo</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* KEY STATISTICS GRID (4 COLUMNS - EXACT PIXEL REPLICATION IN GRAPHICS!) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch select-none">
-                  
-                  {/* CARD 1: TỔNG DOANH THU / LƯỢT XE VÀO/RA */}
-                  <div className={`p-5 rounded-2xl border transition-all ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/60 shadow-xs hover:shadow-md'}`}>
-                    <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-extrabold uppercase text-slate-400 dark:text-slate-500 tracking-wider">
-                        {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? 'LƯỢT XE VÀO/RA' : 'TỔNG DOANH THU'}
-                      </span>
-                      <div className="p-2 rounded-lg bg-blue-100 dark:bg-slate-800/40 text-blue-600 dark:text-blue-400">
-                        {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? <Activity className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}
+                    {/* BREADCRUMB HEADER BANNER */}
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 select-none pb-2 border-b border-slate-150 dark:border-slate-800">
+                      <div className="space-y-1 text-left block">
+                        <div className="text-[10px] uppercase font-black tracking-widest text-slate-400 dark:text-slate-500">
+                          Trang chủ &gt; Quản lý Cơ sở
+                        </div>
+                        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-sans">
+                          Quản lý Cơ sở
+                        </h1>
+                        <p className="text-slate-500 dark:text-slate-400 text-xs font-bold font-sans">
+                          Tổng quan 12 bãi xe đang hoạt động trong hệ thống
+                        </p>
                       </div>
-                    </div>
-                    <div className="mt-3 space-y-1">
-                      <h3 className="text-3xl font-black font-sans leading-none tracking-tight">
-                        {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? '1,420' : formattedRevenue} <span className="text-lg">{user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? 'lượt' : 'Tr'}</span>
-                      </h3>
-                      <p className="text-[11px] font-bold text-emerald-500 flex items-center gap-1.5">
-                        <Activity className="w-3.5 h-3.5" />
-                        <span>{user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? '+8% so với hôm qua' : '+12% so với hôm qua'}</span>
-                      </p>
-                    </div>
-                  </div>
 
-                  {/* CARD 2: XE ĐANG ĐỖ */}
-                  <div className={`p-5 rounded-2xl border transition-all ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/60 shadow-xs hover:shadow-md'}`}>
-                    <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-extrabold uppercase text-slate-400 dark:text-slate-500 tracking-wider">XE ĐANG ĐỖ</span>
-                      <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/40 text-slate-600">
-                        <Car className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      <h3 className="text-3xl font-black font-sans leading-none tracking-tight">
-                        {formattedCarsCount}
-                      </h3>
-                      {/* Linear slider/bar replica */}
-                      <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-slate-900 dark:bg-slate-200" 
-                          style={{ width: `${formattedFullCapacityPercent}%` }} 
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* CARD 3: HIỆU SUẤT LẤP ĐẦY */}
-                  <div className={`p-5 rounded-2xl border transition-all ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/60 shadow-xs hover:shadow-md'}`}>
-                    <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-extrabold uppercase text-slate-400 dark:text-slate-500 tracking-wider">HIỆU SUẤT LẤP ĐẦY</span>
-                      <div className="p-2 rounded-lg bg-emerald-50/50 dark:bg-slate-800/40 text-emerald-600 dark:text-emerald-400">
-                        <Activity className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <div className="mt-3 space-y-1">
-                      <h3 className="text-3xl font-black font-sans leading-none tracking-tight">
-                        {formattedFullCapacityPercent}%
-                      </h3>
-                      <p className="text-[11.5px] font-bold text-slate-500 dark:text-slate-400">
-                        Tối ưu: 80-90%
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* CARD 4: SỰ CỐ CẦN XỬ LÝ (STYLISH RED WARNING CARD) */}
-                  <div className={`p-5 rounded-2xl border transition-all bg-white dark:bg-slate-905 border-rose-200/70 dark:border-rose-950 flex flex-col justify-between`}>
-                    <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-extrabold uppercase text-rose-500 dark:text-rose-400 tracking-wider flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                        SỰ CỐ CẦN XỬ LÝ
-                      </span>
-                      <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400">
-                        <AlertTriangle className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <div className="mt-3 flex justify-between items-end">
-                      <h3 className="text-3.5xl font-black font-mono leading-none tracking-tight text-rose-600 dark:text-rose-400">
-                        {notices.filter(n => n.type === 'ERROR' && n.actionState !== 'RESOLVED').length.toString().padStart(2, '0')}
-                      </h3>
-                      <button 
-                        onClick={() => {
-                          setActiveMenu('security');
-                          triggerToast('Mở trung tâm an ninh vận hành bãi đỗ!', 'info');
-                        }}
-                        className="text-xs font-black text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                      >
-                        Xem chi tiết
-                      </button>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* ROW 2: SPLINE AREA REVENUE CHART & VEHICLES LEGEND (DIAL REPLICAS) */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                  
-                  {/* LEFT COLUMN: AREA SPLINE REVENUE (col-span-8) */}
-                  <div className={`lg:col-span-8 p-6 rounded-2xl border ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/65 shadow-xs'}`}>
-                    <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-800 mb-6 font-sans">
-                      <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest leading-none">
-                        {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? 'Lưu lượng xe 7 ngày qua' : 'Doanh thu 7 ngày qua'}
-                      </h3>
-                      <button onClick={() => triggerToast(user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? 'Lịch sử lưu lượng xe đã được cập nhật!' : 'Lịch sử doanh thu đã được lọc mới nhất!', 'success')} className="p-1 text-slate-400 hover:text-slate-700">
-                        <RefreshCw className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <div className="h-64 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartRevenueData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#2563eb" stopOpacity={0.25}/>
-                              <stop offset="95%" stopColor="#2563eb" stopOpacity={0.01}/>
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#334155' : '#e2e8f0'} />
-                          <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                          <YAxis stroke="#94a3b8" fontSize={11} tickFormatter={(v) => user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? `${v * 15} lượt` : `${v}M`} tickLine={false} />
-                          <Tooltip formatter={(value) => user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? [`${Number(value) * 15} lượt xe`, 'Lượng xe vào/ra'] : [`${value}M VNĐ`, 'Doanh thu']} />
-                          <Area type="monotone" dataKey="amount" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* RIGHT COLUMN: VEHICLES DISTRIBUTION CARD DIALS (col-span-4) */}
-                  <div className={`lg:col-span-4 p-6 rounded-2xl border flex flex-col justify-between ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/65 shadow-xs'}`}>
-                    <div className="pb-3 border-b border-slate-100 dark:border-slate-800 font-sans">
-                      <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest leading-none">
-                        Phân bổ phương tiện
-                      </h3>
-                    </div>
-
-                    <div className="flex-1 flex flex-col items-center justify-center relative py-4 select-none">
-                      <PieChart width={220} height={160}>
-                        <Pie
-                          data={pieVehicleData}
-                          cx="50%"
-                          cy="90%"
-                          startAngle={180}
-                          endAngle={0}
-                          innerRadius={65}
-                          outerRadius={90}
-                          paddingAngle={3}
-                          dataKey="value"
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => {
+                            const name = prompt('Nhập tên cơ sở đỗ xe mới:');
+                            if (name) {
+                              triggerToast(`Yêu cầu thành lập cơ sở "${name}" đang chờ duyệt!`, 'success');
+                            }
+                          }}
+                          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5"
                         >
-                          {pieVehicleData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                      </PieChart>
+                          <Plus className="w-4 h-4 stroke-[3]" />
+                          <span>+ THÊM CƠ SỞ MỚI</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* MAIN TWO-COLUMN CONTAINER */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                       
-                      {/* Big concentric title matched precisely inside the ring space! */}
-                      <div className="absolute bottom-[23px] text-center">
-                        <strong className="text-2xl font-black block tracking-tight leading-none text-slate-850 dark:text-white">
-                          {formattedCarsCount}
-                        </strong>
-                        <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-widest">TỔNG SỐ XE</span>
-                      </div>
-                    </div>
-
-                    {/* VEHICLE DISTRIBUTION PERCENTAGES LEGENDS */}
-                    <div className="space-y-2 pt-4 border-t border-slate-105 dark:border-slate-800 text-[11px] font-sans">
-                      <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-950/20 p-2 rounded-xl">
-                        <div className="flex items-center gap-2 font-bold">
-                          <span className="w-3 h-3 rounded bg-slate-900 border border-slate-700 block" />
-                          <span>⚙️ Ô tô</span>
-                        </div>
-                        <span className="font-extrabold text-slate-700 dark:text-slate-350">60%</span>
-                      </div>
-                      <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-950/20 p-2 rounded-xl">
-                        <div className="flex items-center gap-2 font-bold">
-                          <span className="w-3 h-3 rounded bg-blue-500 block" />
-                          <span>🌐 Xe vãng lai</span>
-                        </div>
-                        <span className="font-extrabold text-slate-700 dark:text-slate-350">25%</span>
-                      </div>
-                      <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-950/20 p-2 rounded-xl">
-                        <div className="flex items-center gap-2 font-bold">
-                          <span className="w-3 h-3 rounded bg-[#10b981] block" />
-                          <span>🌟 Xe VIP</span>
-                        </div>
-                        <span className="font-extrabold text-slate-700 dark:text-slate-350">15%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* ROW 3: STAFF SHIFTS LIST & SYSTEM ALERTS CONSOLE BOX (7:5 ratio) */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch select-none">
-                  
-                  {/* LEFT STAFF CARDS LIST (col-span-7) */}
-                  <div className={`lg:col-span-7 p-6 rounded-2xl border ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-slate-200/65 shadow-xs'} flex flex-col justify-between`}>
-                    <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800 mb-4 font-sans">
-                      <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest">
-                        {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? 'Trạng thái bốt kiểm soát & Cổng' : 'Nhân viên xuất sắc ca hiện tại'}
-                      </h3>
-                      <button 
-                        onClick={() => {
-                          if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN') {
-                            setActiveMenu('monitoring');
-                            triggerToast('Đã mở màn hình giám sát bốt gác thời gian thực!', 'info');
-                          } else {
-                            setActiveMenu('staff');
-                            triggerToast('Lọc toàn bộ dữ liệu nhân viên bốt gác!', 'info');
-                          }
-                        }}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-black cursor-pointer"
-                      >
-                        {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? 'Giám sát ngay' : 'Xem tất cả'}
-                      </button>
-                    </div>
-
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {staff.slice(0, 3).map((member, index) => (
-                        <div key={member.id} className="py-3.5 flex items-center justify-between gap-4 font-sans">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white font-black text-xs flex items-center justify-center border border-slate-200/60 shadow-3xs">
-                              {member.avatar}
-                            </div>
-                            <div className="leading-tight">
-                              <h4 className="text-xs font-black text-slate-800 dark:text-white flex items-center gap-1.5">
-                                {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? member.gate : member.name}
-                                {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? (
-                                  <span className="inline-flex items-center rounded-md bg-emerald-50 dark:bg-[#062419] px-1.5 py-0.5 text-[8px] font-black text-emerald-700 dark:text-emerald-400 ring-1 ring-inset ring-emerald-600/10 dark:ring-emerald-500/20 uppercase tracking-widest">
-                                    Hoạt động
-                                  </span>
-                                ) : (
-                                  index === 0 && (
-                                    <span className="inline-flex items-center rounded-md bg-emerald-50 dark:bg-[#062419] px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-400 ring-1 ring-inset ring-emerald-600/10 dark:ring-emerald-500/20 uppercase tracking-wide">
-                                      ⭐ TOP 1
-                                    </span>
-                                  )
-                                )}
-                              </h4>
-                              <span className="text-[10px] text-slate-400 font-bold block">
-                                {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? `Người trực: ${member.name}` : member.gate}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <div className="text-right font-sans">
-                            <strong className="text-xs font-black text-slate-800 dark:text-slate-200 block">{member.swipes} lượt</strong>
-                            <span className="text-[9px] text-[#22c55e] font-extrabold uppercase tracking-wider">
-                              {user?.role !== 'MANAGER' && user?.role !== 'ADMIN' ? 'Giao dịch quẹt thẻ' : 'Đang đỗ ra/vào'}
+                      {/* LEFT RAIL: MAP & OVERALL HEALTH (col-span-4) */}
+                      <div className="lg:col-span-4 flex flex-col gap-6">
+                        
+                        {/* MAP CONTAINER */}
+                        <div className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-left flex flex-col justify-between">
+                          <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
+                            <span className="font-bold text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                              Bản đồ hệ thống
                             </span>
+                            <button 
+                              onClick={() => triggerToast('Mở rộng toàn bản đồ vệ tinh!', 'info')}
+                              className="text-[10.5px] font-extrabold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                            >
+                              Mở rộng
+                            </button>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* RIGHT SYSTEM ALERTS NOTICES PANEL (col-span-5) */}
-                  <div className={`lg:col-span-5 p-6 rounded-2xl border ${isDarkMode ? 'bg-slate-905 border-slate-800' : 'bg-white border-rose-200/50'}`}>
-                    <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800 mb-4 font-sans">
-                      <h3 className="text-sm font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest leading-none flex items-center gap-1.5">
-                        <span>Thông báo hS thống</span>
-                      </h3>
-                      <span className="inline-flex items-center rounded-md bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 text-[9.5px] font-black text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/10 uppercase tracking-widest">
-                        2 QUAN THƯỜNG
-                      </span>
-                    </div>
+                          {/* HIGH CONTRAST STYLIZED VECTOR MAP PLACEHOLDER */}
+                          <div className="relative h-48 bg-[#151c2c] rounded-xl my-4 overflow-hidden shadow-inner flex items-center justify-center">
+                            {/* Grid Lines */}
+                            <div className="absolute inset-0 bg-[linear-gradient(to_right,#334155_1px,transparent_1px),linear-gradient(to_bottom,#334155_1px,transparent_1px)] bg-[size:14px_24px] opacity-20" />
+                            
+                            {/* Vector Landmass Shapes */}
+                            <div className="absolute w-20 h-20 rounded-full bg-slate-805/40 -top-4 -left-4 blurred-2xl" />
+                            <div className="absolute w-32 h-20 rounded-3xl bg-slate-805/20 bottom-2 right-4 blurred-2xl" />
 
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                      {notices.map(notice => {
-                        const isErr = notice.type === 'ERROR';
-                        const isWarn = notice.type === 'WARNING';
-                        return (
-                          <div 
-                            key={notice.id} 
-                            className={`p-4 rounded-xl border font-sans space-y-2 transition-all ${
-                              isErr 
-                                ? notice.actionState === 'RESOLVED' 
-                                  ? 'bg-emerald-50/10 dark:bg-emerald-950/10 border-emerald-500/20'
-                                  : 'bg-rose-50/50 dark:bg-[#1a0e12] border-rose-200 dark:border-rose-950/80 shadow-3xs'
-                                : isWarn 
-                                  ? 'bg-amber-50/40 dark:bg-[#1c160e] border-amber-200 dark:border-amber-950' 
-                                  : 'bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800'
-                            }`}
-                          >
-                            <div className="flex justify-between items-start gap-4">
-                              <div className="flex items-start gap-2.5">
-                                <div className={`p-1.5 rounded-lg shrink-0 ${isErr ? 'bg-rose-500/10 text-rose-500' : isWarn ? 'bg-amber-500/10 text-amber-500' : 'bg-blue-500/10 text-blue-500'}`}>
-                                  <AlertTriangle className="w-3.5 h-3.5 stroke-[2.5]" />
-                                </div>
-                                <div className="space-y-0.5 leading-tight">
-                                  <h4 className="text-xs font-black text-slate-850 dark:text-slate-100">{notice.title}</h4>
-                                  <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">{notice.desc}</p>
-                                </div>
+                            {/* Street pathways */}
+                            <div className="absolute top-1/2 w-full h-1 bg-slate-700/30 transform -translate-y-1/2" />
+                            <div className="absolute left-1/3 h-full w-1 bg-slate-700/30" />
+                            <div className="absolute right-1/4 h-full w-1 bg-slate-700/30 transform rotate-12" />
+
+                            {/* MAP MARKERS (SCREENSHOT 1 SPECIFICS) */}
+                            {/* Marker 1: Q1-A (Blue, Active) */}
+                            <div className="absolute top-[25%] left-[28%] text-center cursor-pointer transform -translate-y-1/2 -translate-x-1/2 scale-100 hover:scale-110 transition-all select-none" onClick={() => triggerToast('Cơ sở Quận 1 (A) hoạt động ổn định', 'success')}>
+                              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 absolute top-1.5 left-1.5 animate-ping" />
+                              <div className="px-2 py-1 bg-blue-600 text-white font-mono text-[9px] font-black rounded-md shadow-md border border-blue-450 z-10 relative">
+                                Q1-A
                               </div>
                             </div>
 
-                            <div className="flex items-center justify-between pt-1 text-[10px] font-bold font-sans">
-                              <span className="text-slate-400 tracking-wider uppercase">{notice.time}</span>
-                              {notice.actionText && notice.actionState !== 'RESOLVED' && (
-                                <button
-                                  onClick={() => handleManualActionNotice(notice.id)}
-                                  disabled={notice.actionState === 'PENDING'}
-                                  className="text-xs text-[#2563eb] hover:underline font-extrabold flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                >
-                                  {notice.actionState === 'PENDING' ? 'Đang chuyển...' : notice.actionText}
-                                </button>
-                              )}
-                              {notice.actionState === 'RESOLVED' && (
-                                <span className="text-emerald-500 flex items-center gap-1 font-extrabold">
-                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                  <span>Đã phục hồi</span>
-                                </span>
-                              )}
+                            {/* Marker 2: Q3-B (Blue, Active) */}
+                            <div className="absolute bottom-[35%] right-[32%] text-center cursor-pointer transform -translate-y-1/2 -translate-x-1/2 scale-100 hover:scale-110 transition-all select-none" onClick={() => triggerToast('Cơ sở Quận 3 (B) hoạt động ổn định', 'success')}>
+                              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 absolute top-1.5 left-1.5 animate-ping" />
+                              <div className="px-2 py-1 bg-blue-600 text-white font-mono text-[9px] font-black rounded-md shadow-md border border-blue-450 z-10 relative">
+                                Q3-B
+                              </div>
+                            </div>
+
+                            {/* Marker 3: Q5-C (Red, Alert / Maintenance) */}
+                            <div className="absolute top-[45%] right-[15%] text-center cursor-pointer transform -translate-y-1/2 -translate-x-1/2 scale-100 hover:scale-110 transition-all select-none" onClick={() => triggerToast('Cơ sở Quận 5 (C) SC VivoCity đang bảo trì LPR!', 'error')}>
+                              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 absolute top-1.5 left-1.5 animate-ping" />
+                              <div className="px-2 py-1 bg-rose-600 text-white font-mono text-[9px] font-black rounded-md shadow-md border border-rose-450 z-10 relative">
+                                Q5-C
+                              </div>
                             </div>
                           </div>
-                        );
-                      })}
+
+                          <span className="text-[10px] text-slate-400 font-bold block text-center">
+                            📡 Hệ thống định vị trạm thời gian thực (LBS) GPS
+                          </span>
+                        </div>
+
+                        {/* OVERALL HEALTH CONTAINER */}
+                        <div className="bg-white dark:bg-slate-905 border border-slate-205 dark:border-slate-800 rounded-2xl p-5 text-left block">
+                          <span className="font-bold text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-3">
+                            Trạng thái Tổng thể
+                          </span>
+
+                          <div className="space-y-4 block">
+                            <div className="flex justify-between items-end">
+                              <span className="text-xs font-bold text-slate-500">Sức chứa toàn hệ thống</span>
+                              <strong className="text-base font-black text-slate-850 dark:text-white">72%</strong>
+                            </div>
+
+                            {/* Indigo Progress gauge bar */}
+                            <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-blue-600 rounded-full" style={{ width: '72%' }} />
+                            </div>
+
+                            {/* Grid of total Active vs Maintenance indicators */}
+                            <div className="grid grid-cols-2 gap-3 pt-2">
+                              {/* Box 1: Active */}
+                              <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850 rounded-xl text-left">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase">Hoạt động</span>
+                                </div>
+                                <h4 className="text-xl font-black font-mono tracking-tight mt-1">11</h4>
+                              </div>
+                              
+                              {/* Box 2: Maintenance */}
+                              <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850 rounded-xl text-left">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-rose-500" />
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase">Bảo trì</span>
+                                </div>
+                                <h4 className="text-xl font-black font-mono tracking-tight mt-1">01</h4>
+                              </div>
+                            </div>
+
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {/* RIGHT DETAIL: FACILITIES CARDS HUB (col-span-8) */}
+                      <div className="lg:col-span-8 space-y-4">
+                        
+                        {/* QUẬN DISTRICT SELECTOR ROW */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 font-sans">
+                          <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl gap-1 text-xs font-bold">
+                            <button 
+                              onClick={() => triggerToast('Lọc hiển thị toàn bộ 12 cơ sở!', 'success')} 
+                              className="px-4 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg shadow-3xs cursor-pointer"
+                            >
+                              Tất cả (12)
+                            </button>
+                            <button 
+                              onClick={() => triggerToast('Lọc hiển thị quận 1!', 'success')} 
+                              className="px-4 py-2 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+                            >
+                              Quận 1 (5)
+                            </button>
+                            <button 
+                              onClick={() => triggerToast('Lọc hiển thị quận 3!', 'success')} 
+                              className="px-4 py-2 text-slate-400 hover:text-slate-705 dark:hover:text-white cursor-pointer"
+                            >
+                              Quận 3 (4)
+                            </button>
+                          </div>
+                          
+                          <div className="text-xs text-slate-400 font-bold">
+                            Hiển thị 1 - 4 trên 12 cơ sở
+                          </div>
+                        </div>
+
+                        {/* GRID OF COMPREHENSIVE CARD SCHEMES (SPECIFIC TARGET REPLICATIONS) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          
+                          {/* CARD 1: VINCOM CENTER */}
+                          <div className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-805 rounded-2xl p-5 text-left block hover:border-blue-500/50 hover:shadow-lg transition-all space-y-4">
+                            <div className="flex justify-between items-start">
+                              <div className="leading-tight block text-left">
+                                <h3 className="text-base font-black text-slate-850 dark:text-white">Cơ sở Vincom Center</h3>
+                                <span className="text-[11px] text-slate-400 font-bold block mt-1 text-left">72 Lê Thánh Tôn, Quận 1</span>
+                              </div>
+                              <span className="text-[9.5px] font-black text-emerald-600 bg-emerald-55 px-2 py-0.5 rounded uppercase tracking-wider block">
+                                ● Hoạt động
+                              </span>
+                            </div>
+
+                            <div className="space-y-2 block">
+                              <div className="flex justify-between text-xs font-bold text-slate-500">
+                                <span>Sức chứa xe</span>
+                                <span className="text-slate-850 dark:text-white">342 / 400 (85%)</span>
+                              </div>
+                              {/* Blue bar progress */}
+                              <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-blue-600 rounded-full" style={{ width: '85%' }} />
+                              </div>
+                              {/* Sub details column */}
+                              <div className="flex justify-between text-[11px] font-semibold text-slate-400 pt-1 font-sans">
+                                <span>Ô tô: 120 / 150</span>
+                                <span>Xe máy: 222 / 250</span>
+                              </div>
+                            </div>
+
+                            <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-450">
+                              <span>Cập nhật 1 phút trước</span>
+                              <button 
+                                onClick={() => {
+                                  setActiveMenu('monitoring');
+                                  triggerToast('Xem bến bãi Lê Văn Tám!', 'info');
+                                }}
+                                className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-black cursor-pointer"
+                              >
+                                <span>CHI TIẾT</span>
+                                <span>&rarr;</span>
+                              </button>
+                            </div>
+                          </div>
+
+                        </div>
+
+                        {/* BOTTOM PAGINATION CONTROLS */}
+                        <div className="flex items-center justify-center gap-1.5 pt-4 font-sans select-none">
+                          <button onClick={() => triggerToast('Trang trước', 'info')} className="p-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 text-xs font-extrabold">&lt;</button>
+                          <button onClick={() => triggerToast('Trang 1', 'info')} className="px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-black">1</button>
+                          <button onClick={() => triggerToast('Sang trang 2', 'info')} className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 bg-white dark:bg-slate-900 rounded-xl text-xs font-extrabold text-slate-500">2</button>
+                          <button onClick={() => triggerToast('Sang trang 3', 'info')} className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 bg-white dark:bg-slate-900 rounded-xl text-xs font-extrabold text-slate-500">3</button>
+                          <button onClick={() => triggerToast('Trang sau', 'info')} className="p-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 text-xs font-extrabold">&gt;</button>
+                        </div>
+
+                      </div>
+
                     </div>
+
                   </div>
-
-                </div>
-
-              </div>
-            )}
-            {activeMenu === 'monitoring' && (
+                )}
+                        {activeMenu === 'monitoring' && (
               <ParkingMonitorView 
                 blueprintSlots={blueprintSlots}
                 setBlueprintSlots={setBlueprintSlots}
@@ -3355,37 +3219,21 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                       </div>
 
                       <div className="space-y-2 text-xs font-bold leading-relaxed text-slate-650 dark:text-slate-350">
-                        {/* Row Super Admin */}
+                        {/* Row Admin */}
                         <div className="flex justify-between items-center py-1.5 border-b border-dashed border-slate-100 dark:border-slate-850/50">
                           <span className="flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block shrink-0" />
-                            <span className="text-slate-850 dark:text-white">Super Admin</span>
+                            <span className="text-slate-850 dark:text-white">Admin (Quyền tối cao)</span>
                           </span>
-                          <span className="font-mono text-slate-450 dark:text-slate-450 bg-slate-50 dark:bg-slate-950/60 px-1.5 py-0.5 rounded">3</span>
+                          <span className="font-mono text-slate-450 dark:text-slate-450 bg-slate-50 dark:bg-slate-950/60 px-1.5 py-0.5 rounded">1</span>
                         </div>
-                        {/* Row CSM */}
-                        <div className="flex justify-between items-center py-1.5 border-b border-dashed border-slate-100 dark:border-slate-850/50">
-                          <span className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block shrink-0" />
-                            <span className="text-slate-850 dark:text-white">Quản lý Cơ sở</span>
-                          </span>
-                          <span className="font-mono text-slate-450 dark:text-slate-450 bg-slate-50 dark:bg-slate-950/60 px-1.5 py-0.5 rounded">12</span>
-                        </div>
-                        {/* Row Accountant */}
-                        <div className="flex justify-between items-center py-1.5 border-b border-dashed border-slate-100 dark:border-slate-850/50">
-                          <span className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
-                            <span className="text-slate-850 dark:text-white">Kế toán</span>
-                          </span>
-                          <span className="font-mono text-slate-450 dark:text-slate-450 bg-slate-50 dark:bg-slate-950/60 px-1.5 py-0.5 rounded">5</span>
-                        </div>
-                        {/* Row Staff */}
+                        {/* Row User */}
                         <div className="flex justify-between items-center py-1.5">
                           <span className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block shrink-0" />
-                            <span className="text-slate-850 dark:text-white">Nhân viên bãi xe</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block shrink-0" />
+                            <span className="text-slate-850 dark:text-white">User (Vận hành & Bốt gác)</span>
                           </span>
-                          <span className="font-mono text-slate-450 dark:text-slate-450 bg-slate-50 dark:bg-slate-950/60 px-1.5 py-0.5 rounded">48</span>
+                          <span className="font-mono text-slate-450 dark:text-slate-450 bg-slate-50 dark:bg-slate-950/60 px-1.5 py-0.5 rounded">1</span>
                         </div>
                       </div>
 
