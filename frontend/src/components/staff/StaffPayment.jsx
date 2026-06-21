@@ -14,7 +14,7 @@ import {
 } from '@ant-design/icons';
 import { notification, Input, Button, Modal, Spin } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
-import apiClient from '../../services/apiClient';
+import { apiClient } from '../../api/apiClient';
 
 export const StaffPayment = () => {
   const navigate = useNavigate();
