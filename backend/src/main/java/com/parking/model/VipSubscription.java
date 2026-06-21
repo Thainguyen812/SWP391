@@ -25,18 +25,58 @@ public class VipSubscription {
     @Enumerated(EnumType.STRING)
     private Status status;
 
-    public enum Status { PENDING_APPROVAL, ACTIVE, EXPIRED, REJECTED, CANCELLED }
+    @Column(name = "document_photos", columnDefinition = "jsonb")
+    private String documentPhotos;
 
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-    public UUID getVehicleId() { return vehicleId; }
-    public void setVehicleId(UUID vehicleId) { this.vehicleId = vehicleId; }
-    public String getSubscriptionType() { return subscriptionType; }
-    public void setSubscriptionType(String subscriptionType) { this.subscriptionType = subscriptionType; }
-    public java.time.LocalDate getStartDate() { return startDate; }
-    public void setStartDate(java.time.LocalDate startDate) { this.startDate = startDate; }
-    public java.time.LocalDate getEndDate() { return endDate; }
-    public void setEndDate(java.time.LocalDate endDate) { this.endDate = endDate; }
-    public Status getStatus() { return status; }
-    public void setStatus(Status status) { this.status = status; }
+    public enum Status {
+        PENDING_APPROVAL, ACTIVE, EXPIRED, REJECTED, CANCELLED
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public UUID getVehicleId() {
+        return vehicleId;
+    }
+
+    public void setVehicleId(UUID vehicleId) {
+        this.vehicleId = vehicleId;
+    }
+
+    public String getSubscriptionType() {
+        return subscriptionType;
+    }
+
+    public void setSubscriptionType(String subscriptionType) {
+        this.subscriptionType = subscriptionType;
+    }
+
+    public java.time.LocalDate getStartDate() {
+        return startDate;
+    }
+
+    public void setStartDate(java.time.LocalDate startDate) {
+        this.startDate = startDate;
+    }
+
+    public java.time.LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(java.time.LocalDate endDate) {
+        this.endDate = endDate;
+    }
+
+    public Status getStatus() {
+        return status;
+    }
+
+    public void setStatus(Status status) {
+        this.status = status;
+    }
 }

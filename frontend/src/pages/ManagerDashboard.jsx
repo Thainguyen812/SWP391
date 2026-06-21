@@ -1,5 +1,5 @@
 import MainLayout from "../components/layout/MainLayout";
-import { SystemOverviewSection } from "../components/dashboard/SystemOverview";
+import { SystemOverviewSection } from "../components/dashboard/Dashboard_Main";
 
 const ManagerDashboard = () => {
   return (

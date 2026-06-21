@@ -16,7 +16,7 @@ public class Zone {
     private String code;
 
     // stored as JSON text
-    @Column(name = "allowed_sizes", columnDefinition = "text", nullable = false)
+    @Column(name = "allowed_sizes", columnDefinition = "jsonb", nullable = false)
     private String allowedSizes;
 
     @Column(name = "total_slots", nullable = false)
