@@ -81,5 +81,4 @@ public class ParkingController {
         return ResponseEntity.ok(
                 parkingService.congestionCheckout(request)); //nhảy qua serviceyml để xử lý 
     }
-
 }

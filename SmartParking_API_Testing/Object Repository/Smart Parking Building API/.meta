@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ApiCollectionEntity>
+   <description>API collection folder</description>
+   <name>Smart Parking Building API</name>
+   <tag></tag>
+   <folderType>WEBELEMENT</folderType>
+   <collectionType>OPENAPI_3_0</collectionType>
+   <openApiSpecFileName>api-docs.json</openApiSpecFileName>
+</ApiCollectionEntity>

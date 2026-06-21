@@ -20,4 +20,6 @@ public interface ParkingService {
     Transaction congestionCheckout( // check out lưu động vãn lai 
     CongestionCheckoutRequest request
     );
+
+    void cleanupTestData();
 }
