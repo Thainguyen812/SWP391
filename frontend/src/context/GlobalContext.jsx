@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 import { WalletOutlined, CheckCircleFilled, CreditCardOutlined } from '@ant-design/icons';
 
 const GlobalContext = createContext();
@@ -21,6 +21,24 @@ export const GlobalProvider = ({ children }) => {
     { id: 2, staff: "Nguyễn Văn A", shift: "Sáng", start: "06:00", end: "13:44", vehicles: 452, status: "HOÀN THÀNH", isCurrent: false },
     { id: 3, staff: "Trần Thị B", shift: "Đêm", start: "22:00", end: "06:00", vehicles: 318, status: "HOÀN THÀNH", isCurrent: false }
   ]);
+
+  // Fetch from backend on load
+  useEffect(() => {
+    import('../services/shiftService').then(module => {
+      module.shiftService.getShifts().then(data => {
+        if (data && data.length > 0) {
+          // Map backend entities to UI state
+          const mapped = data.map(d => ({
+            id: d.id, staff: d.staffName, shift: d.shiftType, 
+            start: new Date(d.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+            end: d.endTime ? new Date(d.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
+            vehicles: d.vehiclesHandled || 0, status: d.status, isCurrent: d.isCurrent
+          }));
+          setShiftHistory(mapped);
+        }
+      });
+    });
+  }, []);
 
   // 1. Transactions State
   const [transactions, setTransactions] = useState([
@@ -65,6 +83,8 @@ export const GlobalProvider = ({ children }) => {
     transfer: 7250000,
     transactions: 482
   });
+  
+  const [dailyVolume, setDailyVolume] = useState(1284);
 
   const updateShiftStats = (amount, isCash = true) => {
     setShiftStats(prev => ({
@@ -92,6 +112,14 @@ export const GlobalProvider = ({ children }) => {
     }
   };
 
+  const addActiveVehicle = (newVehicle) => {
+    setActiveVehicles(prev => {
+      // Check if already exists to prevent duplicates
+      if (prev.find(v => v.plate === newVehicle.plate)) return prev;
+      return [newVehicle, ...prev];
+    });
+  };
+
   return (
     <GlobalContext.Provider value={{ 
       searchValue, setSearchValue, activeLocation, setActiveLocation,
@@ -100,7 +128,8 @@ export const GlobalProvider = ({ children }) => {
       activityLogs, addActivityLog,
       securityAlerts, addSecurityAlert, removeSecurityAlert, restoreSecurityAlerts,
       shiftStats, updateShiftStats, setShiftStats,
-      activeVehicles, currentVehicle, setCurrentVehicle, removeActiveVehicle
+      dailyVolume, setDailyVolume,
+      activeVehicles, currentVehicle, setCurrentVehicle, removeActiveVehicle, addActiveVehicle
     }}>
       {children}
     </GlobalContext.Provider>

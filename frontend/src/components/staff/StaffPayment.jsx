@@ -18,7 +18,7 @@ import { useGlobalContext } from '../../context/GlobalContext';
 export const StaffPayment = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { addTransaction, updateShiftStats, addActivityLog, currentVehicle, removeActiveVehicle } = useGlobalContext();
+  const { transactions, addTransaction, updateShiftStats, addActivityLog, currentVehicle, removeActiveVehicle } = useGlobalContext();
   
   const lostCardData = location.state?.lostCardVehicle;
   const isLostCard = location.state?.isLostCard;
@@ -29,17 +29,10 @@ export const StaffPayment = () => {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [lan1Status, setLan1Status] = useState(isLostCard ? 'busy' : 'free');
   const [lan2Status, setLan2Status] = useState('busy');
-  const [lpr, setLpr] = useState(lostCardData?.plate || currentVehicle?.plate || '30G-123.45');
+  const [lpr, setLpr] = useState(lostCardData?.plate || currentVehicle?.plate || '');
   const [isEditingLpr, setIsEditingLpr] = useState(false);
   const [hasVehicle, setHasVehicle] = useState(true);
   const [cashGiven, setCashGiven] = useState(totalAmount);
-  
-  const [transactions, setTransactions] = useState([
-    { id: 1, time: '12:35:10', lpr: '29A-999.99', type: 'Vãng lai', typeClass: 'bg-slate-100 text-slate-600', amount: '30,000', status: 'Thành công', statusClass: 'text-emerald-600', icon: <CheckCircleFilled className="mr-1"/> },
-    { id: 2, time: '12:28:45', lpr: '30E-123.88', type: 'Tháng (VIP)', typeClass: 'bg-slate-800 text-white', amount: '0', status: 'Mở tự động', statusClass: 'text-emerald-600', icon: <CheckCircleFilled className="mr-1"/> },
-    { id: 3, time: '12:15:02', lpr: 'UNKNOWN', type: 'Không xác định', typeClass: 'bg-slate-200 text-slate-500', amount: '-', status: 'Lỗi đọc biển', statusClass: 'text-red-600', icon: <WarningFilled className="mr-1"/>, rowClass: 'border-b border-red-50 hover:bg-red-50/50 bg-red-50/20 text-red-600' },
-    { id: 4, time: '12:10:30', lpr: '51F-777.22', type: 'Vãng lai', typeClass: 'bg-slate-100 text-slate-600', amount: '150,000', status: 'Thành công', statusClass: 'text-emerald-600', icon: <CheckCircleFilled className="mr-1"/> }
-  ]);
 
   const handlePayment = () => {
     Modal.confirm({
@@ -50,9 +43,6 @@ export const StaffPayment = () => {
       okButtonProps: { className: 'bg-emerald-600 border-emerald-600 hover:bg-emerald-700' },
       onOk() {
         notification.success({message: 'Thanh toán thành công', description: 'Đã gửi lệnh mở cổng ra.', placement: 'topRight'});
-        
-        // Update Local Mock
-        setTransactions([{ id: Date.now(), time: new Date().toLocaleTimeString('en-GB'), lpr: lpr, type: isLostCard ? 'Phạt thẻ' : 'Vãng lai', typeClass: isLostCard ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600', amount: totalAmount.toLocaleString(), status: 'Thành công', statusClass: 'text-emerald-600', icon: <CheckCircleFilled className="mr-1"/> }, ...transactions.slice(0, 3)]);
         
         // Update Global Context
         addTransaction({
@@ -85,9 +75,7 @@ export const StaffPayment = () => {
           actionColor: "text-emerald-600"
         });
 
-        if (isLostCard) {
-            removeActiveVehicle(lpr);
-        }
+        removeActiveVehicle(lpr);
 
         setHasVehicle(false);
         setLan1Status('free');
@@ -359,13 +347,20 @@ export const StaffPayment = () => {
                 </tr>
               </thead>
               <tbody>
-                {transactions.map(txn => (
-                  <tr key={txn.id} className={txn.rowClass || "border-b border-slate-50 hover:bg-slate-50 transition-colors"}>
-                    <td className="p-4 text-slate-600">{txn.time}</td>
-                    <td className={`p-4 font-bold ${txn.lpr === 'UNKNOWN' ? 'text-red-600' : 'text-slate-800'}`}>{txn.lpr}</td>
-                    <td className="p-4"><span className={`${txn.typeClass} text-[10px] px-2 py-0.5 rounded font-medium`}>{txn.type}</span></td>
+                {transactions.slice(0, 5).map(txn => (
+                  <tr key={txn.id} className={txn.hasError ? "border-b border-red-50 bg-red-50/20 hover:bg-red-50/50 transition-colors" : "border-b border-slate-50 hover:bg-slate-50 transition-colors"}>
+                    <td className="p-4 text-slate-600">{txn.outTime || txn.inTime}</td>
+                    <td className={`p-4 font-bold ${txn.hasError ? 'text-red-600' : 'text-slate-800'}`}>{txn.plate}</td>
+                    <td className="p-4">
+                      <span className={`${txn.type === 'car' ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-600'} text-[10px] px-2 py-0.5 rounded font-medium uppercase`}>
+                        {txn.type === 'car' ? 'Ô TÔ' : (txn.type === 'moto' ? 'XE MÁY' : txn.type)}
+                      </span>
+                    </td>
                     <td className="p-4 font-bold text-slate-800 text-right">{txn.amount}</td>
-                    <td className={`p-4 text-xs font-bold ${txn.statusClass}`}>{txn.icon} {txn.status}</td>
+                    <td className={`p-4 text-xs font-bold ${txn.statusColor.split(' ')[1]}`}>
+                      {txn.hasError ? <CloseCircleFilled className="mr-1" /> : <CheckCircleFilled className="mr-1" />} 
+                      {txn.status}
+                    </td>
                   </tr>
                 ))}
               </tbody>

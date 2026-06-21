@@ -1,6 +1,7 @@
 package com.parking.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.ColumnTransformer;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -61,8 +62,8 @@ public class ParkingSession {
     @Column(name = "mobile_checkout_photo")
     private String mobileCheckoutPhoto;
 
-    @Column(name = "lost_card_proof_photos", columnDefinition = "jsonb")
-    private String lostCardProofPhotos;
+    @Column(name = "lost_card_proof_photos", columnDefinition = "text")
+    private String lostCardProofPhotos = "[]";
 
     @Column(name = "created_at")
     private Instant createdAt;
