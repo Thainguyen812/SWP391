@@ -30,75 +30,37 @@ export default function App() {
   // Check for existing session and initialize mock users database on load
   useEffect(() => {
     const existingUsers = localStorage.getItem('urbanpark_users');
-    let usersList = existingUsers ? JSON.parse(existingUsers) : [];
-
-    // Check if the specific requested Manager and User demo accounts exist, otherwise seed them
-    const hasSpecialManager = usersList.some((u: any) => u.phone === '0909999999');
-    const hasSpecialUser = usersList.some((u: any) => u.phone === '0908888888');
-
-    if (!hasSpecialManager) {
-      usersList.push({
-        phone: '0909999999',
-        password: '123456',
-        name: 'Nguyễn Văn Quản Lý',
-        email: 'manager.demo@urbanpark.com',
-        role: 'MANAGER'
-      });
-    }
-
-    if (!hasSpecialUser) {
-      usersList.push({
-        phone: '0908888888',
-        password: '123456',
-        name: 'Trần Thị Nhân Viên',
-        email: 'user.demo@urbanpark.com',
-        role: 'USER'
-      });
-    }
-
-    if (!existingUsers || !hasSpecialManager || !hasSpecialUser) {
-      if (!existingUsers) {
-        usersList = [
-          {
-            phone: '0901234567',
-            password: '123456',
-            name: 'Nguyễn Văn Đạt',
-            email: 'dat.nguyen@urbanpark.com',
-            role: 'ADMIN'
-          },
-          {
-            phone: '0902222222',
-            password: '123456',
-            name: 'Trần Thị Thuỷ',
-            email: 'thuy.tran@urbanpark.com',
-            role: 'MANAGER'
-          },
-          {
-            phone: '0903333333',
-            password: '123456',
-            name: 'Lê Minh Thành',
-            email: 'thanh.le@urbanpark.com',
-            role: 'USER'
-          },
-          {
-            phone: '0904444444',
-            password: '123456',
-            name: 'Phạm Minh Hoàng',
-            email: 'hoang.pham@urbanpark.com',
-            role: 'DRIVER'
-          },
-          ...usersList
-        ];
-
-        // Filter duplicates
-        const seen = new Set();
-        usersList = usersList.filter((el: any) => {
-          const duplicate = seen.has(el.phone);
-          seen.add(el.phone);
-          return !duplicate;
-        });
-      }
-      localStorage.setItem('urbanpark_users', JSON.stringify(usersList));
+    if (!existingUsers) {
+      localStorage.setItem('urbanpark_users', JSON.stringify([
+        {
+          phone: '0901234567',
+          password: '123456',
+          name: 'Nguyễn Văn Đạt',
+          email: 'dat.nguyen@urbanpark.com',
+          role: 'ADMIN'
+        },
+        {
+          phone: '0902222222',
+          password: '123456',
+          name: 'Trần Thị Thuỷ',
+          email: 'thuy.tran@urbanpark.com',
+          role: 'MANAGER'
+        },
+        {
+          phone: '0903333333',
+          password: '123456',
+          name: 'Lê Minh Thành',
+          email: 'thanh.le@urbanpark.com',
+          role: 'STAFF'
+        },
+        {
+          phone: '0904444444',
+          password: '123456',
+          name: 'Phạm Minh Hoàng',
+          email: 'hoang.pham@urbanpark.com',
+          role: 'DRIVER'
+        }
+      ]));
     }
 
     const storedRefreshToken = localStorage.getItem('urbanpark_refresh_token');
@@ -318,7 +280,7 @@ export default function App() {
         password: password,
         name: name.trim(),
         email: email.trim(),
-        role: 'DRIVER'
+        role: phoneNoSpaces.endsWith('2') ? 'MANAGER' : phoneNoSpaces.endsWith('3') ? 'STAFF' : 'DRIVER'
       };
 
       userList.push(newUser);
@@ -439,7 +401,7 @@ export default function App() {
       showNotification('Đăng xuất thành công, sẵn sàng nhận phiên đăng nhập mới!', 'info');
     };
 
-    if (currentUser.role === 'DRIVER' || currentUser.role === 'USER') {
+    if (currentUser.role === 'DRIVER') {
       return (
         <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full min-h-screen">
           <DriverPwa 
@@ -836,7 +798,7 @@ export default function App() {
                     Cổng đăng nhập
                   </h2>
                   <p className="text-[14px] text-slate-500 mt-1 leading-relaxed">
-                    Chào mừng bạn quay trở lại với UrbanPark Portal.
+                    Chào mừng tài xế quay trở lại với UrbanPark Portal.
                   </p>
                 </div>
 

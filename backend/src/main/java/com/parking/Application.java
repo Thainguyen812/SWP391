@@ -7,8 +7,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-@Import(SecurityConfig.class) // ÉP BUỘC: Bắt Spring Boot phải nuốt file SecurityConfig này vào chạy
-@EnableScheduling // <-- Cần có cái này để kích hoạt luồng chạy ngầm
+@Import(SecurityConfig.class) //ÉP BUỘC: Bắt Spring Boot phải nuốt file SecurityConfig này vào chạy
+@EnableScheduling
 public class Application {
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);

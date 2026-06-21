@@ -8,25 +8,27 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ParkingSessionRepository extends JpaRepository<ParkingSession, UUID> {
+    // --- HEAD ---
+    Optional<ParkingSession> findByLicensePlateAndSessionStatus(String licensePlate, ParkingSession.SessionStatus sessionStatus);
+    java.util.List<ParkingSession> findByVehicleIdAndSessionStatusIn(java.util.UUID vehicleId, java.util.Collection<ParkingSession.SessionStatus> sessionStatuses);
+    
+    long countBySessionStatus(ParkingSession.SessionStatus sessionStatus);
+    java.util.List<ParkingSession> findByIsSuspiciousTrue();
+    long countBySessionStatusAndIsVipTrue(ParkingSession.SessionStatus sessionStatus);
+    java.util.List<ParkingSession> findTop10ByOrderByUpdatedAtDesc();
 
-    // Tìm theo biển số
-    Optional<ParkingSession> findByLicensePlateAndSessionStatus(String licensePlate,
-            ParkingSession.SessionStatus sessionStatus);
+    // Queries cho Staff Features
+    org.springframework.data.domain.Page<ParkingSession> findByLicensePlateContainingIgnoreCase(String licensePlate, org.springframework.data.domain.Pageable pageable);
+    java.util.List<ParkingSession> findByIsSuspiciousTrueAndSessionStatus(ParkingSession.SessionStatus sessionStatus);
+    java.util.List<ParkingSession> findByLicensePlateContainingIgnoreCaseAndSessionStatus(String licensePlate, ParkingSession.SessionStatus sessionStatus);
 
-    // Tìm theo danh sách trạng thái
-    List<ParkingSession> findByVehicleIdAndSessionStatusIn(UUID vehicleId,
-            Collection<ParkingSession.SessionStatus> sessionStatuses);
-
+    // --- origin/main ---
     // Tìm theo ID thẻ
     Optional<ParkingSession> findByCardIdAndSessionStatus(UUID cardId, ParkingSession.SessionStatus sessionStatus);
 
     // Tìm phiên xe đang ACTIVE tại ô đỗ cụ thể (Dành cho Scheduler)
-    Optional<ParkingSession> findByParkedSlotIdAndSessionStatus(UUID parkedSlotId,
-            ParkingSession.SessionStatus sessionStatus);
+    Optional<ParkingSession> findByParkedSlotIdAndSessionStatus(UUID parkedSlotId, ParkingSession.SessionStatus sessionStatus);
 
     // Tìm phiên xe theo thẻ và danh sách trạng thái 
-    List<ParkingSession> findByCardIdAndSessionStatusIn(
-            UUID cardId,
-            Collection<ParkingSession.SessionStatus> statuses
-    );
+    List<ParkingSession> findByCardIdAndSessionStatusIn(UUID cardId, Collection<ParkingSession.SessionStatus> statuses);
 }
