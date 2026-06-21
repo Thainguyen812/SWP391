@@ -35,6 +35,14 @@ export const StaffGateControl = () => {
   const [aiPlate, setAiPlate] = useState('30G-123.45');
   const [aiConfidence, setAiConfidence] = useState(98.5);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
+  const [aiImagePreview, setAiImagePreview] = useState('https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80');
+
+  const handleAiImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setAiImagePreview(URL.createObjectURL(file));
+    }
+  };
 
   const handleManualCheckIn = async () => {
     if (!manualPlate || !manualCardCode) {
@@ -639,11 +647,12 @@ export const StaffGateControl = () => {
       >
         <div className="flex flex-col gap-5 mt-4">
           {/* Mock Camera Image Area */}
-          <div className="border-2 border-dashed border-slate-300 rounded-lg p-2 flex flex-col items-center justify-center bg-slate-50 relative overflow-hidden group cursor-pointer hover:border-blue-400 transition-colors">
+          <label htmlFor="ai-image-upload" className="border-2 border-dashed border-slate-300 rounded-lg p-2 flex flex-col items-center justify-center bg-slate-50 relative overflow-hidden group cursor-pointer hover:border-blue-400 transition-colors">
              <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-             <img src="https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80" alt="Xe mẫu" className="w-full h-40 object-cover rounded mb-2 opacity-80" />
-             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider absolute bottom-4 bg-white/80 px-3 py-1 rounded backdrop-blur-sm">Tải ảnh xe lên (Mock)</span>
-          </div>
+             <img src={aiImagePreview} alt="Xe mẫu" className="w-full h-40 object-cover rounded mb-2 opacity-80" />
+             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider absolute bottom-4 bg-white/80 px-3 py-1 rounded backdrop-blur-sm group-hover:text-blue-600 transition-colors shadow-sm">TẢI ẢNH XE LÊN (BẤM ĐỂ CHỌN)</span>
+             <input type="file" id="ai-image-upload" accept="image/*" className="hidden" onChange={handleAiImageUpload} />
+          </label>
 
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nhận diện Biển số</label>
