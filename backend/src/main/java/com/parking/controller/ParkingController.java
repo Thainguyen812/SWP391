@@ -75,6 +75,13 @@ public class ParkingController {
                 parkingService.checkoutCard(cardId));
     }
 
+    @PostMapping("/checkout-by-code/{cardCode}")
+    public ResponseEntity<Transaction> checkoutByCode(
+            @PathVariable String cardCode) {
+        return ResponseEntity.ok(
+                parkingService.checkoutCardByCode(cardCode));
+    }
+
     @PostMapping("/congestion/checkout") // check out lưu động 
     public ResponseEntity<Transaction> congestionCheckout(
             @RequestBody CongestionCheckoutRequest request) {

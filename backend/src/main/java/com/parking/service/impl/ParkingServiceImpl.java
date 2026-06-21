@@ -571,6 +571,14 @@ public class ParkingServiceImpl implements ParkingService {
                 return transaction;
         }
 
+        @Override
+        @Transactional
+        public Transaction checkoutCardByCode(String cardCode) {
+                Card card = cardRepository.findByCardCode(cardCode)
+                                .orElseThrow(() -> new ApiExceptions.NotFoundException("Thẻ không tồn tại"));
+                return this.checkoutCard(card.getId());
+        }
+
         // task 7 check out lưu động
 
         @Override

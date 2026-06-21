@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons';
 import { notification, Input, Button, Modal, Spin } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
+import apiClient from '../../services/apiClient';
 
 export const StaffPayment = () => {
   const navigate = useNavigate();
@@ -24,15 +25,39 @@ export const StaffPayment = () => {
   const isLostCard = location.state?.isLostCard;
   const penaltyAmount = location.state?.penaltyAmount || 200000;
   const baseAmount = 50000;
-  const totalAmount = isLostCard ? (baseAmount + penaltyAmount) : baseAmount;
-
+  
+  const [totalAmount, setTotalAmount] = useState(isLostCard ? (baseAmount + penaltyAmount) : baseAmount);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [lan1Status, setLan1Status] = useState(isLostCard ? 'busy' : 'free');
-  const [lan2Status, setLan2Status] = useState('busy');
+  const [lan2Status, setLan2Status] = useState('free');
   const [lpr, setLpr] = useState(lostCardData?.plate || currentVehicle?.plate || '');
   const [isEditingLpr, setIsEditingLpr] = useState(false);
-  const [hasVehicle, setHasVehicle] = useState(true);
+  const [hasVehicle, setHasVehicle] = useState(isLostCard ? true : false);
   const [cashGiven, setCashGiven] = useState(totalAmount);
+  const [cardCode, setCardCode] = useState('');
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [backendTxn, setBackendTxn] = useState(null);
+
+  const handleScanCard = async () => {
+    if (!cardCode) return notification.warning({message: 'Vui lòng nhập hoặc quét mã thẻ'});
+    setIsCheckingOut(true);
+    try {
+      const response = await apiClient.post(`/v1/parking/checkout-by-code/${cardCode}`);
+      const txn = response.data;
+      
+      setBackendTxn(txn);
+      setLpr(`THẺ: ${cardCode}`); // Since backend doesn't return plate directly in Transaction
+      setTotalAmount(txn.totalAmount);
+      setCashGiven(txn.totalAmount);
+      setHasVehicle(true);
+      setLan1Status('busy');
+      notification.success({message: 'Quét thẻ thành công', description: `Đã tính phí: ${txn.totalAmount} VND. Vui lòng thu tiền.`});
+    } catch (error) {
+      notification.error({message: 'Lỗi Check-out', description: error.response?.data?.message || 'Không thể check-out bằng thẻ này'});
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
 
   const handlePayment = () => {
     Modal.confirm({
@@ -78,6 +103,10 @@ export const StaffPayment = () => {
         removeActiveVehicle(lpr);
 
         setHasVehicle(false);
+        setBackendTxn(null);
+        setCardCode('');
+        setTotalAmount(0);
+        setCashGiven(0);
         setLan1Status('free');
       }
     });
@@ -99,13 +128,7 @@ export const StaffPayment = () => {
   };
 
   const simulateNextVehicle = () => {
-    const plates = ['29A-888.88', '30F-123.45', '51G-555.55', '14A-111.11'];
-    setLpr(plates[Math.floor(Math.random() * plates.length)]);
-    setPaymentMethod('cash');
-    setCashGiven(totalAmount);
-    setHasVehicle(true);
-    setLan1Status('busy');
-    notification.info({message: 'Xe mới tiến vào làn', description: `Camera LPR đã nhận diện biển số.`, placement: 'topRight'});
+    // Removed because we now use real scanning API
   };
 
   const handleCheckout = () => {
@@ -146,16 +169,26 @@ export const StaffPayment = () => {
           {!hasVehicle ? (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-12 flex flex-col items-center justify-center h-[550px]">
               <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6 shadow-inner border border-slate-100">
-                <CarOutlined className="text-5xl text-slate-300" />
+                <CreditCardOutlined className="text-5xl text-blue-500 animate-pulse" />
               </div>
               <h3 className="text-xl font-bold text-slate-600 mb-2">Làn ra đang trống</h3>
-              <p className="text-slate-400 mb-8 text-center max-w-sm">Hệ thống camera đang giám sát và chờ phương tiện tiếp theo tiến vào vạch nhận diện...</p>
-              <button 
-                onClick={simulateNextVehicle} 
-                className="bg-white border border-slate-300 text-slate-700 px-6 py-3 rounded-lg shadow-sm hover:bg-slate-50 font-bold transition-colors cursor-pointer"
-              >
-                Giả lập xe tiếp theo tới
-              </button>
+              <p className="text-slate-400 mb-8 text-center max-w-sm">Hệ thống camera đang giám sát. Vui lòng quẹt thẻ của khách (vãng lai) để bắt đầu Check-out.</p>
+              
+              <div className="flex flex-col gap-3 w-full max-w-xs">
+                <Input 
+                  placeholder="Nhập hoặc quét mã thẻ..." 
+                  size="large"
+                  value={cardCode}
+                  onChange={e => setCardCode(e.target.value)}
+                  onPressEnter={handleScanCard}
+                  disabled={isCheckingOut}
+                  autoFocus
+                  className="text-center font-mono text-lg font-bold"
+                />
+                <Button type="primary" size="large" onClick={handleScanCard} loading={isCheckingOut} className="w-full font-bold bg-blue-600 shadow-md">
+                  QUÉT THẺ TÍNH PHÍ (API)
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-6">
