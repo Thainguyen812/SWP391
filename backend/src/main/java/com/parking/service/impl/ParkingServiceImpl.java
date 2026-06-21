@@ -12,14 +12,16 @@ import com.parking.model.Vehicle;
 import com.parking.model.VipQrIdentifier;
 import com.parking.model.AuditLog;
 import com.parking.model.AiScanLog;
-
-import com.parking.model.Transaction; // task 5
-
+import com.parking.model.ParkingSlot;
+import com.parking.repository.ParkingSlotRepository;
+import com.parking.model.User;
+import com.parking.repository.UserRepository;
+import com.parking.model.Transaction;
 import com.parking.repository.BlacklistRepository;
 import com.parking.repository.ParkingSessionRepository;
+import com.parking.repository.ZoneRepository;
 import com.parking.repository.VipSubscriptionRepository;
 import com.parking.repository.VehicleRepository;
-import com.parking.repository.ZoneRepository;
 import com.parking.repository.VipQrIdentifierRepository;
 import com.parking.repository.AuditLogRepository;
 import com.parking.repository.AiScanLogRepository;
@@ -58,6 +60,8 @@ public class ParkingServiceImpl implements ParkingService {
 
     private final TransactionRepository transactionRepository;// task 5
     private final CardRepository cardRepository;// task 5
+    private final ParkingSlotRepository slotRepository;
+    private final UserRepository userRepository;
 
     public ParkingServiceImpl(BlacklistRepository blacklistRepository,
             ParkingSessionRepository parkingSessionRepository,
@@ -68,7 +72,9 @@ public class ParkingServiceImpl implements ParkingService {
             AuditLogRepository auditLogRepository,
             AiScanLogRepository aiScanLogRepository,
             TransactionRepository transactionRepository, // task 5
-            CardRepository cardRepository) { // task 5
+            CardRepository cardRepository,
+            ParkingSlotRepository slotRepository,
+            UserRepository userRepository) { // task 5
         this.blacklistRepository = blacklistRepository;
         this.parkingSessionRepository = parkingSessionRepository;
         this.zoneRepository = zoneRepository;
@@ -79,6 +85,8 @@ public class ParkingServiceImpl implements ParkingService {
         this.aiScanLogRepository = aiScanLogRepository;
         this.transactionRepository = transactionRepository; // task 5
         this.cardRepository = cardRepository; // task 5
+        this.slotRepository = slotRepository;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -142,6 +150,20 @@ public class ParkingServiceImpl implements ParkingService {
 
         if (vehicleOpt.isPresent()) {
             ps.setVehicleId(vehicleOpt.get().getId());
+        }
+
+        // Find first available slot in the chosen zone
+        final Zone finalZone = chosen;
+        ParkingSlot assignedSlot = slotRepository.findAll().stream()
+                .filter(s -> s.getZoneId().equals(finalZone.getId()) && "AVAILABLE".equals(s.getSlotStatus()))
+                .findFirst()
+                .orElse(null);
+        if (assignedSlot != null) {
+            assignedSlot.setSlotStatus("OCCUPIED");
+            assignedSlot.setLastUpdated(Instant.now());
+            slotRepository.save(assignedSlot);
+            ps.setParkedSlotId(assignedSlot.getId());
+            ps.setSlotPhotoUrl("https://mock-sensor-camera.com/slots/" + assignedSlot.getId() + ".jpg");
         }
 
         parkingSessionRepository.save(ps);
@@ -267,6 +289,14 @@ public class ParkingServiceImpl implements ParkingService {
         session.setValidatedQrId(qr.getId());
         session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
         session.setCheckOutTime(Instant.now());
+        session.setSlotPhotoUrl(null);
+        if (session.getParkedSlotId() != null) {
+            slotRepository.findById(session.getParkedSlotId()).ifPresent(slot -> {
+                slot.setSlotStatus("AVAILABLE");
+                slot.setLastUpdated(Instant.now());
+                slotRepository.save(slot);
+            });
+        }
         parkingSessionRepository.save(session);
 
         // Tăng số chỗ trống của Zone đỗ (+1 slot)
@@ -397,6 +427,20 @@ public class ParkingServiceImpl implements ParkingService {
         session.setIsVip(false);
         session.setMobileCheckoutPhoto(request.getImage_url());
 
+        // Find first available slot in the chosen zone
+        final Zone finalZone = chosen;
+        ParkingSlot assignedSlot = slotRepository.findAll().stream()
+                .filter(s -> s.getZoneId().equals(finalZone.getId()) && "AVAILABLE".equals(s.getSlotStatus()))
+                .findFirst()
+                .orElse(null);
+        if (assignedSlot != null) {
+            assignedSlot.setSlotStatus("OCCUPIED");
+            assignedSlot.setLastUpdated(Instant.now());
+            slotRepository.save(assignedSlot);
+            session.setParkedSlotId(assignedSlot.getId());
+            session.setSlotPhotoUrl("https://mock-sensor-camera.com/slots/" + assignedSlot.getId() + ".jpg");
+        }
+
         parkingSessionRepository.save(session); // save vào database
 
         // Đổi trạng thái thẻ
@@ -410,121 +454,118 @@ public class ParkingServiceImpl implements ParkingService {
                 "VISITOR_CHECK_IN_OK");
     }
 
-    // task5 check out
     @Override
     @Transactional
     public Transaction checkoutCard(UUID cardId) {
-        // ParkingSession session =
-        // parkingSessionRepository.findByCardIdAndSessionStatus(
-        // cardId,
-        // ParkingSession.SessionStatus.ACTIVE).orElseThrow(
-        // () -> new ApiExceptions.NotFoundException("Không tìm thấy phiên gửi xe ACTIVE
-        // cho thẻ này"));
-
         ParkingSession session = parkingSessionRepository
                 .findByCardIdAndSessionStatusIn(
                         cardId,
                         java.util.List.of(
                                 ParkingSession.SessionStatus.ACTIVE,
                                 ParkingSession.SessionStatus.PASSED_CONFIRMED))
-
                 .stream()
                 .findFirst()
                 .orElseThrow(
                         () -> new ApiExceptions.NotFoundException(
                                 "Không tìm thấy phiên gửi xe hợp lệ"));
-        
+
+        if (session.getIsLocked() != null && session.getIsLocked()) {
+            throw new ApiExceptions.ForbiddenException("Xe đang ở trạng thái KHÓA AN TOÀN chống trộm! Không thể xuất bãi.");
+        }
+
         // task 7 
-if (session.getSessionStatus()
-        == ParkingSession.SessionStatus.PASSED_CONFIRMED) {
+        if (session.getSessionStatus() == ParkingSession.SessionStatus.PASSED_CONFIRMED) {
+            Instant expireTime = session.getMobileCheckoutAt().plusSeconds(1800);
 
-    Instant expireTime =
-            session.getMobileCheckoutAt()
-                    .plusSeconds(1800);
+            if (Instant.now().isAfter(expireTime)) {
+                session.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
+                parkingSessionRepository.save(session);
+                throw new ApiExceptions.BadRequestException("Phiên thanh toán lưu động đã hết hạn 30 phút");
+            }
 
-    if (Instant.now().isAfter(expireTime)) {
+            session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
+            session.setCheckOutTime(Instant.now());
+            session.setSlotPhotoUrl(null);
+            if (session.getParkedSlotId() != null) {
+                slotRepository.findById(session.getParkedSlotId()).ifPresent(slot -> {
+                    slot.setSlotStatus("AVAILABLE");
+                    slot.setLastUpdated(Instant.now());
+                    slotRepository.save(slot);
+                });
+            }
 
-        session.setSessionStatus(
-                ParkingSession.SessionStatus.ACTIVE);
+            parkingSessionRepository.save(session);
 
+            Card card = cardRepository.findById(cardId)
+                    .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thẻ"));
+
+            card.setStatus(Card.CardStatus.AVAILABLE);
+            cardRepository.save(card);
+
+            if (session.getAssignedZoneId() != null) {
+                zoneRepository.decreaseOccupied(session.getAssignedZoneId());
+            }
+
+            return transactionRepository.findBySessionId(session.getId()).orElseThrow();
+        }
+
+        if (session.getIsVip() != null && session.getIsVip()) {
+            throw new ApiExceptions.BadRequestException("Xe VIP không checkout bằng thẻ vãng lai");
+        }
+
+        if (blacklistRepository.existsByCardId(cardId)) {
+            throw new ApiExceptions.ForbiddenException("Thẻ này đang nằm trong blacklist, không thể checkout");
+        }
+
+        if (transactionRepository.findBySessionId(session.getId()).isPresent()) {
+            throw new ApiExceptions.ConflictException("Phiên gửi xe này đã có transaction");
+        }
+
+        Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin xe để tính phí"));
+
+        Instant checkOutTime = Instant.now();
+
+        BigDecimal parkingFee = transactionRepository.calculateParkingFee( // gọi transaction để tính phí
+                vehicle.getVehicleSize(),
+                session.getCheckInTime(),
+                checkOutTime);
+
+        Transaction transaction = new Transaction();
+        transaction.setId(UUID.randomUUID());
+        transaction.setSessionId(session.getId());
+        transaction.setParkingFee(parkingFee);
+        transaction.setLostCardPenalty(BigDecimal.ZERO);
+        transaction.setViolationPenalty(BigDecimal.ZERO);
+        transaction.setTotalAmount(parkingFee);
+        transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
+        transaction.setPaymentStatus(Transaction.PaymentStatus.PENDING);
+        transaction.setIsMobileCheckout(false);
+        transaction.setProcessedAt(checkOutTime);
+
+        transaction = transactionRepository.save(transaction);
+        session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
+        session.setCheckOutTime(checkOutTime);
+        session.setSlotPhotoUrl(null);
+        if (session.getParkedSlotId() != null) {
+            slotRepository.findById(session.getParkedSlotId()).ifPresent(slot -> {
+                slot.setSlotStatus("AVAILABLE");
+                slot.setLastUpdated(Instant.now());
+                slotRepository.save(slot);
+            });
+        }
         parkingSessionRepository.save(session);
 
-        throw new ApiExceptions.BadRequestException(
-                "Phiên thanh toán lưu động đã hết hạn 30 phút");
-    }
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thẻ"));
 
-    session.setSessionStatus(
-            ParkingSession.SessionStatus.COMPLETED);
+        card.setStatus(Card.CardStatus.AVAILABLE);
+        cardRepository.save(card);
 
-    session.setCheckOutTime(
-            Instant.now());
-
-    parkingSessionRepository.save(session);
-
-    Card card = cardRepository.findById(cardId)
-            .orElseThrow(() ->
-                    new ApiExceptions.NotFoundException(
-                            "Không tìm thấy thẻ"));
-
-    card.setStatus(Card.CardStatus.AVAILABLE);
-
-    cardRepository.save(card);
-
-    if (session.getAssignedZoneId() != null) {
-        zoneRepository.decreaseOccupied(
-                session.getAssignedZoneId());
-    }
-
-    return transactionRepository
-            .findBySessionId(session.getId())
-            .orElseThrow();
-}
-        
-    //
-
-    if(session.getIsVip()!=null&&session.getIsVip())
-
-    {
-        throw new ApiExceptions.BadRequestException("Xe VIP không checkout bằng thẻ vãng lai");
-    }
-
-    if(blacklistRepository.existsByCardId(cardId))
-    {
-        throw new ApiExceptions.ForbiddenException("Thẻ này đang nằm trong blacklist, không thể checkout");
-    }
-
-    if(transactionRepository.findBySessionId(session.getId()).isPresent())
-    {
-        throw new ApiExceptions.ConflictException("Phiên gửi xe này đã có transaction");
-    }
-
-    Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
-            .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin xe để tính phí"));
-
-    Instant checkOutTime = Instant.now();
-
-    BigDecimal parkingFee = transactionRepository.calculateParkingFee( // gọi transaction để tính phí
-            vehicle.getVehicleSize(),
-            session.getCheckInTime(),
-            checkOutTime);
-
-    Transaction transaction = new Transaction();transaction.setId(UUID.randomUUID());transaction.setSessionId(session.getId());transaction.setParkingFee(parkingFee);transaction.setLostCardPenalty(BigDecimal.ZERO);transaction.setViolationPenalty(BigDecimal.ZERO);transaction.setTotalAmount(parkingFee);transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);transaction.setPaymentStatus(Transaction.PaymentStatus.PENDING);transaction.setIsMobileCheckout(false);transaction.setProcessedAt(checkOutTime);
-
-    transaction=transactionRepository.save(transaction);session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);session.setCheckOutTime(checkOutTime);parkingSessionRepository.save(session);
-
-    Card card = cardRepository.findById(cardId)
-            .orElseThrow(() -> new ApiExceptions.NotFoundException(
-                    "Không tìm thấy thẻ"));
-
-    card.setStatus(Card.CardStatus.AVAILABLE);
-
-    cardRepository.save(card);
-
-    if(session.getAssignedZoneId()!=null)
-    {
-        zoneRepository.decreaseOccupied(
-                session.getAssignedZoneId());
-    }return transaction;
+        if (session.getAssignedZoneId() != null) {
+            zoneRepository.decreaseOccupied(session.getAssignedZoneId());
+        }
+        return transaction;
     }
 
     // task 7 check out lưu động
@@ -541,6 +582,10 @@ if (session.getSessionStatus()
                 .orElseThrow(
                         () -> new ApiExceptions.NotFoundException(
                                 "Không tìm thấy phiên gửi xe ACTIVE"));
+
+        if (session.getIsLocked() != null && session.getIsLocked()) {
+            throw new ApiExceptions.ForbiddenException("Xe đang ở trạng thái KHÓA AN TOÀN chống trộm! Không thể xuất bãi.");
+        }
 
         if (session.getIsVip() != null
                 && session.getIsVip()) {
@@ -626,8 +671,14 @@ if (session.getSessionStatus()
 
         session.setSessionStatus(
                 ParkingSession.SessionStatus.PASSED_CONFIRMED);
-
-
+        session.setSlotPhotoUrl(null);
+        if (session.getParkedSlotId() != null) {
+            slotRepository.findById(session.getParkedSlotId()).ifPresent(slot -> {
+                slot.setSlotStatus("AVAILABLE");
+                slot.setLastUpdated(Instant.now());
+                slotRepository.save(slot);
+            });
+        }
 
         parkingSessionRepository.save(
                 session);
@@ -659,5 +710,180 @@ if (session.getSessionStatus()
             card.setStatus(com.parking.model.Card.CardStatus.AVAILABLE);
             cardRepository.save(card);
         });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getParkingFee(UUID cardId) {
+        ParkingSession session = parkingSessionRepository
+                .findByCardIdAndSessionStatusIn(
+                        cardId,
+                        java.util.List.of(
+                                ParkingSession.SessionStatus.ACTIVE,
+                                ParkingSession.SessionStatus.PASSED_CONFIRMED))
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy phiên gửi xe hợp lệ"));
+
+        Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin xe để tính phí"));
+
+        Instant checkOutTime = Instant.now();
+        BigDecimal parkingFee = BigDecimal.ZERO;
+        if (session.getIsVip() == null || !session.getIsVip()) {
+            parkingFee = transactionRepository.calculateParkingFee(
+                    vehicle.getVehicleSize(),
+                    session.getCheckInTime(),
+                    checkOutTime);
+        }
+
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("sessionId", session.getId().toString());
+        response.put("cardId", cardId.toString());
+        response.put("licensePlate", session.getLicensePlate());
+        response.put("checkInTime", session.getCheckInTime());
+        response.put("checkOutTime", checkOutTime);
+        response.put("parkingFee", parkingFee);
+        response.put("isVip", session.getIsVip() != null && session.getIsVip());
+        return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<java.util.Map<String, Object>> findCarByDigits(String digits) {
+        List<ParkingSession> sessions = parkingSessionRepository.findActiveSessionsByPlateEndingWith(digits);
+        List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        for (ParkingSession ps : sessions) {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", ps.getId());
+            map.put("licensePlate", ps.getLicensePlate());
+            map.put("checkInTime", ps.getCheckInTime());
+            map.put("slotPhotoUrl", ps.getSlotPhotoUrl());
+            map.put("isVip", ps.getIsVip());
+
+            if (ps.getAssignedZoneId() != null) {
+                zoneRepository.findById(ps.getAssignedZoneId()).ifPresent(zone -> {
+                    map.put("zoneId", zone.getId());
+                    map.put("zoneCode", zone.getCode());
+                    map.put("zoneName", zone.getZoneName());
+                });
+            }
+            if (ps.getParkedSlotId() != null) {
+                slotRepository.findById(ps.getParkedSlotId()).ifPresent(slot -> {
+                    map.put("slotId", slot.getId());
+                    map.put("slotNumber", slot.getSlotNumber());
+                    map.put("slotType", slot.getSlotType());
+                });
+            }
+            result.add(map);
+        }
+        return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<java.util.Map<String, Object>> getMonitoringMap() {
+        List<ParkingSlot> slots = slotRepository.findAll();
+        List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        for (ParkingSlot slot : slots) {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", slot.getId());
+            map.put("zoneId", slot.getZoneId());
+            map.put("slotNumber", slot.getSlotNumber());
+            map.put("slotType", slot.getSlotType());
+            map.put("slotStatus", slot.getSlotStatus());
+            map.put("sensorMockId", slot.getSensorMockId());
+            map.put("evChargerId", slot.getEvChargerId());
+            map.put("lastUpdated", slot.getLastUpdated());
+
+            parkingSessionRepository.findByParkedSlotIdAndSessionStatus(slot.getId(), ParkingSession.SessionStatus.ACTIVE)
+                    .ifPresent(session -> {
+                        map.put("sessionId", session.getId());
+                        map.put("licensePlate", session.getLicensePlate());
+                        map.put("checkInTime", session.getCheckInTime());
+                        map.put("isVip", session.getIsVip());
+                        map.put("slotPhotoUrl", session.getSlotPhotoUrl());
+                    });
+            result.add(map);
+        }
+        return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getVehicleStatus(UUID vehicleId) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin xe"));
+
+        Optional<ParkingSession> sessionOpt = parkingSessionRepository
+                .findByLicensePlateAndSessionStatus(vehicle.getLicensePlate(), ParkingSession.SessionStatus.ACTIVE);
+
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("vehicleId", vehicle.getId());
+        response.put("licensePlate", vehicle.getLicensePlate());
+        response.put("fuelType", vehicle.getFuelType());
+        response.put("vehicleSize", vehicle.getVehicleSize());
+
+        if (sessionOpt.isPresent()) {
+            ParkingSession session = sessionOpt.get();
+            response.put("isParked", true);
+            response.put("sessionId", session.getId());
+            response.put("checkInTime", session.getCheckInTime());
+            response.put("isLocked", session.getIsLocked() != null && session.getIsLocked());
+            response.put("slotPhotoUrl", session.getSlotPhotoUrl());
+
+            if (session.getAssignedZoneId() != null) {
+                zoneRepository.findById(session.getAssignedZoneId()).ifPresent(zone -> {
+                    response.put("zoneCode", zone.getCode());
+                    response.put("zoneName", zone.getZoneName());
+                });
+            }
+            if (session.getParkedSlotId() != null) {
+                slotRepository.findById(session.getParkedSlotId()).ifPresent(slot -> {
+                    response.put("slotNumber", slot.getSlotNumber());
+                    response.put("slotType", slot.getSlotType());
+                });
+            }
+        } else {
+            response.put("isParked", false);
+            response.put("isLocked", false);
+        }
+
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public void approveVipSubscription(UUID id, String status, String rejectionReason, UUID managerId) {
+        VipSubscription subscription = vipSubscriptionRepository.findById(id)
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy hồ sơ VIP"));
+
+        String oldStatusStr = subscription.getStatus() != null ? subscription.getStatus().name() : "null";
+
+        VipSubscription.Status newStatus = VipSubscription.Status.valueOf(status.toUpperCase());
+        subscription.setStatus(newStatus);
+        subscription.setApprovedBy(managerId);
+        subscription.setApprovedAt(Instant.now());
+        if (newStatus == VipSubscription.Status.REJECTED) {
+            subscription.setRejectionReason(rejectionReason);
+        } else {
+            subscription.setRejectionReason(null);
+        }
+
+        vipSubscriptionRepository.save(subscription);
+
+        // Ghi nhận vào audit log
+        AuditLog audit = new AuditLog();
+        audit.setId(UUID.randomUUID());
+        audit.setUserId(managerId);
+        audit.setActionType("VIP_APPROVAL");
+        audit.setEntityType("VipSubscription");
+        audit.setEntityId(subscription.getId());
+        audit.setOldValue("{\"status\":\"" + oldStatusStr + "\"}");
+        audit.setNewValue("{\"status\":\"" + newStatus.name() + "\",\"rejectionReason\":" 
+            + (rejectionReason == null ? "null" : "\"" + rejectionReason + "\"") + "}");
+        audit.setCreatedAt(Instant.now());
+
+        auditLogRepository.save(audit);
     }
 }
