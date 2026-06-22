@@ -176,6 +176,25 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   const [selectedReceipt, setSelectedReceipt] = useState<any | null>(null);
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
   const [emergencyLockdown, setEmergencyLockdown] = useState(false);
+  const [editingStaffGateId, setEditingStaffGateId] = useState<string | null>(null);
+  const [showAddBranchModal, setShowAddBranchModal] = useState(false);
+  const [branches, setBranches] = useState<any[]>(() => {
+    const saved = localStorage.getItem('urbanpark_manager_branches');
+    if (saved) return JSON.parse(saved);
+    return [
+      {
+        id: 'br-1',
+        name: 'Cơ sở Vincom Center',
+        address: '72 Lê Thánh Tôn, Quận 1',
+        status: 'Hoạt động',
+        capacity: 400,
+        occupied: 342,
+        cars: '120 / 150',
+        motorbikes: '222 / 250',
+        updateTime: 'Cập nhật 1 phút trước'
+      }
+    ];
+  });
 
   // Gate Control Live API States
   const [gatePlate, setGatePlate] = useState('');
@@ -397,6 +416,10 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   useEffect(() => {
     localStorage.setItem('urbanpark_manager_logs', JSON.stringify(logs));
   }, [logs]);
+
+  useEffect(() => {
+    localStorage.setItem('urbanpark_manager_branches', JSON.stringify(branches));
+  }, [branches]);
 
   // HR Staff List and live performance metrics (Screenshot 5 Replication)
   const [staff, setStaff] = useState<StaffMember[]>([
@@ -833,7 +856,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
               </div>
               <div className="leading-tight block">
                 <h2 className="text-[19px] font-black tracking-tight text-white font-sans">UrbanPark</h2>
-                <span className="text-[10px] text-slate-400 font-bold block tracking-tight">HS thống đỗ xe thông minh</span>
+                <span className="text-[10px] text-slate-400 font-bold block tracking-tight">Hệ thống đỗ xe thông minh</span>
               </div>
             </div>
 
@@ -1465,13 +1488,8 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
                       <div className="flex items-center gap-2">
                         <button 
-                          onClick={() => {
-                            const name = `Khu Vực ${Math.floor(Math.random() * 100)}`;
-                            if (name) {
-                              triggerToast(`Yêu cầu thành lập cơ sở "${name}" đang chờ duyệt!`, 'success');
-                            }
-                          }}
-                          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+                          onClick={() => setShowAddBranchModal(true)}
+                          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer"
                         >
                           <Plus className="w-4 h-4 stroke-[3]" />
                           <span>+ THÊM CƠ SỞ MỚI</span>
@@ -1575,95 +1593,77 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                               {/* Box 2: Maintenance */}
                               <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850 rounded-xl text-left">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-rose-500" />
+                                  <span className="w-2 h-2 rounded-full bg-amber-500" />
                                   <span className="text-[10px] font-bold text-slate-400 uppercase">Bảo trì</span>
                                 </div>
                                 <h4 className="text-xl font-black font-mono tracking-tight mt-1">01</h4>
                               </div>
                             </div>
-
                           </div>
+
+                        </div>
+
+                        {/* BOTTOM PAGINATION CONTROLS */}
+                        <div className="flex items-center justify-center gap-1.5 pt-4 font-sans select-none">
+                          <button onClick={() => triggerToast('Trang trước', 'info')} className="p-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 text-xs font-extrabold">&lt;</button>
+                          <button onClick={() => triggerToast('Trang 1', 'info')} className="px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-black">1</button>
+                          <button onClick={() => triggerToast('Sang trang 2', 'info')} className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 bg-white dark:bg-slate-900 rounded-xl text-xs font-extrabold text-slate-500">2</button>
+                          <button onClick={() => triggerToast('Sang trang 3', 'info')} className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 bg-white dark:bg-slate-900 rounded-xl text-xs font-extrabold text-slate-500">3</button>
+                          <button onClick={() => triggerToast('Trang sau', 'info')} className="p-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 text-xs font-extrabold">&gt;</button>
                         </div>
 
                       </div>
 
-                      {/* RIGHT DETAIL: FACILITIES CARDS HUB (col-span-8) */}
-                      <div className="lg:col-span-8 space-y-4">
-                        
-                        {/* QUẬN DISTRICT SELECTOR ROW */}
-                        <div className="flex flex-wrap items-center justify-between gap-3 font-sans">
-                          <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl gap-1 text-xs font-bold">
-                            <button 
-                              onClick={() => triggerToast('Lọc hiển thị toàn bộ 12 cơ sở!', 'success')} 
-                              className="px-4 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg shadow-3xs cursor-pointer"
-                            >
-                              Tất cả (12)
-                            </button>
-                            <button 
-                              onClick={() => triggerToast('Lọc hiển thị quận 1!', 'success')} 
-                              className="px-4 py-2 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
-                            >
-                              Quận 1 (5)
-                            </button>
-                            <button 
-                              onClick={() => triggerToast('Lọc hiển thị quận 3!', 'success')} 
-                              className="px-4 py-2 text-slate-400 hover:text-slate-705 dark:hover:text-white cursor-pointer"
-                            >
-                              Quận 3 (4)
-                            </button>
-                          </div>
-                          
-                          <div className="text-xs text-slate-400 font-bold">
-                            Hiển thị 1 - 4 trên 12 cơ sở
-                          </div>
-                        </div>
-
-                        {/* GRID OF COMPREHENSIVE CARD SCHEMES (SPECIFIC TARGET REPLICATIONS) */}
+                      {/* RIGHT RAIL: BRANCH LIST (col-span-8) */}
+                      <div className="lg:col-span-8">
+                        {/* GRID OF COMPREHENSIVE CARD SCHEMES */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          
-                          {/* CARD 1: VINCOM CENTER */}
-                          <div className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-805 rounded-2xl p-5 text-left block hover:border-blue-500/50 hover:shadow-lg transition-all space-y-4">
-                            <div className="flex justify-between items-start">
-                              <div className="leading-tight block text-left">
-                                <h3 className="text-base font-black text-slate-850 dark:text-white">Cơ sở Vincom Center</h3>
-                                <span className="text-[11px] text-slate-400 font-bold block mt-1 text-left">72 Lê Thánh Tôn, Quận 1</span>
-                              </div>
-                              <span className="text-[9.5px] font-black text-emerald-600 bg-emerald-55 px-2 py-0.5 rounded uppercase tracking-wider block">
-                                ● Hoạt động
-                              </span>
-                            </div>
+                          {branches.map(branch => {
+                            const percentage = branch.capacity === 0 ? 0 : Math.round((branch.occupied / branch.capacity) * 100);
+                            return (
+                              <div key={branch.id} className="bg-white dark:bg-slate-905 border border-slate-205 dark:border-slate-805 rounded-2xl p-5 text-left block hover:border-blue-500/50 hover:shadow-lg transition-all space-y-4">
+                                <div className="flex justify-between items-start">
+                                  <div className="leading-tight block text-left">
+                                    <h3 className="text-base font-black text-slate-850 dark:text-white">{branch.name}</h3>
+                                    <span className="text-[11px] text-slate-400 font-bold block mt-1 text-left">{branch.address}</span>
+                                  </div>
+                                  <span className="text-[9.5px] font-black text-emerald-600 bg-emerald-55 px-2 py-0.5 rounded uppercase tracking-wider block">
+                                    ● {branch.status}
+                                  </span>
+                                </div>
 
-                            <div className="space-y-2 block">
-                              <div className="flex justify-between text-xs font-bold text-slate-500">
-                                <span>Sức chứa xe</span>
-                                <span className="text-slate-850 dark:text-white">342 / 400 (85%)</span>
-                              </div>
-                              {/* Blue bar progress */}
-                              <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-600 rounded-full" style={{ width: '85%' }} />
-                              </div>
-                              {/* Sub details column */}
-                              <div className="flex justify-between text-[11px] font-semibold text-slate-400 pt-1 font-sans">
-                                <span>Ô tô: 120 / 150</span>
-                                <span>Xe máy: 222 / 250</span>
-                              </div>
-                            </div>
+                                <div className="space-y-2 block">
+                                  <div className="flex justify-between text-xs font-bold text-slate-505">
+                                    <span>Sức chứa xe</span>
+                                    <span className="text-slate-850 dark:text-white">{branch.occupied} / {branch.capacity} ({percentage}%)</span>
+                                  </div>
+                                  {/* Blue bar progress */}
+                                  <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="h-full bg-blue-600 rounded-full" style={{ width: `${percentage}%` }} />
+                                  </div>
+                                  {/* Sub details column */}
+                                  <div className="flex justify-between text-[11px] font-semibold text-slate-400 pt-1 font-sans">
+                                    <span>Ô tô: {branch.cars}</span>
+                                    <span>Xe máy: {branch.motorbikes}</span>
+                                  </div>
+                                </div>
 
-                            <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-450">
-                              <span>Cập nhật 1 phút trước</span>
-                              <button 
-                                onClick={() => {
-                                  setActiveMenu('monitoring');
-                                  triggerToast('Xem bến bãi Lê Văn Tám!', 'info');
-                                }}
-                                className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-black cursor-pointer"
-                              >
-                                <span>CHI TIẾT</span>
-                                <span>&rarr;</span>
-                              </button>
-                            </div>
-                          </div>
-
+                                <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-450">
+                                  <span>{branch.updateTime}</span>
+                                  <button 
+                                    onClick={() => {
+                                      setActiveMenu('monitoring');
+                                      triggerToast(`Xem bến bãi ${branch.name}!`, 'info');
+                                    }}
+                                    className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-black cursor-pointer"
+                                  >
+                                    <span>CHI TIẾT</span>
+                                    <span>&rarr;</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
 
                         {/* BOTTOM PAGINATION CONTROLS */}
@@ -2736,18 +2736,35 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                                 </span>
 
                                 <div className="flex items-center gap-3">
-                                  <button
-                                    onClick={() => {
-                                      const nextGate = 'Cổng Chính';
-                                      if (nextGate && nextGate.trim()) {
-                                        setStaff(staff.map(s => s.id === member.id ? { ...s, gate: nextGate.trim() } : s));
-                                        triggerToast(`Đã điều phối địa điểm đồn trú cho ${member.name} sang: ${nextGate.trim()}`, "success");
-                                      }
-                                    }}
-                                    className="text-blue-600 dark:text-blue-400 hover:underline font-extrabold"
-                                  >
-                                    Đổi ca/trạm
-                                  </button>
+                                  {editingStaffGateId === member.id ? (
+                                    <select
+                                      autoFocus
+                                      value={member.gate}
+                                      onChange={(e) => {
+                                        const nextGate = e.target.value;
+                                        setStaff(staff.map(s => s.id === member.id ? { ...s, gate: nextGate } : s));
+                                        triggerToast(`Đã điều phối địa điểm đồn trú cho ${member.name} sang: ${nextGate}`, "success");
+                                        setEditingStaffGateId(null);
+                                      }}
+                                      onBlur={() => setEditingStaffGateId(null)}
+                                      className="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-md px-1 py-0.5 text-[11px] outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                    >
+                                      <option value="" disabled>Chọn trạm/cổng...</option>
+                                      <option value="Cổng Vào 01">Cổng Vào 01</option>
+                                      <option value="Cổng Ra 02">Cổng Ra 02</option>
+                                      <option value="Cổng Chính">Cổng Chính</option>
+                                      <option value="Bốt Trung Tâm">Bốt Trung Tâm</option>
+                                      <option value="Tuần Tra Khu A">Tuần Tra Khu A</option>
+                                      <option value="Tuần Tra Khu B">Tuần Tra Khu B</option>
+                                    </select>
+                                  ) : (
+                                    <button
+                                      onClick={() => setEditingStaffGateId(member.id)}
+                                      className="text-blue-600 dark:text-blue-400 hover:underline font-extrabold cursor-pointer"
+                                    >
+                                      Đổi ca/trạm
+                                    </button>
+                                  )}
                                   <span className="text-slate-200">|</span>
                                   <button
                                     onClick={() => {
@@ -2935,6 +2952,85 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                               className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-extrabold uppercase tracking-wide text-[10.5px]"
                             >
                               Đồng ý chỉ định
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </AnimatePresence>
+
+                {/* MODAL ADD BRANCH DIALOG */}
+                <AnimatePresence>
+                  {showAddBranchModal && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                      <div className={`w-full max-w-sm rounded-[24px] p-6 border text-slate-850 ${isDarkMode ? 'bg-[#0f172a] border-slate-850 text-white' : 'bg-white border-slate-200'}`}>
+                        <div className="space-y-4 block text-left font-sans text-xs">
+                          <strong className="text-base font-black tracking-tight block">Thêm cơ sở đỗ xe mới</strong>
+                          
+                          <div className="space-y-3">
+                            <div className="space-y-1 block">
+                              <label className="text-[10px] font-extrabold uppercase text-slate-455">Tên cơ sở</label>
+                              <input id="branch-name-input" type="text" placeholder="Bãi xe ngầm Vincom" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                            </div>
+                            <div className="space-y-1 block">
+                              <label className="text-[10px] font-extrabold uppercase text-slate-455">Địa chỉ</label>
+                              <input id="branch-address-input" type="text" placeholder="72 Lê Thánh Tôn, Quận 1, TP.HCM" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1 block">
+                                <label className="text-[10px] font-extrabold uppercase text-slate-455">Sức chứa tối đa</label>
+                                <input id="branch-capacity-input" type="number" defaultValue="400" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                              </div>
+                              <div className="space-y-1 block">
+                                <label className="text-[10px] font-extrabold uppercase text-slate-455">Số xe hiện tại</label>
+                                <input id="branch-occupied-input" type="number" defaultValue="0" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 justify-end pt-2">
+                            <button
+                              onClick={() => setShowAddBranchModal(false)}
+                              className="px-4 py-2 bg-slate-100 dark:bg-slate-850 rounded-lg font-bold"
+                            >
+                              Hủy bỏ
+                            </button>
+                            <button
+                              onClick={() => {
+                                const nameEl = document.getElementById('branch-name-input') as HTMLInputElement;
+                                const addressEl = document.getElementById('branch-address-input') as HTMLInputElement;
+                                const capEl = document.getElementById('branch-capacity-input') as HTMLInputElement;
+                                const occEl = document.getElementById('branch-occupied-input') as HTMLInputElement;
+                                
+                                if (nameEl && nameEl.value.trim() && addressEl && addressEl.value.trim()) {
+                                  const nameVal = nameEl.value.trim();
+                                  const addressVal = addressEl.value.trim();
+                                  const capacityVal = parseInt(capEl.value, 10) || 400;
+                                  const occupiedVal = parseInt(occEl.value, 10) || 0;
+                                  
+                                  const newB = {
+                                    id: `br-${Date.now()}`,
+                                    name: nameVal,
+                                    address: addressVal,
+                                    status: 'Hoạt động',
+                                    capacity: capacityVal,
+                                    occupied: occupiedVal,
+                                    cars: `${Math.round(occupiedVal * 0.4)} / ${Math.round(capacityVal * 0.4)}`,
+                                    motorbikes: `${Math.round(occupiedVal * 0.6)} / ${Math.round(capacityVal * 0.6)}`,
+                                    updateTime: 'Cập nhật vừa xong'
+                                  };
+                                  
+                                  setBranches([...branches, newB]);
+                                  setShowAddBranchModal(false);
+                                  triggerToast(`Thêm cơ sở "${nameVal}" thành công và đang hoạt động!`, 'success');
+                                } else {
+                                  triggerToast('Vui lòng điền đầy đủ tên cơ sở và địa chỉ.', 'error');
+                                }
+                              }}
+                              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-extrabold uppercase tracking-wide text-[10.5px]"
+                            >
+                              Thêm cơ sở
                             </button>
                           </div>
                         </div>
@@ -3854,7 +3950,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                       <h2 className="text-2.5xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        Nhật ký hS thống (Audit Logs)
+                        Nhật ký hệ thống (Audit Logs)
                       </h2>
                       <p className="text-slate-500 dark:text-slate-400 text-xs">
                         Giám sát và theo dõi mọi hoạt động trong hệ thống quản trị.

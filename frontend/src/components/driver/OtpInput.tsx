@@ -16,11 +16,29 @@ export const OtpInput: React.FC<OtpInputProps> = ({ value, onChange, disabled })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const val = e.target.value.replace(/[^0-9]/g, ''); // numbers only
-    if (!val) return;
-
-    // Take the last character
-    const lastChar = val[val.length - 1];
     const newOtpArray = [...otpArray];
+
+    if (val === '') {
+      // Handle backspace/deletion in the current cell
+      newOtpArray[index] = '';
+      onChange(newOtpArray.join(''));
+      if (index > 0) {
+        inputRefs.current[index - 1]?.focus();
+      }
+      return;
+    }
+
+    // Determine the newly typed character by comparing with the old character in the cell
+    let lastChar = val[val.length - 1];
+    if (val.length > 1) {
+      const oldChar = otpArray[index];
+      if (val[0] === oldChar) {
+        lastChar = val[1];
+      } else {
+        lastChar = val[0];
+      }
+    }
+
     newOtpArray[index] = lastChar;
     const newOtp = newOtpArray.join('');
     onChange(newOtp);
@@ -33,14 +51,9 @@ export const OtpInput: React.FC<OtpInputProps> = ({ value, onChange, disabled })
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
     if (e.key === 'Backspace') {
-      const newOtpArray = [...otpArray];
-      
-      if (otpArray[index] !== '') {
-        // Clear current cell
-        newOtpArray[index] = '';
-        onChange(newOtpArray.join(''));
-      } else if (index > 0) {
-        // Clear previous cell and focus it
+      // If the current cell is already empty, delete the previous cell and focus it
+      if (otpArray[index] === '' && index > 0) {
+        const newOtpArray = [...otpArray];
         newOtpArray[index - 1] = '';
         onChange(newOtpArray.join(''));
         inputRefs.current[index - 1]?.focus();
