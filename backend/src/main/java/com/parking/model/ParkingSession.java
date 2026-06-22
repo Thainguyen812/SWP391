@@ -5,15 +5,11 @@ import org.hibernate.annotations.ColumnTransformer;
 import java.time.Instant;
 import java.util.UUID;
 
-import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
-
 import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.annotations.Type;
 import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "parking_sessions")
-@TypeDef(name = "jsonb", typeClass = JsonBinaryType.class)
 public class ParkingSession {
     @Id
     private UUID id;
