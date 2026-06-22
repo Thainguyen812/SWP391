@@ -111,6 +111,11 @@ export const AuthPage = () => {
   const [showForgotPass, setShowForgotPass] = useState(false);
   const [showForgotConfirmPass, setShowForgotConfirmPass] = useState(false);
 
+  const [forgotOtpSent, setForgotOtpSent] = useState(false);
+  const [forgotOtpTimer, setForgotOtpTimer] = useState(0);
+  const [forgotExpectedOtp, setForgotExpectedOtp] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+
   // Handle countdown trigger for simulated SMS OTP
   useEffect(() => {
     let interval;
@@ -121,6 +126,16 @@ export const AuthPage = () => {
     }
     return () => clearInterval(interval);
   }, [otpTimer]);
+
+  useEffect(() => {
+    let interval;
+    if (forgotOtpTimer > 0) {
+      interval = setInterval(() => {
+        setForgotOtpTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [forgotOtpTimer]);
 
   // Utility toast dispatcher
   const showNotification = (text: string, type = "info") => {
@@ -255,6 +270,29 @@ export const AuthPage = () => {
     }
   };
 
+  // Click handler to request OTP for forgot password
+  const handleRequestForgotOtp = (e) => {
+    e.preventDefault();
+    
+    const phoneNoSpaces = forgotPhone.replace(/\s+/g, '');
+    const vietnamPhoneRegex = /^(0[35789])[0-9]{8}$/;
+    
+    if (!phoneNoSpaces) {
+      showNotification('Vui lòng cung cấp số điện thoại.', 'error');
+      return;
+    } else if (!vietnamPhoneRegex.test(phoneNoSpaces)) {
+      showNotification('Định dạng số điện thoại chưa hỗ trợ.', 'error');
+      return;
+    }
+
+    const mockOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setForgotExpectedOtp(mockOtp);
+    setForgotOtpSent(true);
+    setForgotOtpTimer(60);
+    
+    showNotification(`Đã gửi mã xác thực tới số ${forgotPhone}. Nhập mã: ${mockOtp} để thử nghiệm!`, 'success');
+  };
+
   // Handle Forgot Password Submission
   const handleForgotPasswordSubmit = async (e) => {
     e.preventDefault();
@@ -262,6 +300,18 @@ export const AuthPage = () => {
       showNotification('Vui lòng điền số điện thoại', 'error');
       return;
     }
+    
+    if (!forgotOtpSent) {
+      showNotification('Chưa xác nhận OTP', 'error');
+      return;
+    } else if (!forgotOtp) {
+      showNotification('Vui lòng nhập mã xác thực OTP', 'error');
+      return;
+    } else if (forgotOtp !== forgotExpectedOtp) {
+      showNotification('Mã xác thực OTP không chính xác', 'error');
+      return;
+    }
+
     if (!forgotPass || forgotPass.length < 6) {
       showNotification('Mật khẩu mới phải có ít nhất 6 ký tự', 'error');
       return;
@@ -282,6 +332,10 @@ export const AuthPage = () => {
     setForgotPhone('');
     setForgotPass('');
     setForgotConfirmPass('');
+    setForgotOtp('');
+    setForgotOtpSent(false);
+    setForgotOtpTimer(0);
+    setForgotExpectedOtp('');
     setIsForgotPassword(false);
     setIsSignUp(false);
   };
@@ -528,16 +582,38 @@ export const AuthPage = () => {
                       value={forgotPhone}
                       onChange={(e) => setForgotPhone(e.target.value)}
                       icon={<Smartphone className="w-4 h-4" />}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || forgotOtpSent}
                     />
                   </div>
                   <button 
                     type="button" 
-                    className="h-[42px] px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm whitespace-nowrap mb-[2px]"
+                    onClick={handleRequestForgotOtp}
+                    disabled={isSubmitting || forgotOtpTimer > 0}
+                    className={`
+                      h-[42px] px-4 rounded-lg font-medium text-sm transition-colors shadow-sm whitespace-nowrap mb-[2px] cursor-pointer
+                      ${forgotOtpTimer > 0 
+                        ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white active:scale-95'
+                      }
+                    `}
                   >
-                    Nhận mã OTP
+                    {forgotOtpTimer > 0 ? `Gửi lại (${forgotOtpTimer}s)` : 'Nhận mã OTP'}
                   </button>
                 </div>
+
+                {forgotOtpSent && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="overflow-hidden"
+                  >
+                    <OtpInput 
+                      value={forgotOtp} 
+                      onChange={setForgotOtp} 
+                      disabled={isSubmitting} 
+                    />
+                  </motion.div>
+                )}
 
                 <InputField
                   id="forgot-pass"
@@ -579,7 +655,16 @@ export const AuthPage = () => {
 
                 <div className="text-center pt-4">
                   <span 
-                    onClick={() => setIsForgotPassword(false)}
+                    onClick={() => {
+                      setForgotPhone('');
+                      setForgotPass('');
+                      setForgotConfirmPass('');
+                      setForgotOtp('');
+                      setForgotOtpSent(false);
+                      setForgotOtpTimer(0);
+                      setForgotExpectedOtp('');
+                      setIsForgotPassword(false);
+                    }}
                     className="text-slate-500 hover:text-slate-800 text-sm font-medium cursor-pointer flex items-center justify-center gap-1 inline-flex"
                   >
                     <ArrowLeft className="w-4 h-4" /> Quay lại đăng nhập
