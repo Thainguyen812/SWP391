@@ -101,7 +101,15 @@ export const AuthPage = () => {
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Forgot Password values
+  const [forgotPhone, setForgotPhone] = useState('');
+  const [forgotPass, setForgotPass] = useState('');
+  const [forgotConfirmPass, setForgotConfirmPass] = useState('');
+  const [showForgotPass, setShowForgotPass] = useState(false);
+  const [showForgotConfirmPass, setShowForgotConfirmPass] = useState(false);
 
   // Handle countdown trigger for simulated SMS OTP
   useEffect(() => {
@@ -242,7 +250,36 @@ export const AuthPage = () => {
     }
   };
 
-  // Handle Mock Login Submission
+  // Handle Forgot Password Submission
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (!forgotPhone) {
+      showNotification('Vui lòng điền số điện thoại', 'error');
+      return;
+    }
+    if (!forgotPass || forgotPass.length < 6) {
+      showNotification('Mật khẩu mới phải có ít nhất 6 ký tự', 'error');
+      return;
+    }
+    if (forgotPass !== forgotConfirmPass) {
+      showNotification('Mật khẩu xác nhận không khớp', 'error');
+      return;
+    }
+
+    setIsSubmitting(true);
+    // Mock API call to reset password
+    await new Promise(resolve => setTimeout(resolve, 800));
+    setIsSubmitting(false);
+
+    showNotification('Khôi phục mật khẩu thành công! Bạn có thể đăng nhập ngay bây giờ.', 'success');
+    
+    // Reset form and go back to login
+    setForgotPhone('');
+    setForgotPass('');
+    setForgotConfirmPass('');
+    setIsForgotPassword(false);
+    setIsSignUp(false);
+  };
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     if (!signPhone) {
@@ -456,6 +493,94 @@ export const AuthPage = () => {
                   </button>
                 </div>
               </motion.div>
+            ) : isForgotPassword ? (
+              /* FORGOT PASSWORD FLOW */
+              <motion.form
+                key="forgot-password-form"
+                onSubmit={handleForgotPasswordSubmit}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4"
+              >
+                <div className="mb-6">
+                  <h2 className="text-slate-900 text-3xl font-extrabold tracking-tight">
+                    Khôi phục mật khẩu
+                  </h2>
+                  <p className="text-[14px] text-slate-500 mt-1 leading-relaxed">
+                    Xác minh số điện thoại để đặt lại mật khẩu mới cho tài khoản của bạn.
+                  </p>
+                </div>
+
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <InputField
+                      id="forgot-phone"
+                      label="SỐ ĐIỆN THOẠI ĐÃ ĐĂNG KÝ"
+                      placeholder="090 123 4567"
+                      type="tel"
+                      value={forgotPhone}
+                      onChange={(e) => setForgotPhone(e.target.value)}
+                      icon={<Smartphone className="w-4 h-4" />}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <button 
+                    type="button" 
+                    className="h-[42px] px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm whitespace-nowrap mb-[2px]"
+                  >
+                    Nhận mã OTP
+                  </button>
+                </div>
+
+                <InputField
+                  id="forgot-pass"
+                  label="MẬT KHẨU MỚI"
+                  placeholder="Nhập mật khẩu mới ít nhất 6 ký tự"
+                  type={showForgotPass ? "text" : "password"}
+                  value={forgotPass}
+                  onChange={(e) => setForgotPass(e.target.value)}
+                  icon={<Lock className="w-4 h-4" />}
+                  rightIcon={showForgotPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  onRightIconClick={() => setShowForgotPass(!showForgotPass)}
+                  disabled={isSubmitting}
+                />
+
+                <InputField
+                  id="forgot-confirm-pass"
+                  label="XÁC NHẬN MẬT KHẨU MỚI"
+                  placeholder="Nhập lại mật khẩu mới"
+                  type={showForgotConfirmPass ? "text" : "password"}
+                  value={forgotConfirmPass}
+                  onChange={(e) => setForgotConfirmPass(e.target.value)}
+                  icon={<Lock className="w-4 h-4" />}
+                  rightIcon={showForgotConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  onRightIconClick={() => setShowForgotConfirmPass(!showForgotConfirmPass)}
+                  disabled={isSubmitting}
+                />
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-[#051424] hover:bg-[#0c233e] text-white font-semibold py-3.5 mt-2 rounded-lg tracking-wider text-sm transition-all focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 active:scale-[0.99] uppercase shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isSubmitting ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    'KHÔI PHỤC MẬT KHẨU'
+                  )}
+                </button>
+
+                <div className="text-center pt-4">
+                  <span 
+                    onClick={() => setIsForgotPassword(false)}
+                    className="text-slate-500 hover:text-slate-800 text-sm font-medium cursor-pointer flex items-center justify-center gap-1 inline-flex"
+                  >
+                    <ArrowLeft className="w-4 h-4" /> Quay lại đăng nhập
+                  </span>
+                </div>
+              </motion.form>
             ) : isSignUp ? (
               
               /* SIGN UP FLOW (Exactly matches image layout fields) */
@@ -703,11 +828,7 @@ export const AuthPage = () => {
                   </label>
                   <span 
                     onClick={() => {
-                      if (!signPhone) {
-                        showNotification('Vui lòng nhập số điện thoại trước để lấy lại mật khẩu!', 'error');
-                      } else {
-                        showNotification('Mật khẩu mới đã được gửi qua SMS đến số ' + signPhone, 'success');
-                      }
+                      setIsForgotPassword(true);
                     }}
                     className="text-blue-600 hover:underline cursor-pointer font-medium"
                   >
