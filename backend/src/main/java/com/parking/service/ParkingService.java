@@ -25,6 +25,8 @@ public interface ParkingService {
     CongestionCheckoutRequest request
     );
 
+    Transaction confirmCheckout(UUID transactionId); // confirm check out
+
     void cleanupTestData();
 
     java.util.Map<String, Object> getParkingFee(UUID cardId);
