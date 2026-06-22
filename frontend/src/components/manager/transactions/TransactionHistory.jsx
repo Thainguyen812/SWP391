@@ -118,8 +118,10 @@ export const TransactionHistory = () => {
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Loại phương tiện</label>
               <select className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-slate-50/50 hover:bg-white transition-colors cursor-pointer appearance-none">
                 <option>Tất cả phương tiện</option>
-                <option>Ô tô</option>
-                <option>Xe máy</option>
+                <option value="SEDAN_HATCHBACK">Sedan / Hatchback</option>
+                <option value="SUV_CUV_MPV">SUV / CUV / MPV</option>
+                <option value="EV_CAR">Xe Điện (EV)</option>
+                <option value="LARGE_VAN_MINIBUS">Xe Lớn / Minibus</option>
               </select>
             </div>
             <div className="flex-1 min-w-[200px]">

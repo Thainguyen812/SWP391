@@ -30,7 +30,7 @@ export const StaffPayment = () => {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [lan1Status, setLan1Status] = useState(isLostCard ? 'busy' : 'free');
   const [lan2Status, setLan2Status] = useState('free');
-  const [lpr, setLpr] = useState(lostCardData?.plate || currentVehicle?.plate || '');
+  const [lpr, setLpr] = useState(lostCardData?.plate || currentVehicle?.plate || '30G-123.45');
   const [isEditingLpr, setIsEditingLpr] = useState(false);
   const [hasVehicle, setHasVehicle] = useState(isLostCard ? true : false);
   const [cashGiven, setCashGiven] = useState(totalAmount);
@@ -165,32 +165,6 @@ export const StaffPayment = () => {
         {/* Left Column */}
         <div className="lg:col-span-8 flex flex-col gap-6">
           
-          {/* Main Payment Card or Empty State */}
-          {!hasVehicle ? (
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-12 flex flex-col items-center justify-center h-[550px]">
-              <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6 shadow-inner border border-slate-100">
-                <CreditCardOutlined className="text-5xl text-blue-500 animate-pulse" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-600 mb-2">Làn ra đang trống</h3>
-              <p className="text-slate-400 mb-8 text-center max-w-sm">Hệ thống camera đang giám sát. Vui lòng quẹt thẻ của khách (vãng lai) để bắt đầu Check-out.</p>
-              
-              <div className="flex flex-col gap-3 w-full max-w-xs">
-                <Input 
-                  placeholder="Nhập hoặc quét mã thẻ..." 
-                  size="large"
-                  value={cardCode}
-                  onChange={e => setCardCode(e.target.value)}
-                  onPressEnter={handleScanCard}
-                  disabled={isCheckingOut}
-                  autoFocus
-                  className="text-center font-mono text-lg font-bold"
-                />
-                <Button type="primary" size="large" onClick={handleScanCard} loading={isCheckingOut} className="w-full font-bold bg-blue-600 shadow-md">
-                  QUÉT THẺ TÍNH PHÍ (API)
-                </Button>
-              </div>
-            </div>
-          ) : (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-6">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-bold text-slate-800 m-0">
@@ -358,8 +332,6 @@ export const StaffPayment = () => {
               </div>
             </div>
           </div>
-          )}
-
           {/* History Table */}
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center">
