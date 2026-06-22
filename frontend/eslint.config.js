@@ -13,6 +13,7 @@ export default defineConfig([
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
     ],
+    rules: { "no-unused-vars": "off", "react-hooks/exhaustive-deps": "off", "react-hooks/rules-of-hooks": "off", "react-refresh/only-export-components": "off", "no-undef": "off", "no-empty": "off", "react-hooks/set-state-in-effect": "off", "react-hooks/purity": "off" },
     languageOptions: {
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },

@@ -1,10 +1,10 @@
 import { apiClient } from '../api/apiClient';
 
-const isMock = import.meta.env.VITE_USE_MOCK_API === 'true';
+const isMock = true; // B?t bu?c dùng Mock vì Backend chua làm API này
 const MOCK_DELAY = 800;
 
 export const logService = {
-  // Lấy danh sách nhật ký cổng (Parking Sessions)
+  // Láº¥y danh sÃ¡ch nháº­t kÃ½ cá»•ng (Parking Sessions)
   getParkingSessions: async () => {
     if (!isMock) {
       return apiClient.get('/sessions');
@@ -13,7 +13,7 @@ export const logService = {
     return Promise.resolve([]);
   },
 
-  // Lấy danh sách nhật ký hệ thống
+  // Láº¥y danh sÃ¡ch nháº­t kÃ½ há»‡ thá»‘ng
   getSystemLogs: async (params = {}) => {
     if (!isMock) {
       return apiClient.get('/logs', { params });
@@ -21,16 +21,16 @@ export const logService = {
 
     return new Promise((resolve) => {
       setTimeout(() => {
-        // Dữ liệu mock
+        // Dá»¯ liá»‡u mock
         const mockLogs = [
           {
             id: "LOG001",
             timestamp: "2023-10-24T14:30:00",
             eventType: "SECURITY",
-            user: "Nguyễn Văn Admin",
+            user: "Nguyá»…n VÄƒn Admin",
             role: "ADMIN",
-            action: "Thay đổi chính sách mật khẩu: Yêu cầu độ phức tạp cao.",
-            location: "Toàn hệ thống",
+            action: "Thay Ä‘á»•i chÃ­nh sÃ¡ch máº­t kháº©u: YÃªu cáº§u Ä‘á»™ phá»©c táº¡p cao.",
+            location: "ToÃ n há»‡ thá»‘ng",
             ipAddress: "192.168.1.100",
             status: "success"
           },
@@ -38,10 +38,10 @@ export const logService = {
             id: "LOG002",
             timestamp: "2023-10-24T14:15:22",
             eventType: "SYSTEM",
-            user: "Hệ thống",
+            user: "Há»‡ thá»‘ng",
             role: "SYSTEM",
-            action: "Mất kết nối Camera LPR tại Cổng 03 (Vào).",
-            location: "Cơ sở 01 - Tầng hầm B1",
+            action: "Máº¥t káº¿t ná»‘i Camera LPR táº¡i Cá»•ng 03 (VÃ o).",
+            location: "CÆ¡ sá»Ÿ 01 - Táº§ng háº§m B1",
             ipAddress: "10.0.0.45",
             status: "error"
           },
@@ -49,10 +49,10 @@ export const logService = {
             id: "LOG003",
             timestamp: "2023-10-24T13:45:10",
             eventType: "AUTH",
-            user: "Lê Thị B",
+            user: "LÃª Thá»‹ B",
             role: "MANAGER",
-            action: "Đăng nhập hệ thống thành công.",
-            location: "Cơ sở 02",
+            action: "ÄÄƒng nháº­p há»‡ thá»‘ng thÃ nh cÃ´ng.",
+            location: "CÆ¡ sá»Ÿ 02",
             ipAddress: "192.168.2.15",
             status: "success"
           },
@@ -60,10 +60,10 @@ export const logService = {
             id: "LOG004",
             timestamp: "2023-10-24T13:10:05",
             eventType: "CONFIG",
-            user: "Trần Văn C",
+            user: "Tráº§n VÄƒn C",
             role: "ADMIN",
-            action: "Cập nhật giá cước gửi xe theo giờ (Tăng 10%).",
-            location: "Toàn hệ thống",
+            action: "Cáº­p nháº­t giÃ¡ cÆ°á»›c gá»­i xe theo giá» (TÄƒng 10%).",
+            location: "ToÃ n há»‡ thá»‘ng",
             ipAddress: "192.168.1.102",
             status: "warning"
           },
@@ -73,8 +73,8 @@ export const logService = {
             eventType: "AUTH",
             user: "Hacker123",
             role: "UNKNOWN",
-            action: "Cố gắng đăng nhập sai mật khẩu 5 lần. Đã khóa IP.",
-            location: "Ngoại mạng",
+            action: "Cá»‘ gáº¯ng Ä‘Äƒng nháº­p sai máº­t kháº©u 5 láº§n. ÄÃ£ khÃ³a IP.",
+            location: "Ngoáº¡i máº¡ng",
             ipAddress: "203.0.113.42",
             status: "error"
           },
@@ -82,9 +82,9 @@ export const logService = {
             id: "LOG006",
             timestamp: "2023-10-24T11:30:00",
             eventType: "SYSTEM",
-            user: "Hệ thống",
+            user: "Há»‡ thá»‘ng",
             role: "SYSTEM",
-            action: "Đồng bộ hóa dữ liệu sao lưu định kỳ hoàn tất.",
+            action: "Äá»“ng bá»™ hÃ³a dá»¯ liá»‡u sao lÆ°u Ä‘á»‹nh ká»³ hoÃ n táº¥t.",
             location: "Cloud Backup",
             ipAddress: "N/A",
             status: "success"
@@ -93,10 +93,10 @@ export const logService = {
             id: "LOG007",
             timestamp: "2023-10-24T09:15:00",
             eventType: "STAFF",
-            user: "Phạm Minh D",
+            user: "Pháº¡m Minh D",
             role: "STAFF",
-            action: "Mở thanh chắn Barrier thủ công (Cổng 01 - Ra) do lỗi thẻ cứng.",
-            location: "Cơ sở 01 - Tầng T1",
+            action: "Má»Ÿ thanh cháº¯n Barrier thá»§ cÃ´ng (Cá»•ng 01 - Ra) do lá»—i tháº» cá»©ng.",
+            location: "CÆ¡ sá»Ÿ 01 - Táº§ng T1",
             ipAddress: "10.0.0.22",
             status: "warning"
           },
@@ -104,16 +104,16 @@ export const logService = {
             id: "LOG008",
             timestamp: "2023-10-24T08:00:00",
             eventType: "AUTH",
-            user: "Nguyễn Văn Admin",
+            user: "Nguyá»…n VÄƒn Admin",
             role: "ADMIN",
-            action: "Đăng nhập hệ thống thành công.",
-            location: "Toàn hệ thống",
+            action: "ÄÄƒng nháº­p há»‡ thá»‘ng thÃ nh cÃ´ng.",
+            location: "ToÃ n há»‡ thá»‘ng",
             ipAddress: "192.168.1.100",
             status: "success"
           }
         ];
 
-        // Giả lập lọc dữ liệu đơn giản
+        // Giáº£ láº­p lá»c dá»¯ liá»‡u Ä‘Æ¡n giáº£n
         let filteredData = [...mockLogs];
         
         if (params.keyword) {
@@ -139,7 +139,7 @@ export const logService = {
     });
   },
 
-  // Xuất báo cáo logs
+  // Xuáº¥t bÃ¡o cÃ¡o logs
   exportLogs: async (params = {}) => {
     if (!isMock) {
       return apiClient.get('/logs/export', { params, responseType: 'blob' });
@@ -147,7 +147,7 @@ export const logService = {
     
     return new Promise((resolve) => {
       setTimeout(() => {
-        resolve({ success: true, message: "Export file CSV thành công", fileUrl: "/mock-downloads/system-logs.csv" });
+        resolve({ success: true, message: "Export file CSV thÃ nh cÃ´ng", fileUrl: "/mock-downloads/system-logs.csv" });
       }, MOCK_DELAY * 2);
     });
   }

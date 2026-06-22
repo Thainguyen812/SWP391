@@ -1,28 +1,29 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+import { apiClient } from '../api/apiClient';
 
 export const supportService = {
   getTickets: async () => {
     try {
-      const response = await fetch(`${API_URL}/tickets`);
-      if (!response.ok) throw new Error('Network response was not ok');
-      return await response.json();
+      return await apiClient.get('/tickets');
     } catch (error) {
-      console.error("Failed to fetch tickets from backend, using fallback:", error);
-      return null; // Return null so frontend uses mock data fallback
+      console.error("Failed to fetch tickets from backend:", error);
+      return [];
     }
   },
   
   createTicket: async (ticketData) => {
     try {
-      const response = await fetch(`${API_URL}/tickets`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ticketData)
-      });
-      if (!response.ok) throw new Error('Network response was not ok');
-      return await response.json();
+      return await apiClient.post('/tickets', ticketData);
     } catch (error) {
       console.error("Failed to post ticket to backend:", error);
+      return null;
+    }
+  },
+
+  resolveTicket: async (id) => {
+    try {
+      return await apiClient.put(/tickets//resolve);
+    } catch (error) {
+      console.error("Failed to resolve ticket:", error);
       return null;
     }
   }

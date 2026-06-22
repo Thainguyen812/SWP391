@@ -1,13 +1,13 @@
 import { apiClient } from '../api/apiClient';
 
-// Giả lập độ trễ mạng 1 giây
+// Giáº£ láº­p Ä‘á»™ trá»… máº¡ng 1 giÃ¢y
 const MOCK_DELAY = 1000;
 
-// Lấy cờ từ cấu hình môi trường (.env)
-const isMock = import.meta.env.VITE_USE_MOCK_API === 'true';
+// Láº¥y cá» tá»« cáº¥u hÃ¬nh mÃ´i trÆ°á»ng (.env)
+const isMock = true; // B?t bu?c dùng Mock vì Backend chua làm API này
 
 export const settingsService = {
-  // Lấy dữ liệu cấu hình
+  // Láº¥y dá»¯ liá»‡u cáº¥u hÃ¬nh
   getSystemSettings: async () => {
     if (!isMock) {
       return apiClient.get('/settings/system');
@@ -54,14 +54,14 @@ export const settingsService = {
             lastUpdated: '12/10/2023 14:30',
             hasUpdate: true,
             newVersion: 'v2.5.0',
-            updateNotes: 'Bao gồm cải thiện thuật toán LPR ban đêm.'
+            updateNotes: 'Bao gá»“m cáº£i thiá»‡n thuáº­t toÃ¡n LPR ban Ä‘Ãªm.'
           }
         });
       }, MOCK_DELAY);
     });
   },
 
-  // Giả lập lưu cấu hình
+  // Giáº£ láº­p lÆ°u cáº¥u hÃ¬nh
   saveSystemSettings: async (settingsData) => {
     if (!isMock) {
       return apiClient.put('/settings/system', settingsData);
@@ -69,7 +69,7 @@ export const settingsService = {
     
     return new Promise((resolve) => {
       setTimeout(() => {
-        resolve({ success: true, message: 'Lưu cấu hình thành công' });
+        resolve({ success: true, message: 'LÆ°u cáº¥u hÃ¬nh thÃ nh cÃ´ng' });
       }, 800);
     });
   }

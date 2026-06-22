@@ -24,7 +24,7 @@ const navItems = [
   { path: '/customers', label: 'Khách hàng', icon: <UserOutlined /> },
   { path: '/transactions', label: 'Lịch sử giao dịch', icon: <HistoryOutlined /> },
   { path: '/security', label: 'Bảo mật', icon: <SafetyOutlined /> },
-  { path: '#', label: 'Bàn giao ca', icon: <SwapOutlined /> },
+  { path: '/handover', label: 'Bàn giao ca', icon: <SwapOutlined /> },
 ];
 
 export const Sidebar = ({ onOpenAddBranch }) => {
@@ -84,7 +84,7 @@ export const Sidebar = ({ onOpenAddBranch }) => {
         </button>
         <ul className="sidebar-bottom-list">
           <li>
-            <button className="sidebar-bottom-item">
+            <button className="sidebar-bottom-item" onClick={() => navigate('/support')}>
               <QuestionCircleOutlined className="sidebar-bottom-icon" />
               <span className="sidebar-bottom-label">Hỗ trợ</span>
             </button>
