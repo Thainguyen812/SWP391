@@ -1,4 +1,4 @@
-package com.parking.controller;
+﻿package com.parking.controller;
 
 import com.parking.model.User;
 import com.parking.model.ShiftHistory;
@@ -28,12 +28,12 @@ public class PersonnelController {
             map.put("id", u.getId().toString());
             map.put("name", u.getFullName() != null ? u.getFullName() : u.getUsername());
             map.put("role", u.getRole() != null ? u.getRole().name() : "STAFF");
-            map.put("shift", "Ca S�ng");
-            map.put("status", "�ang l�m vi?c");
+            map.put("shift", "Ca Sáng");
+            map.put("status", "Đang làm việc");
             result.add(map);
         }
         if (result.isEmpty()) {
-            result.add(Map.of("id", "NV001", "name", "Nguy?n Van A", "role", "B?o v?", "shift", "Ca S�ng", "status", "�ang l�m vi?c"));
+            result.add(Map.of("id", "NV001", "name", "Nguyễn Văn A", "role", "Bảo vệ", "shift", "Ca Sáng", "status", "Đang làm việc"));
         }
         return result;
     }
@@ -45,14 +45,14 @@ public class PersonnelController {
         for (ShiftHistory s : shifts) {
             Map<String, Object> map = new HashMap<>();
             map.put("id", s.getId().toString());
-            map.put("shiftName", s.getShiftType() != null ? s.getShiftType().name() : "CA S�NG");
-            map.put("assignedStaff", "Nh�n vi�n");
+            map.put("shiftName", s.getShiftType() != null ? s.getShiftType() : "CA SÁNG");
+            map.put("assignedStaff", "Nhân viên");
             map.put("time", s.getStartTime() != null ? s.getStartTime().toString() : "06:00 - 14:00");
-            map.put("status", s.getEndTime() == null ? "�ang tr?c" : "�� xong");
+            map.put("status", s.getEndTime() == null ? "Đang trực" : "Đã xong");
             result.add(map);
         }
         if (result.isEmpty()) {
-            result.add(Map.of("id", "S1", "shiftName", "Ca S�ng", "assignedStaff", "Nguy?n Van A", "time", "06:00 - 14:00", "status", "�ang tr?c"));
+            result.add(Map.of("id", "S1", "shiftName", "Ca Sáng", "assignedStaff", "Nguyễn Văn A", "time", "06:00 - 14:00", "status", "Đang trực"));
         }
         return result;
     }
@@ -60,10 +60,10 @@ public class PersonnelController {
     @GetMapping("/handover/latest")
     public Map<String, Object> getLatestHandover() {
         Map<String, Object> result = new HashMap<>();
-        result.put("time", "14:05 H�m nay");
-        result.put("fromStaff", "Nguy?n Van A");
-        result.put("toStaff", "Tr?n Th? B");
-        result.put("status", "Ho�n t?t");
+        result.put("time", "14:05 Hôm nay");
+        result.put("fromStaff", "Nguyễn Văn A");
+        result.put("toStaff", "Trần Thị B");
+        result.put("status", "Hoàn tất");
         return result;
     }
 }

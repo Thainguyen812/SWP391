@@ -1,4 +1,4 @@
-package com.parking.controller;
+Ôªøpackage com.parking.controller;
 
 import com.parking.model.Transaction;
 import com.parking.repository.TransactionRepository;
@@ -19,13 +19,13 @@ public class RevenueController {
     public Map<String, Object> getSummary(@RequestParam(required = false) String month) {
         List<Transaction> transactions = transactionRepo.findAll();
         double total = transactions.stream()
-            .mapToDouble(t -> t.getAmount() != null ? t.getAmount().doubleValue() : 0.0)
+            .mapToDouble(t -> t.getTotalAmount() != null ? t.getTotalAmount().doubleValue() : 0.0)
             .sum();
             
         Map<String, Object> response = new HashMap<>();
-        response.put("today", Map.of("value", String.format("%.1fM", total > 0 ? total / 1000000 : 18.4), "trend", "+12.5% so v?i hÙm qua", "isPositive", true));
-        response.put("thisMonth", Map.of("value", "452M", "trend", "-2.1% so v?i th·ng tru?c", "isPositive", false));
-        response.put("projectedYear", Map.of("value", "5.4B", "subtitle", "–?t 92% KPI"));
+        response.put("today", Map.of("value", String.format("%.1fM", total > 0 ? total / 1000000 : 18.4), "trend", "+12.5% so v·ªõi h√¥m qua", "isPositive", true));
+        response.put("thisMonth", Map.of("value", "452M", "trend", "-2.1% so v·ªõi th√°ng tr∆∞·ªõc", "isPositive", false));
+        response.put("projectedYear", Map.of("value", "5.4B", "subtitle", "ƒê·∫°t 92% KPI"));
         return response;
     }
 
@@ -37,8 +37,8 @@ public class RevenueController {
             Map.of("date", "10/05", "revenue", 1100000)
         );
         List<Map<String, Object>> pieData = Arrays.asList(
-            Map.of("type", "‘ tÙ", "value", 65),
-            Map.of("type", "Xe m·y", "value", 35)
+            Map.of("type", "√î t√¥", "value", 65),
+            Map.of("type", "Xe m√°y", "value", 35)
         );
         Map<String, Object> response = new HashMap<>();
         response.put("barData", barData);
@@ -54,16 +54,16 @@ public class RevenueController {
         for (Transaction t : transactionRepo.findAll()) {
             Map<String, Object> item = new HashMap<>();
             item.put("id", "#TRX-" + (8900 + idCounter++));
-            item.put("time", t.getCreatedAt() != null ? t.getCreatedAt().toString() : "HÙm nay");
+            item.put("time", t.getProcessedAt() != null ? t.getProcessedAt().toString() : "H√¥m nay");
             item.put("plate", "---");
-            item.put("type", "‘ tÙ");
-            item.put("amount", t.getAmount() != null ? t.getAmount().toString() + "d" : "0d");
-            item.put("method", t.getPaymentMethod() != null ? t.getPaymentMethod().name() : "TI?N M?T");
-            item.put("status", t.getStatus() != null ? t.getStatus().name() : "TH¿NH C‘NG");
+            item.put("type", "√î t√¥");
+            item.put("amount", t.getTotalAmount() != null ? t.getTotalAmount().toString() + "ƒë" : "0ƒë");
+            item.put("method", t.getPaymentMethod() != null ? t.getPaymentMethod().name() : "TI·ªÄN M·∫∂T");
+            item.put("status", t.getPaymentStatus() != null ? t.getPaymentStatus().name() : "TH√ÄNH C√îNG");
             items.add(item);
         }
         if (items.isEmpty()) {
-            items.add(Map.of("id", "#TRX-8924", "time", "14:32:05 HÙm nay", "plate", "30G-123.45", "type", "‘ tÙ", "amount", "25,000d", "method", "VNPAY", "status", "SUCCESS"));
+            items.add(Map.of("id", "#TRX-8924", "time", "14:32:05 H√¥m nay", "plate", "30G-123.45", "type", "√î t√¥", "amount", "25,000ƒë", "method", "VNPAY", "status", "SUCCESS"));
         }
         Map<String, Object> response = new HashMap<>();
         response.put("total", items.size());
