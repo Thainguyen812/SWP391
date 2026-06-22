@@ -110,7 +110,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
           id: v.id || `veh-${v.plate}`,
           plate: v.plate,
           name: v.name,
-          type: v.type === 'SUV' ? 'Ô tô 4 chỗ' : v.type === 'Sedan' ? 'Ô tô 4 chỗ' : 'Xe máy',
+          type: v.type === 'SUV' ? 'SUV 7 chỗ' : 'Ô tô 4 chỗ',
           regDate: '12/10/2023',
           isActive: true,
           image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
@@ -2469,7 +2469,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
               <div className="space-y-4 text-left">
                 <div>
                   <h3 className="text-lg font-black text-slate-900 tracking-tight leading-none">Thêm phương tiện mới</h3>
-                  <p className="text-slate-400 text-xs mt-1">Đăng ký thêm xe ô tô/xe máy mới vào hệ thống của bạn.</p>
+                  <p className="text-slate-400 text-xs mt-1">Đăng ký thêm xe ô tô mới vào hệ thống của bạn.</p>
                 </div>
 
                 <form onSubmit={handleAddVehicle} className="space-y-4 text-xs font-sans">
@@ -2505,8 +2505,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       className="w-full p-2.5 bg-slate-50 border rounded-lg font-bold border-slate-200 text-slate-850 outline-hidden"
                     >
                       <option value="Ô tô 4 chỗ">🚗 Ô tô 4 chỗ</option>
-                      <option value="Ô tô 7 chỗ">SUV 7 chỗ</option>
-                      <option value="Xe máy">🏍️ Xe máy</option>
+                      <option value="SUV 7 chỗ">SUV 7 chỗ</option>
                     </select>
                   </div>
 
