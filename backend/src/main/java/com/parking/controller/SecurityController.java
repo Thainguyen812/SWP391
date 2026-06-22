@@ -1,4 +1,4 @@
-﻿package com.parking.controller;
+package com.parking.controller;
 
 import com.parking.model.SecurityPolicy;
 import com.parking.repository.SecurityPolicyRepository;

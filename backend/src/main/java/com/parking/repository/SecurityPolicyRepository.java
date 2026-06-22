@@ -1,4 +1,4 @@
-﻿package com.parking.repository;
+package com.parking.repository;
 
 import com.parking.model.SecurityPolicy;
 import org.springframework.data.jpa.repository.JpaRepository;
