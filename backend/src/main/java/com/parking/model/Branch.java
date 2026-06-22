@@ -1,4 +1,4 @@
-﻿package com.parking.model;
+package com.parking.model;
 
 import jakarta.persistence.*;
 import java.util.UUID;

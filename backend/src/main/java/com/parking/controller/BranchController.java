@@ -1,4 +1,4 @@
-﻿package com.parking.controller;
+package com.parking.controller;
 
 import com.parking.model.Branch;
 import com.parking.repository.BranchRepository;
