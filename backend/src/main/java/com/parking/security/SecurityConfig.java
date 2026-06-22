@@ -78,12 +78,19 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:5173", 
-            "http://localhost:5174",
-            "http://127.0.0.1:5173",
-            "http://127.0.0.1:5174"
-        ));
+        // Đọc CORS origins từ biến môi trường (dùng cho Cloud deploy)
+        String corsOrigins = System.getenv("CORS_ALLOWED_ORIGINS");
+        if (corsOrigins != null && !corsOrigins.isEmpty()) {
+            configuration.setAllowedOrigins(Arrays.asList(corsOrigins.split(",")));
+        } else {
+            // Fallback cho local development
+            configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "http://127.0.0.1:5173",
+                "http://127.0.0.1:5174"
+            ));
+        }
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
         configuration.setAllowCredentials(true);

@@ -15,9 +15,7 @@ services:
     restart: unless-stopped
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: ./backend
     container_name: parking_backend
     ports:
       - "8080:8080"
@@ -27,6 +25,15 @@ services:
       - SPRING_DATASOURCE_PASSWORD=ParkingDB@2024!
     depends_on:
       - postgres
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: parking_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
     restart: unless-stopped
 
 volumes:
