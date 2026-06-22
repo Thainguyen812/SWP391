@@ -102,14 +102,14 @@ public class DashboardController {
         }
         
         if (alerts.isEmpty()) {
-            alerts.add(Map.of(
-                "id", idCounter++,
-                "title", "Hệ thống hoạt động bình thường",
-                "description", "Không có cảnh báo an ninh nào.",
-                "time", "HIỆN TẠI",
-                "actionText", null,
-                "type", "success"
-            ));
+            Map<String, Object> defaultAlert = new HashMap<>();
+            defaultAlert.put("id", idCounter++);
+            defaultAlert.put("title", "Hệ thống hoạt động bình thường");
+            defaultAlert.put("description", "Không có cảnh báo an ninh nào.");
+            defaultAlert.put("time", "HIỆN TẠI");
+            defaultAlert.put("actionText", null);
+            defaultAlert.put("type", "success");
+            alerts.add(defaultAlert);
         }
 
         return alerts;
