@@ -31,6 +31,15 @@ public class VipSubscription {
     @Column(name = "document_photos", columnDefinition = "jsonb")
     private String documentPhotos;
 
+    @Column(name = "approved_by")
+    private UUID approvedBy;
+
+    @Column(name = "approved_at")
+    private Instant approvedAt;
+
+    @Column(name = "rejection_reason")
+    private String rejectionReason;
+
     public enum Status {
         PENDING_APPROVAL, ACTIVE, EXPIRED, REJECTED, CANCELLED
     }
@@ -81,5 +90,37 @@ public class VipSubscription {
 
     public void setStatus(Status status) {
         this.status = status;
+    }
+
+    public String getDocumentPhotos() {
+        return documentPhotos;
+    }
+
+    public void setDocumentPhotos(String documentPhotos) {
+        this.documentPhotos = documentPhotos;
+    }
+
+    public UUID getApprovedBy() {
+        return approvedBy;
+    }
+
+    public void setApprovedBy(UUID approvedBy) {
+        this.approvedBy = approvedBy;
+    }
+
+    public Instant getApprovedAt() {
+        return approvedAt;
+    }
+
+    public void setApprovedAt(Instant approvedAt) {
+        this.approvedAt = approvedAt;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
     }
 }

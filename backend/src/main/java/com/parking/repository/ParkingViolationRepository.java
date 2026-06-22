@@ -7,5 +7,5 @@ import java.util.UUID;
 
 @Repository
 public interface ParkingViolationRepository extends JpaRepository<ParkingViolation, UUID> {
-    // Có sẵn các phương thức cơ bản như save(), findById()
+    boolean existsBySessionIdAndViolationType(UUID sessionId, String violationType);
 }

@@ -5,14 +5,17 @@ import com.parking.dto.CheckInResponse;
 import com.parking.dto.CongestionCheckoutRequest;
 import com.parking.exception.ApiExceptions;
 import com.parking.model.BlacklistEntry;
-import com.parking.model.ParkingSession;
 import com.parking.model.ParkingSlot;
+import com.parking.repository.ParkingSlotRepository;
+import com.parking.model.User;
+import com.parking.repository.UserRepository;
 import com.parking.model.VipSubscription;
 import com.parking.model.Zone;
 import com.parking.model.Vehicle;
 import com.parking.model.VipQrIdentifier;
 import com.parking.model.AuditLog;
 import com.parking.model.AiScanLog;
+import com.parking.model.ParkingSession;
 
 import com.parking.model.Transaction; // task 5
 
@@ -62,7 +65,8 @@ public class ParkingServiceImpl implements ParkingService {
 
         private final TransactionRepository transactionRepository;// task 5
         private final CardRepository cardRepository;// task 5
-        private ParkingSlotRepository parkingSlotRepository;
+        private final ParkingSlotRepository parkingSlotRepository;
+        private final UserRepository userRepository;
 
         public ParkingServiceImpl(BlacklistRepository blacklistRepository,
                         ParkingSessionRepository parkingSessionRepository,
@@ -74,7 +78,8 @@ public class ParkingServiceImpl implements ParkingService {
                         AiScanLogRepository aiScanLogRepository,
                         TransactionRepository transactionRepository, // task 5
                         CardRepository cardRepository,
-                        ParkingSlotRepository parkingSlotRepository) { // task 5
+                        ParkingSlotRepository parkingSlotRepository,
+                        UserRepository userRepository) { // task 5
                 this.blacklistRepository = blacklistRepository;
                 this.parkingSessionRepository = parkingSessionRepository;
                 this.zoneRepository = zoneRepository;
@@ -86,6 +91,7 @@ public class ParkingServiceImpl implements ParkingService {
                 this.transactionRepository = transactionRepository; // task 5
                 this.cardRepository = cardRepository; // task 5
                 this.parkingSlotRepository = parkingSlotRepository;
+                this.userRepository = userRepository;
         }
 
         @Override
@@ -150,6 +156,20 @@ public class ParkingServiceImpl implements ParkingService {
 
                 if (vehicleOpt.isPresent()) {
                         ps.setVehicleId(vehicleOpt.get().getId());
+                }
+
+                // Find first available slot in the chosen zone
+                final Zone finalZone = chosen;
+                ParkingSlot assignedSlot = parkingSlotRepository.findAll().stream()
+                        .filter(s -> s.getZoneId().equals(finalZone.getId()) && "AVAILABLE".equals(s.getSlotStatus()))
+                        .findFirst()
+                        .orElse(null);
+                if (assignedSlot != null) {
+                    assignedSlot.setSlotStatus("OCCUPIED");
+                    assignedSlot.setLastUpdated(Instant.now());
+                    parkingSlotRepository.save(assignedSlot);
+                    ps.setParkedSlotId(assignedSlot.getId());
+                    ps.setSlotPhotoUrl("https://mock-sensor-camera.com/slots/" + assignedSlot.getId() + ".jpg");
                 }
 
                 parkingSessionRepository.save(ps);
