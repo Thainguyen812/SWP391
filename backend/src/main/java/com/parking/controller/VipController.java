@@ -1,25 +1,51 @@
 package com.parking.controller;
 
+import com.parking.dto.VipRegistrationRequest;
 import com.parking.model.User;
+import com.parking.model.VipSubscription;
 import com.parking.repository.UserRepository;
 import com.parking.service.ParkingService;
+import com.parking.service.VipService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/vip")
 public class VipController {
 
+    private final VipService vipService;
     private final ParkingService parkingService;
     private final UserRepository userRepository;
 
-    public VipController(ParkingService parkingService, UserRepository userRepository) {
+    public VipController(VipService vipService, ParkingService parkingService, UserRepository userRepository) {
+        this.vipService = vipService;
         this.parkingService = parkingService;
         this.userRepository = userRepository;
+    }
+
+    @GetMapping("/pending")
+    public List<VipSubscription> getPending() {
+        return vipService.getPending();
+    }
+
+    @PutMapping("/{id}/approve")
+    public VipSubscription approve(@PathVariable UUID id) {
+        return vipService.approve(id);
+    }
+
+    @PutMapping("/{id}/reject")
+    public VipSubscription reject(@PathVariable UUID id) {
+        return vipService.reject(id);
+    }
+
+    @PostMapping("/register")
+    public VipSubscription register(@RequestBody VipRegistrationRequest request) {
+        return vipService.register(request);
     }
 
     @PostMapping("/{id}/approve")

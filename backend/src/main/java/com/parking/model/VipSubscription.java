@@ -3,6 +3,7 @@ package com.parking.model;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -27,6 +28,15 @@ public class VipSubscription {
     @Enumerated(EnumType.STRING)
     private Status status;
 
+    @Column(name = "fee_amount", nullable = false)
+    private java.math.BigDecimal feeAmount;
+
+    @Column(name = "payment_method", nullable = false)
+    private String paymentMethod;
+
+    @Column(name = "payment_status", nullable = false)
+    private String paymentStatus;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "document_photos", columnDefinition = "jsonb")
     private String documentPhotos;
@@ -39,6 +49,12 @@ public class VipSubscription {
 
     @Column(name = "rejection_reason")
     private String rejectionReason;
+
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
 
     public enum Status {
         PENDING_APPROVAL, ACTIVE, EXPIRED, REJECTED, CANCELLED
@@ -92,6 +108,30 @@ public class VipSubscription {
         this.status = status;
     }
 
+    public BigDecimal getFeeAmount() {
+        return feeAmount;
+    }
+
+    public void setFeeAmount(BigDecimal feeAmount) {
+        this.feeAmount = feeAmount;
+    }
+
+    public String getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(String paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
+    public String getPaymentStatus() {
+        return paymentStatus;
+    }
+
+    public void setPaymentStatus(String paymentStatus) {
+        this.paymentStatus = paymentStatus;
+    }
+
     public String getDocumentPhotos() {
         return documentPhotos;
     }
@@ -122,5 +162,21 @@ public class VipSubscription {
 
     public void setRejectionReason(String rejectionReason) {
         this.rejectionReason = rejectionReason;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(Instant updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }
