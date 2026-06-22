@@ -224,7 +224,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
         })
       });
       const data = await response.json();
-      if (data.success) {
+      if (data.success) {git status
         triggerToast(data.message, "success");
         // Reset local gate values
         setGatePlate('');
@@ -825,7 +825,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
               </div>
               <div className="leading-tight block">
                 <h2 className="text-[19px] font-black tracking-tight text-white font-sans">UrbanPark</h2>
-                <span className="text-[10px] text-slate-400 font-bold block tracking-tight">HS thống đỗ xe thông minh</span>
+                <span className="text-[10px] text-slate-400 font-bold block tracking-tight">Hệ thống đỗ xe thông minh</span>
               </div>
             </div>
 
