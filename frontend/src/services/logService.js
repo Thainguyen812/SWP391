@@ -1,6 +1,6 @@
 import { apiClient } from '../api/apiClient';
 
-const isMock = import.meta.env.VITE_USE_MOCK_API === 'true';
+const isMock = true; // B?t bu?c dùng Mock vì Backend chua làm API này
 const MOCK_DELAY = 800;
 
 export const logService = {

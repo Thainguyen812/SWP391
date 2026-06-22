@@ -1,7 +1,7 @@
 import { apiClient } from '../api/apiClient';
 
 const MOCK_DELAY = 800;
-const isMock = import.meta.env.VITE_USE_MOCK_API === 'true';
+const isMock = true; // B?t bu?c d�ng Mock v� Backend chua l�m API n�y
 
 // Mock DB để xử lý trạng thái khi người dùng Approve/Reject
 let mockCustomers = [

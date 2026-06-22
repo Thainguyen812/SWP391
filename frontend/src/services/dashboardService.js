@@ -107,7 +107,7 @@ export const dashboardService = {
   createBranch: async (branchData) => {
     if (!isMock) {
       // Dùng Real API
-      return apiClient.post('/branches', branchData);
+      // return apiClient.post('/branches', branchData);
     }
 
     // Dùng Mock Data
@@ -218,7 +218,7 @@ export const dashboardService = {
 
   getRevenueSummary: async (month) => {
     if (!isMock) {
-      return apiClient.get('/revenue/summary', { params: { month } });
+      // return apiClient.get('/revenue/summary', { params: { month } });
     }
 
     return new Promise((resolve) => {
@@ -234,7 +234,7 @@ export const dashboardService = {
 
   getRevenueCharts: async (month) => {
     if (!isMock) {
-      return apiClient.get('/revenue/charts', { params: { month } });
+      // return apiClient.get('/revenue/charts', { params: { month } });
     }
 
     return new Promise((resolve) => {
@@ -262,7 +262,7 @@ export const dashboardService = {
 
   getRevenueTransactions: async (page = 1) => {
     if (!isMock) {
-      return apiClient.get('/revenue/transactions', { params: { page } });
+      // return apiClient.get('/revenue/transactions', { params: { page } });
     }
 
     return new Promise((resolve) => {

@@ -4,7 +4,7 @@ import { apiClient } from '../api/apiClient';
 const MOCK_DELAY = 1000;
 
 // Lấy cờ từ cấu hình môi trường (.env)
-const isMock = import.meta.env.VITE_USE_MOCK_API === 'true';
+const isMock = true; // B?t bu?c d�ng Mock v� Backend chua l�m API n�y
 
 export const personnelService = {
   // Lấy danh sách nhân viên
