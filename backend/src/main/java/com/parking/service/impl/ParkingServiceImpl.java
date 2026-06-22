@@ -135,8 +135,20 @@ public class ParkingServiceImpl implements ParkingService {
             java.util.UUID vehicleUuid = vehicle.getId();
             Optional<VipSubscription> vip = vipSubscriptionRepository.findByVehicleIdAndStatus(vehicleUuid,
                     VipSubscription.Status.ACTIVE);
-            if (vip.isPresent())
-                isVip = true;
+            if (vip.isPresent()) {
+                // Kiểm tra xem subscription còn hạn sử dụng không
+                java.time.LocalDate today = java.time.LocalDate.now();
+                if (!today.isBefore(vip.get().getStartDate()) && !today.isAfter(vip.get().getEndDate())) {
+                    isVip = true;
+                }
+            }
+        }
+
+        // Chốt chặn: Nếu không phải là xe VIP hoạt động, cấm tạo session tự động tại làn AI
+        if (!isVip) {
+            throw new com.parking.exception.ApiExceptions.ForbiddenException(
+                "Phương tiện không có gói VIP hoạt động. Vui lòng di chuyển sang làn thường để quẹt thẻ tạm."
+            );
         }
 
         // Create session
