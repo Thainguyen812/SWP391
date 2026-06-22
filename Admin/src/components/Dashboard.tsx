@@ -224,7 +224,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
         })
       });
       const data = await response.json();
-      if (data.success) {git status
+      if (data.success) {
         triggerToast(data.message, "success");
         // Reset local gate values
         setGatePlate('');
@@ -441,10 +441,10 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
   // Simulated live billing ledger for Revenue tab
   const [transactions, setTransactions] = useState([
-    { id: '#TRX-8924', time: '14:32:05 Hôm nay', plate: '30G-123.45', type: 'Ô tô - Vãng lai', cost: '25,000đ', paymentMethod: 'VNPAY', status: 'THÀNH CÔNG', invoiceNo: 'VAT-8924', note: '' },
-    { id: '#TRX-8923', time: '14:28:11 Hôm nay', plate: '29A-999.99', type: 'Vé tháng (VIP)', cost: '0đ', paymentMethod: 'Thẻ từ Auto', status: 'ĐÃ GHI NHẬN', invoiceNo: 'VAT-8923', note: '' },
-    { id: '#TRX-8922', time: '14:15:00 Hôm nay', plate: '15B-678.90', type: 'Xe máy', cost: '5,000đ', paymentMethod: 'Lỗi kết nối', status: 'CẦN XỬ LÝ', invoiceNo: 'VAT-8922', note: 'Lỗi kết nối' },
-    { id: '#TRX-8921', time: '14:10:22 Hôm nay', plate: '30E-555.22', type: 'Ô tô - Vãng lai', cost: '35,000đ', paymentMethod: 'Tiền mặt', status: 'THÀNH CÔNG', invoiceNo: 'VAT-8921', note: '' }
+    { id: '#TRX-8924', time: '14:32:05 22/06/2026', plate: '30G-123.45', type: 'Ô tô - Vãng lai', cost: '25,000đ', paymentMethod: 'VNPAY', status: 'THÀNH CÔNG', invoiceNo: 'VAT-8924', note: '' },
+    { id: '#TRX-8923', time: '14:28:11 22/06/2026', plate: '29A-999.99', type: 'Vé tháng (VIP)', cost: '0đ', paymentMethod: 'Thẻ từ Auto', status: 'ĐÃ GHI NHẬN', invoiceNo: 'VAT-8923', note: '' },
+    { id: '#TRX-8922', time: '14:15:00 22/06/2026', plate: '15B-678.90', type: 'Xe máy', cost: '5,000đ', paymentMethod: 'Lỗi kết nối', status: 'CẦN XỬ LÝ', invoiceNo: 'VAT-8922', note: 'Lỗi kết nối' },
+    { id: '#TRX-8921', time: '14:10:22 22/06/2026', plate: '30E-555.22', type: 'Ô tô - Vãng lai', cost: '35,000đ', paymentMethod: 'Tiền mặt', status: 'THÀNH CÔNG', invoiceNo: 'VAT-8921', note: '' }
   ]);
 
   // Customer Management Database
@@ -480,6 +480,8 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   }, [customerList]);
 
   const [customerSearch, setCustomerSearch] = useState('');
+  const [adminTimeFilter, setAdminTimeFilter] = useState('Tất cả');
+  const [adminCurrentPage, setAdminCurrentPage] = useState(1);
   const [customerFilter, setCustomerFilter] = useState<'Tất cả' | 'Tháng' | 'VIP'>('Tất cả');
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [customerTab, setCustomerTab] = useState<'list' | 'approvals'>('list');
@@ -594,7 +596,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
       plate: plateToRelease,
       type: isVIP ? 'Vé VIP' : 'Vé Ngày',
       gate: 'Cổng Ra 01',
-      time: new Date().toLocaleTimeString().substring(0, 5) + ' Hôm nay',
+      time: `${new Date().toLocaleTimeString().substring(0, 5)} ${new Date().toLocaleDateString('vi-VN')}`,
       cost: releaseCost,
       originalCost: isVIP ? '0 VNĐ' : '10,000 VNĐ',
       paymentMethod: isVIP ? 'Thẻ từ Auto' : 'VNPAY',
@@ -2439,6 +2441,19 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                     </strong>
                     
                     <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <select 
+                        value={adminTimeFilter}
+                        onChange={(e) => {
+                          setAdminTimeFilter(e.target.value);
+                          setAdminCurrentPage(1);
+                        }}
+                        className="px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-white dark:bg-slate-950 font-sans font-bold text-slate-700 dark:text-slate-300 outline-none hover:bg-slate-50 dark:hover:bg-slate-900"
+                      >
+                        <option value="Tất cả">Mọi thời gian</option>
+                        <option value="Hôm nay">Hôm nay (22/06)</option>
+                        <option value="Tháng này">Tháng này (Tháng 6)</option>
+                      </select>
+
                       <div className="relative flex-1 sm:w-60">
                         <Search className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input 
@@ -2446,8 +2461,8 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                           placeholder="Mã GD, Biển số..." 
                           className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-slate-50 dark:bg-slate-950/50 font-medium focus:ring-1 focus:ring-blue-500 focus:outline-none"
                           onChange={(e) => {
-                            // Can filter simulated transactions list locally
                             setCustomerSearch(e.target.value);
+                            setAdminCurrentPage(1);
                           }}
                         />
                       </div>
@@ -2463,108 +2478,159 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
                   {/* HIGH RESOLUTION TRANSACTION TABLE */}
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left font-sans text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-100 dark:border-slate-850 text-slate-400 font-bold uppercase text-[10px] tracking-wider">
-                          <th className="py-3 px-3">MÃ GD</th>
-                          <th className="py-3 px-3">THỜI GIAN</th>
-                          <th className="py-3 px-2">BIỂN SỐ</th>
-                          <th className="py-3 px-3">LOẠI VÉ</th>
-                          <th className="py-3 px-3">SỐ TIỀN</th>
-                          <th className="py-3 px-3">PHƯƠNG THỨC</th>
-                          <th className="py-3 px-3">TRẠNG THÁI</th>
-                          <th className="py-3 px-3 text-right">THAO TÁC</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
-                        {transactions
-                          .filter(item => {
-                            if (!customerSearch) return true;
-                            const query = customerSearch.toLowerCase();
-                            return item.id.toLowerCase().includes(query) || item.plate.toLowerCase().includes(query);
-                          })
-                          .map(item => {
-                            const isSuccess = item.status === 'THÀNH CÔNG';
-                            const isGhiNhan = item.status === 'ĐÃ GHI NHẬN';
-                            const isCanXuLy = item.status === 'CẦN XỬ LÝ';
-                            
-                            return (
-                              <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/10 transition-colors">
-                                <td className="py-3 px-3 font-mono font-black text-slate-650 dark:text-slate-350">{item.id}</td>
-                                <td className="py-3 px-3 text-slate-500 dark:text-slate-400 font-medium">{item.time}</td>
-                                <td className="py-3 px-2">
-                                  <span className={`inline-block px-2.5 py-1 font-mono font-black rounded-lg uppercase tracking-wider text-[11px] ${
-                                    isGhiNhan 
-                                      ? 'bg-slate-950 dark:bg-slate-900 border border-slate-800 text-yellow-500' 
-                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-850 dark:text-slate-200 border border-slate-200/50 dark:border-slate-750'
-                                  }`}>
-                                    {item.plate}
-                                  </span>
-                                </td>
-                                <td className="py-3 px-3 text-slate-700 dark:text-slate-300 font-bold">{item.type}</td>
-                                <td className="py-3 px-3 text-slate-900 dark:text-white font-extrabold text-sm">{item.cost}</td>
-                                <td className="py-3 px-3">
-                                  {item.paymentMethod === 'Lỗi kết nối' ? (
-                                    <span className="flex items-center gap-1 text-rose-500 font-bold">
-                                      <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0 animate-pulse" />
-                                      <span>Lỗi kết nối</span>
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-505 dark:text-slate-400 font-medium">{item.paymentMethod}</span>
-                                  )}
-                                </td>
-                                <td className="py-3 px-3">
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
-                                    isSuccess 
-                                      ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30' 
-                                      : isCanXuLy 
-                                      ? 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-450 border-rose-100 dark:border-rose-900/30' 
-                                      : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-150 dark:border-slate-800'
-                                  }`}>
-                                    ● {item.status}
-                                  </span>
-                                </td>
-                                <td className="py-3 px-3 text-right">
-                                  {isCanXuLy ? (
-                                    <button 
-                                      onClick={() => {
-                                        setTransactions(prev => prev.map(t => t.id === item.id ? { ...t, status: 'THÀNH CÔNG', paymentMethod: 'QR-Pay Khắc Phục' } : t));
-                                        triggerToast(`Đã xử lý thông luồng thủ công cho giao dịch ${item.id}`, "success");
-                                      }}
-                                      className="px-2.5 py-1 text-[10px] font-black tracking-wide text-white bg-blue-600 hover:bg-blue-700 rounded-lg uppercase"
-                                    >
-                                      Xử lý
-                                    </button>
-                                  ) : (
-                                    <button 
-                                      onClick={() => {
-                                        setSelectedReceipt(item);
-                                        triggerToast(`Hiển thị hóa đơn ${item.id}`, "info");
-                                      }}
-                                      className="px-2 py-1 text-slate-455 hover:text-blue-600 dark:hover:text-blue-400 font-extrabold hover:underline"
-                                    >
-                                      In/Chi tiết
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                      </tbody>
-                    </table>
-                  </div>
+                    {(() => {
+                      const adminItemsPerPage = 5;
+                      const filteredAdminTx = transactions.filter(item => {
+                        // Filter search query
+                        if (customerSearch) {
+                          const query = customerSearch.toLowerCase();
+                          if (!item.id.toLowerCase().includes(query) && !item.plate.toLowerCase().includes(query)) {
+                            return false;
+                          }
+                        }
+                        
+                        // Filter time (local time current is 22/06/2026)
+                        if (adminTimeFilter === 'Hôm nay') {
+                          return item.time.includes('22/06/2026');
+                        } else if (adminTimeFilter === 'Tháng này') {
+                          return item.time.includes('/06/2026');
+                        }
+                        
+                        return true;
+                      });
 
-                  {/* ACCURATE PAGINATION BAR FOOTER IN REVENUE CARD */}
-                  <div className="flex flex-col sm:flex-row justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-850 gap-4 select-none font-sans text-xs">
-                    <span className="text-slate-500 font-medium">Hiển thị 1 - {transactions.length} trên 248 giao dịch</span>
-                    <div className="flex items-center gap-1.5">
-                      <button className="p-1 px-2.5 border rounded-lg bg-white dark:bg-slate-950 font-semibold hover:bg-slate-50">&lt;</button>
-                      <button className="px-3 py-1 font-extrabold bg-blue-600 text-white rounded-lg">1</button>
-                      <button className="px-3 py-1 font-bold border hover:bg-slate-50 rounded-lg" onClick={() => triggerToast("Mở trang 2", "info")}>2</button>
-                      <button className="px-3 py-1 font-bold border hover:bg-slate-50 rounded-lg" onClick={() => triggerToast("Mở trang 3", "info")}>3</button>
-                      <span className="text-slate-400">...</span>
-                      <button className="p-1 px-2.5 border rounded-lg bg-white dark:bg-slate-950 font-semibold hover:bg-slate-50">&gt;</button>
-                    </div>
+                      const totalAdminPages = Math.max(1, Math.ceil(filteredAdminTx.length / adminItemsPerPage));
+                      const displayedAdminTx = filteredAdminTx.slice((adminCurrentPage - 1) * adminItemsPerPage, adminCurrentPage * adminItemsPerPage);
+
+                      return (
+                        <>
+                          <table className="w-full text-left font-sans text-xs">
+                            <thead>
+                              <tr className="border-b border-slate-100 dark:border-slate-850 text-slate-400 font-bold uppercase text-[10px] tracking-wider">
+                                <th className="py-3 px-3">MÃ GD</th>
+                                <th className="py-3 px-3">THỜI GIAN</th>
+                                <th className="py-3 px-2">BIỂN SỐ</th>
+                                <th className="py-3 px-3">LOẠI VÉ</th>
+                                <th className="py-3 px-3">SỐ TIỀN</th>
+                                <th className="py-3 px-3">PHƯƠNG THỨC</th>
+                                <th className="py-3 px-3">TRẠNG THÁI</th>
+                                <th className="py-3 px-3 text-right">THAO TÁC</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
+                              {displayedAdminTx.map(item => {
+                                const isSuccess = item.status === 'THÀNH CÔNG';
+                                const isGhiNhan = item.status === 'ĐÃ GHI NHẬN';
+                                const isCanXuLy = item.status === 'CẦN XỬ LÝ';
+                                
+                                return (
+                                  <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/10 transition-colors">
+                                    <td className="py-3 px-3 font-mono font-black text-slate-650 dark:text-slate-350">{item.id}</td>
+                                    <td className="py-3 px-3 text-slate-500 dark:text-slate-400 font-medium">{item.time}</td>
+                                    <td className="py-3 px-2">
+                                      <span className={`inline-block px-2.5 py-1 font-mono font-black rounded-lg uppercase tracking-wider text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-850 dark:text-slate-200 border border-slate-200/50 dark:border-slate-750`}>
+                                        {item.plate}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-3 text-slate-700 dark:text-slate-300 font-bold">{item.type}</td>
+                                    <td className="py-3 px-3 text-slate-900 dark:text-white font-extrabold text-sm">{item.cost}</td>
+                                    <td className="py-3 px-3">
+                                      {item.paymentMethod === 'Lỗi kết nối' ? (
+                                        <span className="flex items-center gap-1 text-rose-500 font-bold">
+                                          <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0 animate-pulse" />
+                                          <span>Lỗi kết nối</span>
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-505 dark:text-slate-400 font-medium">{item.paymentMethod}</span>
+                                      )}
+                                    </td>
+                                    <td className="py-3 px-3">
+                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                                        isSuccess 
+                                          ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30' 
+                                          : isCanXuLy 
+                                          ? 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-450 border-rose-100 dark:border-rose-900/30' 
+                                          : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-150 dark:border-slate-800'
+                                      }`}>
+                                        ● {item.status}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-3 text-right">
+                                      {isCanXuLy ? (
+                                        <button 
+                                          onClick={() => {
+                                            setTransactions(prev => prev.map(t => t.id === item.id ? { ...t, status: 'THÀNH CÔNG', paymentMethod: 'QR-Pay Khắc Phục' } : t));
+                                            triggerToast(`Đã xử lý thông luồng thủ công cho giao dịch ${item.id}`, "success");
+                                          }}
+                                          className="px-2.5 py-1 text-[10px] font-black tracking-wide text-white bg-blue-600 hover:bg-blue-700 rounded-lg uppercase"
+                                        >
+                                          Xử lý
+                                        </button>
+                                      ) : (
+                                        <button 
+                                          onClick={() => {
+                                            setSelectedReceipt(item);
+                                            triggerToast(`Hiển thị hóa đơn ${item.id}`, "info");
+                                          }}
+                                          className="px-2 py-1 text-slate-455 hover:text-blue-600 dark:hover:text-blue-400 font-extrabold hover:underline"
+                                        >
+                                          In/Chi tiết
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+
+                          {/* ACCURATE PAGINATION BAR FOOTER IN REVENUE CARD */}
+                          <div className="flex flex-col sm:flex-row justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-850 gap-4 select-none font-sans text-xs">
+                            <span className="text-slate-500 font-medium">
+                              Hiển thị {filteredAdminTx.length === 0 ? 0 : (adminCurrentPage - 1) * adminItemsPerPage + 1} - {Math.min(adminCurrentPage * adminItemsPerPage, filteredAdminTx.length)} trên {filteredAdminTx.length} giao dịch
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <button 
+                                onClick={() => {
+                                  if (adminCurrentPage > 1) setAdminCurrentPage(prev => prev - 1);
+                                }}
+                                disabled={adminCurrentPage === 1}
+                                className={`p-1 px-2.5 border rounded-lg font-semibold ${adminCurrentPage === 1 ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-900/50' : 'bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900'}`}
+                              >
+                                &lt;
+                              </button>
+                              
+                              {Array.from({ length: totalAdminPages }).map((_, idx) => {
+                                const pageNum = idx + 1;
+                                return (
+                                  <button
+                                    key={pageNum}
+                                    onClick={() => setAdminCurrentPage(pageNum)}
+                                    className={`px-3 py-1 rounded-lg font-bold ${
+                                      adminCurrentPage === pageNum 
+                                        ? 'bg-blue-600 text-white' 
+                                        : 'border hover:bg-slate-50 dark:hover:bg-slate-900/45 dark:border-slate-800 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-950'
+                                    }`}
+                                  >
+                                    {pageNum}
+                                  </button>
+                                );
+                              })}
+                              
+                              <button 
+                                onClick={() => {
+                                  if (adminCurrentPage < totalAdminPages) setAdminCurrentPage(prev => prev + 1);
+                                }}
+                                disabled={adminCurrentPage === totalAdminPages}
+                                className={`p-1 px-2.5 border rounded-lg font-semibold ${adminCurrentPage === totalAdminPages ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-900/50' : 'bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900'}`}
+                              >
+                                &gt;
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
 
                 </div>

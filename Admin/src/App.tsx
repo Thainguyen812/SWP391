@@ -103,6 +103,19 @@ export default function App() {
   // Navigation / Auth Mode toggle
   const [isSignUp, setIsSignUp] = useState(true);
   
+  // Password Recovery States
+  const [isRecovering, setIsRecovering] = useState(false);
+  const [recoverPhone, setRecoverPhone] = useState('');
+  const [recoverOtp, setRecoverOtp] = useState('');
+  const [recoverOtpSent, setRecoverOtpSent] = useState(false);
+  const [recoverOtpTimer, setRecoverOtpTimer] = useState(0);
+  const [recoverExpectedOtp, setRecoverExpectedOtp] = useState('');
+  const [recoverNewPass, setRecoverNewPass] = useState('');
+  const [recoverConfirmNewPass, setRecoverConfirmNewPass] = useState('');
+  const [showRecoverPass, setShowRecoverPass] = useState(false);
+  const [showRecoverConfirmPass, setShowRecoverConfirmPass] = useState(false);
+  const [recoverErrors, setRecoverErrors] = useState<Record<string, string>>({});
+  
   // Form input states
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -143,6 +156,16 @@ export default function App() {
     }
     return () => clearInterval(interval);
   }, [otpTimer]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (recoverOtpTimer > 0) {
+      interval = setInterval(() => {
+        setRecoverOtpTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [recoverOtpTimer]);
 
   // Utility toast dispatcher
   const showNotification = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -370,11 +393,154 @@ export default function App() {
     }, 1200);
   };
 
+  // Click handler to request OTP for password recovery
+  const handleRequestRecoverOtp = (e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    // Clear old errors related to recovery phone
+    const newErrors = { ...recoverErrors };
+    delete newErrors.phone;
+    
+    const phoneNoSpaces = recoverPhone.replace(/\s+/g, '');
+    const vietnamPhoneRegex = /^(0[35789])[0-9]{8}$/;
+    
+    if (!phoneNoSpaces) {
+      newErrors.phone = 'Vui lòng nhập số điện thoại';
+      setRecoverErrors(newErrors);
+      showNotification('Vui lòng cung cấp số điện thoại.', 'error');
+      return;
+    } else if (!vietnamPhoneRegex.test(phoneNoSpaces)) {
+      newErrors.phone = 'Số điện thoại không đúng định dạng (Ví dụ: 0901234567)';
+      setRecoverErrors(newErrors);
+      showNotification('Định dạng số điện thoại chưa hỗ trợ.', 'error');
+      return;
+    }
+
+    // Check if the phone exists in localStorage
+    const stored = localStorage.getItem('urbanpark_users_v2');
+    const userList = stored ? JSON.parse(stored) : [];
+    const matchedUser = userList.find((u: any) => u.phone.replace(/\s+/g, '') === phoneNoSpaces);
+
+    if (!matchedUser) {
+      newErrors.phone = 'Số điện thoại này chưa được đăng ký trong hệ thống';
+      setRecoverErrors(newErrors);
+      showNotification('Số điện thoại chưa tồn tại trong hệ thống.', 'error');
+      return;
+    }
+
+    setRecoverErrors(newErrors);
+    
+    // Simulate API request to send SMS OTP for recovery
+    const mockOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setRecoverExpectedOtp(mockOtp);
+    setRecoverOtpSent(true);
+    setRecoverOtpTimer(60);
+    
+    showNotification(`Đã gửi mã khôi phục mật khẩu. Nhập mã: ${mockOtp} để đổi mật khẩu!`, 'success');
+  };
+
+  // Handle Password Recovery Submission
+  const handleRecoverSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newErrors: Record<string, string> = {};
+
+    const phoneNoSpaces = recoverPhone.replace(/\s+/g, '');
+    if (!phoneNoSpaces) {
+      newErrors.phone = 'Vui lòng nhập số điện thoại';
+    }
+
+    if (!recoverOtpSent) {
+      newErrors.otp = 'Vui lòng nhấn nhận mã OTP trước';
+    } else if (!recoverOtp) {
+      newErrors.otp = 'Vui lòng nhập mã xác thực OTP';
+    } else if (recoverOtp !== recoverExpectedOtp) {
+      newErrors.otp = 'Mã xác thực OTP không chính xác';
+    }
+
+    if (!recoverNewPass) {
+      newErrors.newPass = 'Vui lòng nhập mật khẩu mới';
+    } else if (recoverNewPass.length < 6) {
+      newErrors.newPass = 'Mật khẩu mới phải dài ít nhất 6 ký tự';
+    }
+
+    if (!recoverConfirmNewPass) {
+      newErrors.confirmNewPass = 'Vui lòng xác nhận mật khẩu mới';
+    } else if (recoverNewPass !== recoverConfirmNewPass) {
+      newErrors.confirmNewPass = 'Mật khẩu xác nhận không trùng khớp';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setRecoverErrors(newErrors);
+      showNotification('Vui lòng kiểm tra lại thông tin nhập vào.', 'error');
+      return;
+    }
+
+    setRecoverErrors({});
+    setIsSubmitting(true);
+
+    // Simulate recovery and password update
+    setTimeout(() => {
+      const stored = localStorage.getItem('urbanpark_users_v2');
+      const userList = stored ? JSON.parse(stored) : [];
+      let updated = false;
+
+      const updatedUserList = userList.map((user: any) => {
+        if (user.phone.replace(/\s+/g, '') === phoneNoSpaces) {
+          updated = true;
+          return {
+            ...user,
+            password: recoverNewPass
+          };
+        }
+        return user;
+      });
+
+      if (updated) {
+        localStorage.setItem('urbanpark_users_v2', JSON.stringify(updatedUserList));
+        showNotification('Khôi phục mật khẩu thành công! Bạn có thể sử dụng mật khẩu mới để đăng nhập.', 'success');
+        
+        // Reset states and return to sign-in view
+        setIsRecovering(false);
+        setIsSignUp(false);
+        setRecoverPhone('');
+        setRecoverOtp('');
+        setRecoverOtpSent(false);
+        setRecoverNewPass('');
+        setRecoverConfirmNewPass('');
+        setSignPhone(recoverPhone); // Auto-populate with the recovered phone
+        setSignPass(recoverNewPass); // Auto-populate with the new password
+      } else {
+        showNotification('Đã có lỗi xảy ra. Không tìm thấy tài khoản tương ứng.', 'error');
+      }
+      setIsSubmitting(false);
+    }, 1500);
+  };
+
   // Reset form to start afresh
   const handleReset = () => {
     setName('');
     setPhone('');
     setOtp('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setAgreeTerms(false);
+    setOtpSent(false);
+    setExpectedOtp('');
+    setOtpTimer(0);
+    setErrors({});
+    setLoginErrors({});
+    setIsRegistered(false);
+    
+    // Clear recovery states too
+    setIsRecovering(false);
+    setRecoverPhone('');
+    setRecoverOtp('');
+    setRecoverOtpSent(false);
+    setRecoverOtpTimer(0);
+    setRecoverNewPass('');
+    setRecoverConfirmNewPass('');
+    setRecoverErrors({});
     setEmail('');
     setPassword('');
     setConfirmPassword('');
@@ -583,6 +749,149 @@ export default function App() {
                   </button>
                 </div>
               </motion.div>
+            ) : isRecovering ? (
+              
+              /* PASSWORD RECOVERY FLOW */
+              <motion.form
+                key="recover-form"
+                onSubmit={handleRecoverSubmit}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4"
+              >
+                <div>
+                  <h2 className="text-slate-900 text-3xl font-extrabold tracking-tight">
+                    Khôi phục mật khẩu
+                  </h2>
+                  <p className="text-[14px] text-slate-500 mt-1 leading-relaxed">
+                    Xác minh số điện thoại để đặt lại mật khẩu mới cho tài khoản của bạn.
+                  </p>
+                </div>
+
+                {/* 1. Recovery Phone input field */}
+                <div className="w-full">
+                  <label htmlFor="recover-phone" className="block text-[11px] font-bold tracking-wider text-slate-700 uppercase mb-1.5">
+                    Số điện thoại đã đăng ký
+                  </label>
+                  <div className="flex gap-2 items-start">
+                    <div className="relative rounded-md shadow-xs flex-1">
+                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <Smartphone className="w-4 h-4" />
+                      </div>
+                      <input
+                        id="recover-phone"
+                        type="tel"
+                        placeholder="090 123 4567"
+                        value={recoverPhone}
+                        onChange={(e) => setRecoverPhone(e.target.value)}
+                        disabled={isSubmitting || recoverOtpSent}
+                        className={`
+                          block w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 
+                          text-[14px] text-slate-800 placeholder-slate-400/80 outline-hidden transition-all duration-200
+                          focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50
+                          disabled:bg-slate-50 disabled:text-slate-400
+                          ${recoverErrors.phone ? 'border-red-300 focus:border-red-500' : ''}
+                        `}
+                      />
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={handleRequestRecoverOtp}
+                      disabled={isSubmitting || recoverOtpTimer > 0}
+                      className={`
+                        h-[43px] px-4 rounded-lg font-medium text-[13px] tracking-wide shrink-0 transition-all shadow-sm flex items-center justify-center cursor-pointer
+                        ${recoverOtpTimer > 0 
+                          ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                          : 'bg-[#2563eb] text-white hover:bg-[#1d4ed8] active:scale-95'
+                        }
+                      `}
+                    >
+                      {recoverOtpTimer > 0 ? `Gửi lại (${recoverOtpTimer}s)` : 'Nhận mã OTP'}
+                    </button>
+                  </div>
+                  {recoverErrors.phone && (
+                    <span className="block text-xs text-red-500 mt-1">{recoverErrors.phone}</span>
+                  )}
+                </div>
+
+                {/* 2. OTP Entry Code block */}
+                {recoverOtpSent && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="overflow-hidden"
+                  >
+                    <OtpInput 
+                      value={recoverOtp} 
+                      onChange={setRecoverOtp} 
+                      disabled={isSubmitting} 
+                    />
+                    {recoverErrors.otp && (
+                      <span className="block text-xs text-red-500 mt-1 px-1">{recoverErrors.otp}</span>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* 3. New Password input */}
+                <InputField
+                  id="recover-new-pass"
+                  label="Mật khẩu mới"
+                  placeholder="Nhập mật khẩu mới ít nhất 6 ký tự"
+                  type={showRecoverPass ? "text" : "password"}
+                  value={recoverNewPass}
+                  onChange={(e) => setRecoverNewPass(e.target.value)}
+                  icon={<Lock className="w-4 h-4" />}
+                  rightIcon={showRecoverPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  onRightIconClick={() => setShowRecoverPass(!showRecoverPass)}
+                  error={recoverErrors.newPass}
+                  disabled={isSubmitting}
+                />
+
+                {/* 4. Confirm New Password input */}
+                <InputField
+                  id="recover-confirm-pass"
+                  label="Xác nhận mật khẩu mới"
+                  placeholder="Nhập lại mật khẩu mới"
+                  type={showRecoverConfirmPass ? "text" : "password"}
+                  value={recoverConfirmNewPass}
+                  onChange={(e) => setRecoverConfirmNewPass(e.target.value)}
+                  icon={<Lock className="w-4 h-4" />}
+                  rightIcon={showRecoverConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  onRightIconClick={() => setShowRecoverConfirmPass(!showRecoverConfirmPass)}
+                  error={recoverErrors.confirmNewPass}
+                  disabled={isSubmitting}
+                />
+
+                {/* Submit button */}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-[#051424] hover:bg-[#0c233e] text-white font-semibold py-3.5 rounded-lg tracking-wider text-sm transition-all focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 active:scale-[0.99] uppercase shadow-md flex items-center justify-center gap-2 mt-4 cursor-pointer disabled:opacity-85"
+                >
+                  {isSubmitting ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    'Khôi phục mật khẩu'
+                  )}
+                </button>
+
+                {/* Back to Login Anchor */}
+                <div className="text-center pt-2">
+                  <span 
+                    onClick={() => {
+                      setIsRecovering(false);
+                      setIsSignUp(false);
+                      setRecoverErrors({});
+                    }}
+                    className="text-slate-500 hover:text-blue-600 font-semibold hover:underline cursor-pointer text-[13px] inline-flex items-center gap-1"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" /> Quay lại đăng nhập
+                  </span>
+                </div>
+              </motion.form>
             ) : isSignUp ? (
               
               /* SIGN UP FLOW (Exactly matches image layout fields) */
@@ -831,7 +1140,16 @@ export default function App() {
                     <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                     Ghi nhớ đăng nhập
                   </label>
-                  <span className="text-blue-600 hover:underline cursor-pointer font-medium">Quên mật khẩu?</span>
+                  <span 
+                    onClick={() => {
+                      setIsRecovering(true);
+                      setRecoverErrors({});
+                      setRecoverPhone(signPhone);
+                    }}
+                    className="text-blue-600 hover:underline cursor-pointer font-medium"
+                  >
+                    Quên mật khẩu?
+                  </span>
                 </div>
 
                 <button
