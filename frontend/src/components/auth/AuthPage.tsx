@@ -20,10 +20,53 @@ import { OtpInput } from './old/OtpInput';
 import { Toast, ToastMessage } from './old/Toast';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
+import { Modal } from 'antd';
 
 
 export const AuthPage = () => {
   const navigate = useNavigate();
+  
+  const showTermsModal = () => {
+    Modal.info({
+      title: 'Điều khoản dịch vụ - UrbanPark',
+      content: (
+        <div className="text-sm text-slate-600 mt-4 h-64 overflow-y-auto pr-2">
+          <p className="mb-2 font-bold text-slate-800">1. Chấp nhận điều khoản</p>
+          <p className="mb-4">Bằng việc đăng ký tài khoản UrbanPark, bạn đồng ý tuân thủ các quy định về việc sử dụng bãi đỗ xe thông minh của chúng tôi.</p>
+          <p className="mb-2 font-bold text-slate-800">2. Trách nhiệm của chủ phương tiện</p>
+          <p className="mb-4">Chủ phương tiện phải đỗ xe đúng nơi quy định, tự bảo quản tư trang cá nhân. Ban quản lý không chịu trách nhiệm đối với các mất mát tài sản để trong xe.</p>
+          <p className="mb-2 font-bold text-slate-800">3. Phí đỗ xe và Thanh toán</p>
+          <p className="mb-4">Phí đỗ xe được tính theo bảng giá niêm yết hiện hành. Khách hàng có trách nhiệm thanh toán đầy đủ qua các hình thức khả dụng trước khi xe rời bãi.</p>
+          <p className="mb-2 font-bold text-slate-800">4. Quy định an toàn</p>
+          <p className="mb-4">Tuân thủ nghiêm ngặt các quy định về phòng cháy chữa cháy, tốc độ tối đa 5km/h trong khuôn viên bãi đỗ xe.</p>
+        </div>
+      ),
+      width: 500,
+      okText: 'Đã hiểu',
+      centered: true,
+      maskClosable: true,
+    });
+  };
+
+  const showPrivacyModal = () => {
+    Modal.info({
+      title: 'Chính sách bảo mật - UrbanPark',
+      content: (
+        <div className="text-sm text-slate-600 mt-4 h-64 overflow-y-auto pr-2">
+          <p className="mb-2 font-bold text-slate-800">1. Thu thập dữ liệu</p>
+          <p className="mb-4">Hệ thống LPR (Nhận diện biển số) sẽ tự động ghi hình và trích xuất biển số xe của bạn khi ra vào bãi đỗ để phục vụ việc tính phí và đảm bảo an ninh.</p>
+          <p className="mb-2 font-bold text-slate-800">2. Bảo vệ thông tin cá nhân</p>
+          <p className="mb-4">Thông tin cá nhân (SĐT, Tên) và dữ liệu lịch sử xe ra vào của bạn được mã hóa an toàn và chỉ sử dụng cho mục đích vận hành bãi đỗ xe.</p>
+          <p className="mb-2 font-bold text-slate-800">3. Chia sẻ dữ liệu</p>
+          <p className="mb-4">Chúng tôi cam kết không bán hoặc chia sẻ dữ liệu của bạn cho bên thứ 3 với mục đích thương mại. Dữ liệu chỉ cung cấp cho cơ quan chức năng khi có yêu cầu hợp pháp.</p>
+        </div>
+      ),
+      width: 500,
+      okText: 'Đã hiểu',
+      centered: true,
+      maskClosable: true,
+    });
+  };
   // User Session Management
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -568,9 +611,9 @@ export const AuthPage = () => {
                     />
                     <label htmlFor="reg-agree" className="text-[13px] text-slate-600 leading-normal select-none">
                       Tôi đồng ý với{' '}
-                      <span className="text-blue-600 hover:underline cursor-pointer">Điều khoản dịch vụ</span>
+                      <span onClick={showTermsModal} className="text-blue-600 hover:underline cursor-pointer">Điều khoản dịch vụ</span>
                       {' '}và{' '}
-                      <span className="text-blue-600 hover:underline cursor-pointer">Chính sách bảo mật</span>
+                      <span onClick={showPrivacyModal} className="text-blue-600 hover:underline cursor-pointer">Chính sách bảo mật</span>
                       {' '}của UrbanPark.
                     </label>
                   </div>
