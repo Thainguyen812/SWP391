@@ -4,6 +4,11 @@ const isMock = import.meta.env.VITE_USE_MOCK_API === 'true';
 
 export const authService = {
   login: async (username, password) => {
+    // Xóa các dữ liệu rác/mock của driver cũ (nếu có) để tránh rò rỉ dữ liệu giữa các tài khoản
+    localStorage.removeItem('urbanpark_user_balance');
+    localStorage.removeItem('urbanpark_user_vehicles');
+    localStorage.removeItem('urbanpark_user_transactions');
+
     if (isMock) {
       await new Promise(resolve => setTimeout(resolve, 600)); // fake delay
       if (password !== '123456') {
@@ -77,6 +82,11 @@ export const authService = {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
+    
+    // Xóa dữ liệu rác/mock của driver
+    localStorage.removeItem('urbanpark_user_balance');
+    localStorage.removeItem('urbanpark_user_vehicles');
+    localStorage.removeItem('urbanpark_user_transactions');
     
     // Điều hướng về trang login
     window.location.href = '/login';
