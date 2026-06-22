@@ -79,7 +79,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'vnpay'>('wallet');
   const [balance, setBalance] = useState<number>(() => {
     const saved = localStorage.getItem('urbanpark_user_balance');
-    return saved ? parseFloat(saved) : 45.50; // standard $45.50 as in mockup
+    return saved ? parseFloat(saved) : 0; // Default to 0 for new users
   });
 
   const [selectedVehId, setSelectedVehId] = useState<string>('veh-1');
@@ -95,28 +95,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         console.error(err);
       }
     }
-    return [
-      {
-        id: 'veh-1',
-        plate: '30G-123.45',
-        name: 'Toyota Camry',
-        type: 'Ô tô 4 chỗ',
-        regDate: '12/10/2023',
-        isActive: true,
-        image: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80',
-        isLocked: false
-      },
-      {
-        id: 'veh-2',
-        plate: '29M1-678.90',
-        name: 'Honda SH',
-        type: 'Xe máy',
-        regDate: '15/10/2023',
-        isActive: true,
-        image: '',
-        isLocked: false
-      }
-    ];
+    return [];
   });
 
   // Background synchronize with live backend
@@ -164,21 +143,16 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         console.error(err);
       }
     }
-    return [
-      { id: 'TXN-9821', date: '24/10/2023 14:30', type: 'Vé ngày', plate: '29A-123.45', fee: '$5.50', isEntry: false, status: 'Thành công' },
-      { id: 'TXN-9820', date: '22/10/2023 09:15', type: 'Vé tháng', plate: '30G-789.01', fee: '$120.00', isEntry: false, status: 'Thành công' },
-      { id: 'TXN-9819', date: '20/10/2023 18:45', type: 'Nạp ví', plate: '-', fee: '$50.00', isEntry: true, status: 'Đang xử lý' },
-      { id: 'TXN-9818', date: '18/10/2023 08:00', type: 'Vé ngày', plate: '29A-123.45', fee: '$3.00', isEntry: false, status: 'Thất bại' }
-    ];
+    return [];
   });
 
   // Current parked vehicle mock details
-  const [currentParked, setCurrentParked] = useState({
-    plate: '30A-123.45',
-    status: 'ĐANG ĐỖ',
-    location: 'Khu A • Tầng 2',
-    isParked: true
-  });
+  const [currentParked, setCurrentParked] = useState<{
+    plate: string;
+    status: string;
+    location: string;
+    isParked: boolean;
+  } | null>(null);
 
   // Modal controls
   const [addVehicleModalOpen, setAddVehicleModalOpen] = useState(false);
@@ -1017,18 +991,26 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           <span className="text-[10px] font-black uppercase text-slate-400">TRỌNG ĐIỂM GIÁM SÁT</span>
                           <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Trạng Thái Hiện Tại</h3>
                         </div>
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 text-[#10b981] font-bold text-xs rounded-full uppercase tracking-wide">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          ĐANG ĐỖ
-                        </span>
+                        {currentParked ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 text-[#10b981] font-bold text-xs rounded-full uppercase tracking-wide">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            ĐANG ĐỖ
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 border border-slate-200 text-slate-500 font-bold text-xs rounded-full uppercase tracking-wide">
+                            TRỐNG
+                          </span>
+                        )}
                       </div>
 
-                      <p className="text-slate-500 text-xs mt-3">Xe đang đỗ trong cơ sở bãi đỗ thông minh</p>
+                      <p className="text-slate-500 text-xs mt-3">
+                        {currentParked ? "Xe đang đỗ trong cơ sở bãi đỗ thông minh" : "Hiện tại không có xe nào đang đỗ trong bãi"}
+                      </p>
 
                       <div className="grid grid-cols-2 gap-4 mt-6">
                         <div className="p-4 bg-white border border-slate-200/60 rounded-xl leading-snug">
                           <span className="text-[9px] font-extrabold text-slate-400 uppercase block tracking-wider">BIỂN SỐ NHẬN DIỆN</span>
-                          <strong className="text-sm sm:text-base font-black text-slate-800 font-mono italic tracking-wide">{currentParked.plate}</strong>
+                          <strong className="text-sm sm:text-base font-black text-slate-800 font-mono italic tracking-wide">{currentParked?.plate || 'Chưa ghi nhận'}</strong>
                         </div>
                         <div className="p-4 bg-white border border-slate-200/60 rounded-xl leading-snug flex items-center gap-3">
                           <div className="p-2 bg-red-50 text-red-500 rounded-lg">
@@ -1036,7 +1018,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           </div>
                           <div>
                             <span className="text-[9px] font-extrabold text-slate-400 uppercase block tracking-wider">VỊ TRÍ ƯỚC TÍNH</span>
-                            <strong className="text-xs sm:text-sm font-extrabold text-slate-850 block">{currentParked.location}</strong>
+                            <strong className="text-xs sm:text-sm font-extrabold text-slate-850 block">{currentParked?.location || 'Chưa ghi nhận'}</strong>
                           </div>
                         </div>
                       </div>
