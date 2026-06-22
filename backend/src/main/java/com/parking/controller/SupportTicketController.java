@@ -35,4 +35,16 @@ public class SupportTicketController {
         SupportTicket saved = ticketRepo.save(ticket);
         return ResponseEntity.ok(saved);
     }
+
+    @PutMapping("/{id}/resolve")
+    public ResponseEntity<?> resolveTicket(@PathVariable Long id) {
+        SupportTicket ticket = ticketRepo.findById(id).orElse(null);
+        if (ticket == null) {
+            return ResponseEntity.notFound().build();
+        }
+        ticket.setStatus("Đã xử lý");
+        ticket.setResolvedAt(LocalDateTime.now());
+        ticketRepo.save(ticket);
+        return ResponseEntity.ok().build();
+    }
 }

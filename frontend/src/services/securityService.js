@@ -1,7 +1,7 @@
 import { apiClient } from '../api/apiClient';
 
 const MOCK_DELAY = 800;
-const isMock = import.meta.env.VITE_USE_MOCK_API === 'true';
+const isMock = true; // B?t bu?c dùng Mock vì Backend chua làm API này
 
 export const securityService = {
   getSecurityPolicies: async () => {
@@ -13,8 +13,8 @@ export const securityService = {
       setTimeout(() => {
         resolve({
           is2FAEnabled: true,
-          sessionTimeoutDesktop: '30 Phút',
-          sessionTimeoutMobile: '4 Giờ',
+          sessionTimeoutDesktop: '30 PhÃºt',
+          sessionTimeoutMobile: '4 Giá»',
           passwordMinLength: 12,
           passwordRequireSpecial: true,
           passwordRequireNumber: true
@@ -32,9 +32,9 @@ export const securityService = {
       setTimeout(() => {
         resolve([
           { id: 1, name: "Super Admin", count: 3, color: "bg-red-500" },
-          { id: 2, name: "Quản lý Cơ sở", count: 12, color: "bg-blue-600" },
-          { id: 3, name: "Kế toán", count: 5, color: "bg-emerald-500" },
-          { id: 4, name: "Nhân viên Bãi xe", count: 48, color: "bg-slate-500" },
+          { id: 2, name: "Quáº£n lÃ½ CÆ¡ sá»Ÿ", count: 12, color: "bg-blue-600" },
+          { id: 3, name: "Káº¿ toÃ¡n", count: 5, color: "bg-emerald-500" },
+          { id: 4, name: "NhÃ¢n viÃªn BÃ£i xe", count: 48, color: "bg-slate-500" },
         ]);
       }, MOCK_DELAY);
     });
@@ -51,14 +51,14 @@ export const securityService = {
           {
             id: 1,
             type: "success",
-            content: "Admin NguyenV đã cập nhật chính sách mật khẩu.",
-            time: "10:45 AM - Hôm nay",
+            content: "Admin NguyenV Ä‘Ã£ cáº­p nháº­t chÃ­nh sÃ¡ch máº­t kháº©u.",
+            time: "10:45 AM - HÃ´m nay",
           },
           {
             id: 2,
             type: "warning",
-            content: "Đăng nhập thất bại (x3) tài khoản nhanvien_bx02.",
-            time: "09:12 AM - Hôm nay",
+            content: "ÄÄƒng nháº­p tháº¥t báº¡i (x3) tÃ i khoáº£n nhanvien_bx02.",
+            time: "09:12 AM - HÃ´m nay",
           },
         ]);
       }, MOCK_DELAY);
@@ -72,7 +72,7 @@ export const securityService = {
 
     return new Promise((resolve) => {
       setTimeout(() => {
-        resolve({ success: true, message: "Lưu cấu hình thành công" });
+        resolve({ success: true, message: "LÆ°u cáº¥u hÃ¬nh thÃ nh cÃ´ng" });
       }, 500);
     });
   }

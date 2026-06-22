@@ -11,6 +11,8 @@ import { SettingsMain } from './components/manager/settings/Settings_Main';
 import { PersonnelMain } from './components/manager/personnel/Personnel_Main';
 import { SecurityMain } from './components/manager/security/Security_Main';
 import { LogsMain } from './components/manager/logs/Logs_Main';
+import { HandoverMain } from './components/manager/handover/Handover_Main';
+import { SupportMain } from './components/manager/support/Support_Main';
 import { TransactionHistory } from './components/manager/transactions/TransactionHistory';
 import { StaffDashboard } from './components/staff/StaffDashboard';
 import { StaffGateControl } from './components/staff/StaffGateControl';
@@ -22,6 +24,7 @@ import { StaffSettings } from './components/staff/StaffSettings';
 import { StaffSupport } from './components/staff/StaffSupport';
 import StaffLayout from './components/layout/StaffLayout';
 import { DriverPwa } from './components/driver/DriverPwa';
+import { Dashboard as LegacyDashboard } from './components/driver/Dashboard';
 import { useNavigate } from 'react-router-dom';
 import { GlobalProvider } from './context/GlobalContext';
 
@@ -48,6 +51,27 @@ const DriverPage = ({ children }) => (
   </ProtectedRoute>
 );
 
+const LegacyAdminWrapper = () => {
+  const navigate = useNavigate();
+  const rawUser = authService.getUser();
+  const currentUser = rawUser 
+    ? { name: rawUser.fullName || rawUser.username, phone: rawUser.username, role: rawUser.role }
+    : { name: 'Admin', phone: '0901234567', role: 'ADMIN' };
+  
+  return (
+    <ProtectedRoute allowedRoles={['MANAGER', 'ADMIN']}>
+      <LegacyDashboard 
+        user={currentUser}
+        accessToken="mock-access"
+        onLogout={() => {
+          authService.logout();
+          navigate('/login');
+        }}
+      />
+    </ProtectedRoute>
+  );
+};
+
 const RootRedirect = () => {
   const isAuthenticated = authService.isAuthenticated();
   const user = authService.getUser();
@@ -61,7 +85,7 @@ const RootRedirect = () => {
   } else if (user.role === 'STAFF') {
     return <Navigate to="/staff-dashboard" replace />;
   } else {
-    return <Navigate to="/overview" replace />;
+    return <Navigate to="/admin" replace />;
   }
 };
 
@@ -126,9 +150,10 @@ function App() {
         {/* Public Route */}
         <Route path="/login" element={<AuthPage />} />
         <Route path="/register" element={<AuthPage />} />
+        <Route path="/" element={<RootRedirect />} />
+        <Route path="/admin" element={<LegacyAdminWrapper />} />
 
         {/* Protected Routes */}
-        <Route path="/" element={<RootRedirect />} />
         
         {/* Nhóm Quản trị */}
         <Route path="/overview" element={
@@ -153,11 +178,17 @@ function App() {
           <ProtectedPage allowedRoles={managementRoles}><SecurityMain /></ProtectedPage>
         } />
         <Route path="/settings" element={
-          <ProtectedPage allowedRoles={managementRoles}><SettingsMain /></ProtectedPage>
-        } />
+            <ProtectedPage allowedRoles={managementRoles}><SettingsMain /></ProtectedPage>
+          } />
         <Route path="/logs" element={
-          <ProtectedPage allowedRoles={managementRoles}><LogsMain /></ProtectedPage>
-        } />
+            <ProtectedPage allowedRoles={managementRoles}><LogsMain /></ProtectedPage>
+          } />
+        <Route path="/handover" element={
+            <ProtectedPage allowedRoles={managementRoles}><HandoverMain /></ProtectedPage>
+          } />
+        <Route path="/support" element={
+            <ProtectedPage allowedRoles={managementRoles}><SupportMain /></ProtectedPage>
+          } />
 
         {/* Nhóm Nhân viên (Staff) */}
         <Route path="/staff-dashboard" element={
