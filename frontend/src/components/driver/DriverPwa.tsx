@@ -122,7 +122,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   // Background synchronize with live backend
   const fetchVehiclesFromApi = async () => {
     try {
-      const response = await fetch('/api/vehicles');
+      const response = await fetch('/api/vehicles', {
+        headers: { 'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}` }
+      });
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
         const mapped: UserVehicle[] = data.data.map((v: any, index: number) => ({
@@ -382,7 +384,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     try {
       const response = await fetch('/api/vehicles/lock', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+        },
         body: JSON.stringify({ plate: plateStr, isLocked: !currentIsLocked })
       });
       const data = await response.json();

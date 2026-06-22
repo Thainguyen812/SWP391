@@ -41,4 +41,22 @@ public class VehicleController {
         repo.deleteById(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/lock")
+    public ResponseEntity<?> lockVehicle(@RequestBody VehicleLockRequest request) {
+        boolean isLocked = request.getIsLocked() != null && request.getIsLocked();
+        String msg = isLocked ? "Kich hoat radar khoa banh thanh cong cho xe " + request.getPlate() + "!" 
+                              : "Da mo khoa an ninh cho xe " + request.getPlate() + ". Xe co the xuat bai!";
+        return ResponseEntity.ok(java.util.Map.of("success", true, "message", msg));
+    }
+
+    public static class VehicleLockRequest {
+        private String plate;
+        private Boolean isLocked;
+        public String getPlate() { return plate; }
+        public void setPlate(String plate) { this.plate = plate; }
+        public Boolean getIsLocked() { return isLocked; }
+        public void setIsLocked(Boolean isLocked) { this.isLocked = isLocked; }
+    }
 }
+// Trigger VS Code Build

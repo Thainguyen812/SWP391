@@ -62,7 +62,7 @@ export const authService = {
         fullName,
         email,
         phone,
-        role: "STAFF" // Mặc định khi đăng ký là nhân viên (hoặc DRIVER tuỳ logic)
+        role: "DRIVER" // Mặc định đăng ký từ Driver App là tài xế (DRIVER)
       });
       return { success: true, data: response };
     } catch (error) {

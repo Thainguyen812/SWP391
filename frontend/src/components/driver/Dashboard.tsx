@@ -189,7 +189,9 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
   const fetchGateScanLogs = async () => {
     try {
-      const r = await fetch('/api/gate/logs');
+      const r = await fetch('/api/gate/logs', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
       const d = await r.json();
       if (d.success && Array.isArray(d.data)) {
         setLiveScanLogs(d.data);
@@ -215,7 +217,10 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     try {
       const response = await fetch('/api/gate/scan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
         body: JSON.stringify({
           plate: gatePlate.trim(),
           cardCode: gateCardCode.trim(),
@@ -250,7 +255,10 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
   const handleClearGateLogs = async () => {
     try {
-      const response = await fetch('/api/gate/clear', { method: 'POST' });
+      const response = await fetch('/api/gate/clear', { 
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
       const data = await response.json();
       if (data.success) {
         setLiveScanLogs([]);

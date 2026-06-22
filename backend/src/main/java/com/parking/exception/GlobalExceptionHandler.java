@@ -20,7 +20,7 @@ public class GlobalExceptionHandler {
         if (ex instanceof RuntimeException) {
             return ResponseEntity.status(400).body(new ErrorBody(ex.getMessage()));
         }
-        return ResponseEntity.status(500).body(new ErrorBody("Internal server error"));
+        return ResponseEntity.status(500).body(new ErrorBody("Internal server error: " + ex.getClass().getName() + " - " + ex.getMessage()));
     }
 
     public static class ErrorBody {

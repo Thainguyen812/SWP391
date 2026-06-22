@@ -100,7 +100,9 @@ public class AuthService implements org.springframework.security.core.userdetail
             u.setFullName(req.getFullName());
             u.setEmail(req.getEmail());
             u.setPhone(req.getPhone());
-            if (req.getRole() != null && req.getRole().equalsIgnoreCase("STAFF")) {
+            if (req.getUsername().matches("^\\+?[0-9]{9,15}$")) {
+                u.setRole(User.Role.DRIVER);
+            } else if (req.getRole() != null && req.getRole().equalsIgnoreCase("STAFF")) {
                 u.setRole(User.Role.STAFF);
             } else {
                 u.setRole(User.Role.DRIVER); // Mặc định đăng ký mới là tài xế (Driver)
