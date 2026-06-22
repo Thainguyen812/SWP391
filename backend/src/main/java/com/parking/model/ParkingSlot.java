@@ -12,12 +12,20 @@ public class ParkingSlot {
     @Id
     private UUID id;
 
-    // Sửa từ status -> slot_status
+    @Column(name = "zone_id", nullable = false)
+    private UUID zoneId;
+
+    @Column(name = "slot_number", nullable = false)
+    private String slotNumber;
+
+    @Column(name = "slot_type", nullable = false)
+    private String slotType = "NORMAL";
     @Column(name = "slot_status", nullable = false)
     private String slotStatus;
 
-    // Sửa từ chargerStatus -> ev_charger_id
-    // Dùng kiểu UUID để tham chiếu tới bảng trụ sạc (mock)
+    @Column(name = "sensor_mock_id")
+    private String sensorMockId;
+
     @Column(name = "ev_charger_id")
     private String evChargerId;
 

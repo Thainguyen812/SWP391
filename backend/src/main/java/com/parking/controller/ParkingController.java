@@ -75,6 +75,13 @@ public class ParkingController {
                 parkingService.checkoutCard(cardId));
     }
 
+    @PostMapping("/checkout-by-code/{cardCode}")
+    public ResponseEntity<Transaction> checkoutByCode(
+            @PathVariable String cardCode) {
+        return ResponseEntity.ok(
+                parkingService.checkoutCardByCode(cardCode));
+    }
+
     @PostMapping("/congestion/checkout") // check out lưu động 
     public ResponseEntity<Transaction> congestionCheckout(
             @RequestBody CongestionCheckoutRequest request) {
@@ -82,4 +89,20 @@ public class ParkingController {
                 parkingService.congestionCheckout(request)); //nhảy qua serviceyml để xử lý 
     }
 
+    @GetMapping("/fee/{cardId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
+    public ResponseEntity<java.util.Map<String, Object>> getParkingFee(@PathVariable UUID cardId) {
+        return ResponseEntity.ok(parkingService.getParkingFee(cardId));
+    }
+
+    @GetMapping("/find-car")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> findCarByDigits(@RequestParam String digits) {
+        return ResponseEntity.ok(parkingService.findCarByDigits(digits));
+    }
+
+    @GetMapping("/monitoring/map")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('STAFF', 'MANAGER', 'ADMIN')")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getMonitoringMap() {
+        return ResponseEntity.ok(parkingService.getMonitoringMap());
+    }
 }

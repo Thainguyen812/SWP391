@@ -4,6 +4,7 @@ import com.parking.model.ParkingSession;
 import com.parking.model.VipQrIdentifier;
 import com.parking.repository.ParkingSessionRepository;
 import com.parking.repository.VipQrIdentifierRepository;
+import com.parking.service.ParkingService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -18,10 +19,12 @@ public class DriverController {
 
     private final VipQrIdentifierRepository qrRepo;
     private final ParkingSessionRepository sessionRepo;
+    private final ParkingService parkingService;
 
-    public DriverController(VipQrIdentifierRepository qrRepo, ParkingSessionRepository sessionRepo) {
+    public DriverController(VipQrIdentifierRepository qrRepo, ParkingSessionRepository sessionRepo, ParkingService parkingService) {
         this.qrRepo = qrRepo;
         this.sessionRepo = sessionRepo;
+        this.parkingService = parkingService;
     }
 
     @PostMapping("/qr/generate")
@@ -58,6 +61,12 @@ public class DriverController {
         }
 
         return ResponseEntity.ok("Cập nhật trạng thái khóa chống trộm thành công!");
+    }
+
+    @GetMapping("/vehicle/{vehicleId}/status")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ResponseEntity<java.util.Map<String, Object>> getVehicleStatus(@PathVariable UUID vehicleId) {
+        return ResponseEntity.ok(parkingService.getVehicleStatus(vehicleId));
     }
 
     // Helper DTOs

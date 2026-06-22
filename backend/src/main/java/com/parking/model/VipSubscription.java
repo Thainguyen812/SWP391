@@ -1,7 +1,8 @@
 package com.parking.model;
 
 import jakarta.persistence.*;
-
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -27,7 +28,6 @@ public class VipSubscription {
     @Enumerated(EnumType.STRING)
     private Status status;
 
-    //
     @Column(name = "fee_amount", nullable = false)
     private java.math.BigDecimal feeAmount;
 
@@ -37,14 +37,24 @@ public class VipSubscription {
     @Column(name = "payment_status", nullable = false)
     private String paymentStatus;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "document_photos", columnDefinition = "jsonb")
+    private String documentPhotos;
+
+    @Column(name = "approved_by")
+    private UUID approvedBy;
+
+    @Column(name = "approved_at")
+    private Instant approvedAt;
+
+    @Column(name = "rejection_reason")
+    private String rejectionReason;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
-
-    @Column(name = "approved_at")
-    private Instant approvedAt;
 
     public enum Status {
         PENDING_APPROVAL, ACTIVE, EXPIRED, REJECTED, CANCELLED
@@ -122,6 +132,38 @@ public class VipSubscription {
         this.paymentStatus = paymentStatus;
     }
 
+    public String getDocumentPhotos() {
+        return documentPhotos;
+    }
+
+    public void setDocumentPhotos(String documentPhotos) {
+        this.documentPhotos = documentPhotos;
+    }
+
+    public UUID getApprovedBy() {
+        return approvedBy;
+    }
+
+    public void setApprovedBy(UUID approvedBy) {
+        this.approvedBy = approvedBy;
+    }
+
+    public Instant getApprovedAt() {
+        return approvedAt;
+    }
+
+    public void setApprovedAt(Instant approvedAt) {
+        this.approvedAt = approvedAt;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -137,14 +179,4 @@ public class VipSubscription {
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
     }
-
-    public Instant getApprovedAt() {
-        return approvedAt;
-    }
-
-    public void setApprovedAt(Instant approvedAt) {
-        this.approvedAt = approvedAt;
-    }
-
-    
 }

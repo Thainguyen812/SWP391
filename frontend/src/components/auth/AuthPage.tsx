@@ -196,7 +196,7 @@ export const AuthPage = () => {
     }
 
     setIsSubmitting(true);
-    const result = await authService.login(signPhone, signPass);
+    const result = await authService.login(signPhone.trim(), signPass);
     setIsSubmitting(false);
 
     if (result.success) {
@@ -206,6 +206,8 @@ export const AuthPage = () => {
       setTimeout(() => {
         if (user && user.role === 'DRIVER') {
           navigate('/driver');
+        } else if (user && user.role === 'STAFF') {
+          navigate('/staff-dashboard');
         } else {
           navigate('/overview');
         }

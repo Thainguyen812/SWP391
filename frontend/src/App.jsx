@@ -2,22 +2,42 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AuthPage } from './components/auth/AuthPage';
-import { SystemOverviewSection } from './components/dashboard/Dashboard_Main';
-import { MonitoringPage } from './components/monitoring/Monitoring_Main';
-import { RevenuePage } from './components/revenue/Revenue_Main';
-import { CustomerPage } from './components/customers/Customer_Main';
-import { SettingsMain } from './components/settings/Settings_Main';
-import { PersonnelMain } from './components/personnel/Personnel_Main';
-import { SecurityMain } from './components/security/Security_Main';
-import { LogsMain } from './components/logs/Logs_Main';
+import { authService } from './services/authService';
+import { SystemOverviewSection } from './components/manager/dashboard/Dashboard_Main';
+import { MonitoringPage } from './components/manager/monitoring/Monitoring_Main';
+import { RevenuePage } from './components/manager/revenue/Revenue_Main';
+import { CustomerPage } from './components/manager/customers/Customer_Main';
+import { SettingsMain } from './components/manager/settings/Settings_Main';
+import { PersonnelMain } from './components/manager/personnel/Personnel_Main';
+import { SecurityMain } from './components/manager/security/Security_Main';
+import { LogsMain } from './components/manager/logs/Logs_Main';
+import { TransactionHistory } from './components/manager/transactions/TransactionHistory';
+import { StaffDashboard } from './components/staff/StaffDashboard';
+import { StaffGateControl } from './components/staff/StaffGateControl';
+import { StaffPayment } from './components/staff/StaffPayment';
+import { StaffMonitoring } from './components/staff/StaffMonitoring';
+import { StaffSecurityAlerts } from './components/staff/StaffSecurityAlerts';
+import { StaffLostCard } from './components/staff/StaffLostCard';
+import { StaffSettings } from './components/staff/StaffSettings';
+import { StaffSupport } from './components/staff/StaffSupport';
+import StaffLayout from './components/layout/StaffLayout';
+import { DriverPwa } from './components/driver/DriverPwa';
+import { useNavigate } from 'react-router-dom';
 import { GlobalProvider } from './context/GlobalContext';
 
-// Helper component to wrap protected pages with MainLayout
 const ProtectedPage = ({ children, allowedRoles }) => (
   <ProtectedRoute allowedRoles={allowedRoles}>
     <MainLayout>
       {children}
     </MainLayout>
+  </ProtectedRoute>
+);
+
+const StaffProtectedPage = ({ children }) => (
+  <ProtectedRoute allowedRoles={['STAFF']}>
+    <StaffLayout>
+      {children}
+    </StaffLayout>
   </ProtectedRoute>
 );
 
@@ -27,6 +47,39 @@ const DriverPage = ({ children }) => (
     {children}
   </ProtectedRoute>
 );
+
+const RootRedirect = () => {
+  const isAuthenticated = authService.isAuthenticated();
+  const user = authService.getUser();
+
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.role === 'DRIVER') {
+    return <Navigate to="/driver" replace />;
+  } else if (user.role === 'STAFF') {
+    return <Navigate to="/staff-dashboard" replace />;
+  } else {
+    return <Navigate to="/overview" replace />;
+  }
+};
+
+const DriverAppWrapper = () => {
+  const user = authService.getUser() || { username: 'driver', fullName: 'Tài xế', role: 'DRIVER' };
+  const navigate = useNavigate();
+  
+  return (
+    <DriverPwa 
+      user={{ phone: user.username, name: user.fullName, role: user.role }}
+      accessToken={localStorage.getItem('token')}
+      onLogout={() => {
+        authService.logout();
+        navigate('/login');
+      }}
+    />
+  );
+};
 
 import React from 'react';
 
@@ -63,7 +116,7 @@ class ErrorBoundary extends React.Component {
 }
 
 function App() {
-  const managementRoles = ['MANAGER', 'ADMIN', 'STAFF'];
+  const managementRoles = ['MANAGER', 'ADMIN'];
 
   return (
     <BrowserRouter>
@@ -75,7 +128,7 @@ function App() {
         <Route path="/register" element={<AuthPage />} />
 
         {/* Protected Routes */}
-        <Route path="/" element={<Navigate to="/overview" replace />} />
+        <Route path="/" element={<RootRedirect />} />
         
         {/* Nhóm Quản trị */}
         <Route path="/overview" element={
@@ -93,6 +146,9 @@ function App() {
         <Route path="/staff" element={
           <ProtectedPage allowedRoles={managementRoles}><PersonnelMain /></ProtectedPage>
         } />
+        <Route path="/transactions" element={
+          <ProtectedPage allowedRoles={managementRoles}><TransactionHistory /></ProtectedPage>
+        } />
         <Route path="/security" element={
           <ProtectedPage allowedRoles={managementRoles}><SecurityMain /></ProtectedPage>
         } />
@@ -103,13 +159,33 @@ function App() {
           <ProtectedPage allowedRoles={managementRoles}><LogsMain /></ProtectedPage>
         } />
 
+        {/* Nhóm Nhân viên (Staff) */}
+        <Route path="/staff-dashboard" element={
+          <StaffProtectedPage><StaffDashboard /></StaffProtectedPage>
+        } />
+        <Route path="/staff-gate-control" element={
+          <StaffProtectedPage><StaffGateControl /></StaffProtectedPage>
+        } />
+        <Route path="/staff-payment" element={
+          <StaffProtectedPage><StaffPayment /></StaffProtectedPage>
+        } />
+        <Route path="/staff-monitoring" element={
+          <StaffProtectedPage><StaffMonitoring /></StaffProtectedPage>
+        } />
+        <Route path="/staff-security" element={
+          <StaffProtectedPage><StaffSecurityAlerts /></StaffProtectedPage>
+        } />
+        <Route path="/staff-lost-card" element={
+          <StaffProtectedPage><StaffLostCard /></StaffProtectedPage>
+        } />
+        <Route path="/staff-transactions" element={<StaffProtectedPage><TransactionHistory /></StaffProtectedPage>} />
+        <Route path="/staff-settings" element={<StaffProtectedPage><StaffSettings /></StaffProtectedPage>} />
+        <Route path="/staff-support" element={<StaffProtectedPage><StaffSupport /></StaffProtectedPage>} />
+
         {/* Nhóm Khách hàng (Driver) */}
         <Route path="/driver" element={
           <DriverPage>
-            <div style={{ padding: '20px', textAlign: 'center' }}>
-              <h1>Giao diện Driver</h1>
-              <p>Trang này đang được phát triển bởi Dev khác.</p>
-            </div>
+            <DriverAppWrapper />
           </DriverPage>
         } />
 

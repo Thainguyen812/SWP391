@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -19,4 +20,9 @@ public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, UUID> 
             "AND s.evChargerId IS NOT NULL " +
             "AND s.lastUpdated <= :timeLimit")
     List<ParkingSlot> findViolatingSlots(@Param("timeLimit") Instant timeLimit);
+
+    // Thêm vào ParkingSlotRepository.java
+    Optional<ParkingSlot> findFirstBySlotTypeAndSlotStatus(String slotType, String slotStatus);
+
+    Optional<ParkingSlot> findFirstByZoneIdAndSlotStatusAndSlotType(UUID zoneId, String slotStatus, String slotType);
 }

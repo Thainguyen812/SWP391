@@ -49,6 +49,15 @@ public class VipServiceImpl implements VipService {
         }
 
         @Override
+        public VipSubscription reject(UUID id) {
+                VipSubscription vip = repo.findById(id)
+                                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn VIP"));
+                vip.setStatus(VipSubscription.Status.REJECTED);
+                vip.setUpdatedAt(java.time.Instant.now());
+                return repo.save(vip);
+        }
+
+        @Override
         public VipSubscription register(
                         VipRegistrationRequest request) {
 

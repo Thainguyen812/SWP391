@@ -1,11 +1,11 @@
 @reference "../../index.css";
 
 .top-app-bar {
-  @apply w-full h-[72px] bg-white dark:bg-[#1e293b] border-b border-[#e9e7e9] dark:border-[#334155] flex items-center justify-between px-6 flex-shrink-0 transition-colors;
+  @apply w-full h-16 bg-white dark:bg-[#1e293b] border-b border-[#e9e7e9] dark:border-[#334155] flex items-center justify-between px-6 flex-shrink-0 transition-colors;
 }
 
 .search-container {
-  @apply flex items-center h-full w-[280px];
+  @apply flex items-center h-full w-auto flex-shrink-0;
 }
 
 .search-input-wrapper {
@@ -21,7 +21,11 @@
 }
 
 .location-nav {
-  @apply flex items-center justify-center flex-1 h-full pl-12 pr-12;
+  @apply flex items-center justify-center flex-1 h-full px-4 overflow-x-auto overflow-y-hidden;
+  scrollbar-width: none; /* Firefox */
+}
+.location-nav::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
 }
 
 .location-list {

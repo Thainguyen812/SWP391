@@ -19,11 +19,88 @@ import { InputField } from './components/InputField';
 import { OtpInput } from './components/OtpInput';
 import { Toast, ToastMessage } from './components/Toast';
 import { Dashboard } from './components/Dashboard';
+import { DriverPwa } from './components/DriverPwa';
 
 export default function App() {
   // User Session Management
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ phone: string; role: string; name: string } | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+
+  // Check for existing session and initialize mock users database on load
+  useEffect(() => {
+    const existingUsers = localStorage.getItem('urbanpark_users');
+    if (!existingUsers) {
+      localStorage.setItem('urbanpark_users', JSON.stringify([
+        {
+          phone: '0901234567',
+          password: '123456',
+          name: 'Nguyễn Văn Đạt',
+          email: 'dat.nguyen@urbanpark.com',
+          role: 'ADMIN'
+        },
+        {
+          phone: '0902222222',
+          password: '123456',
+          name: 'Trần Thị Thuỷ',
+          email: 'thuy.tran@urbanpark.com',
+          role: 'MANAGER'
+        },
+        {
+          phone: '0903333333',
+          password: '123456',
+          name: 'Lê Minh Thành',
+          email: 'thanh.le@urbanpark.com',
+          role: 'STAFF'
+        },
+        {
+          phone: '0904444444',
+          password: '123456',
+          name: 'Phạm Minh Hoàng',
+          email: 'hoang.pham@urbanpark.com',
+          role: 'DRIVER'
+        }
+      ]));
+    }
+
+    const storedRefreshToken = localStorage.getItem('urbanpark_refresh_token');
+    const storedUser = localStorage.getItem('urbanpark_session_user');
+    
+    if (storedRefreshToken && storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        // Sinh ngẫu nhiên Access Token lưu vào bộ nhớ tạm (in-memory state)
+        const mockAccessToken = 'access_tok_' + Math.random().toString(36).substring(2, 12);
+        
+        setAccessToken(mockAccessToken);
+        setCurrentUser(parsedUser);
+        setIsLoggedIn(true);
+        
+        // Notify user of restored session
+        setTimeout(() => {
+          showNotification('Phiên làm việc tự động khôi phục nhờ Refresh Token từ LocalStorage!', 'success');
+        }, 500);
+      } catch (err) {
+        // Clear corrupt data
+        localStorage.removeItem('urbanpark_refresh_token');
+        localStorage.removeItem('urbanpark_session_user');
+      }
+    }
+  }, []);
+
+  // Hàm thủ công gọi Refresh Token để lấy Access Token mới
+  const handleManualRefreshToken = () => {
+    const storedRefreshToken = localStorage.getItem('urbanpark_refresh_token');
+    if (!storedRefreshToken) {
+      showNotification('Không tìm thấy Refresh Token trong LocalStorage!', 'error');
+      return;
+    }
+    
+    // Simulate refresh endpoint response
+    const nextAccessToken = 'access_tok_' + Math.random().toString(36).substring(2, 12);
+    setAccessToken(nextAccessToken);
+    showNotification('Đã gọi Refresh Token thành công! Cấp Access Token mới vào bộ nhớ tạm.', 'success');
+  };
 
   // Navigation / Auth Mode toggle
   const [isSignUp, setIsSignUp] = useState(true);
@@ -53,6 +130,7 @@ export default function App() {
 
   // UI States & feedback
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loginErrors, setLoginErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -123,8 +201,19 @@ export default function App() {
     }
 
     const phoneNoSpaces = phone.replace(/\s+/g, '');
+    const vietnamPhoneRegex = /^(0[35789])[0-9]{8}$/;
     if (!phoneNoSpaces) {
       newErrors.phone = 'Vui lòng nhập số điện thoại';
+    } else if (!vietnamPhoneRegex.test(phoneNoSpaces)) {
+      newErrors.phone = 'Số điện thoại không đúng định dạng (Ví dụ: 0901234567)';
+    } else {
+      // Check duplicate phone
+      const stored = localStorage.getItem('urbanpark_users');
+      const userList = stored ? JSON.parse(stored) : [];
+      const duplicate = userList.find((u: any) => u.phone.replace(/\s+/g, '') === phoneNoSpaces);
+      if (duplicate) {
+        newErrors.phone = 'Số điện thoại này đã được đăng ký trước đó rồi';
+      }
     }
 
     if (!otpSent) {
@@ -140,6 +229,14 @@ export default function App() {
       newErrors.email = 'Vui lòng nhập địa chỉ email';
     } else if (!emailRegex.test(email)) {
       newErrors.email = 'Địa chỉ email không hợp lệ';
+    } else {
+      // Check duplicate email
+      const stored = localStorage.getItem('urbanpark_users');
+      const userList = stored ? JSON.parse(stored) : [];
+      const duplicate = userList.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+      if (duplicate) {
+        newErrors.email = 'Địa chỉ email này đã được sử dụng bởi người dùng khác';
+      }
     }
 
     if (!password) {
@@ -174,6 +271,21 @@ export default function App() {
 
     // Simulate standard server latency
     setTimeout(() => {
+      const stored = localStorage.getItem('urbanpark_users');
+      const userList = stored ? JSON.parse(stored) : [];
+      
+      const phoneNoSpaces = phone.replace(/\s+/g, '');
+      const newUser = {
+        phone: phoneNoSpaces,
+        password: password,
+        name: name.trim(),
+        email: email.trim(),
+        role: phoneNoSpaces.endsWith('2') ? 'MANAGER' : phoneNoSpaces.endsWith('3') ? 'STAFF' : 'DRIVER'
+      };
+
+      userList.push(newUser);
+      localStorage.setItem('urbanpark_users', JSON.stringify(userList));
+
       setIsSubmitting(false);
       setIsRegistered(true);
       showNotification('Đăng ký tài khoản Driver Portal thành công!', 'success');
@@ -183,40 +295,80 @@ export default function App() {
   // Handle Mock Login Submission
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const newLoginErrors: Record<string, string> = {};
+
+    const cleanSignPhone = signPhone.replace(/\s+/g, '');
+
     if (!signPhone) {
-      showNotification('Vui lòng điền số điện thoại', 'error');
-      return;
+      newLoginErrors.signPhone = 'Vui lòng nhập số điện thoại đăng nhập';
     }
     if (!signPass) {
-      showNotification('Vui lòng điền mật khẩu', 'error');
+      newLoginErrors.signPass = 'Vui lòng nhập mật khẩu tài khoản';
+    }
+
+    if (Object.keys(newLoginErrors).length > 0) {
+      setLoginErrors(newLoginErrors);
+      showNotification('Vui lòng cung cấp đầy đủ thông tin đăng nhập', 'error');
       return;
     }
 
     setIsSubmitting(true);
 
     setTimeout(() => {
-      setIsSubmitting(false);
-      
-      // Determine role based on phone suffix or defaults
-      let assignedRole = 'ADMIN';
-      let mockName = 'Nguyễn Văn Đạt';
-      
-      const lastChar = signPhone.trim().slice(-1);
-      if (lastChar === '2') {
-        assignedRole = 'MANAGER';
-        mockName = 'Trần Thị Thuỷ';
-      } else if (lastChar === '3') {
-        assignedRole = 'STAFF';
-        mockName = 'Lê Minh Thành';
+      const stored = localStorage.getItem('urbanpark_users');
+      const userList = stored ? JSON.parse(stored) : [];
+
+      // Fallback defaults if empty
+      const finalUserList = userList.length > 0 ? userList : [
+        {
+          phone: '0901234567',
+          password: '123456',
+          name: 'Nguyễn Văn Đạt',
+          email: 'dat.nguyen@urbanpark.com',
+          role: 'ADMIN'
+        }
+      ];
+
+      const matchedUser = finalUserList.find((u: any) => u.phone.replace(/\s+/g, '') === cleanSignPhone);
+
+      if (!matchedUser) {
+        setIsSubmitting(false);
+        newLoginErrors.signPhone = 'Số điện thoại này chưa được đăng ký trong hệ thống';
+        setLoginErrors(newLoginErrors);
+        showNotification('Không tìm thấy tài khoản với số điện thoại này!', 'error');
+        return;
       }
 
-      setCurrentUser({
-        phone: signPhone,
-        name: mockName,
-        role: assignedRole
-      });
+      if (matchedUser.password !== signPass) {
+        setIsSubmitting(false);
+        newLoginErrors.signPass = 'Mật khẩu vừa nhập không trùng khớp. Vui lòng kiểm tra lại';
+        setLoginErrors(newLoginErrors);
+        showNotification('Mật khẩu không chính xác!', 'error');
+        return;
+      }
+
+      setLoginErrors({});
+      setIsSubmitting(false);
+      
+      const mockAccessToken = 'access_tok_' + Math.random().toString(36).substring(2, 12);
+      const mockRefreshToken = 'refresh_tok_' + Math.random().toString(36).substring(2, 12) + '_' + Date.now();
+
+      // Lưu Access Token vào bộ nhớ tạm (state variable in-memory)
+      setAccessToken(mockAccessToken);
+
+      // Lưu Refresh Token vào LocalStorage để duy trì phiên làm việc
+      localStorage.setItem('urbanpark_refresh_token', mockRefreshToken);
+
+      const userPayload = {
+        phone: matchedUser.phone,
+        name: matchedUser.name,
+        role: matchedUser.role || 'ADMIN'
+      };
+      localStorage.setItem('urbanpark_session_user', JSON.stringify(userPayload));
+
+      setCurrentUser(userPayload);
       setIsLoggedIn(true);
-      showNotification('Đăng nhập hệ thống UrbanPark thành công!', 'success');
+      showNotification(`Chào mừng ${matchedUser.name} quay trở lại! Đăng nhập thành công.`, 'success');
     }, 1200);
   };
 
@@ -233,17 +385,40 @@ export default function App() {
     setExpectedOtp('');
     setOtpTimer(0);
     setErrors({});
+    setLoginErrors({});
     setIsRegistered(false);
   };
 
   if (isLoggedIn && currentUser) {
+    const handleLogout = () => {
+      setIsLoggedIn(false);
+      setCurrentUser(null);
+      setAccessToken(null);
+      setSignPhone('');
+      setSignPass('');
+      localStorage.removeItem('urbanpark_refresh_token');
+      localStorage.removeItem('urbanpark_session_user');
+      showNotification('Đăng xuất thành công, sẵn sàng nhận phiên đăng nhập mới!', 'info');
+    };
+
+    if (currentUser.role === 'DRIVER') {
+      return (
+        <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full min-h-screen">
+          <DriverPwa 
+            user={currentUser}
+            accessToken={accessToken}
+            onLogout={handleLogout}
+          />
+        </div>
+      );
+    }
+
     return (
       <Dashboard 
         user={currentUser} 
-        onLogout={() => {
-          setIsLoggedIn(false);
-          setCurrentUser(null);
-        }} 
+        accessToken={accessToken}
+        onRefreshToken={handleManualRefreshToken}
+        onLogout={handleLogout} 
       />
     );
   }
@@ -597,6 +772,7 @@ export default function App() {
                       onClick={() => {
                         setIsSignUp(false);
                         setErrors({});
+                        setLoginErrors({});
                       }}
                       className="text-blue-600 font-semibold hover:underline cursor-pointer ml-1"
                     >
@@ -634,6 +810,7 @@ export default function App() {
                   value={signPhone}
                   onChange={(e) => setSignPhone(e.target.value)}
                   icon={<Smartphone className="w-4 h-4" />}
+                  error={loginErrors.signPhone}
                   disabled={isSubmitting}
                 />
 
@@ -647,6 +824,7 @@ export default function App() {
                   icon={<Lock className="w-4 h-4" />}
                   rightIcon={showSignPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   onRightIconClick={() => setShowSignPass(!showSignPass)}
+                  error={loginErrors.signPass}
                   disabled={isSubmitting}
                 />
 
@@ -677,6 +855,7 @@ export default function App() {
                       onClick={() => {
                         setIsSignUp(true);
                         setErrors({});
+                        setLoginErrors({});
                       }}
                       className="text-blue-600 font-semibold hover:underline cursor-pointer ml-1"
                     >

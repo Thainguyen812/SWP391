@@ -47,24 +47,51 @@ public class AuthService implements org.springframework.security.core.userdetail
                 .build();
     }
 
-    public LoginResponse login(LoginRequest req){
-        Optional<User> uOpt = userRepo.findByUsername(req.getUsername());
-        if (uOpt.isEmpty()) throw new RuntimeException("Invalid credentials");
-        User u = uOpt.get();
-        if (!passwordEncoder.matches(req.getPassword(), u.getPasswordHash())) throw new RuntimeException("Invalid credentials");
-        
-        String access = jwtUtils.generateJwtToken(u.getUsername(), java.util.List.of("ROLE_" + u.getRole().name()));
-        UUID refreshUuid = UUID.randomUUID();
-        RefreshToken rt = new RefreshToken();
-        rt.setId(UUID.randomUUID());
-        rt.setUserId(u.getId());
-        rt.setToken(refreshUuid);
-        rt.setExpiresAt(Instant.now().plusSeconds(7*24*3600));
-        refreshRepo.save(rt);
-        return new LoginResponse(access, refreshUuid.toString(), u);
+    public LoginResponse login(LoginRequest req) {
+        try {
+            // 1. Kiểm tra username tồn tại dưới DB
+            Optional<User> uOpt = userRepo.findByUsername(req.getUsername());
+            if (uOpt.isEmpty()) {
+                throw new RuntimeException("❌ LỖI: Không tìm thấy Username '" + req.getUsername() + "' dưới Database!");
+            }
+
+            User u = uOpt.get();
+
+            // 2. Kiểm tra mật khẩu khớp hay không
+            if (!passwordEncoder.matches(req.getPassword(), u.getPasswordHash())) {
+                throw new RuntimeException("❌ LỖI: Mật khẩu bị sai (hoặc chưa mã hóa băm Bcrypt)!");
+            }
+
+            // 3. Kiểm tra Role trước khi tạo JWT
+            if (u.getRole() == null) {
+                throw new RuntimeException("❌ LỖI: User này tồn tại nhưng cột 'role' dưới Database đang bị rỗng (NULL)!");
+            }
+            String access = jwtUtils.generateJwtToken(u.getUsername(), java.util.List.of("ROLE_" + u.getRole().name()));
+
+            // 4. Tạo cấu trúc Refresh Token
+            UUID refreshUuid = UUID.randomUUID();
+            RefreshToken rt = new RefreshToken();
+            rt.setId(UUID.randomUUID());
+            rt.setUserId(u.getId());
+            rt.setToken(refreshUuid);
+            rt.setExpiresAt(java.time.Instant.now().plusSeconds(7 * 24 * 3600));
+
+            // 5. Lưu Refresh Token vào Database
+            refreshRepo.save(rt);
+
+            // Truyền u vào constructor LoginResponse để Frontend nhận được thông tin User
+            return new LoginResponse(access, refreshUuid.toString(), u);
+
+        } catch (Exception e) {
+            System.err.println("=================================================");
+            System.err.println("❌ PHÁT HIỆN LỖI HỆ THỐNG TẠI HÀM LOGIN:");
+            System.err.println("=================================================");
+            e.printStackTrace();
+            throw e;
+        }
     }
 
-    public LoginResponse register(RegisterRequest req){
+    public LoginResponse register(RegisterRequest req) {
         try {
             User u = new User();
             u.setId(UUID.randomUUID());
@@ -76,13 +103,16 @@ public class AuthService implements org.springframework.security.core.userdetail
             if (req.getRole() != null && req.getRole().equalsIgnoreCase("STAFF")) {
                 u.setRole(User.Role.STAFF);
             } else {
-                u.setRole(User.Role.DRIVER);
+                u.setRole(User.Role.DRIVER); // Mặc định đăng ký mới là tài xế (Driver)
             }
             u.setStatus(User.Status.ACTIVE);
             u.setCreatedAt(Instant.now());
             userRepo.save(u);
-            // auto login
-            LoginRequest lr = new LoginRequest(); lr.setUsername(req.getUsername()); lr.setPassword(req.getPassword());
+
+            // Tự động đăng nhập luôn sau khi đăng ký thành công
+            LoginRequest lr = new LoginRequest();
+            lr.setUsername(req.getUsername());
+            lr.setPassword(req.getPassword());
             return login(lr);
         } catch (Exception e) {
             throw new RuntimeException("Register failed: " + e.getMessage(), e);

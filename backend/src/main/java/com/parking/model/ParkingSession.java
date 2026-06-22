@@ -1,8 +1,6 @@
 package com.parking.model;
 
 import jakarta.persistence.*;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.time.Instant;
@@ -65,16 +63,17 @@ public class ParkingSession {
     @Column(name = "mobile_checkout_photo")
     private String mobileCheckoutPhoto;
 
-    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "lost_card_proof_photos")
     private String lostCardProofPhotos;
+
+    @Column(name = "slot_photo_url")
+    private String slotPhotoUrl;
 
     @Column(name = "created_at")
     private Instant createdAt;
 
     @Column(name = "updated_at")
     private Instant updatedAt;
-
 
     public enum SessionStatus { ACTIVE, COMPLETED, PASSED_CONFIRMED, LOST_CARD }
 
@@ -119,9 +118,10 @@ public class ParkingSession {
     public void setMobileCheckoutAt(Instant mobileCheckoutAt) { this.mobileCheckoutAt = mobileCheckoutAt; }
     public String getMobileCheckoutPhoto() { return mobileCheckoutPhoto; }
     public void setMobileCheckoutPhoto(String mobileCheckoutPhoto) { this.mobileCheckoutPhoto = mobileCheckoutPhoto; }
-
     public String getLostCardProofPhotos() { return lostCardProofPhotos; }
     public void setLostCardProofPhotos(String lostCardProofPhotos) { this.lostCardProofPhotos = lostCardProofPhotos; }
+    public String getSlotPhotoUrl() { return slotPhotoUrl; }
+    public void setSlotPhotoUrl(String slotPhotoUrl) { this.slotPhotoUrl = slotPhotoUrl; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
