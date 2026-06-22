@@ -51,7 +51,7 @@ export const StaffGateControl = () => {
     }
     setIsCheckingIn(true);
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
       // Map local Vietnamese labels to backend allowed_sizes
       let mappedType = 'SEDAN_HATCHBACK';
       if (manualType === 'Ô tô gầm thấp 4-5 chỗ') mappedType = 'SEDAN_HATCHBACK';
@@ -120,7 +120,7 @@ export const StaffGateControl = () => {
     }
     setIsAiProcessing(true);
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
       
       const response = await apiClient.post(`/v1/parking/check-in/ai`, {
         plate: aiPlate.toUpperCase(),
