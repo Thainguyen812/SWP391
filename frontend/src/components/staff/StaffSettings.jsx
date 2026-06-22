@@ -29,7 +29,7 @@ export const StaffSettings = () => {
 
   const allChecked = checks.printer && checks.camera && checks.gate;
 
-  const handleTakeover = () => {
+  const handleHandover = () => {
     if (!selectedStaffId) {
       notification.warning({ message: 'Vui lòng chọn nhân viên tiếp nhận', placement: 'topRight' });
       return;
@@ -37,52 +37,49 @@ export const StaffSettings = () => {
     const nextStaff = availableStaff.find(s => s.id === selectedStaffId);
 
     Modal.confirm({
-      title: 'Xác nhận tiếp nhận ca',
-      content: `Bạn (${nextStaff.name}) xác nhận đã kiểm tra đủ thiết bị và tiền mặt để tiếp nhận ca trực này?`,
-      okText: 'Tiếp nhận',
+      title: 'Xác nhận chuyển ca trực',
+      content: `Hệ thống sẽ chốt doanh thu ca hiện tại và chuyển ca trực cho ${nextStaff.name}. Bạn có chắc chắn?`,
+      okText: 'Chuyển ca',
       cancelText: 'Hủy',
       onOk() {
         setIsHandoverProcessing(true);
         return new Promise(resolve => {
           setTimeout(() => {
             setIsHandoverProcessing(false);
-            setShiftState('active');
-            setCurrentUser({...nextStaff, shift: 'Sáng', station: "Làn Ra 02 (T-OUT-02)"});
-            setShiftHistory(prev => [
-              { id: Date.now(), staff: nextStaff.name, shift: 'Sáng', start: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), end: '--:--', vehicles: 0, status: 'ĐANG TRỰC', isCurrent: true },
-              ...prev.map(sh => ({...sh, isCurrent: false}))
-            ]);
-            setShiftStats({ revenue: 0, cash: 0, transfer: 0, transactions: 0 });
-            setChecks({ printer: false, camera: false, gate: false });
-            setSelectedStaffId('');
-            notification.success({ message: 'Tiếp nhận ca thành công', description: `Ca trực mới đã bắt đầu cho ${nextStaff.name}.`, placement: 'topRight' });
-            resolve();
-          }, 1500);
-        });
-      }
-    });
-  };
+            
+            // 1. Chốt lịch sử ca cũ
+            setShiftHistory(prev => {
+              const newHistory = [...prev];
+              if (newHistory.length > 0 && newHistory[0].status === 'ĐANG TRỰC') {
+                newHistory[0].status = 'HOÀN THÀNH';
+                newHistory[0].end = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                newHistory[0].vehicles = shiftStats.transactions;
+                newHistory[0].isCurrent = false;
+              }
+              // Thêm ca mới vào đầu danh sách
+              return [
+                { id: Date.now(), staff: nextStaff.name, shift: 'Sáng', start: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), end: '--:--', vehicles: 0, status: 'ĐANG TRỰC', isCurrent: true },
+                ...newHistory
+              ];
+            });
 
-  const handleHandover = () => {
-    Modal.confirm({
-      title: 'Xác nhận bàn giao ca',
-      content: 'Hệ thống sẽ chốt doanh thu và in báo cáo bàn giao. Bạn có chắc chắn?',
-      okText: 'Bàn giao & In',
-      cancelText: 'Hủy',
-      okButtonProps: { danger: true },
-      onOk() {
-        setShiftState('handed_over');
-        setShiftHistory(prev => {
-          const newHistory = [...prev];
-          if (newHistory.length > 0 && newHistory[0].status === 'ĐANG TRỰC') {
-            newHistory[0].status = 'HOÀN THÀNH';
-            newHistory[0].end = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-            newHistory[0].vehicles = shiftStats.transactions;
-            newHistory[0].isCurrent = false;
-          }
-          return newHistory;
+            // 2. Chuyển người dùng hiện tại
+            setCurrentUser({...nextStaff, shift: 'Sáng', station: "Làn Ra 02 (T-OUT-02)"});
+
+            // 3. Reset thống kê
+            setShiftStats({ revenue: 0, cash: 0, transfer: 0, transactions: 0 });
+            
+            // 4. Reset form
+            setSelectedStaffId('');
+            
+            notification.success({ 
+              message: 'Chuyển ca thành công', 
+              description: `Ca trực mới đã bắt đầu cho ${nextStaff.name}. Thống kê đã được làm mới!`, 
+              placement: 'topRight' 
+            });
+            resolve();
+          }, 1000);
         });
-        notification.success({ message: 'Bàn giao thành công', description: 'Đang in báo cáo chốt ca... Vui lòng chọn nhân viên tiếp nhận.', placement: 'topRight' });
       }
     });
   };
@@ -143,47 +140,21 @@ export const StaffSettings = () => {
                 </div>
               </div>
 
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">NHÂN VIÊN TIẾP NHẬN</div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">CHỌN CA TIẾP NHẬN</div>
               <select 
                 value={selectedStaffId}
                 onChange={e => setSelectedStaffId(e.target.value)}
-                disabled={shiftState !== 'handed_over'}
-                className="w-full border border-slate-300 rounded-lg py-2.5 px-3 text-sm text-slate-800 font-medium bg-slate-50 mb-6 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                className="w-full border border-slate-300 rounded-lg py-2.5 px-3 text-sm text-slate-800 font-medium bg-slate-50 mb-6 focus:outline-none focus:border-blue-500"
               >
-                <option value="">-- Chọn nhân viên mới --</option>
+                <option value="">-- Chọn nhân viên nhận ca --</option>
                 {availableStaff.filter(s => s.id !== currentUser.id).map(s => (
                   <option key={s.id} value={s.id}>{s.name} ({s.id})</option>
                 ))}
               </select>
 
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">KIỂM TRA THIẾT BỊ (NHÂN VIÊN MỚI)</div>
-              <div className="flex flex-col gap-3 mb-8">
-                <label className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); setChecks(p => ({...p, printer: !p.printer})); }}>
-                  <div className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${checks.printer ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 group-hover:border-blue-500'}`}>
-                    {checks.printer && <CheckOutlined className="text-[10px]" />}
-                  </div>
-                  <span className="text-sm text-slate-700">Máy in hoạt động tốt</span>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); setChecks(p => ({...p, camera: !p.camera})); }}>
-                  <div className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${checks.camera ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 group-hover:border-blue-500'}`}>
-                    {checks.camera && <CheckOutlined className="text-[10px]" />}
-                  </div>
-                  <span className="text-sm text-slate-700">Camera LPR rõ nét</span>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); setChecks(p => ({...p, gate: !p.gate})); }}>
-                  <div className={`w-4 h-4 border rounded flex items-center justify-center transition-colors ${checks.gate ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 group-hover:border-blue-500'}`}>
-                    {checks.gate && <CheckOutlined className="text-[10px]" />}
-                  </div>
-                  <span className="text-sm text-slate-700">Cổng chắn (Gate) ổn định</span>
-                </label>
-              </div>
-
               <div className="mt-auto flex flex-col gap-3">
-                <button onClick={handleTakeover} disabled={isHandoverProcessing || !allChecked || shiftState === 'active'} className="w-full bg-[#0f172a] hover:bg-slate-800 text-white font-bold py-3 rounded-lg text-xs tracking-wide transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                  {isHandoverProcessing && <LoadingOutlined spin />} TIẾP NHẬN CA (NV MỚI)
-                </button>
-                <button onClick={handleHandover} disabled={shiftState === 'handed_over'} className="w-full bg-white hover:bg-red-50 text-red-600 border border-red-200 font-bold py-3 rounded-lg text-xs tracking-wide transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                  XÁC NHẬN BÀN GIAO
+                <button onClick={handleHandover} disabled={isHandoverProcessing || !selectedStaffId} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-sm tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm">
+                  {isHandoverProcessing && <LoadingOutlined spin />} TIẾN HÀNH CHUYỂN CA
                 </button>
               </div>
             </div>

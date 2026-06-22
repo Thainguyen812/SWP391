@@ -888,6 +888,7 @@ public class ParkingServiceImpl implements ParkingService {
 
         auditLogRepository.save(audit);
     }
+
     @Override
     @Transactional
     public Transaction checkoutCardByCode(String cardCode) {

@@ -28,7 +28,7 @@ public class VipSubscription {
     private Status status;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "document_photos")
+    @Column(name = "document_photos", columnDefinition = "jsonb")
     private String documentPhotos;
 
     @Column(name = "approved_by")

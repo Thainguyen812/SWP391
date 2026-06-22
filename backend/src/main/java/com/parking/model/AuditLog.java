@@ -25,11 +25,11 @@ public class AuditLog {
     private UUID entityId;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "old_value")
+    @Column(name = "old_value", columnDefinition = "jsonb")
     private String oldValue;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "new_value")
+    @Column(name = "new_value", columnDefinition = "jsonb")
     private String newValue;
 
     @Column(name = "ip_address")

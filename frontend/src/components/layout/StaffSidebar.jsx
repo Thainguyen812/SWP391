@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
+import { useGlobalContext } from '../../context/GlobalContext';
 import { 
   AppstoreOutlined, 
   VideoCameraOutlined, 
@@ -30,15 +31,19 @@ const navItems = [
 export const StaffSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { currentUser } = useGlobalContext();
 
-  // Try to get user data for bottom section
-  let userName = "Nguyễn Văn A";
-  let userShift = "CA SÁNG (06:00 - 14:00)";
+  // Try to get user data from localStorage for fallback, else use GlobalContext
+  let userName = currentUser?.name || "Nguyễn Văn A";
+  let shiftName = currentUser?.shift?.toUpperCase() || "SÁNG";
+  let userShift = `CA ${shiftName}`;
+  let userAvatar = currentUser?.avatar || "";
+
   try {
     const userStr = localStorage.getItem('user');
     if (userStr) {
       const user = JSON.parse(userStr);
-      if (user.fullName) userName = user.fullName;
+      if (user.fullName && !currentUser) userName = user.fullName;
     }
   } catch (e) {}
 
@@ -82,7 +87,13 @@ export const StaffSidebar = () => {
       {/* Bottom Area: User Info */}
       <div className="border-t border-white/20 p-5 mt-auto flex-shrink-0">
         <div className="flex items-center gap-4 mb-6 px-1">
-          <div className="w-12 h-12 rounded-[14px] border border-white/30 bg-transparent flex-shrink-0"></div>
+          {userAvatar ? (
+            <img src={userAvatar} alt="avatar" className="w-12 h-12 rounded-[14px] border border-white/30 object-cover flex-shrink-0 shadow-md" />
+          ) : (
+            <div className="w-12 h-12 rounded-[14px] border border-white/30 bg-slate-800 flex items-center justify-center flex-shrink-0 shadow-md">
+              <UserOutlined className="text-white text-xl" />
+            </div>
+          )}
           <div className="flex flex-col min-w-0">
             <span className="text-base font-bold text-white leading-tight truncate">{userName}</span>
             <span className="text-[10px] text-slate-400 uppercase tracking-wider mt-1 truncate">{userShift}</span>
@@ -90,10 +101,13 @@ export const StaffSidebar = () => {
         </div>
 
         <div className="flex flex-col mt-2 px-1 gap-1">
-          <button className="sidebar-bottom-item bg-transparent border-0 cursor-pointer text-left w-full text-slate-300 hover:text-white hover:bg-white/5 rounded-lg">
+          <Link 
+            to="/staff-support"
+            className={`sidebar-bottom-item border-0 cursor-pointer text-left w-full rounded-lg ${location.pathname === '/staff-support' ? 'bg-blue-600 text-white' : 'bg-transparent text-slate-300 hover:text-white hover:bg-white/5'}`}
+          >
             <QuestionCircleOutlined className="sidebar-bottom-icon" />
             <span className="sidebar-bottom-label ml-1">Hỗ trợ</span>
-          </button>
+          </Link>
           <button onClick={handleLogout} className="sidebar-bottom-item bg-transparent border-0 cursor-pointer text-left w-full text-slate-300 hover:text-white hover:bg-white/5 rounded-lg">
             <LogoutOutlined className="sidebar-bottom-icon" />
             <span className="sidebar-bottom-label ml-1">Đăng xuất</span>

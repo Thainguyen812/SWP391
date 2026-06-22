@@ -9,11 +9,12 @@ import {
 import { useState, useEffect } from 'react';
 import { notification, Modal, Dropdown } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import { apiClient } from '../../api/apiClient';
 import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffGateControl = () => {
   const navigate = useNavigate();
-  const { addActivityLog, activeVehicles, currentVehicle, setCurrentVehicle } = useGlobalContext();
+  const { addActivityLog, activeVehicles, currentVehicle, setCurrentVehicle, addActiveVehicle, dailyVolume, setDailyVolume } = useGlobalContext();
   const [isEmergency, setIsEmergency] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('Tất cả');
@@ -23,6 +24,151 @@ export const StaffGateControl = () => {
     "[WARN] Cảm biến làn L-IN-02 có độ trễ 200ms",
     "[INFO] Hệ thống: Sẵn sàng."
   ]);
+
+  const [manualPlate, setManualPlate] = useState('');
+  const [manualCardCode, setManualCardCode] = useState('');
+  const [manualType, setManualType] = useState('Ô tô gầm thấp 4-5 chỗ');
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+
+  // AI Simulator State
+  const [isAiModalVisible, setIsAiModalVisible] = useState(false);
+  const [aiPlate, setAiPlate] = useState('30G-123.45');
+  const [aiConfidence, setAiConfidence] = useState(98.5);
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
+  const [aiImagePreview, setAiImagePreview] = useState('https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80');
+
+  const handleAiImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setAiImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleManualCheckIn = async () => {
+    if (!manualPlate || !manualCardCode) {
+      notification.error({ message: 'Lỗi', description: 'Vui lòng nhập đầy đủ biển số xe và mã thẻ!' });
+      return;
+    }
+    setIsCheckingIn(true);
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      // Map local Vietnamese labels to backend allowed_sizes
+      let mappedType = 'SEDAN_HATCHBACK';
+      if (manualType === 'Ô tô gầm thấp 4-5 chỗ') mappedType = 'SEDAN_HATCHBACK';
+      if (manualType === 'Ô tô gầm cao 5-7 chỗ') mappedType = 'SUV_CUV_MPV';
+      if (manualType === 'Xe điện (EV)') mappedType = 'EV_CAR';
+      if (manualType === 'Xe cỡ lớn / Van') mappedType = 'LARGE_VAN_MINIBUS';
+
+      // Using apiClient so the Bearer token is automatically attached!
+      const response = await apiClient.post(`/v1/parking/check-in/visitor`, {
+        plate: manualPlate,
+        vehicle_type: mappedType,
+        card_code: manualCardCode,
+        image_url: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80'
+      });
+      notification.success({ message: 'Thành công', description: `Đã check-in cho xe ${manualPlate} với thẻ ${manualCardCode}` });
+      addLog(`[MANUAL_CHECKIN] Success: Plate ${manualPlate}, Type: ${manualType}, Card: ${manualCardCode}`, 'SUCCESS');
+      
+      // Update Global Context so dashboard and history update instantly
+      addActivityLog({
+        plate: manualPlate,
+        model: manualType,
+        type: "VÃNG LAI",
+        gate: "MANUAL",
+        action: "Vào Cổng",
+        time: "Vừa xong",
+        status: "Thành Công",
+        typeColor: "text-blue-600",
+        statusColor: "bg-emerald-100 text-emerald-700",
+        actionColor: "text-emerald-600"
+      });
+
+      // Update real-time table gates
+      addActiveVehicle({
+        id: Date.now(), // Temporary random ID for frontend tracking
+        plate: manualPlate,
+        type: "Vãng lai",
+        confidence: "100%",
+        status: "Hợp lệ",
+        gate: "L-VÀO 1", // Mocking physical gate for the manual operation
+        inTime: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}),
+        outTime: "--:--",
+        image: "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80",
+        model: manualType,
+        duration: "Đang vào"
+      });
+      
+      // Tăng biến đếm tổng lượt lên 1
+      setDailyVolume(prev => prev + 1);
+
+      setManualPlate('');
+      setManualCardCode('');
+    } catch (err) {
+      console.error(err);
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || 'Không thể check-in lúc này';
+      notification.error({ message: 'Thất bại', description: errorMsg });
+      addLog(`[ERROR] Check-in thất bại: ${errorMsg}`, 'ERROR');
+    } finally {
+      setIsCheckingIn(false);
+    }
+  };
+
+  const handleAiCheckIn = async () => {
+    if (!aiPlate) {
+      notification.error({ message: 'Lỗi', description: 'Vui lòng nhập biển số xe!' });
+      return;
+    }
+    setIsAiProcessing(true);
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      
+      const response = await apiClient.post(`/v1/parking/check-in/ai`, {
+        plate: aiPlate.toUpperCase(),
+        vehicle_type: 'SEDAN_HATCHBACK',
+        camera_id: "CAM-01-IN",
+        confidence_score: parseFloat(aiConfidence),
+        image_url: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80'
+      });
+      
+      notification.success({ message: 'AI Nhận diện Thành công', description: `Biển số ${aiPlate} hợp lệ.` });
+      addLog(`[AI_LPR] Success: Plate ${aiPlate}, Conf: ${aiConfidence}%`, 'OK');
+      setIsAiModalVisible(false);
+      setAiPlate('');
+      setAiConfidence(98.5);
+      
+      addActivityLog({
+        plate: aiPlate,
+        model: "Nhận diện Camera",
+        type: "VIP",
+        gate: "CAM-01-IN",
+        action: "Vào Cổng (AI)",
+        time: "Vừa xong",
+        status: "Thành Công",
+        typeColor: "text-amber-600",
+        statusColor: "bg-emerald-100 text-emerald-700",
+        actionColor: "text-emerald-600"
+      });
+      setDailyVolume(prev => prev + 1);
+
+    } catch (err) {
+      console.error(err);
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || 'AI Nhận diện thất bại';
+      // MÔ PHỎNG LOGIC NGOẠI LỆ < 70%
+      if (aiConfidence < 70 || errorMsg.includes("mờ")) {
+         notification.warning({ 
+           message: 'Cảnh báo AI', 
+           description: errorMsg,
+           duration: 8
+         });
+         addLog(`[AI_LPR] Failed: Conf ${aiConfidence}%. Reason: ${errorMsg}`, 'WARN');
+      } else {
+         notification.error({ message: 'Lỗi', description: errorMsg });
+         addLog(`[ERROR] AI Check-in: ${errorMsg}`, 'ERROR');
+      }
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
 
   const [gates, setGates] = useState([]);
 
@@ -200,7 +346,7 @@ export const StaffGateControl = () => {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
           <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Tổng lượt vào/ra hôm nay</h4>
           <div className="flex items-baseline gap-3">
-            <span className="text-4xl font-extrabold text-slate-800">1,284</span>
+            <span className="text-4xl font-extrabold text-slate-800">{dailyVolume.toLocaleString()}</span>
             <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded">+12%</span>
           </div>
         </div>
@@ -411,6 +557,61 @@ export const StaffGateControl = () => {
                   </div>
                 </div>
               ))}
+              <button 
+                onClick={() => setIsAiModalVisible(true)}
+                className="mt-1 w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 px-4 rounded transition-colors flex items-center justify-center gap-2 text-xs uppercase tracking-wider shadow-sm"
+              >
+                <VideoCameraOutlined /> MÔ PHỎNG LPR CAMERA
+              </button>
+            </div>
+          </div>
+
+          {/* Manual Check-In */}
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col p-4 mb-6">
+            <h3 className="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wider flex items-center gap-2">
+              <CheckCircleFilled className="text-emerald-500" /> Nhập xe thủ công
+            </h3>
+            <div className="flex flex-col gap-3">
+              <input 
+                type="text" 
+                placeholder="Biển số xe (VD: 30A-123.45)" 
+                value={manualPlate}
+                onChange={(e) => setManualPlate(e.target.value)}
+                className="border border-slate-200 p-2 rounded text-sm focus:outline-none focus:border-blue-500 uppercase"
+              />
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  placeholder="Mã thẻ (Quẹt thẻ...)" 
+                  value={manualCardCode}
+                  onChange={(e) => setManualCardCode(e.target.value)}
+                  className="border border-slate-200 p-2 rounded text-sm focus:outline-none focus:border-blue-500 flex-1"
+                />
+                <button 
+                  onClick={() => setManualCardCode(String(Math.floor(Math.random() * 50) + 1).padStart(6, '0'))}
+                  title="Giả lập máy quét thẻ"
+                  className="bg-slate-100 border border-slate-200 px-3 rounded text-xs font-semibold text-slate-600 hover:bg-slate-200 transition-colors flex items-center gap-1"
+                >
+                  💳 Quét mẫu
+                </button>
+              </div>
+              <select 
+                value={manualType} 
+                onChange={(e) => setManualType(e.target.value)}
+                className="border border-slate-200 p-2 rounded text-sm focus:outline-none focus:border-blue-500"
+              >
+                <option value="Ô tô gầm thấp 4-5 chỗ">Ô tô gầm thấp 4-5 chỗ (Sedan/Hatchback)</option>
+                <option value="Ô tô gầm cao 5-7 chỗ">Ô tô gầm cao 5-7 chỗ (SUV/CUV/MPV)</option>
+                <option value="Xe điện (EV)">Xe điện (EV)</option>
+                <option value="Xe cỡ lớn / Van">Xe cỡ lớn / Van (Minibus 16c/Tải van)</option>
+              </select>
+              <button 
+                onClick={handleManualCheckIn}
+                disabled={isCheckingIn}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors disabled:bg-blue-400"
+              >
+                {isCheckingIn ? 'Đang xử lý...' : 'CHECK-IN KHÁCH'}
+              </button>
             </div>
           </div>
 
@@ -432,6 +633,71 @@ export const StaffGateControl = () => {
         </div>
       </div>
       
+      {/* AI LPR Simulator Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-slate-800 uppercase tracking-wider font-bold">
+            <VideoCameraOutlined className="text-blue-600" /> Mô phỏng AI LPR Scanner
+          </div>
+        }
+        open={isAiModalVisible}
+        onCancel={() => setIsAiModalVisible(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <div className="flex flex-col gap-5 mt-4">
+          {/* Mock Camera Image Area */}
+          <label htmlFor="ai-image-upload" className="border-2 border-dashed border-slate-300 rounded-lg p-2 flex flex-col items-center justify-center bg-slate-50 relative overflow-hidden group cursor-pointer hover:border-blue-400 transition-colors">
+             <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+             <img src={aiImagePreview} alt="Xe mẫu" className="w-full h-40 object-cover rounded mb-2 opacity-80" />
+             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider absolute bottom-4 bg-white/80 px-3 py-1 rounded backdrop-blur-sm group-hover:text-blue-600 transition-colors shadow-sm">TẢI ẢNH XE LÊN (BẤM ĐỂ CHỌN)</span>
+             <input type="file" id="ai-image-upload" accept="image/*" className="hidden" onChange={handleAiImageUpload} />
+          </label>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nhận diện Biển số</label>
+            <input 
+              type="text" 
+              value={aiPlate}
+              onChange={(e) => setAiPlate(e.target.value)}
+              className="w-full border border-slate-300 p-3 rounded-lg font-mono text-xl text-slate-800 font-bold focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 uppercase text-center"
+              placeholder="VD: 30G-123.45"
+            />
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex justify-between items-center">
+              <span>Độ tin cậy (Confidence Score)</span>
+              <span className={`text-base ${aiConfidence < 70 ? 'text-red-500' : 'text-emerald-500'}`}>{aiConfidence}%</span>
+            </label>
+            <input 
+              type="range" 
+              min="0" max="100" step="0.1"
+              value={aiConfidence}
+              onChange={(e) => setAiConfidence(e.target.value)}
+              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            />
+            {aiConfidence < 70 ? (
+              <p className="text-[11px] text-red-500 mt-3 font-semibold flex items-center gap-1 bg-red-50 p-2 rounded">
+                <ExclamationCircleFilled /> Hệ thống Backend sẽ từ chối nhận diện do độ tin cậy dưới ngưỡng (70%).
+              </p>
+            ) : (
+              <p className="text-[11px] text-emerald-600 mt-3 font-semibold flex items-center gap-1 bg-emerald-50 p-2 rounded">
+                <CheckCircleFilled /> Độ tin cậy đạt yêu cầu để mở cổng tự động.
+              </p>
+            )}
+          </div>
+
+          <button
+            onClick={handleAiCheckIn}
+            disabled={isAiProcessing}
+            className={`w-full font-bold py-3.5 px-4 rounded-lg transition-colors shadow-md mt-2 flex items-center justify-center gap-2 uppercase tracking-wider ${aiConfidence < 70 ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-500/20' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20'} disabled:opacity-70`}
+          >
+            {isAiProcessing ? 'Đang gửi Backend xử lý...' : (aiConfidence < 70 ? 'Quét (Bị từ chối)' : 'Quét Camera LPR')}
+          </button>
+        </div>
+      </Modal>
+
     </div>
   );
 };

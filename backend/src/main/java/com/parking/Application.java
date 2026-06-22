@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-@Import(SecurityConfig.class) //ÉP BUỘC: Bắt Spring Boot phải nuốt file SecurityConfig này vào chạy
+@Import(SecurityConfig.class) // ÉP BUỘC: Bắt Spring Boot phải nuốt file SecurityConfig này vào chạy
 @EnableScheduling
 public class Application {
     @jakarta.annotation.PostConstruct

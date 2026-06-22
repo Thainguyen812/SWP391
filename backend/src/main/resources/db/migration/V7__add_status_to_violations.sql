@@ -1,0 +1,1 @@
+ALTER TABLE parking_violations ADD COLUMN status VARCHAR(20) DEFAULT 'PENDING';

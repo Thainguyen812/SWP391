@@ -3,15 +3,15 @@ import MainLayout from './components/layout/MainLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AuthPage } from './components/auth/AuthPage';
 import { authService } from './services/authService';
-import { SystemOverviewSection } from './components/dashboard/Dashboard_Main';
-import { MonitoringPage } from './components/monitoring/Monitoring_Main';
-import { RevenuePage } from './components/revenue/Revenue_Main';
-import { CustomerPage } from './components/customers/Customer_Main';
-import { SettingsMain } from './components/settings/Settings_Main';
-import { PersonnelMain } from './components/personnel/Personnel_Main';
-import { SecurityMain } from './components/security/Security_Main';
-import { LogsMain } from './components/logs/Logs_Main';
-import { TransactionHistory } from './components/transactions/TransactionHistory';
+import { SystemOverviewSection } from './components/manager/dashboard/Dashboard_Main';
+import { MonitoringPage } from './components/manager/monitoring/Monitoring_Main';
+import { RevenuePage } from './components/manager/revenue/Revenue_Main';
+import { CustomerPage } from './components/manager/customers/Customer_Main';
+import { SettingsMain } from './components/manager/settings/Settings_Main';
+import { PersonnelMain } from './components/manager/personnel/Personnel_Main';
+import { SecurityMain } from './components/manager/security/Security_Main';
+import { LogsMain } from './components/manager/logs/Logs_Main';
+import { TransactionHistory } from './components/manager/transactions/TransactionHistory';
 import { StaffDashboard } from './components/staff/StaffDashboard';
 import { StaffGateControl } from './components/staff/StaffGateControl';
 import { StaffPayment } from './components/staff/StaffPayment';
@@ -19,6 +19,7 @@ import { StaffMonitoring } from './components/staff/StaffMonitoring';
 import { StaffSecurityAlerts } from './components/staff/StaffSecurityAlerts';
 import { StaffLostCard } from './components/staff/StaffLostCard';
 import { StaffSettings } from './components/staff/StaffSettings';
+import { StaffSupport } from './components/staff/StaffSupport';
 import StaffLayout from './components/layout/StaffLayout';
 import { DriverPwa } from './components/driver/DriverPwa';
 import { useNavigate } from 'react-router-dom';
@@ -177,12 +178,9 @@ function App() {
         <Route path="/staff-lost-card" element={
           <StaffProtectedPage><StaffLostCard /></StaffProtectedPage>
         } />
-        <Route path="/staff-transactions" element={
-          <StaffProtectedPage><TransactionHistory /></StaffProtectedPage>
-        } />
-        <Route path="/staff-settings" element={
-          <StaffProtectedPage><StaffSettings /></StaffProtectedPage>
-        } />
+        <Route path="/staff-transactions" element={<StaffProtectedPage><TransactionHistory /></StaffProtectedPage>} />
+        <Route path="/staff-settings" element={<StaffProtectedPage><StaffSettings /></StaffProtectedPage>} />
+        <Route path="/staff-support" element={<StaffProtectedPage><StaffSupport /></StaffProtectedPage>} />
 
         {/* Nhóm Khách hàng (Driver) */}
         <Route path="/driver" element={
