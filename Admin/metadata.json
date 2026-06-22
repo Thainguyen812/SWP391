@@ -1,6 +1,0 @@
-{
-  "name": "UrbanPark User Portal",
-  "description": "Cổng thông tin đăng ký tài xế và hệ thống quản lý cơ sở hạ tầng đô thị thông minh UrbanPark",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
