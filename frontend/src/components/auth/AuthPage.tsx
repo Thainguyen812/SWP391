@@ -20,10 +20,53 @@ import { OtpInput } from './old/OtpInput';
 import { Toast, ToastMessage } from './old/Toast';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
+import { Modal } from 'antd';
 
 
 export const AuthPage = () => {
   const navigate = useNavigate();
+  
+  const showTermsModal = () => {
+    Modal.info({
+      title: 'Điều khoản dịch vụ - UrbanPark',
+      content: (
+        <div className="text-sm text-slate-600 mt-4 h-64 overflow-y-auto pr-2">
+          <p className="mb-2 font-bold text-slate-800">1. Chấp nhận điều khoản</p>
+          <p className="mb-4">Bằng việc đăng ký tài khoản UrbanPark, bạn đồng ý tuân thủ các quy định về việc sử dụng bãi đỗ xe thông minh của chúng tôi.</p>
+          <p className="mb-2 font-bold text-slate-800">2. Trách nhiệm của chủ phương tiện</p>
+          <p className="mb-4">Chủ phương tiện phải đỗ xe đúng nơi quy định, tự bảo quản tư trang cá nhân. Ban quản lý không chịu trách nhiệm đối với các mất mát tài sản để trong xe.</p>
+          <p className="mb-2 font-bold text-slate-800">3. Phí đỗ xe và Thanh toán</p>
+          <p className="mb-4">Phí đỗ xe được tính theo bảng giá niêm yết hiện hành. Khách hàng có trách nhiệm thanh toán đầy đủ qua các hình thức khả dụng trước khi xe rời bãi.</p>
+          <p className="mb-2 font-bold text-slate-800">4. Quy định an toàn</p>
+          <p className="mb-4">Tuân thủ nghiêm ngặt các quy định về phòng cháy chữa cháy, tốc độ tối đa 5km/h trong khuôn viên bãi đỗ xe.</p>
+        </div>
+      ),
+      width: 500,
+      okText: 'Đã hiểu',
+      centered: true,
+      maskClosable: true,
+    });
+  };
+
+  const showPrivacyModal = () => {
+    Modal.info({
+      title: 'Chính sách bảo mật - UrbanPark',
+      content: (
+        <div className="text-sm text-slate-600 mt-4 h-64 overflow-y-auto pr-2">
+          <p className="mb-2 font-bold text-slate-800">1. Thu thập dữ liệu</p>
+          <p className="mb-4">Hệ thống LPR (Nhận diện biển số) sẽ tự động ghi hình và trích xuất biển số xe của bạn khi ra vào bãi đỗ để phục vụ việc tính phí và đảm bảo an ninh.</p>
+          <p className="mb-2 font-bold text-slate-800">2. Bảo vệ thông tin cá nhân</p>
+          <p className="mb-4">Thông tin cá nhân (SĐT, Tên) và dữ liệu lịch sử xe ra vào của bạn được mã hóa an toàn và chỉ sử dụng cho mục đích vận hành bãi đỗ xe.</p>
+          <p className="mb-2 font-bold text-slate-800">3. Chia sẻ dữ liệu</p>
+          <p className="mb-4">Chúng tôi cam kết không bán hoặc chia sẻ dữ liệu của bạn cho bên thứ 3 với mục đích thương mại. Dữ liệu chỉ cung cấp cho cơ quan chức năng khi có yêu cầu hợp pháp.</p>
+        </div>
+      ),
+      width: 500,
+      okText: 'Đã hiểu',
+      centered: true,
+      maskClosable: true,
+    });
+  };
   // User Session Management
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -58,7 +101,15 @@ export const AuthPage = () => {
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Forgot Password values
+  const [forgotPhone, setForgotPhone] = useState('');
+  const [forgotPass, setForgotPass] = useState('');
+  const [forgotConfirmPass, setForgotConfirmPass] = useState('');
+  const [showForgotPass, setShowForgotPass] = useState(false);
+  const [showForgotConfirmPass, setShowForgotConfirmPass] = useState(false);
 
   // Handle countdown trigger for simulated SMS OTP
   useEffect(() => {
@@ -199,7 +250,36 @@ export const AuthPage = () => {
     }
   };
 
-  // Handle Mock Login Submission
+  // Handle Forgot Password Submission
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (!forgotPhone) {
+      showNotification('Vui lòng điền số điện thoại', 'error');
+      return;
+    }
+    if (!forgotPass || forgotPass.length < 6) {
+      showNotification('Mật khẩu mới phải có ít nhất 6 ký tự', 'error');
+      return;
+    }
+    if (forgotPass !== forgotConfirmPass) {
+      showNotification('Mật khẩu xác nhận không khớp', 'error');
+      return;
+    }
+
+    setIsSubmitting(true);
+    // Mock API call to reset password
+    await new Promise(resolve => setTimeout(resolve, 800));
+    setIsSubmitting(false);
+
+    showNotification('Khôi phục mật khẩu thành công! Bạn có thể đăng nhập ngay bây giờ.', 'success');
+    
+    // Reset form and go back to login
+    setForgotPhone('');
+    setForgotPass('');
+    setForgotConfirmPass('');
+    setIsForgotPassword(false);
+    setIsSignUp(false);
+  };
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     if (!signPhone) {
@@ -413,6 +493,94 @@ export const AuthPage = () => {
                   </button>
                 </div>
               </motion.div>
+            ) : isForgotPassword ? (
+              /* FORGOT PASSWORD FLOW */
+              <motion.form
+                key="forgot-password-form"
+                onSubmit={handleForgotPasswordSubmit}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4"
+              >
+                <div className="mb-6">
+                  <h2 className="text-slate-900 text-3xl font-extrabold tracking-tight">
+                    Khôi phục mật khẩu
+                  </h2>
+                  <p className="text-[14px] text-slate-500 mt-1 leading-relaxed">
+                    Xác minh số điện thoại để đặt lại mật khẩu mới cho tài khoản của bạn.
+                  </p>
+                </div>
+
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <InputField
+                      id="forgot-phone"
+                      label="SỐ ĐIỆN THOẠI ĐÃ ĐĂNG KÝ"
+                      placeholder="090 123 4567"
+                      type="tel"
+                      value={forgotPhone}
+                      onChange={(e) => setForgotPhone(e.target.value)}
+                      icon={<Smartphone className="w-4 h-4" />}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <button 
+                    type="button" 
+                    className="h-[42px] px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm whitespace-nowrap mb-[2px]"
+                  >
+                    Nhận mã OTP
+                  </button>
+                </div>
+
+                <InputField
+                  id="forgot-pass"
+                  label="MẬT KHẨU MỚI"
+                  placeholder="Nhập mật khẩu mới ít nhất 6 ký tự"
+                  type={showForgotPass ? "text" : "password"}
+                  value={forgotPass}
+                  onChange={(e) => setForgotPass(e.target.value)}
+                  icon={<Lock className="w-4 h-4" />}
+                  rightIcon={showForgotPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  onRightIconClick={() => setShowForgotPass(!showForgotPass)}
+                  disabled={isSubmitting}
+                />
+
+                <InputField
+                  id="forgot-confirm-pass"
+                  label="XÁC NHẬN MẬT KHẨU MỚI"
+                  placeholder="Nhập lại mật khẩu mới"
+                  type={showForgotConfirmPass ? "text" : "password"}
+                  value={forgotConfirmPass}
+                  onChange={(e) => setForgotConfirmPass(e.target.value)}
+                  icon={<Lock className="w-4 h-4" />}
+                  rightIcon={showForgotConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  onRightIconClick={() => setShowForgotConfirmPass(!showForgotConfirmPass)}
+                  disabled={isSubmitting}
+                />
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-[#051424] hover:bg-[#0c233e] text-white font-semibold py-3.5 mt-2 rounded-lg tracking-wider text-sm transition-all focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 active:scale-[0.99] uppercase shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isSubmitting ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    'KHÔI PHỤC MẬT KHẨU'
+                  )}
+                </button>
+
+                <div className="text-center pt-4">
+                  <span 
+                    onClick={() => setIsForgotPassword(false)}
+                    className="text-slate-500 hover:text-slate-800 text-sm font-medium cursor-pointer flex items-center justify-center gap-1 inline-flex"
+                  >
+                    <ArrowLeft className="w-4 h-4" /> Quay lại đăng nhập
+                  </span>
+                </div>
+              </motion.form>
             ) : isSignUp ? (
               
               /* SIGN UP FLOW (Exactly matches image layout fields) */
@@ -568,9 +736,9 @@ export const AuthPage = () => {
                     />
                     <label htmlFor="reg-agree" className="text-[13px] text-slate-600 leading-normal select-none">
                       Tôi đồng ý với{' '}
-                      <span className="text-blue-600 hover:underline cursor-pointer">Điều khoản dịch vụ</span>
+                      <span onClick={showTermsModal} className="text-blue-600 hover:underline cursor-pointer">Điều khoản dịch vụ</span>
                       {' '}và{' '}
-                      <span className="text-blue-600 hover:underline cursor-pointer">Chính sách bảo mật</span>
+                      <span onClick={showPrivacyModal} className="text-blue-600 hover:underline cursor-pointer">Chính sách bảo mật</span>
                       {' '}của UrbanPark.
                     </label>
                   </div>
@@ -658,7 +826,14 @@ export const AuthPage = () => {
                     <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                     Ghi nhớ đăng nhập
                   </label>
-                  <span className="text-blue-600 hover:underline cursor-pointer font-medium">Quên mật khẩu?</span>
+                  <span 
+                    onClick={() => {
+                      setIsForgotPassword(true);
+                    }}
+                    className="text-blue-600 hover:underline cursor-pointer font-medium"
+                  >
+                    Quên mật khẩu?
+                  </span>
                 </div>
 
                 <button

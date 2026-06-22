@@ -79,7 +79,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'vnpay'>('wallet');
   const [balance, setBalance] = useState<number>(() => {
     const saved = localStorage.getItem('urbanpark_user_balance');
-    return saved ? parseFloat(saved) : 45.50; // standard $45.50 as in mockup
+    return saved ? parseFloat(saved) : 0; // Default to 0 for new users
   });
 
   const [selectedVehId, setSelectedVehId] = useState<string>('veh-1');
@@ -95,28 +95,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         console.error(err);
       }
     }
-    return [
-      {
-        id: 'veh-1',
-        plate: '30G-123.45',
-        name: 'Toyota Camry',
-        type: 'Ô tô 4 chỗ',
-        regDate: '12/10/2023',
-        isActive: true,
-        image: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80',
-        isLocked: false
-      },
-      {
-        id: 'veh-2',
-        plate: '29M1-678.90',
-        name: 'Honda SH',
-        type: 'Xe máy',
-        regDate: '15/10/2023',
-        isActive: true,
-        image: '',
-        isLocked: false
-      }
-    ];
+    return [];
   });
 
   // Background synchronize with live backend
@@ -131,7 +110,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
           id: v.id || `veh-${v.plate}`,
           plate: v.plate,
           name: v.name,
-          type: v.type === 'SUV' ? 'Ô tô 4 chỗ' : v.type === 'Sedan' ? 'Ô tô 4 chỗ' : 'Xe máy',
+          type: v.type === 'SUV_CUV_MPV' ? 'Ô tô gầm cao 5-7 chỗ' : 
+                v.type === 'EV_CAR' ? 'Xe điện (EV)' : 
+                v.type === 'LARGE_VAN_MINIBUS' ? 'Xe cỡ lớn / Van' : 
+                'Ô tô gầm thấp 4-5 chỗ',
           regDate: '12/10/2023',
           isActive: true,
           image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
@@ -164,31 +146,26 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         console.error(err);
       }
     }
-    return [
-      { id: 'TXN-9821', date: '24/10/2023 14:30', type: 'Vé ngày', plate: '29A-123.45', fee: '$5.50', isEntry: false, status: 'Thành công' },
-      { id: 'TXN-9820', date: '22/10/2023 09:15', type: 'Vé tháng', plate: '30G-789.01', fee: '$120.00', isEntry: false, status: 'Thành công' },
-      { id: 'TXN-9819', date: '20/10/2023 18:45', type: 'Nạp ví', plate: '-', fee: '$50.00', isEntry: true, status: 'Đang xử lý' },
-      { id: 'TXN-9818', date: '18/10/2023 08:00', type: 'Vé ngày', plate: '29A-123.45', fee: '$3.00', isEntry: false, status: 'Thất bại' }
-    ];
+    return [];
   });
 
   // Current parked vehicle mock details
-  const [currentParked, setCurrentParked] = useState({
-    plate: '30A-123.45',
-    status: 'ĐANG ĐỖ',
-    location: 'Khu A • Tầng 2',
-    isParked: true
-  });
+  const [currentParked, setCurrentParked] = useState<{
+    plate: string;
+    status: string;
+    location: string;
+    isParked: boolean;
+  } | null>(null);
 
   // Modal controls
   const [addVehicleModalOpen, setAddVehicleModalOpen] = useState(false);
   const [newPlate, setNewPlate] = useState('');
   const [newName, setNewName] = useState('');
-  const [newType, setNewType] = useState('Ô tô 4 chỗ');
+  const [newType, setNewType] = useState('Ô tô gầm thấp 4-5 chỗ');
 
   // VIP Step Subscription State
   const [regStep, setRegStep] = useState<1 | 2 | 3>(2); // Default on select package for full mockup fidelity
-  const [selectedVehicleForVIP, setSelectedVehicleForVIP] = useState('30A-123.45');
+  const [selectedVehicleForVIP, setSelectedVehicleForVIP] = useState('');
   const [selectedPackPrice, setSelectedPackPrice] = useState<number>(1000000); // 1,000,000₫ for monthly VIP
   const [selectedPackLabel, setSelectedPackLabel] = useState('Thẻ Tháng VIP');
   const [vnpayBank, setVnpayBank] = useState('Vietcombank');
@@ -249,6 +226,18 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   useEffect(() => {
     localStorage.setItem('urbanpark_user_transactions', JSON.stringify(transactions));
   }, [transactions]);
+
+  // Auto-select first vehicle for VIP reg if none is selected or selection is invalid
+  useEffect(() => {
+    if (vehicles.length > 0) {
+      const isSelectedValid = vehicles.some(v => v.plate === selectedVehicleForVIP);
+      if (!isSelectedValid) {
+        setSelectedVehicleForVIP(vehicles[0].plate);
+      }
+    } else {
+      setSelectedVehicleForVIP('');
+    }
+  }, [vehicles, selectedVehicleForVIP]);
 
   // Audio synthezised siren
   const startSiren = () => {
@@ -1017,18 +1006,26 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           <span className="text-[10px] font-black uppercase text-slate-400">TRỌNG ĐIỂM GIÁM SÁT</span>
                           <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Trạng Thái Hiện Tại</h3>
                         </div>
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 text-[#10b981] font-bold text-xs rounded-full uppercase tracking-wide">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          ĐANG ĐỖ
-                        </span>
+                        {currentParked ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 text-[#10b981] font-bold text-xs rounded-full uppercase tracking-wide">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            ĐANG ĐỖ
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 border border-slate-200 text-slate-500 font-bold text-xs rounded-full uppercase tracking-wide">
+                            TRỐNG
+                          </span>
+                        )}
                       </div>
 
-                      <p className="text-slate-500 text-xs mt-3">Xe đang đỗ trong cơ sở bãi đỗ thông minh</p>
+                      <p className="text-slate-500 text-xs mt-3">
+                        {currentParked ? "Xe đang đỗ trong cơ sở bãi đỗ thông minh" : "Hiện tại không có xe nào đang đỗ trong bãi"}
+                      </p>
 
                       <div className="grid grid-cols-2 gap-4 mt-6">
                         <div className="p-4 bg-white border border-slate-200/60 rounded-xl leading-snug">
                           <span className="text-[9px] font-extrabold text-slate-400 uppercase block tracking-wider">BIỂN SỐ NHẬN DIỆN</span>
-                          <strong className="text-sm sm:text-base font-black text-slate-800 font-mono italic tracking-wide">{currentParked.plate}</strong>
+                          <strong className="text-sm sm:text-base font-black text-slate-800 font-mono italic tracking-wide">{currentParked?.plate || 'Chưa ghi nhận'}</strong>
                         </div>
                         <div className="p-4 bg-white border border-slate-200/60 rounded-xl leading-snug flex items-center gap-3">
                           <div className="p-2 bg-red-50 text-red-500 rounded-lg">
@@ -1036,7 +1033,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           </div>
                           <div>
                             <span className="text-[9px] font-extrabold text-slate-400 uppercase block tracking-wider">VỊ TRÍ ƯỚC TÍNH</span>
-                            <strong className="text-xs sm:text-sm font-extrabold text-slate-850 block">{currentParked.location}</strong>
+                            <strong className="text-xs sm:text-sm font-extrabold text-slate-850 block">{currentParked?.location || 'Chưa ghi nhận'}</strong>
                           </div>
                         </div>
                       </div>
@@ -1479,38 +1476,41 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         </strong>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {[
-                            { vehicle: '30A-123.45', desc: 'SEDAN - TRẮNG', value: '30A-123.45' },
-                            { vehicle: '29C-987.65', desc: 'SUV - ĐEN', value: '29C-987.65' }
-                          ].map(item => {
-                            const isChosen = selectedVehicleForVIP === item.value;
-                            return (
-                              <button
-                                key={item.value}
-                                onClick={() => setSelectedVehicleForVIP(item.value)}
-                                className={`p-4 border rounded-2xl text-left flex items-center justify-between transition-all select-none cursor-pointer ${
-                                  isChosen 
-                                    ? 'border-blue-600 bg-blue-50/20 text-blue-800 font-extrabold ring-2 ring-blue-600/10' 
-                                    : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-                                }`}
-                              >
-                                <div>
-                                  <span className="text-[10px] text-slate-400 font-semibold block">{item.desc}</span>
-                                  <strong className="text-sm font-black font-mono tracking-wider">{item.vehicle}</strong>
-                                </div>
-                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                                  isChosen ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
-                                }`}>
-                                  {isChosen && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                                </div>
-                              </button>
-                            );
-                          })}
+                          {vehicles.length === 0 ? (
+                            <div className="col-span-full p-4 text-sm text-slate-500 text-center border border-dashed border-slate-300 rounded-2xl bg-slate-50">
+                              Chưa có phương tiện nào. Vui lòng quay lại tab "Xe của tôi" để thêm xe trước khi đăng ký dịch vụ!
+                            </div>
+                          ) : (
+                            vehicles.map(v => {
+                              const isChosen = selectedVehicleForVIP === v.plate;
+                              return (
+                                <button
+                                  key={v.id}
+                                  onClick={() => setSelectedVehicleForVIP(v.plate)}
+                                  className={`p-4 border rounded-2xl text-left flex items-center justify-between transition-all select-none cursor-pointer ${
+                                    isChosen 
+                                      ? 'border-blue-600 bg-blue-50/20 text-blue-800 font-extrabold ring-2 ring-blue-600/10' 
+                                      : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                                  }`}
+                                >
+                                  <div>
+                                    <span className="text-[10px] text-slate-400 font-semibold block">{v.type} - {v.name}</span>
+                                    <strong className="text-sm font-black font-mono tracking-wider">{v.plate}</strong>
+                                  </div>
+                                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                                    isChosen ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
+                                  }`}>
+                                    {isChosen && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                  </div>
+                                </button>
+                              );
+                            })
+                          )}
                         </div>
 
                         <button 
                           onClick={() => {
-                            setNewType('Ô tô 4 chỗ');
+                            setNewType('Ô tô gầm thấp 4-5 chỗ');
                             setAddVehicleModalOpen(true);
                           }}
                           className="pt-2 text-xs font-black text-blue-600 hover:underline inline-block cursor-pointer"
@@ -2472,7 +2472,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
               <div className="space-y-4 text-left">
                 <div>
                   <h3 className="text-lg font-black text-slate-900 tracking-tight leading-none">Thêm phương tiện mới</h3>
-                  <p className="text-slate-400 text-xs mt-1">Đăng ký thêm xe ô tô/xe máy mới vào hệ thống của bạn.</p>
+                  <p className="text-slate-400 text-xs mt-1">Đăng ký thêm xe ô tô mới vào hệ thống của bạn.</p>
                 </div>
 
                 <form onSubmit={handleAddVehicle} className="space-y-4 text-xs font-sans">
@@ -2507,9 +2507,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       onChange={e => setNewType(e.target.value)}
                       className="w-full p-2.5 bg-slate-50 border rounded-lg font-bold border-slate-200 text-slate-850 outline-hidden"
                     >
-                      <option value="Ô tô 4 chỗ">🚗 Ô tô 4 chỗ</option>
-                      <option value="Ô tô 7 chỗ">SUV 7 chỗ</option>
-                      <option value="Xe máy">🏍️ Xe máy</option>
+                      <option value="Ô tô gầm thấp 4-5 chỗ">🚗 Ô tô gầm thấp 4-5 chỗ</option>
+                      <option value="Ô tô gầm cao 5-7 chỗ">🚙 Ô tô gầm cao 5-7 chỗ</option>
+                      <option value="Xe điện (EV)">⚡ Xe điện (EV)</option>
+                      <option value="Xe cỡ lớn / Van">🚐 Xe cỡ lớn / Van</option>
                     </select>
                   </div>
 
