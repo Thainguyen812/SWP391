@@ -3,9 +3,9 @@ DECLARE
     zone_a_id UUID;
     zone_b_id UUID;
 BEGIN
-    -- Sửa lại từ 'F1'/'F2' thành 'ZONE-A'/'ZONE-B'
-    SELECT id INTO zone_a_id FROM zones WHERE zone_code = 'ZONE-A' LIMIT 1;
-    SELECT id INTO zone_b_id FROM zones WHERE zone_code = 'ZONE-B' LIMIT 1;
+    -- Sửa lại từ 'ZONE-A'/'ZONE-B' thành 'F1'/'F2' để khớp với bảng zones trong V1
+    SELECT id INTO zone_a_id FROM zones WHERE zone_code = 'F1' LIMIT 1;
+    SELECT id INTO zone_b_id FROM zones WHERE zone_code = 'F2' LIMIT 1;
 
     -- Thêm các bản ghi, sử dụng các biến vừa tìm được
     INSERT INTO parking_sessions (
