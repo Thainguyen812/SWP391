@@ -1,6 +1,8 @@
 package com.parking.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.util.UUID;
 
 @Entity
@@ -16,6 +18,7 @@ public class Zone {
     private String code;
 
     // stored as JSON text
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "allowed_sizes", columnDefinition = "jsonb", nullable = false)
     private String allowedSizes;
 

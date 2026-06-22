@@ -1,6 +1,8 @@
 package com.parking.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -25,6 +27,7 @@ public class VipSubscription {
     @Enumerated(EnumType.STRING)
     private Status status;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "document_photos", columnDefinition = "jsonb")
     private String documentPhotos;
 
