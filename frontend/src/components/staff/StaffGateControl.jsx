@@ -55,9 +55,9 @@ export const StaffGateControl = () => {
       // Map local Vietnamese labels to backend allowed_sizes
       let mappedType = 'SEDAN_HATCHBACK';
       if (manualType === 'Ô tô gầm thấp 4-5 chỗ') mappedType = 'SEDAN_HATCHBACK';
-      if (manualType === 'Ô tô gầm cao 5-7 chỗ') mappedType = 'SUV_CUV_MPV';
-      if (manualType === 'Xe điện (EV)') mappedType = 'EV_CAR';
-      if (manualType === 'Xe cỡ lớn / Van') mappedType = 'LARGE_VAN_MINIBUS';
+      if (manualType === 'Xe 7 chỗ') mappedType = 'SUV_CUV_MPV';
+      if (manualType === 'Xe 9 chỗ') mappedType = 'LARGE_VAN_MINIBUS';
+      if (manualType === 'Xe 16 chỗ') mappedType = 'LARGE_VAN_MINIBUS';
 
       // Using apiClient so the Bearer token is automatically attached!
       const response = await apiClient.post(`/v1/parking/check-in/visitor`, {
@@ -601,9 +601,9 @@ export const StaffGateControl = () => {
                 className="border border-slate-200 p-2 rounded text-sm focus:outline-none focus:border-blue-500"
               >
                 <option value="Ô tô gầm thấp 4-5 chỗ">Ô tô gầm thấp 4-5 chỗ (Sedan/Hatchback)</option>
-                <option value="Ô tô gầm cao 5-7 chỗ">Ô tô gầm cao 5-7 chỗ (SUV/CUV/MPV)</option>
-                <option value="Xe điện (EV)">Xe điện (EV)</option>
-                <option value="Xe cỡ lớn / Van">Xe cỡ lớn / Van (Minibus 16c/Tải van)</option>
+                <option value="Xe 7 chỗ">Xe 7 chỗ (SUV/CUV/MPV)</option>
+                <option value="Xe 9 chỗ">Xe 9 chỗ (Minibus/Van)</option>
+                <option value="Xe 16 chỗ">Xe 16 chỗ (Minibus)</option>
               </select>
               <button 
                 onClick={handleManualCheckIn}

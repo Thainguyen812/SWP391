@@ -182,7 +182,7 @@ export const AuthPage = () => {
     }
 
     if (!otpSent) {
-      newErrors.otp = 'Vui lòng nhấn nhận mã OTP trước';
+      newErrors.otp = 'Chưa xác nhận OTP';
     } else if (!otp) {
       newErrors.otp = 'Vui lòng nhập mã xác thực OTP';
     } else if (otp !== expectedOtp) {
@@ -213,14 +213,19 @@ export const AuthPage = () => {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
   };
 
   // Handle Form Submission
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) {
-      showNotification('Vui lòng sửa các lỗi thông tin đăng ký bên dưới.', 'error');
+    const newErrors = validateForm();
+    if (Object.keys(newErrors).length > 0) {
+      if (Object.keys(newErrors).length === 1 && newErrors.otp) {
+        showNotification('Chưa xác nhận OTP', 'error');
+      } else {
+        showNotification('Vui lòng sửa các lỗi thông tin đăng ký bên dưới.', 'error');
+      }
       return;
     }
 
