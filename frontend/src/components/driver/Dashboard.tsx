@@ -2960,85 +2960,6 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                   )}
                 </AnimatePresence>
 
-                {/* MODAL ADD BRANCH DIALOG */}
-                <AnimatePresence>
-                  {showAddBranchModal && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-                      <div className={`w-full max-w-sm rounded-[24px] p-6 border text-slate-850 ${isDarkMode ? 'bg-[#0f172a] border-slate-850 text-white' : 'bg-white border-slate-200'}`}>
-                        <div className="space-y-4 block text-left font-sans text-xs">
-                          <strong className="text-base font-black tracking-tight block">Thêm cơ sở đỗ xe mới</strong>
-                          
-                          <div className="space-y-3">
-                            <div className="space-y-1 block">
-                              <label className="text-[10px] font-extrabold uppercase text-slate-455">Tên cơ sở</label>
-                              <input id="branch-name-input" type="text" placeholder="Bãi xe ngầm Vincom" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
-                            </div>
-                            <div className="space-y-1 block">
-                              <label className="text-[10px] font-extrabold uppercase text-slate-455">Địa chỉ</label>
-                              <input id="branch-address-input" type="text" placeholder="72 Lê Thánh Tôn, Quận 1, TP.HCM" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-1 block">
-                                <label className="text-[10px] font-extrabold uppercase text-slate-455">Sức chứa tối đa</label>
-                                <input id="branch-capacity-input" type="number" defaultValue="400" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
-                              </div>
-                              <div className="space-y-1 block">
-                                <label className="text-[10px] font-extrabold uppercase text-slate-455">Số xe hiện tại</label>
-                                <input id="branch-occupied-input" type="number" defaultValue="0" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex gap-2 justify-end pt-2">
-                            <button
-                              onClick={() => setShowAddBranchModal(false)}
-                              className="px-4 py-2 bg-slate-100 dark:bg-slate-850 rounded-lg font-bold"
-                            >
-                              Hủy bỏ
-                            </button>
-                            <button
-                              onClick={() => {
-                                const nameEl = document.getElementById('branch-name-input') as HTMLInputElement;
-                                const addressEl = document.getElementById('branch-address-input') as HTMLInputElement;
-                                const capEl = document.getElementById('branch-capacity-input') as HTMLInputElement;
-                                const occEl = document.getElementById('branch-occupied-input') as HTMLInputElement;
-                                
-                                if (nameEl && nameEl.value.trim() && addressEl && addressEl.value.trim()) {
-                                  const nameVal = nameEl.value.trim();
-                                  const addressVal = addressEl.value.trim();
-                                  const capacityVal = parseInt(capEl.value, 10) || 400;
-                                  const occupiedVal = parseInt(occEl.value, 10) || 0;
-                                  
-                                  const newB = {
-                                    id: `br-${Date.now()}`,
-                                    name: nameVal,
-                                    address: addressVal,
-                                    status: 'Hoạt động',
-                                    capacity: capacityVal,
-                                    occupied: occupiedVal,
-                                    cars: `${Math.round(occupiedVal * 0.4)} / ${Math.round(capacityVal * 0.4)}`,
-                                    motorbikes: `${Math.round(occupiedVal * 0.6)} / ${Math.round(capacityVal * 0.6)}`,
-                                    updateTime: 'Cập nhật vừa xong'
-                                  };
-                                  
-                                  setBranches([...branches, newB]);
-                                  setShowAddBranchModal(false);
-                                  triggerToast(`Thêm cơ sở "${nameVal}" thành công và đang hoạt động!`, 'success');
-                                } else {
-                                  triggerToast('Vui lòng điền đầy đủ tên cơ sở và địa chỉ.', 'error');
-                                }
-                              }}
-                              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-extrabold uppercase tracking-wide text-[10.5px]"
-                            >
-                              Thêm cơ sở
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </AnimatePresence>
-
               </div>
             )}
 
@@ -4305,6 +4226,85 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
               </div>
             </div>
           </footer>
+
+        {/* MODAL ADD BRANCH DIALOG */}
+        <AnimatePresence>
+          {showAddBranchModal && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+              <div className={`w-full max-w-sm rounded-[24px] p-6 border text-slate-850 ${isDarkMode ? 'bg-[#0f172a] border-slate-850 text-white' : 'bg-white border-slate-200'}`}>
+                <div className="space-y-4 block text-left font-sans text-xs">
+                  <strong className="text-base font-black tracking-tight block">Thêm cơ sở đỗ xe mới</strong>
+                  
+                  <div className="space-y-3">
+                    <div className="space-y-1 block">
+                      <label className="text-[10px] font-extrabold uppercase text-slate-455">Tên cơ sở</label>
+                      <input id="branch-name-input" type="text" placeholder="Bãi xe ngầm Vincom" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                    </div>
+                    <div className="space-y-1 block">
+                      <label className="text-[10px] font-extrabold uppercase text-slate-455">Địa chỉ</label>
+                      <input id="branch-address-input" type="text" placeholder="72 Lê Thánh Tôn, Quận 1, TP.HCM" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1 block">
+                        <label className="text-[10px] font-extrabold uppercase text-slate-455">Sức chứa tối đa</label>
+                        <input id="branch-capacity-input" type="number" defaultValue="400" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                      </div>
+                      <div className="space-y-1 block">
+                        <label className="text-[10px] font-extrabold uppercase text-slate-455">Số xe hiện tại</label>
+                        <input id="branch-occupied-input" type="number" defaultValue="0" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 justify-end pt-2">
+                    <button
+                      onClick={() => setShowAddBranchModal(false)}
+                      className="px-4 py-2 bg-slate-100 dark:bg-slate-850 rounded-lg font-bold"
+                    >
+                      Hủy bỏ
+                    </button>
+                    <button
+                      onClick={() => {
+                        const nameEl = document.getElementById('branch-name-input') as HTMLInputElement;
+                        const addressEl = document.getElementById('branch-address-input') as HTMLInputElement;
+                        const capEl = document.getElementById('branch-capacity-input') as HTMLInputElement;
+                        const occEl = document.getElementById('branch-occupied-input') as HTMLInputElement;
+                        
+                        if (nameEl && nameEl.value.trim() && addressEl && addressEl.value.trim()) {
+                          const nameVal = nameEl.value.trim();
+                          const addressVal = addressEl.value.trim();
+                          const capacityVal = parseInt(capEl.value, 10) || 400;
+                          const occupiedVal = parseInt(occEl.value, 10) || 0;
+                          
+                          const newB = {
+                            id: `br-${Date.now()}`,
+                            name: nameVal,
+                            address: addressVal,
+                            status: 'Hoạt động',
+                            capacity: capacityVal,
+                            occupied: occupiedVal,
+                            cars: `${Math.round(occupiedVal * 0.4)} / ${Math.round(capacityVal * 0.4)}`,
+                            motorbikes: `${Math.round(occupiedVal * 0.6)} / ${Math.round(capacityVal * 0.6)}`,
+                            updateTime: 'Cập nhật vừa xong'
+                          };
+                          
+                          setBranches([...branches, newB]);
+                          setShowAddBranchModal(false);
+                          triggerToast(`Thêm cơ sở "${nameVal}" thành công và đang hoạt động!`, 'success');
+                        } else {
+                          triggerToast('Vui lòng điền đầy đủ tên cơ sở và địa chỉ.', 'error');
+                        }
+                      }}
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-extrabold uppercase tracking-wide text-[10.5px]"
+                    >
+                      Thêm cơ sở
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
 
         </main>
 
