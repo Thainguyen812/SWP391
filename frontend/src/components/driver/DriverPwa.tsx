@@ -58,6 +58,8 @@ interface UserVehicle {
   isActive: boolean;
   image: string;
   isLocked: boolean;
+  activeSubscription?: string;
+  subscriptionExpiry?: string;
 }
 
 interface TransactionItem {
@@ -69,6 +71,53 @@ interface TransactionItem {
   isEntry: boolean;
   status: 'Thành công' | 'Đang xử lý' | 'Thất bại';
 }
+
+const isTxDateInFilter = (txDateStr: string, filter: string) => {
+  if (!txDateStr || filter === 'Tất cả') return true;
+  
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  let txDate: Date;
+  if (txDateStr === 'Vừa xong') {
+    txDate = today;
+  } else {
+    const parts = txDateStr.split('/');
+    if (parts.length !== 3) return true;
+    txDate = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+  }
+  
+  // Calculate difference in days (allowing same day to be 0)
+  const diffTime = today.getTime() - txDate.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  switch (filter) {
+    case 'Hôm nay':
+      return diffDays === 0;
+    case 'Hôm qua':
+      return diffDays === 1;
+    case '7 ngày qua':
+      return diffDays >= 0 && diffDays <= 7;
+    case 'Tháng này':
+      return txDate.getMonth() === today.getMonth() && txDate.getFullYear() === today.getFullYear();
+    case 'Tháng trước': {
+      const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      return txDate.getMonth() === lastMonth.getMonth() && txDate.getFullYear() === lastMonth.getFullYear();
+    }
+    case '3 tháng trước': {
+      const threeMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 3, today.getDate());
+      return txDate >= threeMonthsAgo;
+    }
+    case 'Năm nay':
+      return txDate.getFullYear() === today.getFullYear();
+    case 'Năm ngoái':
+      return txDate.getFullYear() === today.getFullYear() - 1;
+    case 'Các năm trước':
+      return txDate.getFullYear() < today.getFullYear();
+    default:
+      return true;
+  }
+};
 
 export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: DriverPwaProps) {
   // ----------------------------------------------------
@@ -100,6 +149,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
   // Background synchronize with live backend
   const fetchVehiclesFromApi = async () => {
+    if (isOffline) return; // Skip API calls when offline
     try {
       const response = await fetch('/api/vehicles', {
         headers: { 'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}` }
@@ -110,9 +160,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
           id: v.id || `veh-${v.plate}`,
           plate: v.plate,
           name: v.name,
-          type: v.type === 'SUV_CUV_MPV' ? 'Ô tô gầm cao 5-7 chỗ' : 
-                v.type === 'EV_CAR' ? 'Xe điện (EV)' : 
-                v.type === 'LARGE_VAN_MINIBUS' ? 'Xe cỡ lớn / Van' : 
+          type: v.type === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
+                v.type === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
                 'Ô tô gầm thấp 4-5 chỗ',
           regDate: '12/10/2023',
           isActive: true,
@@ -141,12 +190,83 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     const saved = localStorage.getItem('urbanpark_user_transactions');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (err) {
         console.error(err);
       }
     }
-    return [];
+    
+    // Generate realistic seeded transactions relative to current date
+    const now = new Date();
+    const formatDate = (d: Date) => {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+    const lastMonth = new Date(now); lastMonth.setMonth(now.getMonth() - 1);
+    const threeMonthsAgo = new Date(now); threeMonthsAgo.setMonth(now.getMonth() - 3);
+    const lastYear = new Date(now); lastYear.setFullYear(now.getFullYear() - 1);
+    const twoYearsAgo = new Date(now); twoYearsAgo.setFullYear(now.getFullYear() - 2);
+
+    return [
+      {
+        id: 'TXN-8761',
+        date: 'Vừa xong',
+        type: 'Nạp ví VNPAY',
+        plate: '-',
+        fee: '+$50.00',
+        isEntry: true,
+        status: 'Thành công'
+      },
+      {
+        id: 'TXN-8762',
+        date: formatDate(yesterday),
+        type: 'Xe ô tô vào bãi',
+        plate: '30A-99999',
+        fee: '-$2.00',
+        isEntry: false,
+        status: 'Thành công'
+      },
+      {
+        id: 'TXN-8763',
+        date: formatDate(lastMonth),
+        type: 'Đăng kí Thẻ Tháng VIP',
+        plate: '30A-99999',
+        fee: '-$40.00',
+        isEntry: false,
+        status: 'Thành công'
+      },
+      {
+        id: 'TXN-8764',
+        date: formatDate(threeMonthsAgo),
+        type: 'Nạp ví VNPAY',
+        plate: '-',
+        fee: '+$100.00',
+        isEntry: true,
+        status: 'Thành công'
+      },
+      {
+        id: 'TXN-8765',
+        date: formatDate(lastYear),
+        type: 'Xe ô tô vào bãi',
+        plate: '29A-11111',
+        fee: '-$2.00',
+        isEntry: false,
+        status: 'Thành công'
+      },
+      {
+        id: 'TXN-8766',
+        date: formatDate(twoYearsAgo),
+        type: 'Đăng kí Thẻ Tháng VIP',
+        plate: '29A-11111',
+        fee: '-$40.00',
+        isEntry: false,
+        status: 'Thành công'
+      }
+    ];
   });
 
   // Current parked vehicle mock details
@@ -197,7 +317,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [smsNotifyReceipt, setSmsNotifyReceipt] = useState(false);
 
   // Billing Filters
-  const [billingTimeFilter, setBillingTimeFilter] = useState<'Tháng này' | 'Tháng trước' | '3 tháng trước'>('Tháng này');
+  const [billingTimeFilter, setBillingTimeFilter] = useState<string>('Tháng này');
   const [billingTypeFilter, setBillingTypeFilter] = useState<'Tất cả' | 'Vé ngày' | 'Vé tháng' | 'Nạp tiền'>('Tất cả');
 
   // Support center interactive states
@@ -369,6 +489,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   };
 
   const handleToggleLockInPwa = async (vehicleId: string, plateStr: string, currentIsLocked: boolean) => {
+    if (isOffline) {
+      triggerToast('Lỗi: Không thể thực hiện khóa/mở khóa xe ở chế độ Ngoại tuyến!', 'error');
+      return;
+    }
     setIsTogglingLock(vehicleId);
     try {
       const response = await fetch('/api/vehicles/lock', {
@@ -395,6 +519,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
   // Checkout VIP flow
   const handleStartVnpay = () => {
+    if (isOffline) {
+      triggerToast('Lỗi: Không thể đăng ký Thẻ Tháng VIP ở chế độ Ngoại tuyến!', 'error');
+      return;
+    }
     if (paymentMethod === 'wallet') {
       const neededUSD = selectedPackPrice === 50000 ? 2.0 : 40.0;
       if (balance < neededUSD) {
@@ -413,6 +541,26 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         status: 'Thành công'
       };
       setTransactions(prev => [newTx, ...prev]);
+      
+      // Update vehicle subscription status in local state
+      setVehicles(prev => prev.map(v => {
+        if (v.plate === selectedVehicleForVIP) {
+          const expiryDate = new Date();
+          if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
+            expiryDate.setMonth(expiryDate.getMonth() + 1);
+          } else {
+            expiryDate.setDate(expiryDate.getDate() + 1);
+          }
+          const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
+          return {
+            ...v,
+            activeSubscription: selectedPackLabel,
+            subscriptionExpiry: expiryString
+          };
+        }
+        return v;
+      }));
+
       setRegStep(3); // success step!
       triggerToast(`Đăng kí thành công bằng Ví UrbanPark cho xe ${selectedVehicleForVIP}!`, 'success');
     } else {
@@ -422,6 +570,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   };
 
   const handleSendVnpayDomesticCard = () => {
+    if (isOffline) {
+      triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
+      return;
+    }
     if (!vnpayCardNo.trim() || !vnpayCardHolder.trim()) {
       triggerToast('Vui lòng điền đầy đủ số thẻ & tên chủ thẻ', 'error');
       return;
@@ -431,6 +583,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   };
 
   const handleConfirmVnpayPayment = () => {
+    if (isOffline) {
+      triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
+      return;
+    }
     if (vnpayOtp !== '2026' && vnpayOtp !== 'OTP-2026') {
       triggerToast('Vui lòng nhập đúng mã OTP Sandbox: OTP-2026', 'error');
       return;
@@ -438,19 +594,56 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
     setVnpayStep('success');
 
-    // Deduct from balance for simulation if desired, or let balance stay. Let's add a fresh transaction
-    const formattedPrice = selectedPackPrice === 50000 ? '50,000₫' : '1,000,000₫';
-    const newTx: TransactionItem = {
-      id: `txn-${Date.now()}`,
-      date: 'Vừa xong',
-      type: `Đăng kí ${selectedPackLabel}`,
-      plate: selectedVehicleForVIP,
-      fee: `-${formattedPrice}`,
-      isEntry: false,
-      status: 'Thành công'
-    };
-    setTransactions(prev => [newTx, ...prev]);
-    triggerToast(`Đăng kí thành viên thành công cho xe ${selectedVehicleForVIP}!`, 'success');
+    const isTopUp = selectedPackLabel.includes('Nạp tiền');
+
+    if (isTopUp) {
+      setBalance(prev => prev + selectedPackPrice);
+      const newTx: TransactionItem = {
+        id: `txn-${Date.now()}`,
+        date: 'Vừa xong',
+        type: 'Nạp ví VNPAY',
+        plate: '-',
+        fee: `+$${selectedPackPrice.toFixed(2)}`,
+        isEntry: true,
+        status: 'Thành công'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+      triggerToast(`Nạp thành công $${selectedPackPrice.toFixed(2)} vào ví điện tử!`, 'success');
+    } else {
+      // Deduct from balance for simulation if desired, or let balance stay. Let's add a fresh transaction
+      const formattedPrice = selectedPackPrice === 50000 ? '50,000₫' : '1,000,000₫';
+      const newTx: TransactionItem = {
+        id: `txn-${Date.now()}`,
+        date: 'Vừa xong',
+        type: `Đăng kí ${selectedPackLabel}`,
+        plate: selectedVehicleForVIP,
+        fee: `-${formattedPrice}`,
+        isEntry: false,
+        status: 'Thành công'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+      
+      // Update vehicle subscription status in local state
+      setVehicles(prev => prev.map(v => {
+        if (v.plate === selectedVehicleForVIP) {
+          const expiryDate = new Date();
+          if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
+            expiryDate.setMonth(expiryDate.getMonth() + 1);
+          } else {
+            expiryDate.setDate(expiryDate.getDate() + 1);
+          }
+          const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
+          return {
+            ...v,
+            activeSubscription: selectedPackLabel,
+            subscriptionExpiry: expiryString
+          };
+        }
+        return v;
+      }));
+
+      triggerToast(`Đăng kí thành viên thành công cho xe ${selectedVehicleForVIP}!`, 'success');
+    }
   };
 
   const handleCloseVnpay = () => {
@@ -1201,6 +1394,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           <button
                             type="button"
                             onClick={() => {
+                              if (isOffline) {
+                                triggerToast('Lỗi: Không thể nạp ví ở chế độ Ngoại tuyến!', 'error');
+                                return;
+                              }
                               setBalance(prev => prev + 50.0);
                               const newTx: TransactionItem = {
                                 id: `TXN-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -1344,6 +1541,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             <div>
                               <strong className="text-xl font-black text-slate-850 font-mono tracking-wide">{v.plate}</strong>
                               <span className="text-xs text-slate-400 font-bold block mt-0.5">{v.name}</span>
+                              {v.activeSubscription && (
+                                <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 text-[9px] font-black text-emerald-700 bg-emerald-50 rounded-md uppercase tracking-wider">
+                                  ✨ {v.activeSubscription}
+                                </span>
+                              )}
                             </div>
                             <div className="p-2 bg-slate-50 border border-slate-100 rounded-lg text-slate-500">
                               <Car className="w-4 h-4" />
@@ -1356,8 +1558,17 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                               <strong className="text-xs font-black text-slate-700 block mt-0.5">{v.type}</strong>
                             </div>
                             <div>
-                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">NGÀY ĐĂNG KÝ</span>
-                              <strong className="text-xs font-extrabold text-slate-700 block mt-0.5">{v.regDate}</strong>
+                              {v.activeSubscription ? (
+                                <>
+                                  <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest block">HẠN SỬ DỤNG</span>
+                                  <strong className="text-xs font-black text-emerald-600 block mt-0.5">{v.subscriptionExpiry}</strong>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">NGÀY ĐĂNG KÝ</span>
+                                  <strong className="text-xs font-extrabold text-slate-700 block mt-0.5">{v.regDate}</strong>
+                                </>
+                              )}
                             </div>
                           </div>
 
@@ -1722,12 +1933,25 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           </label>
                           <select 
                             value={billingTimeFilter}
-                            onChange={(e) => setBillingTimeFilter(e.target.value as any)}
-                            className="w-full p-2.5 bg-slate-50 hover:bg-slate-100 text-xs font-bold rounded-xl border border-slate-200 text-slate-800 outline-none transition-all"
+                            onChange={(e) => setBillingTimeFilter(e.target.value)}
+                            className="w-full p-2.5 bg-slate-50 hover:bg-slate-100 text-xs font-bold rounded-xl border border-slate-200 text-slate-850 outline-none transition-all cursor-pointer"
                           >
-                            <option value="Tháng này">Tháng này</option>
-                            <option value="Tháng trước">Tháng trước</option>
-                            <option value="3 tháng trước">3 tháng trước</option>
+                            <option value="Tất cả">Tất cả thời gian</option>
+                            <optgroup label="Gần đây">
+                              <option value="Hôm nay">Hôm nay</option>
+                              <option value="Hôm qua">Hôm qua</option>
+                              <option value="7 ngày qua">7 ngày qua</option>
+                            </optgroup>
+                            <optgroup label="Theo tháng">
+                              <option value="Tháng này">Tháng này</option>
+                              <option value="Tháng trước">Tháng trước</option>
+                              <option value="3 tháng trước">3 tháng trước</option>
+                            </optgroup>
+                            <optgroup label="Theo năm">
+                              <option value="Năm nay">Năm nay</option>
+                              <option value="Năm ngoái">Năm ngoái</option>
+                              <option value="Các năm trước">Các năm trước</option>
+                            </optgroup>
                           </select>
                         </div>
 
@@ -1769,6 +1993,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         <tbody className="divide-y divide-slate-100/70 text-slate-700 font-sans">
                           {transactions
                             .filter(tx => {
+                              // Filter by date range
+                              if (!isTxDateInFilter(tx.date, billingTimeFilter)) return false;
+                              
+                              // Filter by type
                               if (billingTypeFilter === 'Tất cả') return true;
                               return tx.type.toLowerCase().trim() === billingTypeFilter.toLowerCase().trim();
                             })
@@ -2035,6 +2263,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           <button 
                             type="button"
                             onClick={() => {
+                              if (isOffline) {
+                                triggerToast('Lỗi: Không thể nạp tiền vào ví ở chế độ Ngoại tuyến!', 'error');
+                                return;
+                              }
                               setSelectedPackPrice(50.00);
                               setSelectedPackLabel('Nạp tiền vào ví điện tử UrbanPark');
                               setVnpayStep('info');
@@ -2279,6 +2511,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       <form 
                         onSubmit={e => {
                           e.preventDefault();
+                          if (isOffline) {
+                            triggerToast('Lỗi: Không thể gửi yêu cầu hỗ trợ khi Ngoại tuyến!', 'error');
+                            return;
+                          }
                           if (!ticketTopic || !ticketMessage) {
                             triggerToast('Vui lòng điền đầy đủ chủ đề và nội dung!', 'error');
                             return;
@@ -2508,9 +2744,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       className="w-full p-2.5 bg-slate-50 border rounded-lg font-bold border-slate-200 text-slate-850 outline-hidden"
                     >
                       <option value="Ô tô gầm thấp 4-5 chỗ">🚗 Ô tô gầm thấp 4-5 chỗ</option>
-                      <option value="Ô tô gầm cao 5-7 chỗ">🚙 Ô tô gầm cao 5-7 chỗ</option>
-                      <option value="Xe điện (EV)">⚡ Xe điện (EV)</option>
-                      <option value="Xe cỡ lớn / Van">🚐 Xe cỡ lớn / Van</option>
+                      <option value="Xe 7 chỗ">🚙 Xe 7 chỗ</option>
+                      <option value="Xe 9 chỗ">🚐 Xe 9 chỗ</option>
+                      <option value="Xe 16 chỗ">🚌 Xe 16 chỗ</option>
                     </select>
                   </div>
 
