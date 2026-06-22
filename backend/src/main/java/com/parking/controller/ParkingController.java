@@ -10,7 +10,8 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
 import com.parking.dto.VisitorCheckInRequest;// TASK 5
-import com.parking.dto.CongestionCheckoutRequest; // task 7 
+import com.parking.dto.FloorEntryVerificationRequest;
+import com.parking.dto.FloorEntryVerificationResponse;
 
 // phần 1 / check out task 5
 import java.util.UUID;
@@ -97,5 +98,12 @@ public class ParkingController {
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('STAFF', 'MANAGER', 'ADMIN')")
     public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getMonitoringMap() {
         return ResponseEntity.ok(parkingService.getMonitoringMap());
+    }
+
+    @PostMapping("/verify-floor-entry")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('STAFF', 'MANAGER', 'ADMIN')")
+    public ResponseEntity<FloorEntryVerificationResponse> verifyFloorEntry(
+            @RequestBody FloorEntryVerificationRequest request) {
+        return ResponseEntity.ok(parkingService.verifyFloorEntry(request));
     }
 }
