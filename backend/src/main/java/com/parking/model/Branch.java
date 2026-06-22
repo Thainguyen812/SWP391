@@ -1,4 +1,4 @@
-package com.parking.model;
+﻿package com.parking.model;
 
 import jakarta.persistence.*;
 import java.util.UUID;
@@ -7,7 +7,7 @@ import java.util.UUID;
 @Table(name = "branches")
 public class Branch {
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    
     private UUID id;
 
     @Column(name = "branch_name", unique = true, nullable = false)

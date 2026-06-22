@@ -1,4 +1,4 @@
-package com.parking.controller;
+Ôªøpackage com.parking.controller;
 
 import com.parking.model.SecurityPolicy;
 import com.parking.repository.SecurityPolicyRepository;
@@ -23,23 +23,33 @@ public class SecurityController {
             map.put("id", p.getId().toString());
             map.put("name", p.getPolicyName());
             map.put("description", p.getDescription());
-            map.put("status", Boolean.TRUE.equals(p.getIsActive()) ? "Active" : "Inactive");
+            map.put("status", p.getIsActive() != null && p.getIsActive() ? "Active" : "Inactive");
             result.add(map);
-        }
-        if (result.isEmpty()) {
-            result.add(Map.of("id", "P1", "name", "Require MFA", "description", "YÍu c?u x·c th?c 2 bu?c cho Admin", "status", "Active"));
         }
         return result;
     }
 
     @PostMapping("/policies")
     public Map<String, Object> updatePolicies(@RequestBody List<Map<String, Object>> policies) {
-        // Dummy update
-        return Map.of("success", true, "message", "C?p nh?t chÌnh s·ch th‡nh cÙng");
+        for (Map<String, Object> pol : policies) {
+            String name = (String) pol.get("name");
+            String status = (String) pol.get("status");
+            SecurityPolicy p = policyRepo.findByPolicyName(name);
+            if (p == null) {
+                p = new SecurityPolicy();
+                p.setId(UUID.randomUUID());
+                p.setPolicyName(name);
+                p.setDescription((String) pol.get("description"));
+            }
+            p.setIsActive("Active".equalsIgnoreCase(status) || "true".equalsIgnoreCase(status));
+            p.setUpdatedAt(java.time.LocalDateTime.now());
+            policyRepo.save(p);
+        }
+        return Map.of("success", true, "message", "C·∫≠p nh·∫≠t ch√≠nh s√°ch th√†nh c√¥ng");
     }
 
-    @GetMapping("/rbac-stats")
-    public Map<String, Object> getRbacStats() {
+    @GetMapping("/stats")
+    public Map<String, Object> getSecurityStats() {
         Map<String, Object> result = new HashMap<>();
         result.put("adminCount", 2);
         result.put("managerCount", 5);

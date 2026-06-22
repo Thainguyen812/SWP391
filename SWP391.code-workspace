@@ -1,0 +1,14 @@
+﻿{
+    "folders": [
+        {
+            "path": "backend"
+        },
+        {
+            "path": "frontend"
+        }
+    ],
+    "settings": {
+        "java.project.importOnFirstTimeStartup": "automatic",
+        "java.configuration.updateBuildConfiguration": "automatic"
+    }
+}

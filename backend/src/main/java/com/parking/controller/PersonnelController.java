@@ -22,18 +22,15 @@ public class PersonnelController {
     @GetMapping("/list")
     public List<Map<String, Object>> getPersonnelList() {
         List<Map<String, Object>> result = new ArrayList<>();
-        List<User> users = userRepo.findAll();
-        for (User u : users) {
+        for (User u : userRepo.findAll()) {
+            if ("VIP".equals(u.getRole().name())) continue;
             Map<String, Object> map = new HashMap<>();
             map.put("id", u.getId().toString());
             map.put("name", u.getFullName() != null ? u.getFullName() : u.getUsername());
             map.put("role", u.getRole() != null ? u.getRole().name() : "STAFF");
-            map.put("shift", "Ca Sáng");
-            map.put("status", "Đang làm việc");
+            map.put("shift", "Ca trực");
+            map.put("status", u.getStatus() != null ? u.getStatus().name() : "ACTIVE");
             result.add(map);
-        }
-        if (result.isEmpty()) {
-            result.add(Map.of("id", "NV001", "name", "Nguyễn Văn A", "role", "Bảo vệ", "shift", "Ca Sáng", "status", "Đang làm việc"));
         }
         return result;
     }
@@ -41,29 +38,29 @@ public class PersonnelController {
     @GetMapping("/shifts/today")
     public List<Map<String, Object>> getShiftsToday() {
         List<Map<String, Object>> result = new ArrayList<>();
-        List<ShiftHistory> shifts = shiftRepo.findAll();
-        for (ShiftHistory s : shifts) {
+        for (ShiftHistory s : shiftRepo.findAllByOrderByStartTimeDesc()) {
             Map<String, Object> map = new HashMap<>();
             map.put("id", s.getId().toString());
-            map.put("shiftName", s.getShiftType() != null ? s.getShiftType() : "CA SÁNG");
-            map.put("assignedStaff", "Nhân viên");
-            map.put("time", s.getStartTime() != null ? s.getStartTime().toString() : "06:00 - 14:00");
-            map.put("status", s.getEndTime() == null ? "Đang trực" : "Đã xong");
+            map.put("shiftName", s.getShiftType() != null ? s.getShiftType() : "CA");
+            map.put("assignedStaff", s.getStaffName());
+            map.put("time", s.getStartTime() != null ? s.getStartTime().toString() : "");
+            map.put("status", s.getStatus() != null ? s.getStatus() : "HOÀN THÀNH");
             result.add(map);
-        }
-        if (result.isEmpty()) {
-            result.add(Map.of("id", "S1", "shiftName", "Ca Sáng", "assignedStaff", "Nguyễn Văn A", "time", "06:00 - 14:00", "status", "Đang trực"));
         }
         return result;
     }
 
     @GetMapping("/handover/latest")
     public Map<String, Object> getLatestHandover() {
+        List<ShiftHistory> shifts = shiftRepo.findAllByOrderByStartTimeDesc();
         Map<String, Object> result = new HashMap<>();
-        result.put("time", "14:05 Hôm nay");
-        result.put("fromStaff", "Nguyễn Văn A");
-        result.put("toStaff", "Trần Thị B");
-        result.put("status", "Hoàn tất");
+        if (!shifts.isEmpty()) {
+            ShiftHistory latest = shifts.get(0);
+            result.put("time", latest.getStartTime() != null ? latest.getStartTime().toString() : "N/A");
+            result.put("fromStaff", latest.getStaffName());
+            result.put("toStaff", latest.getStaffName());
+            result.put("status", latest.getStatus());
+        }
         return result;
     }
 }

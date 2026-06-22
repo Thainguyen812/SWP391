@@ -1,4 +1,4 @@
-package com.parking.model;
+﻿package com.parking.model;
 
 import jakarta.persistence.*;
 import java.util.UUID;
@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Table(name = "system_settings")
 public class SystemSetting {
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    
     private UUID id;
 
     @Column(name = "setting_key", unique = true, nullable = false)

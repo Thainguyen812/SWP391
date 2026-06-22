@@ -1,4 +1,4 @@
-package com.parking.controller;
+﻿package com.parking.controller;
 
 import com.parking.model.SystemSetting;
 import com.parking.repository.SystemSettingRepository;
@@ -21,16 +21,22 @@ public class SettingsController {
         for (SystemSetting s : settingRepo.findAll()) {
             result.put(s.getSettingKey(), s.getSettingValue());
         }
-        if (result.isEmpty()) {
-            result.put("system_name", "Smart Parking Pro");
-            result.put("maintenance_mode", "false");
-        }
         return result;
     }
 
     @PutMapping("/system")
     public Map<String, Object> updateSystemSettings(@RequestBody Map<String, String> settings) {
-        // Dummy update
-        return Map.of("success", true, "message", "C?p nh?t c�i d?t th�nh c�ng");
+        for (Map.Entry<String, String> entry : settings.entrySet()) {
+            SystemSetting setting = settingRepo.findBySettingKey(entry.getKey());
+            if (setting == null) {
+                setting = new SystemSetting();
+                setting.setId(UUID.randomUUID());
+                setting.setSettingKey(entry.getKey());
+            }
+            setting.setSettingValue(entry.getValue());
+            setting.setUpdatedAt(java.time.LocalDateTime.now());
+            settingRepo.save(setting);
+        }
+        return Map.of("success", true, "message", "Cập nhật cài đặt thành công");
     }
 }

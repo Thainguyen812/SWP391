@@ -23,47 +23,43 @@ public class RevenueController {
             .sum();
             
         Map<String, Object> response = new HashMap<>();
-        response.put("today", Map.of("value", String.format("%.1fM", total > 0 ? total / 1000000 : 18.4), "trend", "+12.5% so với hôm qua", "isPositive", true));
-        response.put("thisMonth", Map.of("value", "452M", "trend", "-2.1% so với tháng trước", "isPositive", false));
-        response.put("projectedYear", Map.of("value", "5.4B", "subtitle", "Đạt 92% KPI"));
+        response.put("today", Map.of("value", String.format("%.1fK", total / 1000), "trend", "+5.2% so với hôm qua", "isPositive", true));
+        response.put("thisMonth", Map.of("value", String.format("%.1fM", total * 30 / 1000000), "trend", "+2.1% so với tháng trước", "isPositive", true));
+        response.put("projectedYear", Map.of("value", String.format("%.1fB", total * 365 / 1000000000), "subtitle", "Đạt 85% KPI"));
         return response;
     }
 
     @GetMapping("/charts")
     public Map<String, Object> getCharts(@RequestParam(required = false) String month) {
         List<Map<String, Object>> barData = Arrays.asList(
-            Map.of("date", "01/05", "revenue", 1200000),
-            Map.of("date", "05/05", "revenue", 1500000),
-            Map.of("date", "10/05", "revenue", 1100000)
+            Map.of("date", "Hôm nay", "revenue", 50000),
+            Map.of("date", "Hôm qua", "revenue", 45000),
+            Map.of("date", "Hôm kia", "revenue", 60000)
         );
         List<Map<String, Object>> pieData = Arrays.asList(
-            Map.of("type", "Ô tô", "value", 65),
-            Map.of("type", "Xe máy", "value", 35)
+            Map.of("type", "Ô tô", "value", 60),
+            Map.of("type", "Xe máy", "value", 40)
         );
         Map<String, Object> response = new HashMap<>();
         response.put("barData", barData);
         response.put("pieData", pieData);
-        response.put("totalVehicleRevenue", "18.4M");
+        response.put("totalVehicleRevenue", "125K");
         return response;
     }
 
     @GetMapping("/transactions")
     public Map<String, Object> getTransactions(@RequestParam(defaultValue = "1") int page) {
         List<Map<String, Object>> items = new ArrayList<>();
-        int idCounter = 1;
         for (Transaction t : transactionRepo.findAll()) {
             Map<String, Object> item = new HashMap<>();
-            item.put("id", "#TRX-" + (8900 + idCounter++));
+            item.put("id", t.getId().toString().substring(0,8));
             item.put("time", t.getProcessedAt() != null ? t.getProcessedAt().toString() : "Hôm nay");
             item.put("plate", "---");
-            item.put("type", "Ô tô");
+            item.put("type", "Phương tiện");
             item.put("amount", t.getTotalAmount() != null ? t.getTotalAmount().toString() + "đ" : "0đ");
             item.put("method", t.getPaymentMethod() != null ? t.getPaymentMethod().name() : "TIỀN MẶT");
             item.put("status", t.getPaymentStatus() != null ? t.getPaymentStatus().name() : "THÀNH CÔNG");
             items.add(item);
-        }
-        if (items.isEmpty()) {
-            items.add(Map.of("id", "#TRX-8924", "time", "14:32:05 Hôm nay", "plate", "30G-123.45", "type", "Ô tô", "amount", "25,000đ", "method", "VNPAY", "status", "SUCCESS"));
         }
         Map<String, Object> response = new HashMap<>();
         response.put("total", items.size());

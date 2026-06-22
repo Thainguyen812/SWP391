@@ -1,4 +1,4 @@
-package com.parking.controller;
+﻿package com.parking.controller;
 
 import com.parking.model.User;
 import com.parking.repository.UserRepository;
@@ -17,12 +17,20 @@ public class CustomerController {
 
     @GetMapping("/stats")
     public Map<String, Object> getCustomerStats() {
+        long vipCount = userRepo.findAll().stream().filter(u -> "VIP".equals(u.getRole().name())).count();
         Map<String, Object> result = new HashMap<>();
-        long totalUsers = userRepo.count();
-        result.put("totalUsers", totalUsers > 0 ? totalUsers : 1250);
-        result.put("activeMonthly", 850);
-        result.put("vipSubscriptions", 320);
-        result.put("newUsersThisMonth", 45);
+        result.put("activeMonthly", vipCount);
+        result.put("activeBlacklist", 0);
         return result;
+    }
+
+    @GetMapping("/blacklist")
+    public List<Map<String, Object>> getBlacklist() {
+        return new ArrayList<>(); // To be implemented with BlacklistCard table
+    }
+
+    @GetMapping("/blacklist/history")
+    public List<Map<String, Object>> getBlacklistHistory() {
+        return new ArrayList<>();
     }
 }

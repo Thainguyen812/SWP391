@@ -1,4 +1,4 @@
-package com.parking.model;
+﻿package com.parking.model;
 
 import jakarta.persistence.*;
 import java.util.UUID;
@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Table(name = "security_policies")
 public class SecurityPolicy {
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    
     private UUID id;
 
     @Column(name = "policy_name", unique = true, nullable = false)

@@ -166,7 +166,7 @@ export const AuthPage = () => {
   };
 
   // Handle Form Submission
-  const handleRegisterSubmit = (e) => {
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) {
       showNotification('Vui lòng sửa các lỗi thông tin đăng ký bên dưới.', 'error');
@@ -175,12 +175,28 @@ export const AuthPage = () => {
 
     setIsSubmitting(true);
 
-    // Simulate standard server latency
-    setTimeout(() => {
+    try {
+      const phoneClean = phone.replace(/\s+/g, '');
+      const result = await authService.register(
+        phoneClean, // username
+        password,
+        name.trim(), // fullName
+        email.trim(),
+        phoneClean // phone
+      );
+
       setIsSubmitting(false);
-      setIsRegistered(true);
-      showNotification('Đăng ký tài khoản Driver Portal thành công!', 'success');
-    }, 1500);
+      
+      if (result.success) {
+        setIsRegistered(true);
+        showNotification('Đăng ký tài khoản Driver Portal thành công!', 'success');
+      } else {
+        showNotification(result.message || 'Đăng ký thất bại. Vui lòng thử lại.', 'error');
+      }
+    } catch (error) {
+      setIsSubmitting(false);
+      showNotification('Lỗi kết nối đến máy chủ. Vui lòng thử lại sau.', 'error');
+    }
   };
 
   // Handle Mock Login Submission
@@ -209,7 +225,7 @@ export const AuthPage = () => {
         } else if (user && user.role === 'STAFF') {
           navigate('/staff-dashboard');
         } else {
-          navigate('/overview');
+          navigate('/admin');
         }
       }, 500);
     } else {
