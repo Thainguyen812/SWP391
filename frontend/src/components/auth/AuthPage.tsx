@@ -658,7 +658,18 @@ export const AuthPage = () => {
                     <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                     Ghi nhớ đăng nhập
                   </label>
-                  <span className="text-blue-600 hover:underline cursor-pointer font-medium">Quên mật khẩu?</span>
+                  <span 
+                    onClick={() => {
+                      if (!signPhone) {
+                        showNotification('Vui lòng nhập số điện thoại trước để lấy lại mật khẩu!', 'error');
+                      } else {
+                        showNotification('Mật khẩu mới đã được gửi qua SMS đến số ' + signPhone, 'success');
+                      }
+                    }}
+                    className="text-blue-600 hover:underline cursor-pointer font-medium"
+                  >
+                    Quên mật khẩu?
+                  </span>
                 </div>
 
                 <button
