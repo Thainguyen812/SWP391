@@ -81,4 +81,21 @@ public class ParkingController {
         return ResponseEntity.ok(
                 parkingService.congestionCheckout(request)); //nhảy qua serviceyml để xử lý 
     }
+
+    @GetMapping("/fee/{cardId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
+    public ResponseEntity<java.util.Map<String, Object>> getParkingFee(@PathVariable UUID cardId) {
+        return ResponseEntity.ok(parkingService.getParkingFee(cardId));
+    }
+
+    @GetMapping("/find-car")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> findCarByDigits(@RequestParam String digits) {
+        return ResponseEntity.ok(parkingService.findCarByDigits(digits));
+    }
+
+    @GetMapping("/monitoring/map")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('STAFF', 'MANAGER', 'ADMIN')")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getMonitoringMap() {
+        return ResponseEntity.ok(parkingService.getMonitoringMap());
+    }
 }

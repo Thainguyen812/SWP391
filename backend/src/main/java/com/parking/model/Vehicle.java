@@ -36,6 +36,9 @@ public class Vehicle {
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
+    @Column(name = "fuel_type", nullable = false)
+    private String fuelType = "GASOLINE";
+
     @Column(name = "created_at")
     private Instant createdAt;
 
@@ -67,6 +70,8 @@ public class Vehicle {
     public void setViolationCount(int violationCount) { this.violationCount = violationCount; }
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { isActive = active; }
+    public String getFuelType() { return fuelType; }
+    public void setFuelType(String fuelType) { this.fuelType = fuelType; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

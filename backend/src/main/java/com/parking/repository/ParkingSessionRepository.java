@@ -26,9 +26,11 @@ public interface ParkingSessionRepository extends JpaRepository<ParkingSession, 
     // Tìm theo ID thẻ
     Optional<ParkingSession> findByCardIdAndSessionStatus(UUID cardId, ParkingSession.SessionStatus sessionStatus);
 
-    // Tìm phiên xe đang ACTIVE tại ô đỗ cụ thể (Dành cho Scheduler)
     Optional<ParkingSession> findByParkedSlotIdAndSessionStatus(UUID parkedSlotId, ParkingSession.SessionStatus sessionStatus);
 
     // Tìm phiên xe theo thẻ và danh sách trạng thái 
     List<ParkingSession> findByCardIdAndSessionStatusIn(UUID cardId, Collection<ParkingSession.SessionStatus> statuses);
+
+    @org.springframework.data.jpa.repository.Query("SELECT ps FROM ParkingSession ps WHERE ps.sessionStatus = 'ACTIVE' AND ps.licensePlate LIKE %:digits")
+    List<ParkingSession> findActiveSessionsByPlateEndingWith(@org.springframework.data.repository.query.Param("digits") String digits);
 }
