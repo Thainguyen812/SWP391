@@ -162,7 +162,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
   // VIP Step Subscription State
   const [regStep, setRegStep] = useState<1 | 2 | 3>(2); // Default on select package for full mockup fidelity
-  const [selectedVehicleForVIP, setSelectedVehicleForVIP] = useState('30A-123.45');
+  const [selectedVehicleForVIP, setSelectedVehicleForVIP] = useState('');
   const [selectedPackPrice, setSelectedPackPrice] = useState<number>(1000000); // 1,000,000₫ for monthly VIP
   const [selectedPackLabel, setSelectedPackLabel] = useState('Thẻ Tháng VIP');
   const [vnpayBank, setVnpayBank] = useState('Vietcombank');
@@ -223,6 +223,18 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   useEffect(() => {
     localStorage.setItem('urbanpark_user_transactions', JSON.stringify(transactions));
   }, [transactions]);
+
+  // Auto-select first vehicle for VIP reg if none is selected or selection is invalid
+  useEffect(() => {
+    if (vehicles.length > 0) {
+      const isSelectedValid = vehicles.some(v => v.plate === selectedVehicleForVIP);
+      if (!isSelectedValid) {
+        setSelectedVehicleForVIP(vehicles[0].plate);
+      }
+    } else {
+      setSelectedVehicleForVIP('');
+    }
+  }, [vehicles, selectedVehicleForVIP]);
 
   // Audio synthezised siren
   const startSiren = () => {
@@ -1461,33 +1473,36 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         </strong>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {[
-                            { vehicle: '30A-123.45', desc: 'SEDAN - TRẮNG', value: '30A-123.45' },
-                            { vehicle: '29C-987.65', desc: 'SUV - ĐEN', value: '29C-987.65' }
-                          ].map(item => {
-                            const isChosen = selectedVehicleForVIP === item.value;
-                            return (
-                              <button
-                                key={item.value}
-                                onClick={() => setSelectedVehicleForVIP(item.value)}
-                                className={`p-4 border rounded-2xl text-left flex items-center justify-between transition-all select-none cursor-pointer ${
-                                  isChosen 
-                                    ? 'border-blue-600 bg-blue-50/20 text-blue-800 font-extrabold ring-2 ring-blue-600/10' 
-                                    : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-                                }`}
-                              >
-                                <div>
-                                  <span className="text-[10px] text-slate-400 font-semibold block">{item.desc}</span>
-                                  <strong className="text-sm font-black font-mono tracking-wider">{item.vehicle}</strong>
-                                </div>
-                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                                  isChosen ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
-                                }`}>
-                                  {isChosen && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                                </div>
-                              </button>
-                            );
-                          })}
+                          {vehicles.length === 0 ? (
+                            <div className="col-span-full p-4 text-sm text-slate-500 text-center border border-dashed border-slate-300 rounded-2xl bg-slate-50">
+                              Chưa có phương tiện nào. Vui lòng quay lại tab "Xe của tôi" để thêm xe trước khi đăng ký dịch vụ!
+                            </div>
+                          ) : (
+                            vehicles.map(v => {
+                              const isChosen = selectedVehicleForVIP === v.plate;
+                              return (
+                                <button
+                                  key={v.id}
+                                  onClick={() => setSelectedVehicleForVIP(v.plate)}
+                                  className={`p-4 border rounded-2xl text-left flex items-center justify-between transition-all select-none cursor-pointer ${
+                                    isChosen 
+                                      ? 'border-blue-600 bg-blue-50/20 text-blue-800 font-extrabold ring-2 ring-blue-600/10' 
+                                      : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                                  }`}
+                                >
+                                  <div>
+                                    <span className="text-[10px] text-slate-400 font-semibold block">{v.type} - {v.name}</span>
+                                    <strong className="text-sm font-black font-mono tracking-wider">{v.plate}</strong>
+                                  </div>
+                                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                                    isChosen ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
+                                  }`}>
+                                    {isChosen && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                  </div>
+                                </button>
+                              );
+                            })
+                          )}
                         </div>
 
                         <button 
