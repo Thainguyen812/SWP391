@@ -20,9 +20,11 @@ public class VipSubscription {
     private String subscriptionType;
 
     @Column(name = "start_date", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd")
     private java.time.LocalDate startDate;
 
     @Column(name = "end_date", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd")
     private java.time.LocalDate endDate;
 
     @Enumerated(EnumType.STRING)
