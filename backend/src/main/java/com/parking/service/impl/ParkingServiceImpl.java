@@ -16,7 +16,9 @@ import com.parking.model.ParkingSlot;
 import com.parking.repository.ParkingSlotRepository;
 import com.parking.model.User;
 import com.parking.repository.UserRepository;
-import com.parking.model.Transaction;
+import com.parking.model.Transaction; // task 5
+import com.parking.dto.FloorEntryVerificationRequest;
+import com.parking.dto.FloorEntryVerificationResponse;
 import com.parking.repository.BlacklistRepository;
 import com.parking.repository.ParkingSessionRepository;
 import com.parking.repository.ZoneRepository;
@@ -893,5 +895,50 @@ public class ParkingServiceImpl implements ParkingService {
         Card card = cardRepository.findByCardCode(cardCode)
                 .orElseThrow(() -> new ApiExceptions.NotFoundException("Thẻ không tồn tại"));
         return this.checkoutCard(card.getId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public FloorEntryVerificationResponse verifyFloorEntry(FloorEntryVerificationRequest request) {
+        if (request.getLicensePlate() != null && !request.getLicensePlate().trim().isEmpty()) {
+            String licensePlate = request.getLicensePlate().trim();
+            Vehicle vehicle = vehicleRepository.findByLicensePlate(licensePlate)
+                    .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin xe"));
+
+            vipSubscriptionRepository.findByVehicleIdAndStatus(vehicle.getId(), VipSubscription.Status.ACTIVE)
+                    .orElseThrow(() -> new ApiExceptions.BadRequestException("Xe này không đăng ký thẻ VIP hoạt động!"));
+
+            ParkingSession session = parkingSessionRepository.findByLicensePlateAndSessionStatus(licensePlate, ParkingSession.SessionStatus.ACTIVE)
+                    .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy phiên gửi xe hoạt động cho xe VIP này"));
+
+            Zone zone = zoneRepository.findById(session.getAssignedZoneId())
+                    .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin tầng đỗ đã chỉ định"));
+
+            boolean isMatch = zone.getCode().equalsIgnoreCase(request.getCurrentFloorCode());
+            if (isMatch) {
+                return new FloorEntryVerificationResponse(true, "Xác nhận đúng tầng! Mở barie vào " + zone.getZoneName(), zone.getCode());
+            } else {
+                return new FloorEntryVerificationResponse(false, "Sai tầng đỗ! Xe VIP được chỉ định đỗ tại " + zone.getZoneName() + ", không được vào tầng " + request.getCurrentFloorCode(), zone.getCode());
+            }
+        } else if (request.getCardCode() != null && !request.getCardCode().trim().isEmpty()) {
+            String cardCode = request.getCardCode().trim();
+            Card card = cardRepository.findByCardCode(cardCode)
+                    .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thẻ tạm này"));
+
+            ParkingSession session = parkingSessionRepository.findByCardIdAndSessionStatus(card.getId(), ParkingSession.SessionStatus.ACTIVE)
+                    .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy phiên gửi xe hoạt động cho thẻ này"));
+
+            Zone zone = zoneRepository.findById(session.getAssignedZoneId())
+                    .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin tầng đỗ đã chỉ định"));
+
+            boolean isMatch = zone.getCode().equalsIgnoreCase(request.getCurrentFloorCode());
+            if (isMatch) {
+                return new FloorEntryVerificationResponse(true, "Xác nhận đúng tầng! Mở barie vào " + zone.getZoneName(), zone.getCode());
+            } else {
+                return new FloorEntryVerificationResponse(false, "Sai tầng đỗ! Xe vãng lai được chỉ định đỗ tại " + zone.getZoneName() + ", không được vào tầng " + request.getCurrentFloorCode(), zone.getCode());
+            }
+        } else {
+            throw new ApiExceptions.BadRequestException("Yêu cầu cung cấp biển số xe VIP hoặc mã thẻ vãng lai để xác thực");
+        }
     }
 }

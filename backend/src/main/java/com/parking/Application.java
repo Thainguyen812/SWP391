@@ -10,6 +10,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @Import(SecurityConfig.class) // ÉP BUỘC: Bắt Spring Boot phải nuốt file SecurityConfig này vào chạy
 @EnableScheduling
 public class Application {
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+    }
+
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);
     }
