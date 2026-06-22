@@ -110,7 +110,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
           id: v.id || `veh-${v.plate}`,
           plate: v.plate,
           name: v.name,
-          type: v.type === 'SUV' ? 'SUV 7 chỗ' : 'Ô tô 4 chỗ',
+          type: v.type === 'SUV_CUV_MPV' ? 'Ô tô gầm cao 5-7 chỗ' : 
+                v.type === 'EV_CAR' ? 'Xe điện (EV)' : 
+                v.type === 'LARGE_VAN_MINIBUS' ? 'Xe cỡ lớn / Van' : 
+                'Ô tô gầm thấp 4-5 chỗ',
           regDate: '12/10/2023',
           isActive: true,
           image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
@@ -158,7 +161,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [addVehicleModalOpen, setAddVehicleModalOpen] = useState(false);
   const [newPlate, setNewPlate] = useState('');
   const [newName, setNewName] = useState('');
-  const [newType, setNewType] = useState('Ô tô 4 chỗ');
+  const [newType, setNewType] = useState('Ô tô gầm thấp 4-5 chỗ');
 
   // VIP Step Subscription State
   const [regStep, setRegStep] = useState<1 | 2 | 3>(2); // Default on select package for full mockup fidelity
@@ -1507,7 +1510,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                         <button 
                           onClick={() => {
-                            setNewType('Ô tô 4 chỗ');
+                            setNewType('Ô tô gầm thấp 4-5 chỗ');
                             setAddVehicleModalOpen(true);
                           }}
                           className="pt-2 text-xs font-black text-blue-600 hover:underline inline-block cursor-pointer"
@@ -2504,8 +2507,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       onChange={e => setNewType(e.target.value)}
                       className="w-full p-2.5 bg-slate-50 border rounded-lg font-bold border-slate-200 text-slate-850 outline-hidden"
                     >
-                      <option value="Ô tô 4 chỗ">🚗 Ô tô 4 chỗ</option>
-                      <option value="SUV 7 chỗ">SUV 7 chỗ</option>
+                      <option value="Ô tô gầm thấp 4-5 chỗ">🚗 Ô tô gầm thấp 4-5 chỗ</option>
+                      <option value="Ô tô gầm cao 5-7 chỗ">🚙 Ô tô gầm cao 5-7 chỗ</option>
+                      <option value="Xe điện (EV)">⚡ Xe điện (EV)</option>
+                      <option value="Xe cỡ lớn / Van">🚐 Xe cỡ lớn / Van</option>
                     </select>
                   </div>
 
