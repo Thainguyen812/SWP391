@@ -19,8 +19,7 @@ public class ParkingSlot {
     private String slotNumber;
 
     @Column(name = "slot_type", nullable = false)
-    private String slotType;
-
+    private String slotType = "NORMAL";
     @Column(name = "slot_status", nullable = false)
     private String slotStatus;
 

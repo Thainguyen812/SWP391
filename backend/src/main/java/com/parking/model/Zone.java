@@ -17,8 +17,9 @@ public class Zone {
     @Column(name = "zone_code", unique = true, nullable = false)
     private String code;
 
+    // stored as JSON text
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "allowed_sizes", nullable = false)
+    @Column(name = "allowed_sizes", columnDefinition = "jsonb", nullable = false)
     private String allowedSizes;
 
     @Column(name = "total_slots", nullable = false)

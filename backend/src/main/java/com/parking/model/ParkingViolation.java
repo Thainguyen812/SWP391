@@ -7,6 +7,8 @@ import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "parking_violations")
@@ -26,7 +28,7 @@ public class ParkingViolation {
 
     // Ảnh bằng chứng (JSONB)
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "photo_urls")
+    @Column(name = "photo_urls", columnDefinition = "jsonb")
     private String photoUrls = "[]";
 
     // Người/Hệ thống phát hiện (Bắt buộc)

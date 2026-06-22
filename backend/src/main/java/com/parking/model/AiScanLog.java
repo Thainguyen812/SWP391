@@ -1,6 +1,7 @@
 package com.parking.model;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -29,7 +30,7 @@ public class AiScanLog {
     private String detectedPlate;
 
     @Column(name = "confidence_score", nullable = false)
-    private Double confidenceScore;
+    private BigDecimal confidenceScore;
 
     @Column(name = "detected_vehicle_type")
     private String detectedVehicleType;
@@ -44,10 +45,10 @@ public class AiScanLog {
     private String detectedShape;
 
     @Column(name = "match_score")
-    private Double matchScore;
+    private BigDecimal matchScore;
 
     @Column(name = "color_diff")
-    private Double colorDiff;
+    private BigDecimal colorDiff;
 
     @Column(name = "shape_match")
     private Boolean shapeMatch;
@@ -90,8 +91,13 @@ public class AiScanLog {
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public String getDetectedPlate() { return detectedPlate; }
     public void setDetectedPlate(String detectedPlate) { this.detectedPlate = detectedPlate; }
-    public Double getConfidenceScore() { return confidenceScore; }
-    public void setConfidenceScore(Double confidenceScore) { this.confidenceScore = confidenceScore; }
+    public BigDecimal getConfidenceScore() {
+        return confidenceScore;
+    }
+
+    public void setConfidenceScore(BigDecimal confidenceScore) {
+        this.confidenceScore = confidenceScore;
+    }
     public String getDetectedVehicleType() { return detectedVehicleType; }
     public void setDetectedVehicleType(String detectedVehicleType) { this.detectedVehicleType = detectedVehicleType; }
     public String getDetectedColor() { return detectedColor; }
@@ -100,10 +106,21 @@ public class AiScanLog {
     public void setDetectedColorRgb(String detectedColorRgb) { this.detectedColorRgb = detectedColorRgb; }
     public String getDetectedShape() { return detectedShape; }
     public void setDetectedShape(String detectedShape) { this.detectedShape = detectedShape; }
-    public Double getMatchScore() { return matchScore; }
-    public void setMatchScore(Double matchScore) { this.matchScore = matchScore; }
-    public Double getColorDiff() { return colorDiff; }
-    public void setColorDiff(Double colorDiff) { this.colorDiff = colorDiff; }
+    public BigDecimal getMatchScore() {
+        return matchScore;
+    }
+
+    public void setMatchScore(BigDecimal matchScore) {
+        this.matchScore = matchScore;
+    }
+
+    public BigDecimal getColorDiff() {
+        return colorDiff;
+    }
+
+    public void setColorDiff(BigDecimal colorDiff) {
+        this.colorDiff = colorDiff;
+    }
     public Boolean getShapeMatch() { return shapeMatch; }
     public void setShapeMatch(Boolean shapeMatch) { this.shapeMatch = shapeMatch; }
     public String getScannedQrToken() { return scannedQrToken; }

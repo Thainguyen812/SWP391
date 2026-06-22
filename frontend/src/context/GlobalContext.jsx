@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 import { WalletOutlined, CheckCircleFilled, CreditCardOutlined } from '@ant-design/icons';
 
 const GlobalContext = createContext();
@@ -21,6 +21,24 @@ export const GlobalProvider = ({ children }) => {
     { id: 2, staff: "Nguyễn Văn A", shift: "Sáng", start: "06:00", end: "13:44", vehicles: 452, status: "HOÀN THÀNH", isCurrent: false },
     { id: 3, staff: "Trần Thị B", shift: "Đêm", start: "22:00", end: "06:00", vehicles: 318, status: "HOÀN THÀNH", isCurrent: false }
   ]);
+
+  // Fetch from backend on load
+  useEffect(() => {
+    import('../services/shiftService').then(module => {
+      module.shiftService.getShifts().then(data => {
+        if (data && data.length > 0) {
+          // Map backend entities to UI state
+          const mapped = data.map(d => ({
+            id: d.id, staff: d.staffName, shift: d.shiftType, 
+            start: new Date(d.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+            end: d.endTime ? new Date(d.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
+            vehicles: d.vehiclesHandled || 0, status: d.status, isCurrent: d.isCurrent
+          }));
+          setShiftHistory(mapped);
+        }
+      });
+    });
+  }, []);
 
   // 1. Transactions State
   const [transactions, setTransactions] = useState([
@@ -65,6 +83,8 @@ export const GlobalProvider = ({ children }) => {
     transfer: 7250000,
     transactions: 482
   });
+  
+  const [dailyVolume, setDailyVolume] = useState(1284);
 
   const updateShiftStats = (amount, isCash = true) => {
     setShiftStats(prev => ({
@@ -79,7 +99,7 @@ export const GlobalProvider = ({ children }) => {
   const [activeVehicles, setActiveVehicles] = useState([
     { id: 1, plate: "51A-123.45", type: "Vãng lai", confidence: "98.4%", status: "Hợp lệ", gate: "Cổng vào 1", inTime: "08:15", outTime: "--:--", image: "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80", model: "Kia Morning", duration: "Đang vào" },
     { id: 2, plate: "72C-889.01", type: "VIP", confidence: "99.1%", status: "Hợp lệ", gate: "Cổng ra 1", inTime: "07:00", outTime: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}), image: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80", model: "Fiat 500", duration: "3h 15m" },
-    { id: 3, plate: "30E-555.55", type: "Vé tháng", confidence: "97.5%", status: "Lỗi thẻ", gate: "Cổng ra VIP", inTime: "09:30", outTime: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}), image: "https://images.unsplash.com/photo-1503376713246-1e66cce2b164?auto=format&fit=crop&w=600&q=80", model: "Mazda 3", duration: "1h 45m" },
+    { id: 3, plate: "30E-555.55", type: "Vé tháng", confidence: "97.5%", status: "Lỗi thẻ", gate: "Cổng ra VIP", inTime: "09:30", outTime: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}), image: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80", model: "Mazda 3", duration: "1h 45m" },
     { id: 4, plate: "51K-443.21", type: "Vãng lai", confidence: "95.2%", status: "Chờ thanh toán", gate: "Cổng ra Khách", inTime: "08:00", outTime: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}), image: "https://images.unsplash.com/photo-1600661653561-629509216228?auto=format&fit=crop&w=600&q=80", model: "Tesla Model Y", duration: "3h 30m" },
     { id: 5, plate: "99A-999.99", type: "Biển đen", confidence: "99.9%", status: "Cảnh báo", gate: "Cổng vào 2", inTime: "Vừa xong", outTime: "--:--", image: "", model: "Toyota Vios", duration: "0m" }
   ]);
@@ -92,6 +112,14 @@ export const GlobalProvider = ({ children }) => {
     }
   };
 
+  const addActiveVehicle = (newVehicle) => {
+    setActiveVehicles(prev => {
+      // Check if already exists to prevent duplicates
+      if (prev.find(v => v.plate === newVehicle.plate)) return prev;
+      return [newVehicle, ...prev];
+    });
+  };
+
   return (
     <GlobalContext.Provider value={{ 
       searchValue, setSearchValue, activeLocation, setActiveLocation,
@@ -100,7 +128,8 @@ export const GlobalProvider = ({ children }) => {
       activityLogs, addActivityLog,
       securityAlerts, addSecurityAlert, removeSecurityAlert, restoreSecurityAlerts,
       shiftStats, updateShiftStats, setShiftStats,
-      activeVehicles, currentVehicle, setCurrentVehicle, removeActiveVehicle
+      dailyVolume, setDailyVolume,
+      activeVehicles, currentVehicle, setCurrentVehicle, removeActiveVehicle, addActiveVehicle
     }}>
       {children}
     </GlobalContext.Provider>

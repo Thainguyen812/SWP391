@@ -250,7 +250,12 @@ export const StaffDashboard = () => {
                   onClick={() => setCurrentVehicle(vehicle)}
                   className={`relative rounded-lg overflow-hidden border-2 aspect-[16/9] bg-slate-900 group cursor-pointer transition-all ${isSelected ? 'border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)] scale-[1.02] z-10' : 'border-slate-200 hover:border-slate-400 opacity-90 hover:opacity-100'}`}
                 >
-                  <img src={vehicle.image || "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80"} alt={`Cam ${index + 1}`} className="w-full h-full object-cover opacity-80" />
+                  <img 
+                    src={vehicle.image || "https://placehold.co/600x400/1e293b/ffffff?text=Camera+Feed"} 
+                    onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/600x400/1e293b/ffffff?text=Camera+Feed"; }}
+                    alt={`Cam ${index + 1}`} 
+                    className="w-full h-full object-cover opacity-80" 
+                  />
                   
                   <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm">
                     CAM-0{index + 1}: {vehicle.gate.toUpperCase()}

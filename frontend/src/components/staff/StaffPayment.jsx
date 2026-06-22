@@ -14,32 +14,50 @@ import {
 } from '@ant-design/icons';
 import { notification, Input, Button, Modal, Spin } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
+import { apiClient } from '../../api/apiClient';
 
 export const StaffPayment = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { addTransaction, updateShiftStats, addActivityLog, currentVehicle, removeActiveVehicle } = useGlobalContext();
+  const { transactions, addTransaction, updateShiftStats, addActivityLog, currentVehicle, removeActiveVehicle } = useGlobalContext();
   
   const lostCardData = location.state?.lostCardVehicle;
   const isLostCard = location.state?.isLostCard;
   const penaltyAmount = location.state?.penaltyAmount || 200000;
   const baseAmount = 50000;
-  const totalAmount = isLostCard ? (baseAmount + penaltyAmount) : baseAmount;
-
+  
+  const [totalAmount, setTotalAmount] = useState(isLostCard ? (baseAmount + penaltyAmount) : baseAmount);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [lan1Status, setLan1Status] = useState(isLostCard ? 'busy' : 'free');
-  const [lan2Status, setLan2Status] = useState('busy');
-  const [lpr, setLpr] = useState(lostCardData?.plate || currentVehicle?.plate || '30G-123.45');
+  const [lan2Status, setLan2Status] = useState('free');
+  const [lpr, setLpr] = useState(lostCardData?.plate || currentVehicle?.plate || '');
   const [isEditingLpr, setIsEditingLpr] = useState(false);
-  const [hasVehicle, setHasVehicle] = useState(true);
+  const [hasVehicle, setHasVehicle] = useState(isLostCard ? true : false);
   const [cashGiven, setCashGiven] = useState(totalAmount);
-  
-  const [transactions, setTransactions] = useState([
-    { id: 1, time: '12:35:10', lpr: '29A-999.99', type: 'Vãng lai', typeClass: 'bg-slate-100 text-slate-600', amount: '30,000', status: 'Thành công', statusClass: 'text-emerald-600', icon: <CheckCircleFilled className="mr-1"/> },
-    { id: 2, time: '12:28:45', lpr: '30E-123.88', type: 'Tháng (VIP)', typeClass: 'bg-slate-800 text-white', amount: '0', status: 'Mở tự động', statusClass: 'text-emerald-600', icon: <CheckCircleFilled className="mr-1"/> },
-    { id: 3, time: '12:15:02', lpr: 'UNKNOWN', type: 'Không xác định', typeClass: 'bg-slate-200 text-slate-500', amount: '-', status: 'Lỗi đọc biển', statusClass: 'text-red-600', icon: <WarningFilled className="mr-1"/>, rowClass: 'border-b border-red-50 hover:bg-red-50/50 bg-red-50/20 text-red-600' },
-    { id: 4, time: '12:10:30', lpr: '51F-777.22', type: 'Vãng lai', typeClass: 'bg-slate-100 text-slate-600', amount: '150,000', status: 'Thành công', statusClass: 'text-emerald-600', icon: <CheckCircleFilled className="mr-1"/> }
-  ]);
+  const [cardCode, setCardCode] = useState('');
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [backendTxn, setBackendTxn] = useState(null);
+
+  const handleScanCard = async () => {
+    if (!cardCode) return notification.warning({message: 'Vui lòng nhập hoặc quét mã thẻ'});
+    setIsCheckingOut(true);
+    try {
+      const response = await apiClient.post(`/v1/parking/checkout-by-code/${cardCode}`);
+      const txn = response.data;
+      
+      setBackendTxn(txn);
+      setLpr(`THẺ: ${cardCode}`); // Since backend doesn't return plate directly in Transaction
+      setTotalAmount(txn.totalAmount);
+      setCashGiven(txn.totalAmount);
+      setHasVehicle(true);
+      setLan1Status('busy');
+      notification.success({message: 'Quét thẻ thành công', description: `Đã tính phí: ${txn.totalAmount} VND. Vui lòng thu tiền.`});
+    } catch (error) {
+      notification.error({message: 'Lỗi Check-out', description: error.response?.data?.message || 'Không thể check-out bằng thẻ này'});
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
 
   const handlePayment = () => {
     Modal.confirm({
@@ -50,9 +68,6 @@ export const StaffPayment = () => {
       okButtonProps: { className: 'bg-emerald-600 border-emerald-600 hover:bg-emerald-700' },
       onOk() {
         notification.success({message: 'Thanh toán thành công', description: 'Đã gửi lệnh mở cổng ra.', placement: 'topRight'});
-        
-        // Update Local Mock
-        setTransactions([{ id: Date.now(), time: new Date().toLocaleTimeString('en-GB'), lpr: lpr, type: isLostCard ? 'Phạt thẻ' : 'Vãng lai', typeClass: isLostCard ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600', amount: totalAmount.toLocaleString(), status: 'Thành công', statusClass: 'text-emerald-600', icon: <CheckCircleFilled className="mr-1"/> }, ...transactions.slice(0, 3)]);
         
         // Update Global Context
         addTransaction({
@@ -85,11 +100,13 @@ export const StaffPayment = () => {
           actionColor: "text-emerald-600"
         });
 
-        if (isLostCard) {
-            removeActiveVehicle(lpr);
-        }
+        removeActiveVehicle(lpr);
 
         setHasVehicle(false);
+        setBackendTxn(null);
+        setCardCode('');
+        setTotalAmount(0);
+        setCashGiven(0);
         setLan1Status('free');
       }
     });
@@ -111,13 +128,7 @@ export const StaffPayment = () => {
   };
 
   const simulateNextVehicle = () => {
-    const plates = ['29A-888.88', '30F-123.45', '51G-555.55', '14A-111.11'];
-    setLpr(plates[Math.floor(Math.random() * plates.length)]);
-    setPaymentMethod('cash');
-    setCashGiven(totalAmount);
-    setHasVehicle(true);
-    setLan1Status('busy');
-    notification.info({message: 'Xe mới tiến vào làn', description: `Camera LPR đã nhận diện biển số.`, placement: 'topRight'});
+    // Removed because we now use real scanning API
   };
 
   const handleCheckout = () => {
@@ -158,16 +169,26 @@ export const StaffPayment = () => {
           {!hasVehicle ? (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-12 flex flex-col items-center justify-center h-[550px]">
               <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6 shadow-inner border border-slate-100">
-                <CarOutlined className="text-5xl text-slate-300" />
+                <CreditCardOutlined className="text-5xl text-blue-500 animate-pulse" />
               </div>
               <h3 className="text-xl font-bold text-slate-600 mb-2">Làn ra đang trống</h3>
-              <p className="text-slate-400 mb-8 text-center max-w-sm">Hệ thống camera đang giám sát và chờ phương tiện tiếp theo tiến vào vạch nhận diện...</p>
-              <button 
-                onClick={simulateNextVehicle} 
-                className="bg-white border border-slate-300 text-slate-700 px-6 py-3 rounded-lg shadow-sm hover:bg-slate-50 font-bold transition-colors cursor-pointer"
-              >
-                Giả lập xe tiếp theo tới
-              </button>
+              <p className="text-slate-400 mb-8 text-center max-w-sm">Hệ thống camera đang giám sát. Vui lòng quẹt thẻ của khách (vãng lai) để bắt đầu Check-out.</p>
+              
+              <div className="flex flex-col gap-3 w-full max-w-xs">
+                <Input 
+                  placeholder="Nhập hoặc quét mã thẻ..." 
+                  size="large"
+                  value={cardCode}
+                  onChange={e => setCardCode(e.target.value)}
+                  onPressEnter={handleScanCard}
+                  disabled={isCheckingOut}
+                  autoFocus
+                  className="text-center font-mono text-lg font-bold"
+                />
+                <Button type="primary" size="large" onClick={handleScanCard} loading={isCheckingOut} className="w-full font-bold bg-blue-600 shadow-md">
+                  QUÉT THẺ TÍNH PHÍ (API)
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-6">
@@ -359,13 +380,20 @@ export const StaffPayment = () => {
                 </tr>
               </thead>
               <tbody>
-                {transactions.map(txn => (
-                  <tr key={txn.id} className={txn.rowClass || "border-b border-slate-50 hover:bg-slate-50 transition-colors"}>
-                    <td className="p-4 text-slate-600">{txn.time}</td>
-                    <td className={`p-4 font-bold ${txn.lpr === 'UNKNOWN' ? 'text-red-600' : 'text-slate-800'}`}>{txn.lpr}</td>
-                    <td className="p-4"><span className={`${txn.typeClass} text-[10px] px-2 py-0.5 rounded font-medium`}>{txn.type}</span></td>
+                {transactions.slice(0, 5).map(txn => (
+                  <tr key={txn.id} className={txn.hasError ? "border-b border-red-50 bg-red-50/20 hover:bg-red-50/50 transition-colors" : "border-b border-slate-50 hover:bg-slate-50 transition-colors"}>
+                    <td className="p-4 text-slate-600">{txn.outTime || txn.inTime}</td>
+                    <td className={`p-4 font-bold ${txn.hasError ? 'text-red-600' : 'text-slate-800'}`}>{txn.plate}</td>
+                    <td className="p-4">
+                      <span className={`${txn.type === 'car' ? 'bg-slate-100 text-slate-600' : 'bg-blue-100 text-blue-600'} text-[10px] px-2 py-0.5 rounded font-medium uppercase`}>
+                        {txn.type === 'car' ? 'Ô TÔ' : (txn.type === 'moto' ? 'XE MÁY' : txn.type)}
+                      </span>
+                    </td>
                     <td className="p-4 font-bold text-slate-800 text-right">{txn.amount}</td>
-                    <td className={`p-4 text-xs font-bold ${txn.statusClass}`}>{txn.icon} {txn.status}</td>
+                    <td className={`p-4 text-xs font-bold ${txn.statusColor.split(' ')[1]}`}>
+                      {txn.hasError ? <CloseCircleFilled className="mr-1" /> : <CheckCircleFilled className="mr-1" />} 
+                      {txn.status}
+                    </td>
                   </tr>
                 ))}
               </tbody>

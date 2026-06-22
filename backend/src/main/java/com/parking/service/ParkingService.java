@@ -17,6 +17,7 @@ public interface ParkingService {
     
     CheckInResponse visitorCheckIn(VisitorCheckInRequest request);//task 5 check in vãn lai
     Transaction checkoutCard(UUID cardId); //task 5 check out vãn lai
+    Transaction checkoutCardByCode(String cardCode);
 
     Transaction congestionCheckout( // check out lưu động vãn lai 
     CongestionCheckoutRequest request

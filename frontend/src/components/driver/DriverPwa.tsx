@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { apiClient } from '../../api/apiClient';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
@@ -377,22 +379,46 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false, liv
   // ----------------------------------------------------
   // --- ANTI-THEFT BLOCK / TOGGLING STATE ---
   // ----------------------------------------------------
-  const handleToggleLock = (sessionPlate: string) => {
-    let newLockState = false;
-    setSessions(prev => prev.map(s => {
-      if (s.vehicle_plate === sessionPlate) {
-        newLockState = !s.is_locked;
-        return { ...s, is_locked: newLockState };
-      }
-      return s;
-    }));
-
-    addLog(`[DRIVER_PORTAL] [UPDATE] Set lock constraint is_locked=${newLockState.toString().toUpperCase()} for ${sessionPlate}.`);
+  const handleToggleLock = async (sessionPlate: string) => {
+    // Tìm session hiện tại
+    const session = sessions.find(s => s.vehicle_plate === sessionPlate);
+    if (!session) return;
     
-    if (newLockState) {
-      triggerToast(`Đã bật chế độ chống trộm cực đỉnh cho xe ${sessionPlate}. Radar quét liên tục bảo vệ tích cực.`, 'success');
-    } else {
-      triggerToast(`Đã tắt khóa an toàn bảo vệ xe ${sessionPlate}. Giờ đây xe có thể ra bãi bình thường.`, 'info');
+    const newLockState = !session.is_locked;
+    // Tạm dùng id của session thay cho vehicleId, hoặc random UUID nếu không đúng định dạng
+    const dummyVehicleId = '123e4567-e89b-12d3-a456-426614174000'; // FIXME: Replace with real vehicleId when available
+
+    try {
+      // Gọi API thực tế
+      await apiClient.put(`/v1/driver/vehicle/lock`, {
+        vehicleId: session.id.includes('-') ? session.id : dummyVehicleId, 
+        lockStatus: newLockState
+      });
+      
+      setSessions(prev => prev.map(s => {
+        if (s.vehicle_plate === sessionPlate) {
+          return { ...s, is_locked: newLockState };
+        }
+        return s;
+      }));
+
+      addLog(`[DRIVER_PORTAL] [UPDATE] Set lock constraint is_locked=${newLockState.toString().toUpperCase()} for ${sessionPlate} via API.`);
+      
+      if (newLockState) {
+        triggerToast(`Đã bật chế độ chống trộm cực đỉnh cho xe ${sessionPlate}. Radar quét liên tục bảo vệ tích cực.`, 'success');
+      } else {
+        triggerToast(`Đã tắt khóa an toàn bảo vệ xe ${sessionPlate}. Giờ đây xe có thể ra bãi bình thường.`, 'info');
+      }
+    } catch (err) {
+      console.error("Lock vehicle error", err);
+      // Fallback for UI if API fails (since we are testing without real session context)
+      setSessions(prev => prev.map(s => {
+        if (s.vehicle_plate === sessionPlate) {
+          return { ...s, is_locked: newLockState };
+        }
+        return s;
+      }));
+      triggerToast(`(Fallback) Đã ${newLockState ? 'bật' : 'tắt'} khóa an toàn bảo vệ xe ${sessionPlate}. (Lỗi API)`, 'warning');
     }
   };
 
@@ -425,23 +451,49 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false, liv
     return () => clearInterval(timer);
   }, [qrToken, qrStatusText]);
 
-  const handleGenerateNewQr = (purpose: string = "Thẻ xe tháng ra/vào bãi") => {
-    const expiredAt = Date.now() + 5 * 60 * 1000; // 5 mins
-    const mockToken = `UP_TOKEN_${Math.random().toString(36).substring(2, 10).toUpperCase()}_${Date.now().toString().slice(-4)}`;
+  const handleGenerateNewQr = async (purpose: string = "Thẻ xe tháng ra/vào bãi") => {
+    const dummyVehicleId = '123e4567-e89b-12d3-a456-426614174000'; // FIXME: Thay bằng vehicleId thật
     
-    const newQr: VipQrIdentifier = {
-      qr_token: mockToken,
-      purpose,
-      expired_at: expiredAt,
-      is_used: false
-    };
+    try {
+      const response = await apiClient.post(`/v1/driver/qr/generate`, {
+        vehicleId: dummyVehicleId,
+        purpose: purpose
+      });
 
-    setQrToken(newQr);
-    setSecondsLeft(300);
-    setQrStatusText('ACTIVE');
+      const data = response.data;
+      const expiredAt = new Date(data.expiredAt || Date.now() + 5 * 60 * 1000).getTime();
+      
+      const newQr: VipQrIdentifier = {
+        qr_token: data.qrToken,
+        purpose: data.purpose,
+        expired_at: expiredAt,
+        is_used: data.used
+      };
 
-    addLog(`[QR_MODULE] [POST] Generated dynamic QR Token: ${mockToken}. expired_at: ${new Date(expiredAt).toLocaleTimeString('vi-VN')}. Purpose: ${purpose}`);
-    triggerToast(`Đã tạo mã QR bảo mật động mới. Có hiệu lực trong vòng 5 phút (Sinh mã dùng 1 lần)`, 'success');
+      setQrToken(newQr);
+      setSecondsLeft(Math.floor((expiredAt - Date.now()) / 1000));
+      setQrStatusText('ACTIVE');
+
+      addLog(`[QR_MODULE] [POST] Generated dynamic QR via API: ${data.qrToken}`);
+      triggerToast(`Đã tạo mã QR bảo mật động mới. Có hiệu lực trong vòng 5 phút (Sinh mã dùng 1 lần)`, 'success');
+    } catch (err) {
+      console.error("Generate QR error", err);
+      // Fallback
+      const expiredAt = Date.now() + 5 * 60 * 1000;
+      const mockToken = `UP_TOKEN_${Math.random().toString(36).substring(2, 10).toUpperCase()}_${Date.now().toString().slice(-4)}`;
+      
+      const newQr: VipQrIdentifier = {
+        qr_token: mockToken,
+        purpose,
+        expired_at: expiredAt,
+        is_used: false
+      };
+
+      setQrToken(newQr);
+      setSecondsLeft(300);
+      setQrStatusText('ACTIVE');
+      triggerToast(`(Fallback) Đã tạo mã QR bảo mật động tạm thời do lỗi API`, 'warning');
+    }
   };
 
   const handleSimulateScanAtGate = () => {
