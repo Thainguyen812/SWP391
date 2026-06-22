@@ -75,6 +75,15 @@ public class ParkingController {
         return ResponseEntity.ok(
                 parkingService.checkoutCard(cardId));
     }
+    
+    // confirm check out dành cho staff
+    @PostMapping("/checkout/confirm/{transactionId}")
+    public ResponseEntity<Transaction> confirmCheckout(
+        @PathVariable UUID transactionId) {
+
+        return ResponseEntity.ok(
+            parkingService.confirmCheckout(transactionId));
+}
 
     @PostMapping("/checkout-by-code/{cardCode}")
     public ResponseEntity<Transaction> checkoutByCode(
