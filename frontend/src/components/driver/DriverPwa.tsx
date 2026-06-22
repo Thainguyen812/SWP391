@@ -127,7 +127,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [isOffline, setIsOffline] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'vnpay'>('wallet');
   const [balance, setBalance] = useState<number>(() => {
-    const saved = localStorage.getItem('urbanpark_user_balance');
+    const saved = localStorage.getItem(`urbanpark_user_balance_${user?.username || 'default'}`);
     return saved ? parseFloat(saved) : 0; // Default to 0 for new users
   });
 
@@ -136,7 +136,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [isTogglingLock, setIsTogglingLock] = useState<string | null>(null);
 
   const [vehicles, setVehicles] = useState<UserVehicle[]>(() => {
-    const saved = localStorage.getItem('urbanpark_user_vehicles');
+    const saved = localStorage.getItem(`urbanpark_user_vehicles_${user?.username || 'default'}`);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -187,7 +187,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   }, []);
 
   const [transactions, setTransactions] = useState<TransactionItem[]>(() => {
-    const saved = localStorage.getItem('urbanpark_user_transactions');
+    const saved = localStorage.getItem(`urbanpark_user_transactions_${user?.username || 'default'}`);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -336,16 +336,16 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
   // Sync state to LocalStorage
   useEffect(() => {
-    localStorage.setItem('urbanpark_user_balance', balance.toString());
-  }, [balance]);
+    localStorage.setItem(`urbanpark_user_balance_${user?.username || 'default'}`, balance.toString());
+  }, [balance, user?.username]);
 
   useEffect(() => {
-    localStorage.setItem('urbanpark_user_vehicles', JSON.stringify(vehicles));
-  }, [vehicles]);
+    localStorage.setItem(`urbanpark_user_vehicles_${user?.username || 'default'}`, JSON.stringify(vehicles));
+  }, [vehicles, user?.username]);
 
   useEffect(() => {
-    localStorage.setItem('urbanpark_user_transactions', JSON.stringify(transactions));
-  }, [transactions]);
+    localStorage.setItem(`urbanpark_user_transactions_${user?.username || 'default'}`, JSON.stringify(transactions));
+  }, [transactions, user?.username]);
 
   // Auto-select first vehicle for VIP reg if none is selected or selection is invalid
   useEffect(() => {
