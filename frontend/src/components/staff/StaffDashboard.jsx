@@ -25,7 +25,7 @@ export const StaffDashboard = () => {
   const [violationPlate, setViolationPlate] = useState('');
   const [violationReason, setViolationReason] = useState('Đỗ sai quy định');
 
-  const { activityLogs, addSecurityAlert, securityAlerts, currentVehicle, setCurrentVehicle, activeVehicles } = useGlobalContext();
+  const { activityLogs, addActivityLog, addSecurityAlert, securityAlerts, currentVehicle, setCurrentVehicle, activeVehicles } = useGlobalContext();
 
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
@@ -105,6 +105,18 @@ export const StaffDashboard = () => {
         okButtonProps: { type: 'primary', className: 'bg-blue-600' },
         onOk() {
           setIsManualBarrierOpen(true);
+          addActivityLog({
+            plate: 'N/A',
+            model: 'Thủ công',
+            type: 'MỞ BARRIER',
+            gate: 'Cổng Khẩn Cấp',
+            action: 'Mở Thủ công',
+            time: 'Vừa xong',
+            status: 'THÀNH CÔNG',
+            typeColor: 'text-orange-600',
+            statusColor: 'bg-emerald-100 text-emerald-700',
+            actionColor: 'text-emerald-600'
+          });
           notification.success({ message: 'Thành công', description: 'Lệnh mở Barrier đã được gửi đến thiết bị.', placement: 'topRight' });
         }
       });
@@ -118,6 +130,18 @@ export const StaffDashboard = () => {
         okButtonProps: { type: 'primary', danger: true, className: 'bg-red-600' },
         onOk() {
           setIsManualBarrierOpen(false);
+          addActivityLog({
+            plate: 'N/A',
+            model: 'Thủ công',
+            type: 'ĐÓNG BARRIER',
+            gate: 'Cổng Khẩn Cấp',
+            action: 'Đóng Thủ công',
+            time: 'Vừa xong',
+            status: 'THÀNH CÔNG',
+            typeColor: 'text-orange-600',
+            statusColor: 'bg-emerald-100 text-emerald-700',
+            actionColor: 'text-emerald-600'
+          });
           notification.success({ message: 'Thành công', description: 'Lệnh đóng Barrier đã được gửi đến thiết bị.', placement: 'topRight' });
         }
       });
@@ -373,13 +397,13 @@ export const StaffDashboard = () => {
                     <Spin size="large" tip="Đang tải dữ liệu thực từ máy chủ..." />
                   </td>
                 </tr>
-              ) : logs.length === 0 ? (
+              ) : displayLogs.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="p-8 text-center text-slate-500">
                     Không có dữ liệu
                   </td>
                 </tr>
-              ) : logs.map((log, i) => (
+              ) : displayLogs.map((log, i) => (
                 <tr key={i} className="hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
                   <td className="p-4">
                     <div className="flex items-center gap-3">
