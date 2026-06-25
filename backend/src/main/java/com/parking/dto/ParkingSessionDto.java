@@ -9,6 +9,7 @@ public class ParkingSessionDto {
     private UUID id;
     private String licensePlate;
     private UUID assignedZoneId;
+    private UUID cardId;
     private Instant checkInTime;
     private Instant checkOutTime;
     private String sessionStatus;
@@ -25,6 +26,7 @@ public class ParkingSessionDto {
         this.id = session.getId();
         this.licensePlate = session.getLicensePlate();
         this.assignedZoneId = session.getAssignedZoneId();
+        this.cardId = session.getCardId();
         this.checkInTime = session.getCheckInTime();
         this.checkOutTime = session.getCheckOutTime();
         this.sessionStatus = session.getSessionStatus() != null ? session.getSessionStatus().name() : null;
@@ -42,6 +44,7 @@ public class ParkingSessionDto {
     public UUID getId() { return id; }
     public String getLicensePlate() { return licensePlate; }
     public UUID getAssignedZoneId() { return assignedZoneId; }
+    public UUID getCardId() { return cardId; }
     public Instant getCheckInTime() { return checkInTime; }
     public Instant getCheckOutTime() { return checkOutTime; }
     public String getSessionStatus() { return sessionStatus; }
