@@ -195,22 +195,24 @@ export const StaffDashboard = () => {
     <div className="p-6 w-full">
       
       {/* Alert Banner */}
-      <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg flex justify-between items-center mb-6">
-        <div className="flex items-start gap-3">
-          <InfoCircleOutlined className="text-red-500 mt-1" />
-          <div>
-            <h4 className="text-red-600 font-bold text-xs tracking-wider uppercase mb-1">Trạng thái: Lưu lượng cao</h4>
-            <p className="text-slate-700 text-sm m-0">Cổng vào số 1 đang có dấu hiệu ùn tắc. Vui lòng hỗ trợ điều phối.</p>
+      {securityAlerts && securityAlerts.length > 0 && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg flex justify-between items-center mb-6">
+          <div className="flex items-start gap-3">
+            <InfoCircleOutlined className="text-red-500 mt-1" />
+            <div>
+              <h4 className="text-red-600 font-bold text-xs tracking-wider uppercase mb-1">Cảnh báo An ninh</h4>
+              <p className="text-slate-700 text-sm m-0">Hệ thống đang có {securityAlerts.length} cảnh báo cần xử lý. Vui lòng kiểm tra màn hình Giám sát.</p>
+            </div>
           </div>
+          <button 
+            onClick={() => notification.info({ message: 'Hệ thống', description: 'Đã báo cáo tình trạng an ninh cho bộ phận quản lý.', placement: 'topRight' })}
+            className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium px-4 py-2 rounded flex items-center gap-2 text-sm transition-colors"
+          >
+            <SoundOutlined />
+            Báo cáo Quản lý
+          </button>
         </div>
-        <button 
-          onClick={() => notification.info({ message: 'Hệ thống', description: 'Đã ghi nhận báo cáo ùn tắc và thông báo cho Quản lý.', placement: 'topRight' })}
-          className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium px-4 py-2 rounded flex items-center gap-2 text-sm transition-colors"
-        >
-          <SoundOutlined />
-          Báo cáo Ùn tắc
-        </button>
-      </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

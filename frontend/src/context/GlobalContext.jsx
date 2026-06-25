@@ -85,7 +85,7 @@ export const GlobalProvider = ({ children }) => {
       if (logsRes.data && logsRes.data.items && logsRes.data.items.length > 0) {
         setActivityLogs(logsRes.data.items);
       } else {
-        setActivityLogs(FALLBACK_LOGS); // Mock fallback if empty from API temporarily
+        setActivityLogs([]); // Empty data is fine, do not fallback
       }
 
       // 2. Fetch Transactions
@@ -93,7 +93,7 @@ export const GlobalProvider = ({ children }) => {
       if (txnRes.data && txnRes.data.items && txnRes.data.items.length > 0) {
         setTransactions(txnRes.data.items);
       } else {
-        setTransactions(FALLBACK_TRANSACTIONS);
+        setTransactions([]);
       }
       
       // 3. Fetch Shifts
