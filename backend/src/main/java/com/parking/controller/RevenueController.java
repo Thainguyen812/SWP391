@@ -86,7 +86,7 @@ public class RevenueController {
         // Lấy các giao dịch trong ngày hôm nay (giả lập ca hiện tại)
         java.time.LocalDate today = java.time.LocalDate.now();
         List<Transaction> shiftTxns = transactions.stream()
-            .filter(t -> t.getCreatedAt() != null && t.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toLocalDate().equals(today))
+            .filter(t -> t.getProcessedAt() != null && t.getProcessedAt().atZone(java.time.ZoneId.systemDefault()).toLocalDate().equals(today))
             .toList();
 
         double revenue = 0;
@@ -96,7 +96,7 @@ public class RevenueController {
         for (Transaction t : shiftTxns) {
             double amount = t.getTotalAmount() != null ? t.getTotalAmount().doubleValue() : 0.0;
             revenue += amount;
-            if ("TIỀN MẶT".equalsIgnoreCase(t.getPaymentMethod()) || "CASH".equalsIgnoreCase(t.getPaymentMethod())) {
+            if (Transaction.PaymentMethod.CASH.equals(t.getPaymentMethod())) {
                 cash += amount;
             } else {
                 transfer += amount;
