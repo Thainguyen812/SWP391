@@ -186,88 +186,37 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     return () => clearInterval(timer);
   }, []);
 
-  const [transactions, setTransactions] = useState<TransactionItem[]>(() => {
-    const saved = localStorage.getItem(`urbanpark_user_transactions_${user?.username || 'default'}`);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    
-    // Generate realistic seeded transactions relative to current date
-    const now = new Date();
-    const formatDate = (d: Date) => {
-      const day = String(d.getDate()).padStart(2, '0');
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const year = d.getFullYear();
-      return `${day}/${month}/${year}`;
-    };
-    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
-    const lastMonth = new Date(now); lastMonth.setMonth(now.getMonth() - 1);
-    const threeMonthsAgo = new Date(now); threeMonthsAgo.setMonth(now.getMonth() - 3);
-    const lastYear = new Date(now); lastYear.setFullYear(now.getFullYear() - 1);
-    const twoYearsAgo = new Date(now); twoYearsAgo.setFullYear(now.getFullYear() - 2);
+  const [transactions, setTransactions] = useState<TransactionItem[]>([]);
 
-    return [
-      {
-        id: 'TXN-8761',
-        date: 'Vừa xong',
-        type: 'Nạp ví VNPAY',
-        plate: '-',
-        fee: '+$50.00',
-        isEntry: true,
-        status: 'Thành công'
-      },
-      {
-        id: 'TXN-8762',
-        date: formatDate(yesterday),
-        type: 'Xe ô tô vào bãi',
-        plate: '30A-99999',
-        fee: '-$2.00',
-        isEntry: false,
-        status: 'Thành công'
-      },
-      {
-        id: 'TXN-8763',
-        date: formatDate(lastMonth),
-        type: 'Đăng kí Thẻ Tháng VIP',
-        plate: '30A-99999',
-        fee: '-$40.00',
-        isEntry: false,
-        status: 'Thành công'
-      },
-      {
-        id: 'TXN-8764',
-        date: formatDate(threeMonthsAgo),
-        type: 'Nạp ví VNPAY',
-        plate: '-',
-        fee: '+$100.00',
-        isEntry: true,
-        status: 'Thành công'
-      },
-      {
-        id: 'TXN-8765',
-        date: formatDate(lastYear),
-        type: 'Xe ô tô vào bãi',
-        plate: '29A-11111',
-        fee: '-$2.00',
-        isEntry: false,
-        status: 'Thành công'
-      },
-      {
-        id: 'TXN-8766',
-        date: formatDate(twoYearsAgo),
-        type: 'Đăng kí Thẻ Tháng VIP',
-        plate: '29A-11111',
-        fee: '-$40.00',
-        isEntry: false,
-        status: 'Thành công'
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        const response = await fetch('/api/logs', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.items && data.items.length > 0) {
+            const mapped = data.items.map((item: any, index: number) => ({
+              id: `#TRX-${9000 + index}`,
+              date: item.time,
+              type: 'Gửi xe',
+              plate: item.plate,
+              fee: item.action === 'Vào bãi' ? '0 đ' : '15,000 đ',
+              isEntry: item.action === 'Vào bãi',
+              status: item.status === 'Thành Công' ? 'Thành công' : 'Đang xử lý'
+            }));
+            setTransactions(mapped);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch driver transactions", err);
       }
-    ];
-  });
+    };
+    if (!isMock) {
+      fetchTransactions();
+    }
+  }, [user]);
 
   // Current parked vehicle mock details
   const [currentParked, setCurrentParked] = useState<{

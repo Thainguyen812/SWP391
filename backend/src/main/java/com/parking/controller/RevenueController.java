@@ -1,7 +1,9 @@
 package com.parking.controller;
 
 import com.parking.model.Transaction;
+import com.parking.model.ParkingSession;
 import com.parking.repository.TransactionRepository;
+import com.parking.repository.ParkingSessionRepository;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
@@ -10,9 +12,11 @@ import java.util.*;
 public class RevenueController {
     
     private final TransactionRepository transactionRepo;
+    private final ParkingSessionRepository sessionRepo;
 
-    public RevenueController(TransactionRepository transactionRepo) {
+    public RevenueController(TransactionRepository transactionRepo, ParkingSessionRepository sessionRepo) {
         this.transactionRepo = transactionRepo;
+        this.sessionRepo = sessionRepo;
     }
 
     @GetMapping("/summary")
@@ -54,8 +58,17 @@ public class RevenueController {
             Map<String, Object> item = new HashMap<>();
             item.put("id", t.getId().toString().substring(0,8));
             item.put("time", t.getProcessedAt() != null ? t.getProcessedAt().toString() : "Hôm nay");
-            item.put("plate", "---");
-            item.put("type", "Phương tiện");
+            
+            // Fetch associated ParkingSession for plate and type
+            Optional<ParkingSession> session = sessionRepo.findById(t.getSessionId());
+            if (session.isPresent()) {
+                item.put("plate", session.get().getLicensePlate());
+                item.put("type", session.get().getIsVip() != null && session.get().getIsVip() ? "VIP" : "Vãng lai");
+            } else {
+                item.put("plate", "---");
+                item.put("type", "Phương tiện");
+            }
+            
             item.put("amount", t.getTotalAmount() != null ? t.getTotalAmount().toString() + "đ" : "0đ");
             item.put("method", t.getPaymentMethod() != null ? t.getPaymentMethod().name() : "TIỀN MẶT");
             item.put("status", t.getPaymentStatus() != null ? t.getPaymentStatus().name() : "THÀNH CÔNG");

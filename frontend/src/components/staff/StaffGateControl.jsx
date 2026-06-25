@@ -14,7 +14,7 @@ import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffGateControl = () => {
   const navigate = useNavigate();
-  const { addActivityLog, activeVehicles, currentVehicle, setCurrentVehicle, addActiveVehicle, dailyVolume, setDailyVolume } = useGlobalContext();
+  const { addActivityLog, activeVehicles, currentVehicle, setCurrentVehicle, addActiveVehicle, dailyVolume, setDailyVolume, fetchAllDataFromBackend } = useGlobalContext();
   const [isEmergency, setIsEmergency] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('Tất cả');
@@ -69,34 +69,10 @@ export const StaffGateControl = () => {
       notification.success({ message: 'Thành công', description: `Đã check-in cho xe ${manualPlate} với thẻ ${manualCardCode}` });
       addLog(`[MANUAL_CHECKIN] Success: Plate ${manualPlate}, Type: ${manualType}, Card: ${manualCardCode}`, 'SUCCESS');
       
-      // Update Global Context so dashboard and history update instantly
-      addActivityLog({
-        plate: manualPlate,
-        model: manualType,
-        type: "VÃNG LAI",
-        gate: "MANUAL",
-        action: "Vào Cổng",
-        time: "Vừa xong",
-        status: "Thành Công",
-        typeColor: "text-blue-600",
-        statusColor: "bg-emerald-100 text-emerald-700",
-        actionColor: "text-emerald-600"
-      });
-
-      // Update real-time table gates
-      addActiveVehicle({
-        id: Date.now(), // Temporary random ID for frontend tracking
-        plate: manualPlate,
-        type: "Vãng lai",
-        confidence: "100%",
-        status: "Hợp lệ",
-        gate: "L-VÀO 1", // Mocking physical gate for the manual operation
-        inTime: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}),
-        outTime: "--:--",
-        image: "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80",
-        model: manualType,
-        duration: "Đang vào"
-      });
+      // Fetch latest data from backend to sync globally!
+      if (fetchAllDataFromBackend) {
+        fetchAllDataFromBackend();
+      }
       
       // Tăng biến đếm tổng lượt lên 1
       setDailyVolume(prev => prev + 1);
