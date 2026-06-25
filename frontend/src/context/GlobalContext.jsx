@@ -2,8 +2,6 @@ import React, { createContext, useState, useContext, useEffect, useCallback } fr
 import { WalletOutlined, CheckCircleFilled, CreditCardOutlined } from '@ant-design/icons';
 import { apiClient } from '../api/apiClient';
 
-const isMock = import.meta.env.VITE_USE_MOCK_API === 'true';
-
 const GlobalContext = createContext();
 
 // ---------------------------------------------------------
@@ -48,6 +46,7 @@ const FALLBACK_DAILY_VOLUME = 1284;
 
 export const GlobalProvider = ({ children }) => {
   const [searchValue, setSearchValue] = useState("");
+  const [useMockData, setUseMockData] = useState(false); // Default to Real Data
   const [totalGates, setTotalGates] = useState(6);
   const [activeLocation, setActiveLocation] = useState("toan-he-thong");
 
@@ -68,7 +67,7 @@ export const GlobalProvider = ({ children }) => {
 
   // CENTRALIZED FETCH FUNCTION
   const fetchAllDataFromBackend = useCallback(async () => {
-    if (isMock) {
+    if (useMockData) {
       setTransactions(FALLBACK_TRANSACTIONS);
       setActivityLogs(FALLBACK_LOGS);
       setActiveVehicles(FALLBACK_VEHICLES);
@@ -171,7 +170,7 @@ export const GlobalProvider = ({ children }) => {
       setCurrentUser(FALLBACK_CURRENT_USER);
       setShiftHistory(FALLBACK_SHIFT_HISTORY);
     }
-  }, []);
+  }, [useMockData]);
 
   // Use fetchAllDataFromBackend in useEffect
   useEffect(() => {
@@ -212,6 +211,7 @@ export const GlobalProvider = ({ children }) => {
   return (
     <GlobalContext.Provider value={{ 
       searchValue, setSearchValue, activeLocation, setActiveLocation, totalGates, setTotalGates,
+      useMockData, setUseMockData,
       currentUser, setCurrentUser, shiftHistory, setShiftHistory,
       transactions, addTransaction,
       activityLogs, addActivityLog,
