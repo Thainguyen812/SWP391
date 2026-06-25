@@ -33,6 +33,16 @@ public class LogController {
             item.put("action", isCheckOut ? "Ra bãi" : "Vào bãi");
             item.put("time", isCheckOut ? s.getCheckOutTime().toString() : (s.getCheckInTime() != null ? s.getCheckInTime().toString() : "Vừa xong"));
             
+            // Generate a deterministic random image based on license plate length or hash
+            String[] images = {
+                "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80",
+                "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80",
+                "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80",
+                "https://images.unsplash.com/photo-1600661653561-629509216228?auto=format&fit=crop&w=600&q=80"
+            };
+            int imgIndex = s.getLicensePlate() != null ? Math.abs(s.getLicensePlate().hashCode()) % images.length : 0;
+            item.put("image", images[imgIndex]);
+
             if (s.getIsSuspicious() != null && s.getIsSuspicious()) {
                 item.put("status", "Cảnh Báo");
                 item.put("statusColor", "bg-red-100 text-red-600");

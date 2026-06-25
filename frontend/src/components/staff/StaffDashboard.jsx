@@ -407,9 +407,19 @@ export const StaffDashboard = () => {
                 <tr key={i} className="hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
                   <td className="p-4">
                     <div className="flex items-center gap-3">
-                      <div className={`font-bold px-2 py-1 rounded bg-slate-100 text-slate-700 text-sm`}>
-                        {log.plate.split('-')[0]}
-                      </div>
+                      {log.image ? (
+                        <div className="w-12 h-8 rounded overflow-hidden bg-slate-900 border border-slate-200 shadow-sm flex-shrink-0">
+                          <img src={log.image} alt={log.plate} className="w-full h-full object-cover" />
+                        </div>
+                      ) : log.plate === 'N/A' ? (
+                        <div className="w-12 h-8 rounded bg-slate-100 border border-slate-200 text-slate-400 flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <WarningOutlined className="text-yellow-500" />
+                        </div>
+                      ) : (
+                        <div className={`font-bold px-2 py-1 rounded bg-slate-100 text-slate-700 text-sm flex-shrink-0`}>
+                          {log.plate.split('-')[0]}
+                        </div>
+                      )}
                       <div>
                         <div className="font-bold text-slate-800 text-sm">{log.plate}</div>
                         <div className="text-xs text-slate-500">{log.model}</div>
