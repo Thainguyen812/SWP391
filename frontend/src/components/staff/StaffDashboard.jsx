@@ -312,9 +312,7 @@ export const StaffDashboard = () => {
               // Nếu trạng thái là 'Hợp lệ', nghĩa là xe đã đi qua cổng và đang đỗ trong bãi -> Không hiển thị trên Camera nữa.
               const vehicle = activeVehicles?.find(v => 
                 v.gate && 
-                v.gate.toUpperCase() === cam.name.toUpperCase() && 
-                v.status !== 'Hợp lệ' && 
-                v.status !== 'ACTIVE'
+                v.gate.toUpperCase() === cam.name.toUpperCase()
               );
               const isSelected = vehicle && currentVehicle?.id === vehicle.id;
               

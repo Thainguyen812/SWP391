@@ -38,7 +38,7 @@ export const StaffMonitoring = () => {
 
     for (let i = 1; i <= entryCount; i++) {
       const gateName = `CỔNG VÀO ${i}`;
-      const processingVehicle = activeVehicles?.find(v => v.gate && v.gate.toUpperCase() === gateName && v.status !== 'Hợp lệ' && v.status !== 'ACTIVE');
+      const processingVehicle = activeVehicles?.find(v => v.gate && v.gate.toUpperCase() === gateName);
       dynamicCams.push({
         id: `IN-${i}`,
         name: gateName,
@@ -53,7 +53,7 @@ export const StaffMonitoring = () => {
     
     for (let i = 1; i <= exitCount; i++) {
       const gateName = `CỔNG RA ${i}`;
-      const processingVehicle = activeVehicles?.find(v => v.gate && v.gate.toUpperCase() === gateName && v.status !== 'Hợp lệ' && v.status !== 'ACTIVE');
+      const processingVehicle = activeVehicles?.find(v => v.gate && v.gate.toUpperCase() === gateName);
       dynamicCams.push({
         id: `OUT-${i}`,
         name: gateName,
