@@ -155,10 +155,11 @@ export const GlobalProvider = ({ children }) => {
         console.error("Failed to fetch sessions for active vehicles", e);
         setActiveVehicles([]);
       } 
-      setSecurityAlerts([]);
-      setShiftStats({ revenue: 0, cash: 0, transfer: 0, transactions: 0 });
-      setDailyVolume(0);
-      setCurrentUser({ name: "Chưa đăng nhập", id: "N/A", station: "N/A", avatar: "", shift: "N/A" });
+      // Cấp dữ liệu giả cho các phần chưa có API backend
+      setSecurityAlerts(FALLBACK_SECURITY_ALERTS);
+      setShiftStats(FALLBACK_SHIFT_STATS);
+      setDailyVolume(FALLBACK_DAILY_VOLUME);
+      setCurrentUser(FALLBACK_CURRENT_USER);
 
     } catch (error) {
       console.error("Failed to fetch backend data", error);
