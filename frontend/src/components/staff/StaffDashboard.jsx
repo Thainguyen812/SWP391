@@ -45,7 +45,7 @@ export const StaffDashboard = () => {
   // Combine local global context logs (for live interactions) with backend logs
   const displayLogs = [...activityLogs, ...logs];
 
-  const activeGatesCount = activeVehicles ? activeVehicles.length : 0;
+  const vehiclesInLotCount = activeVehicles ? activeVehicles.length : 0;
   const pendingProcessingCount = activeVehicles ? activeVehicles.filter(v => v.status !== 'Hợp lệ').length : 0;
   const waitingPaymentCount = activeVehicles ? activeVehicles.filter(v => v.status === 'Chờ thanh toán' || v.status === 'Lỗi thẻ').length : 0;
   const alertsCount = securityAlerts ? securityAlerts.length : 0;
@@ -224,19 +224,20 @@ export const StaffDashboard = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Làn hoạt động */}
+        {/* Xe trong bãi */}
         <div 
-          onClick={() => { setNewGateCount(totalGates || 6); setIsGateConfigModalVisible(true); }}
-          className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
+          className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between"
         >
-          <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Làn hoạt động</h4>
+          <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Xe trong bãi</h4>
           <div className="flex items-center justify-between">
             <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-extrabold text-slate-800">4</span>
-              <span className="text-xl text-slate-400 font-medium">/{totalGates || 6}</span>
+              <span className="text-4xl font-extrabold text-slate-800">{vehiclesInLotCount}</span>
+              <span className="text-xl text-slate-400 font-medium">xe</span>
             </div>
             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
-              <div className="w-4 h-4 border-2 border-blue-500 rounded-full"></div>
+              <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
             </div>
           </div>
         </div>
