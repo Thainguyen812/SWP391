@@ -155,21 +155,21 @@ export const GlobalProvider = ({ children }) => {
         console.error("Failed to fetch sessions for active vehicles", e);
         setActiveVehicles([]);
       } 
-      setSecurityAlerts(FALLBACK_SECURITY_ALERTS);
-      setShiftStats(FALLBACK_SHIFT_STATS);
-      setDailyVolume(FALLBACK_DAILY_VOLUME);
-      setCurrentUser(FALLBACK_CURRENT_USER);
+      setSecurityAlerts([]);
+      setShiftStats({ revenue: 0, cash: 0, transfer: 0, transactions: 0 });
+      setDailyVolume(0);
+      setCurrentUser({ name: "Chưa đăng nhập", id: "N/A", station: "N/A", avatar: "", shift: "N/A" });
 
     } catch (error) {
-      console.error("Failed to fetch backend data, using mock data", error);
-      setTransactions(FALLBACK_TRANSACTIONS);
-      setActivityLogs(FALLBACK_LOGS);
-      setActiveVehicles(FALLBACK_VEHICLES);
-      setSecurityAlerts(FALLBACK_SECURITY_ALERTS);
-      setShiftStats(FALLBACK_SHIFT_STATS);
-      setDailyVolume(FALLBACK_DAILY_VOLUME);
-      setCurrentUser(FALLBACK_CURRENT_USER);
-      setShiftHistory(FALLBACK_SHIFT_HISTORY);
+      console.error("Failed to fetch backend data", error);
+      setTransactions([]);
+      setActivityLogs([]);
+      setActiveVehicles([]);
+      setSecurityAlerts([]);
+      setShiftStats({ revenue: 0, cash: 0, transfer: 0, transactions: 0 });
+      setDailyVolume(0);
+      setCurrentUser({ name: "Lỗi kết nối", id: "", station: "", avatar: "", shift: "" });
+      setShiftHistory([]);
     }
   }, [useMockData]);
 
