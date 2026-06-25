@@ -207,7 +207,13 @@ export const StaffDashboard = () => {
             </div>
           </div>
           <button 
-            onClick={() => notification.info({ message: 'Hệ thống', description: 'Đã báo cáo tình trạng an ninh cho bộ phận quản lý.', placement: 'topRight' })}
+            onClick={() => {
+              const msg = message.loading('Đang gửi báo cáo khẩn cấp...', 0);
+              setTimeout(() => {
+                msg();
+                notification.success({ message: 'Báo cáo thành công', description: 'Toàn bộ thông tin cảnh báo đã được gửi đến thiết bị của Quản lý.', placement: 'topRight' });
+              }, 1500);
+            }}
             className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium px-4 py-2 rounded flex items-center gap-2 text-sm transition-colors"
           >
             <SoundOutlined />
@@ -219,12 +225,15 @@ export const StaffDashboard = () => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Làn hoạt động */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+        <div 
+          onClick={() => { setNewGateCount(totalGates || 6); setIsGateConfigModalVisible(true); }}
+          className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
+        >
           <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Làn hoạt động</h4>
           <div className="flex items-center justify-between">
             <div className="flex items-baseline gap-1">
               <span className="text-4xl font-extrabold text-slate-800">4</span>
-              <span className="text-xl text-slate-400 font-medium">/6</span>
+              <span className="text-xl text-slate-400 font-medium">/{totalGates || 6}</span>
             </div>
             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
               <div className="w-4 h-4 border-2 border-blue-500 rounded-full"></div>
@@ -253,7 +262,10 @@ export const StaffDashboard = () => {
         </div>
 
         {/* Cảnh báo mở */}
-        <div className="bg-white p-5 rounded-xl border border-red-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
+        <div 
+          onClick={() => setIsAlertModalVisible(true)}
+          className="bg-white p-5 rounded-xl border border-red-200 shadow-sm flex flex-col justify-between relative overflow-hidden cursor-pointer hover:border-red-400 hover:shadow-md transition-all"
+        >
           <div className="flex justify-between items-start mb-2">
             <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Cảnh báo mở</h4>
             <span className="text-red-500 text-3xl font-bold leading-none mt-[-5px]">*</span>
@@ -551,6 +563,79 @@ export const StaffDashboard = () => {
           <InfoCircleOutlined className="text-blue-500 mt-0.5" />
           <span className="text-xs text-slate-600">Hình ảnh bằng chứng sẽ tự động được trích xuất từ Camera gần nhất (Cổng vào 1 / Lối đi khu A).</span>
         </div>
+      
+      {/* Gate Config Modal */}
+      <Modal
+        title="Cấu hình hệ thống"
+        open={isGateConfigModalVisible}
+        onOk={() => {
+          setTotalGates(newGateCount);
+          setIsGateConfigModalVisible(false);
+          notification.success({ message: 'Thành công', description: 'Đã cập nhật số lượng làn hoạt động.' });
+        }}
+        onCancel={() => setIsGateConfigModalVisible(false)}
+        okText="Lưu cấu hình"
+        cancelText="Hủy"
+      >
+        <div className="py-4">
+          <label className="block text-slate-700 font-medium mb-2">Tổng số Làn/Cổng giám sát:</label>
+          <input 
+            type="number" 
+            min="1" max="20"
+            className="w-full border border-slate-300 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
+            value={newGateCount}
+            onChange={(e) => setNewGateCount(parseInt(e.target.value) || 1)}
+          />
+        </div>
+      </Modal>
+
+      {/* Security Alerts Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-red-600">
+            <WarningOutlined />
+            <span>Xử lý Cảnh báo An ninh</span>
+          </div>
+        }
+        open={isAlertModalVisible}
+        footer={null}
+        onCancel={() => setIsAlertModalVisible(false)}
+        width={700}
+      >
+        <div className="py-4">
+          {securityAlerts && securityAlerts.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              <CheckCircleFilled className="text-4xl text-emerald-500 mb-3 block mx-auto" />
+              Không có cảnh báo an ninh nào cần xử lý.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {securityAlerts && securityAlerts.map(alert => (
+                <div key={alert.id} className="border border-red-200 rounded-lg p-4 bg-red-50 flex justify-between items-center">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Tag color="error">{alert.type}</Tag>
+                      <span className="font-bold text-slate-800">{alert.plate}</span>
+                    </div>
+                    <p className="text-slate-600 text-sm m-0">{alert.reason}</p>
+                    <p className="text-slate-400 text-xs m-0 mt-1">{alert.time}</p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      removeSecurityAlert(alert.id);
+                      notification.success({ message: 'Đã xử lý', description: `Đã xác nhận và gỡ cảnh báo cho xe ${alert.plate}` });
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors"
+                  >
+                    Xử lý
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
+
       </Modal>
     </div>
   );
