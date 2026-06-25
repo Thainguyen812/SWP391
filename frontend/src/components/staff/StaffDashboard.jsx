@@ -228,20 +228,20 @@ export const StaffDashboard = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Xe trong bãi */}
-        <div 
-          className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between"
-        >
-          <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Xe trong bãi</h4>
+        {/* Làn hoạt động */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Số làn hoạt động</h4>
           <div className="flex items-center justify-between">
             <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-extrabold text-slate-800">{vehiclesInLotCount}</span>
-              <span className="text-xl text-slate-400 font-medium">xe</span>
+              <span className="text-4xl font-extrabold text-slate-800">{isEmergency ? 0 : totalGates}</span>
+              <span className="text-xl text-slate-400 font-medium">/ {totalGates}</span>
             </div>
-            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
-              <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
+            <div className="flex gap-1">
+              {isEmergency ? (
+                [...Array(totalGates)].map((_, i) => <div key={i} className="w-2 h-2 rounded-full bg-red-500"></div>)
+              ) : (
+                [...Array(totalGates)].map((_, i) => <div key={i} className="w-2 h-2 rounded-full bg-emerald-500"></div>)
+              )}
             </div>
           </div>
         </div>
