@@ -113,16 +113,17 @@ export const StaffDashboard = () => {
         onOk() {
           setIsManualBarrierOpen(true);
           addActivityLog({
-            plate: 'N/A',
-            model: 'Thủ công',
+            plate: currentVehicle ? currentVehicle.plate : 'N/A',
+            model: currentVehicle ? currentVehicle.model : 'Thủ công',
             type: 'MỞ BARRIER',
-            gate: 'Cổng Khẩn Cấp',
+            gate: currentVehicle ? currentVehicle.gate : 'Cổng Khẩn Cấp',
             action: 'Mở Thủ công',
             time: 'Vừa xong',
             status: 'THÀNH CÔNG',
             typeColor: 'text-orange-600',
             statusColor: 'bg-emerald-100 text-emerald-700',
-            actionColor: 'text-emerald-600'
+            actionColor: 'text-emerald-600',
+            image: currentVehicle ? currentVehicle.image : null
           });
           notification.success({ message: 'Thành công', description: 'Lệnh mở Barrier đã được gửi đến thiết bị.', placement: 'topRight' });
         }
@@ -138,16 +139,17 @@ export const StaffDashboard = () => {
         onOk() {
           setIsManualBarrierOpen(false);
           addActivityLog({
-            plate: 'N/A',
-            model: 'Thủ công',
+            plate: currentVehicle ? currentVehicle.plate : 'N/A',
+            model: currentVehicle ? currentVehicle.model : 'Thủ công',
             type: 'ĐÓNG BARRIER',
-            gate: 'Cổng Khẩn Cấp',
+            gate: currentVehicle ? currentVehicle.gate : 'Cổng Khẩn Cấp',
             action: 'Đóng Thủ công',
             time: 'Vừa xong',
             status: 'THÀNH CÔNG',
             typeColor: 'text-orange-600',
             statusColor: 'bg-emerald-100 text-emerald-700',
-            actionColor: 'text-emerald-600'
+            actionColor: 'text-emerald-600',
+            image: currentVehicle ? currentVehicle.image : null
           });
           notification.success({ message: 'Thành công', description: 'Lệnh đóng Barrier đã được gửi đến thiết bị.', placement: 'topRight' });
         }
