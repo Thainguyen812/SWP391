@@ -30,6 +30,13 @@ export const StaffDashboard = () => {
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
 
+  // Auto-select first active vehicle on load
+  useEffect(() => {
+    if (activeVehicles && activeVehicles.length > 0 && !currentVehicle) {
+      setCurrentVehicle(activeVehicles[0]);
+    }
+  }, [activeVehicles, currentVehicle, setCurrentVehicle]);
+
   // Combine local global context logs (for live interactions) with backend logs
   const displayLogs = [...activityLogs, ...logs];
 
