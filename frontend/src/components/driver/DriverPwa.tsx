@@ -213,9 +213,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         console.error("Failed to fetch driver transactions", err);
       }
     };
-    if (!isMock) {
-      fetchTransactions();
-    }
+    fetchTransactions();
   }, [user]);
 
   // Current parked vehicle mock details
