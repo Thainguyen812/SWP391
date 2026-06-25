@@ -14,7 +14,7 @@ import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffGateControl = () => {
   const navigate = useNavigate();
-  const { addActivityLog, activeVehicles, currentVehicle, setCurrentVehicle, addActiveVehicle, dailyVolume, setDailyVolume, fetchAllDataFromBackend } = useGlobalContext();
+  const { addActivityLog, activeVehicles, currentVehicle, setCurrentVehicle, addActiveVehicle, dailyVolume, setDailyVolume, fetchAllDataFromBackend, totalGates } = useGlobalContext();
   const [isEmergency, setIsEmergency] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('Tất cả');
