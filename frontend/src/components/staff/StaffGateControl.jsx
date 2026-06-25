@@ -146,29 +146,54 @@ export const StaffGateControl = () => {
     }
   };
 
-  const [gates, setGates] = useState([]);
+  const INITIAL_GATES = [
+    { id: 'L-VÀO 1', type: 'TRỐNG', typeColor: 'bg-slate-100 text-slate-400', plate: '---', barrier: 'ĐÓNG', barrierColor: 'text-red-500', mode: 'Tự động', actions: ['lock', 'wrench'], vehicleId: null },
+    { id: 'L-VÀO 2', type: 'TRỐNG', typeColor: 'bg-slate-100 text-slate-400', plate: '---', barrier: 'ĐÓNG', barrierColor: 'text-red-500', mode: 'Tự động', actions: ['lock', 'wrench'], vehicleId: null },
+    { id: 'L-VÀO 3', type: 'TRỐNG', typeColor: 'bg-slate-100 text-slate-400', plate: '---', barrier: 'ĐÓNG', barrierColor: 'text-red-500', mode: 'Tự động', actions: ['lock', 'wrench'], vehicleId: null },
+    { id: 'L-RA 1', type: 'TRỐNG', typeColor: 'bg-slate-100 text-slate-400', plate: '---', barrier: 'ĐÓNG', barrierColor: 'text-red-500', mode: 'Tự động', actions: ['lock', 'wrench'], vehicleId: null },
+    { id: 'L-RA 2', type: 'TRỐNG', typeColor: 'bg-slate-100 text-slate-400', plate: '---', barrier: 'ĐÓNG', barrierColor: 'text-red-500', mode: 'Tự động', actions: ['lock', 'wrench'], vehicleId: null },
+    { id: 'L-RA 3', type: 'TRỐNG', typeColor: 'bg-slate-100 text-slate-400', plate: '---', barrier: 'ĐÓNG', barrierColor: 'text-red-500', mode: 'Tự động', actions: ['lock', 'wrench'], vehicleId: null }
+  ];
+
+  const [gates, setGates] = useState(INITIAL_GATES);
 
   useEffect(() => {
-    if (activeVehicles && activeVehicles.length > 0) {
-      const initialGates = activeVehicles.map(v => {
-        let mode = v.status === 'Chờ thanh toán' ? 'Thủ công' : 'Tự động';
-        let barrier = v.status === 'Chờ thanh toán' ? 'ĐANG CHỜ' : (v.status === 'Cảnh báo' || v.status === 'Lỗi thẻ' ? 'ĐÓNG' : 'MỞ');
-        let barrierColor = barrier === 'MỞ' ? 'text-emerald-500' : (barrier === 'ĐÓNG' ? 'text-red-500' : 'text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded');
-        
-        return {
-          id: v.gate.replace('Cổng', 'L').replace(' ', '-').toUpperCase(),
-          type: v.type.toUpperCase(),
-          typeColor: "bg-slate-200 text-slate-700",
-          plate: v.plate,
-          barrier: barrier,
-          barrierColor: barrierColor,
-          mode: mode,
-          actions: mode === 'Thủ công' ? ["approve", "reject"] : ["lock", "wrench"],
-          vehicleId: v.id
-        };
+    setGates(prevGates => {
+      // We map over the previous gates so we don't lose maintenance states.
+      // But we need to make sure we clear the vehicles for gates that no longer have a vehicle.
+      let newGates = prevGates.map(g => {
+        // Keep maintenance state, but clear out vehicle if it's not maintained
+        if (g.mode === 'Bảo trì') return g;
+        return { ...g, type: 'TRỐNG', typeColor: 'bg-slate-100 text-slate-400', plate: '---', barrier: 'ĐÓNG', barrierColor: 'text-red-500', mode: 'Tự động', actions: ['lock', 'wrench'], vehicleId: null };
       });
-      setGates(initialGates);
-    }
+
+      if (activeVehicles && activeVehicles.length > 0) {
+        activeVehicles.forEach(v => {
+          let gateId = v.gate.replace('Cổng', 'L').replace(' ', '-').toUpperCase();
+          
+          let gateIndex = newGates.findIndex(g => g.id === gateId);
+          // If a new dynamic gate appears (like L-VÀO 4), we append it to the list
+          if (gateIndex === -1) {
+            newGates.push({ id: gateId, mode: 'Tự động' });
+            gateIndex = newGates.length - 1;
+          }
+
+          let g = newGates[gateIndex];
+          if (g.mode === 'Bảo trì') return;
+
+          g.type = v.type.toUpperCase();
+          g.typeColor = "bg-slate-200 text-slate-700";
+          g.plate = v.plate;
+          
+          g.mode = v.status === 'Chờ thanh toán' ? 'Thủ công' : 'Tự động';
+          g.barrier = v.status === 'Chờ thanh toán' ? 'ĐANG CHỜ' : (v.status === 'Cảnh báo' || v.status === 'Lỗi thẻ' ? 'ĐÓNG' : 'MỞ');
+          g.barrierColor = g.barrier === 'MỞ' ? 'text-emerald-500' : (g.barrier === 'ĐÓNG' ? 'text-red-500' : 'text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded');
+          g.actions = g.mode === 'Thủ công' ? ["approve", "reject"] : ["lock", "wrench"];
+          g.vehicleId = v.id;
+        });
+      }
+      return newGates;
+    });
   }, [activeVehicles]);
 
   const addLog = (msg, type = 'INFO') => {
@@ -337,12 +362,26 @@ export const StaffGateControl = () => {
           <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Số làn đang hoạt động</h4>
           <div className="flex items-center justify-between">
             <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-extrabold text-slate-800">4</span>
-              <span className="text-xl text-slate-400 font-medium">/ 6</span>
+              <span className="text-4xl font-extrabold text-slate-800">
+                {(() => {
+                  const gatesInMaintenance = gates.filter(g => g.mode === 'Bảo trì').length;
+                  return Math.max(0, totalGates - gatesInMaintenance);
+                })()}
+              </span>
+              <span className="text-xl text-slate-400 font-medium">/ {totalGates}</span>
             </div>
             <div className="flex gap-1">
-              {[1, 2, 3, 4].map(i => <div key={i} className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>)}
-              {[1, 2].map(i => <div key={i} className="w-2.5 h-2.5 rounded-full bg-red-500"></div>)}
+              {(() => {
+                const gatesInMaintenance = gates.filter(g => g.mode === 'Bảo trì').length;
+                const activeLanesCount = Math.max(0, totalGates - gatesInMaintenance);
+                const inactiveLanesCount = totalGates - activeLanesCount;
+                return (
+                  <>
+                    {[...Array(activeLanesCount)].map((_, i) => <div key={`active-${i}`} className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>)}
+                    {[...Array(inactiveLanesCount)].map((_, i) => <div key={`inactive-${i}`} className="w-2.5 h-2.5 rounded-full bg-red-500"></div>)}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
