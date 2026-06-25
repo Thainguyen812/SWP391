@@ -121,6 +121,7 @@ export const TopAppBarSection = () => {
 
       {/* Right Area: Actions */}
       <div className="flex items-center justify-end gap-4 flex-1">
+        {/*
         <button 
           className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors cursor-pointer ${useMockData ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-emerald-100 text-emerald-700 border-emerald-300'}`}
           onClick={() => setUseMockData(!useMockData)}
@@ -128,6 +129,7 @@ export const TopAppBarSection = () => {
         >
           {useMockData ? "MOCK DATA" : "REAL DATA"}
         </button>
+        */}
         <button 
           className="text-slate-500 hover:text-slate-800 transition-colors cursor-pointer text-[20px]"
           onClick={() => notification.info({ message: "Không có thông báo mới", description: "Hệ thống đang hoạt động bình thường.", placement: "topRight" })}
