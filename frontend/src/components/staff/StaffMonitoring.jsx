@@ -12,7 +12,14 @@ import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffMonitoring = () => {
   const navigate = useNavigate();
-  const { activeVehicles } = useGlobalContext();
+  const { activeVehicles, securityAlerts } = useGlobalContext();
+  
+  const totalCapacity = 500;
+  const vehiclesInLot = activeVehicles ? activeVehicles.length : 0;
+  const availableSpots = Math.max(0, totalCapacity - vehiclesInLot);
+  const occupancyRate = ((vehiclesInLot / totalCapacity) * 100).toFixed(1);
+  const alertsCount = securityAlerts ? securityAlerts.length : 0;
+  
   const [alerts, setAlerts] = useState([
     { id: 1, type: 'Cao', time: '08:44:05', title: 'Phát hiện xe không biển số', desc: 'Cổng ra 1 • Yêu cầu kiểm tra thủ công', actionable: true },
     { id: 2, type: 'Trung bình', time: '08:30:12', title: 'Cảnh báo đỗ sai vị trí', desc: 'Tầng hầm B1, Khu C • Đỗ lấn vạch', actionable: true },
@@ -116,23 +123,23 @@ export const StaffMonitoring = () => {
             <h4 className="text-slate-500 text-xs font-bold mb-2">Tổng chỗ đỗ</h4>
             <span className="font-serif font-bold text-slate-400">P</span>
           </div>
-          <div className="text-4xl font-extrabold text-slate-800">500</div>
+          <div className="text-4xl font-extrabold text-slate-800">{totalCapacity}</div>
         </div>
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-start mb-2">
             <h4 className="text-slate-500 text-xs font-bold mb-2">Đang trống</h4>
             <CheckCircleOutlined className="text-slate-400" />
           </div>
-          <div className="text-4xl font-extrabold text-emerald-600">124</div>
+          <div className="text-4xl font-extrabold text-emerald-600">{availableSpots}</div>
         </div>
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-start mb-2">
             <h4 className="text-slate-500 text-xs font-bold mb-2">Tỷ lệ lấp đầy</h4>
             <InfoCircleOutlined className="text-slate-400" />
           </div>
-          <div className="text-4xl font-extrabold text-blue-600 mb-2">75%</div>
+          <div className="text-4xl font-extrabold text-blue-600 mb-2">{occupancyRate}%</div>
           <div className="w-full bg-slate-100 rounded-full h-1.5">
-            <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: '75%' }}></div>
+            <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${occupancyRate}%` }}></div>
           </div>
         </div>
         <div className="bg-red-50 p-5 rounded-xl border border-red-200 shadow-sm flex flex-col justify-between">
