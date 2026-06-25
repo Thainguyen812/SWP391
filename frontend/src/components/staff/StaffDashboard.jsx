@@ -45,7 +45,6 @@ export const StaffDashboard = () => {
   // Combine local global context logs (for live interactions) with backend logs
   const displayLogs = [...activityLogs, ...logs];
 
-  const totalGates = 6;
   const activeGatesCount = activeVehicles ? activeVehicles.length : 0;
   const pendingProcessingCount = activeVehicles ? activeVehicles.filter(v => v.status !== 'Hợp lệ').length : 0;
   const waitingPaymentCount = activeVehicles ? activeVehicles.filter(v => v.status === 'Chờ thanh toán' || v.status === 'Lỗi thẻ').length : 0;
