@@ -564,6 +564,8 @@ export const StaffDashboard = () => {
           <span className="text-xs text-slate-600">Hình ảnh bằng chứng sẽ tự động được trích xuất từ Camera gần nhất (Cổng vào 1 / Lối đi khu A).</span>
         </div>
       
+      </Modal>
+
       {/* Gate Config Modal */}
       <Modal
         title="Cấu hình hệ thống"
@@ -636,8 +638,7 @@ export const StaffDashboard = () => {
         </div>
       </Modal>
 
-      </Modal>
-    </div>
+          </div>
   );
 };
 
