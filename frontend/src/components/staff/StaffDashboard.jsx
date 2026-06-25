@@ -18,7 +18,7 @@ import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffDashboard = () => {
   const navigate = useNavigate();
-  const [isManualBarrierOpen, setIsManualBarrierOpen] = useState(false);
+  const [manualBarrierStates, setManualBarrierStates] = useState({});
   
   // States for Violation Modal
   const [isViolationModalVisible, setIsViolationModalVisible] = useState(false);
@@ -26,6 +26,8 @@ export const StaffDashboard = () => {
   const [violationReason, setViolationReason] = useState('Đỗ sai quy định');
 
   const { activityLogs, addActivityLog, addSecurityAlert, securityAlerts, currentVehicle, setCurrentVehicle, activeVehicles } = useGlobalContext();
+
+  const isManualBarrierOpen = currentVehicle ? manualBarrierStates[currentVehicle.id] || false : false;
 
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
@@ -111,7 +113,7 @@ export const StaffDashboard = () => {
         cancelText: 'Hủy bỏ',
         okButtonProps: { type: 'primary', className: 'bg-blue-600' },
         onOk() {
-          setIsManualBarrierOpen(true);
+          if (currentVehicle) setManualBarrierStates(prev => ({ ...prev, [currentVehicle.id]: true }));
           addActivityLog({
             plate: currentVehicle ? currentVehicle.plate : 'N/A',
             model: currentVehicle ? currentVehicle.model : 'Thủ công',
@@ -137,7 +139,7 @@ export const StaffDashboard = () => {
         cancelText: 'Hủy bỏ',
         okButtonProps: { type: 'primary', danger: true, className: 'bg-red-600' },
         onOk() {
-          setIsManualBarrierOpen(false);
+          if (currentVehicle) setManualBarrierStates(prev => ({ ...prev, [currentVehicle.id]: false }));
           addActivityLog({
             plate: currentVehicle ? currentVehicle.plate : 'N/A',
             model: currentVehicle ? currentVehicle.model : 'Thủ công',
