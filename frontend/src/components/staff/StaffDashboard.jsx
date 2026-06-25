@@ -296,13 +296,18 @@ export const StaffDashboard = () => {
             </span>
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { id: 'CAM-01', name: 'CỔNG VÀO 1', defaultImage: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80' },
-              { id: 'CAM-02', name: 'CỔNG VÀO 2', defaultImage: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80' },
-              { id: 'CAM-03', name: 'CỔNG RA 1', defaultImage: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80' },
-              { id: 'CAM-04', name: 'CỔNG RA 2', defaultImage: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80' }
-            ].map((cam, index) => {
+          <div className={`grid ${totalGates > 4 ? 'grid-cols-3' : 'grid-cols-2'} gap-4`}>
+            {Array.from({ length: totalGates }).map((_, i) => {
+              const isEntry = i < Math.ceil(totalGates / 2);
+              const gateNum = isEntry ? i + 1 : i - Math.ceil(totalGates / 2) + 1;
+              const typeLabel = isEntry ? 'VÀO' : 'RA';
+              
+              const cam = {
+                id: `CAM-${isEntry ? 'IN' : 'OUT'}-${gateNum.toString().padStart(2, '0')}`,
+                name: `CỔNG ${typeLabel} ${gateNum}`,
+                defaultImage: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80'
+              };
+              
               // Chỉ hiển thị xe trên màn hình Camera nếu xe ĐANG TRONG QUÁ TRÌNH XỬ LÝ tại đúng cổng đó.
               // Nếu trạng thái là 'Hợp lệ', nghĩa là xe đã đi qua cổng và đang đỗ trong bãi -> Không hiển thị trên Camera nữa.
               const vehicle = activeVehicles?.find(v => 

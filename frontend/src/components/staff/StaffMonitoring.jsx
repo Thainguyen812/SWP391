@@ -12,7 +12,7 @@ import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffMonitoring = () => {
   const navigate = useNavigate();
-  const { activeVehicles, securityAlerts } = useGlobalContext();
+  const { activeVehicles, securityAlerts, totalGates } = useGlobalContext();
   
   const totalCapacity = 500;
   const vehiclesInLot = activeVehicles ? activeVehicles.length : 0;
@@ -30,20 +30,44 @@ export const StaffMonitoring = () => {
   const [cameras, setCameras] = useState([]);
 
   useEffect(() => {
-    if (activeVehicles && activeVehicles.length > 0) {
-      const liveCams = activeVehicles.slice(0, 5).map((v, i) => ({
-        id: i + 1,
-        name: v.gate,
-        location: `LPR Camera - ${v.gate}`,
-        status: v.status === 'Cảnh báo' || v.status === 'Lỗi thẻ' ? 'WARNING' : 'NORMAL',
-        statusText: v.status === 'Cảnh báo' || v.status === 'Lỗi thẻ' ? `CẢNH BÁO: ${v.status}` : 'Nhận diện BSX ổn định',
-        time: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit', second:'2-digit'}),
-        image: v.image || 'https://images.unsplash.com/photo-1510443697925-eb43fb60341e?auto=format&fit=crop&w=600&q=80',
-        plate: v.plate
-      }));
-      setCameras(liveCams);
+    const entryCount = Math.ceil(totalGates / 2);
+    const exitCount = totalGates - entryCount;
+    const dynamicCams = [];
+    
+    const timeNow = new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+
+    for (let i = 1; i <= entryCount; i++) {
+      const gateName = `CỔNG VÀO ${i}`;
+      const processingVehicle = activeVehicles?.find(v => v.gate && v.gate.toUpperCase() === gateName && v.status !== 'Hợp lệ' && v.status !== 'ACTIVE');
+      dynamicCams.push({
+        id: `IN-${i}`,
+        name: gateName,
+        location: `LPR Camera - ${gateName}`,
+        status: processingVehicle && (processingVehicle.status === 'Cảnh báo' || processingVehicle.status === 'Lỗi thẻ') ? 'WARNING' : 'NORMAL',
+        statusText: processingVehicle ? `Nhận diện: ${processingVehicle.plate}` : 'Đang hoạt động - Trống',
+        time: timeNow,
+        image: processingVehicle ? (processingVehicle.image || 'https://images.unsplash.com/photo-1510443697925-eb43fb60341e?auto=format&fit=crop&w=600&q=80') : 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80',
+        plate: processingVehicle ? processingVehicle.plate : ''
+      });
     }
-  }, [activeVehicles]);
+    
+    for (let i = 1; i <= exitCount; i++) {
+      const gateName = `CỔNG RA ${i}`;
+      const processingVehicle = activeVehicles?.find(v => v.gate && v.gate.toUpperCase() === gateName && v.status !== 'Hợp lệ' && v.status !== 'ACTIVE');
+      dynamicCams.push({
+        id: `OUT-${i}`,
+        name: gateName,
+        location: `LPR Camera - ${gateName}`,
+        status: processingVehicle && (processingVehicle.status === 'Cảnh báo' || processingVehicle.status === 'Lỗi thẻ') ? 'WARNING' : 'NORMAL',
+        statusText: processingVehicle ? `Nhận diện: ${processingVehicle.plate}` : 'Đang hoạt động - Trống',
+        time: timeNow,
+        image: processingVehicle ? (processingVehicle.image || 'https://images.unsplash.com/photo-1510443697925-eb43fb60341e?auto=format&fit=crop&w=600&q=80') : 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80',
+        plate: processingVehicle ? processingVehicle.plate : ''
+      });
+    }
+    
+    setCameras(dynamicCams);
+  }, [activeVehicles, totalGates]);
 
   const handleFixCamera = (id) => {
     Modal.confirm({
