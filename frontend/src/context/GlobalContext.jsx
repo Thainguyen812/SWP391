@@ -4,49 +4,10 @@ import { apiClient } from '../api/apiClient';
 
 const GlobalContext = createContext();
 
-// ---------------------------------------------------------
-// MOCK DATA FALLBACKS (Moved outside to keep component clean)
-// ---------------------------------------------------------
-const FALLBACK_TRANSACTIONS = [
-  { id: "#TRX-8829", plate: "29A-123.45", type: "car", inTime: "08:15", outTime: "10:30", amount: "45,000 đ", paymentMethod: "Ví UrbanPark", status: "Thành công", statusColor: "bg-emerald-100 text-emerald-700" }
-];
-const FALLBACK_LOGS = [
-  { plate: "30G-123.45", model: "Hyundai Tucson", type: "VÉ THÁNG", gate: "Làn vào 1 - Cửa A", action: "Chặn Tự động", time: "Vừa xong", status: "Chưa Xử Lý", typeColor: "text-blue-600", statusColor: "bg-red-100 text-red-600", actionColor: "text-red-500", image: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80" }
-];
-const FALLBACK_VEHICLES = [
-  { id: 1, plate: "51A-123.45", type: "Vãng lai", confidence: "98.4%", status: "Hợp lệ", gate: "Cổng vào 1", inTime: "08:15", outTime: "--:--", image: "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80", model: "Kia Morning", duration: "Đang vào" },
-  { id: 2, plate: "29C-445.11", type: "Vãng lai", confidence: "95.2%", status: "Chờ thanh toán", gate: "Cổng ra 1", inTime: "07:30", outTime: "08:22", image: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80", model: "Ford Ranger", duration: "52 phút" },
-  { id: 3, plate: "30G-123.45", type: "VIP", confidence: "99.1%", status: "Hợp lệ", gate: "Cổng vào 2", inTime: "08:20", outTime: "--:--", image: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80", model: "Hyundai Tucson", duration: "Đang vào" },
-  { id: 4, plate: "15B-008.88", type: "Vé tháng", confidence: "92.0%", status: "Lỗi thẻ", gate: "Cổng ra 2", inTime: "06:15", outTime: "08:25", image: "https://images.unsplash.com/photo-1600661653561-629509216228?auto=format&fit=crop&w=600&q=80", model: "Toyota Innova", duration: "2 giờ 10 phút" }
-];
-const FALLBACK_SECURITY_ALERTS = [
-  { id: 'blacklist', type: 'BIỂN SỐ ĐEN', plate: '30G-123.45', reason: 'Nghi phạm trộm cắp', time: 'Vừa xong' },
-  { id: 'wrong_zone', type: 'PHÁT HIỆN SAI KHU VỰC', plate: '29C-445.11', reason: 'Xe tải hạng nhẹ (Không có đặc quyền VIP)', time: '15 phút trước' },
-  { id: 'alarm', type: 'KÍCH HOẠT CHỐNG TRỘM', plate: '51H-889.02', reason: 'Phát hiện chấn động mạnh và âm thanh báo động', time: '2 phút trước' }
-];
-const FALLBACK_CURRENT_USER = {
-  name: "Trần Thị B",
-  id: "NV-1088",
-  station: "Làn Ra 02 (T-OUT-02)",
-  avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-  shift: "Chiều"
-};
-const FALLBACK_SHIFT_HISTORY = [
-  { id: 1, staff: "Trần Thị B", shift: "Chiều", start: "13:44", end: "--:--", vehicles: 0, status: "ĐANG TRỰC", isCurrent: true },
-  { id: 2, staff: "Nguyễn Văn A", shift: "Sáng", start: "06:00", end: "13:44", vehicles: 452, status: "HOÀN THÀNH", isCurrent: false },
-  { id: 3, staff: "Trần Thị B", shift: "Đêm", start: "22:00", end: "06:00", vehicles: 318, status: "HOÀN THÀNH", isCurrent: false }
-];
-const FALLBACK_SHIFT_STATS = {
-  revenue: 12450000,
-  cash: 5200000,
-  transfer: 7250000,
-  transactions: 482
-};
-const FALLBACK_DAILY_VOLUME = 1284;
+// No more mock data. Completely API driven.
 
 export const GlobalProvider = ({ children }) => {
   const [searchValue, setSearchValue] = useState("");
-  const [useMockData, setUseMockData] = useState(false); // Default to Real Data
   const [totalGates, setTotalGates] = useState(6);
   const [activeLocation, setActiveLocation] = useState("toan-he-thong");
   const [isEmergency, setIsEmergency] = useState(false); // Persistent emergency state
@@ -68,25 +29,13 @@ export const GlobalProvider = ({ children }) => {
 
   // CENTRALIZED FETCH FUNCTION
   const fetchAllDataFromBackend = useCallback(async () => {
-    if (useMockData) {
-      setTransactions(FALLBACK_TRANSACTIONS);
-      setActivityLogs(FALLBACK_LOGS);
-      setActiveVehicles(FALLBACK_VEHICLES);
-      setSecurityAlerts(FALLBACK_SECURITY_ALERTS);
-      setShiftStats(FALLBACK_SHIFT_STATS);
-      setDailyVolume(FALLBACK_DAILY_VOLUME);
-      setCurrentUser(FALLBACK_CURRENT_USER);
-      setShiftHistory(FALLBACK_SHIFT_HISTORY);
-      return;
-    }
-
     try {
       // 1. Fetch Logs
       const logsData = await apiClient.get('/logs');
       if (logsData && logsData.items && logsData.items.length > 0) {
         setActivityLogs(logsData.items);
       } else {
-        setActivityLogs([]); // Empty data is fine, do not fallback
+        setActivityLogs([]);
       }
 
       // 2. Fetch Transactions
@@ -109,9 +58,9 @@ export const GlobalProvider = ({ children }) => {
             }));
             setShiftHistory(mapped);
           } else {
-            setShiftHistory(FALLBACK_SHIFT_HISTORY);
+            setShiftHistory([]);
           }
-        }).catch(() => setShiftHistory(FALLBACK_SHIFT_HISTORY));
+        }).catch(() => setShiftHistory([]));
       });
 
       // 4. Fetch Active Vehicles (Sessions without checkout)
@@ -147,32 +96,63 @@ export const GlobalProvider = ({ children }) => {
             }));
           setActiveVehicles(active);
         } else {
-          console.error("sessionData does not contain an array:", sessionData);
           setActiveVehicles([]);
         }
-        
       } catch (e) {
         console.error("Failed to fetch sessions for active vehicles", e);
         setActiveVehicles([]);
       } 
-      // Cấp dữ liệu giả cho các phần chưa có API backend
-      setSecurityAlerts(FALLBACK_SECURITY_ALERTS);
-      setShiftStats(FALLBACK_SHIFT_STATS);
-      setDailyVolume(FALLBACK_DAILY_VOLUME);
-      setCurrentUser(FALLBACK_CURRENT_USER);
+      
+      // 5. Fetch Current User Profile
+      try {
+        const userProfile = await apiClient.get('/auth/me');
+        setCurrentUser(userProfile);
+      } catch (e) {
+        console.error("Failed to fetch user profile", e);
+        setCurrentUser({ name: "Chưa đăng nhập", id: "N/A", station: "N/A", avatar: "", shift: "N/A" });
+      }
+
+      // 6. Fetch Security Alerts
+      try {
+        const alerts = await apiClient.get('/security/alerts');
+        setSecurityAlerts(alerts || []);
+      } catch (e) {
+        console.error("Failed to fetch security alerts", e);
+        setSecurityAlerts([]);
+      }
+
+      // 7. Fetch Shift Stats
+      try {
+        const stats = await apiClient.get('/revenue/shift-stats');
+        setShiftStats(stats || { revenue: 0, cash: 0, transfer: 0, transactions: 0 });
+      } catch (e) {
+        console.error("Failed to fetch shift stats", e);
+        setShiftStats({ revenue: 0, cash: 0, transfer: 0, transactions: 0 });
+      }
+
+      // 8. Fetch Daily Volume
+      try {
+        const volume = await apiClient.get('/sessions/daily-volume');
+        setDailyVolume(volume?.volume || 0);
+      } catch (e) {
+        console.error("Failed to fetch daily volume", e);
+        setDailyVolume(0);
+      }
+
+      // 9. Fetch System Settings
+      try {
+        const settings = await apiClient.get('/settings/system');
+        if (settings?.totalGates) {
+          setTotalGates(parseInt(settings.totalGates, 10));
+        }
+      } catch (e) {
+        console.error("Failed to fetch settings", e);
+      }
 
     } catch (error) {
       console.error("Failed to fetch backend data", error);
-      setTransactions([]);
-      setActivityLogs([]);
-      setActiveVehicles([]);
-      setSecurityAlerts([]);
-      setShiftStats({ revenue: 0, cash: 0, transfer: 0, transactions: 0 });
-      setDailyVolume(0);
-      setCurrentUser({ name: "Lỗi kết nối", id: "", station: "", avatar: "", shift: "" });
-      setShiftHistory([]);
     }
-  }, [useMockData]);
+  }, []);
 
   // Use fetchAllDataFromBackend in useEffect
   useEffect(() => {
@@ -184,7 +164,7 @@ export const GlobalProvider = ({ children }) => {
   const addActivityLog = (newLog) => setActivityLogs(prev => [newLog, ...prev]);
   const addSecurityAlert = (newAlert) => setSecurityAlerts(prev => [newAlert, ...prev]);
   const removeSecurityAlert = (id) => setSecurityAlerts(prev => prev.filter(alert => alert.id !== id));
-  const restoreSecurityAlerts = () => setSecurityAlerts(FALLBACK_SECURITY_ALERTS);
+  const restoreSecurityAlerts = () => fetchAllDataFromBackend();
 
   const updateShiftStats = (amount, isCash = true) => {
     setShiftStats(prev => ({
@@ -211,10 +191,8 @@ export const GlobalProvider = ({ children }) => {
   };
 
   return (
-    <GlobalContext.Provider value={{ 
-      searchValue, setSearchValue, activeLocation, setActiveLocation, totalGates, setTotalGates,
-      useMockData, setUseMockData,
-      isEmergency, setIsEmergency,
+    <GlobalContext.Provider value={{        searchValue, setSearchValue, activeLocation, setActiveLocation, totalGates, setTotalGates,
+        isEmergency, setIsEmergency,
       currentUser, setCurrentUser, shiftHistory, setShiftHistory,
       transactions, addTransaction,
       activityLogs, addActivityLog,

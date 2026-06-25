@@ -79,4 +79,36 @@ public class RevenueController {
         response.put("items", items);
         return response;
     }
+
+    @GetMapping("/shift-stats")
+    public Map<String, Object> getShiftStats() {
+        List<Transaction> transactions = transactionRepo.findAll();
+        // Lấy các giao dịch trong ngày hôm nay (giả lập ca hiện tại)
+        java.time.LocalDate today = java.time.LocalDate.now();
+        List<Transaction> shiftTxns = transactions.stream()
+            .filter(t -> t.getCreatedAt() != null && t.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toLocalDate().equals(today))
+            .toList();
+
+        double revenue = 0;
+        double cash = 0;
+        double transfer = 0;
+
+        for (Transaction t : shiftTxns) {
+            double amount = t.getTotalAmount() != null ? t.getTotalAmount().doubleValue() : 0.0;
+            revenue += amount;
+            if ("TIỀN MẶT".equalsIgnoreCase(t.getPaymentMethod()) || "CASH".equalsIgnoreCase(t.getPaymentMethod())) {
+                cash += amount;
+            } else {
+                transfer += amount;
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("revenue", revenue);
+        response.put("cash", cash);
+        response.put("transfer", transfer);
+        response.put("transactions", shiftTxns.size());
+        
+        return response;
+    }
 }

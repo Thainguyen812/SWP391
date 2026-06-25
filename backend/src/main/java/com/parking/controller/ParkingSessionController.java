@@ -60,4 +60,13 @@ public class ParkingSessionController {
         repo.deleteById(id);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/daily-volume")
+    public ResponseEntity<?> getDailyVolume() {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        long count = repo.findAll().stream()
+            .filter(s -> s.getCheckInTime() != null && s.getCheckInTime().atZone(java.time.ZoneId.systemDefault()).toLocalDate().equals(today))
+            .count();
+        return ResponseEntity.ok(java.util.Map.of("volume", count));
+    }
 }
