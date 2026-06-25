@@ -31,37 +31,51 @@ export const GlobalProvider = ({ children }) => {
   const fetchAllDataFromBackend = useCallback(async () => {
     try {
       // 1. Fetch Logs
-      const logsData = await apiClient.get('/logs');
-      if (logsData && logsData.items && logsData.items.length > 0) {
-        setActivityLogs(logsData.items);
-      } else {
+      try {
+        const logsData = await apiClient.get('/logs');
+        if (logsData && logsData.items && logsData.items.length > 0) {
+          setActivityLogs(logsData.items);
+        } else {
+          setActivityLogs([]);
+        }
+      } catch (e) {
+        console.error("Failed to fetch logs", e);
         setActivityLogs([]);
       }
 
       // 2. Fetch Transactions
-      const txnData = await apiClient.get('/revenue/transactions');
-      if (txnData && txnData.items && txnData.items.length > 0) {
-        setTransactions(txnData.items);
-      } else {
+      try {
+        const txnData = await apiClient.get('/revenue/transactions');
+        if (txnData && txnData.items && txnData.items.length > 0) {
+          setTransactions(txnData.items);
+        } else {
+          setTransactions([]);
+        }
+      } catch (e) {
+        console.error("Failed to fetch transactions", e);
         setTransactions([]);
       }
       
       // 3. Fetch Shifts
-      import('../services/shiftService').then(module => {
-        module.shiftService.getShifts().then(data => {
-          if (data && data.length > 0) {
-            const mapped = data.map(d => ({
-              id: d.id, staff: d.staffName, shift: d.shiftType, 
-              start: new Date(d.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-              end: d.endTime ? new Date(d.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
-              vehicles: d.vehiclesHandled || 0, status: d.status, isCurrent: d.isCurrent
-            }));
-            setShiftHistory(mapped);
-          } else {
-            setShiftHistory([]);
-          }
-        }).catch(() => setShiftHistory([]));
-      });
+      try {
+        import('../services/shiftService').then(module => {
+          module.shiftService.getShifts().then(data => {
+            if (data && data.length > 0) {
+              const mapped = data.map(d => ({
+                id: d.id, staff: d.staffName, shift: d.shiftType, 
+                start: new Date(d.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                end: d.endTime ? new Date(d.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
+                vehicles: d.vehiclesHandled || 0, status: d.status, isCurrent: d.isCurrent
+              }));
+              setShiftHistory(mapped);
+            } else {
+              setShiftHistory([]);
+            }
+          }).catch(() => setShiftHistory([]));
+        });
+      } catch (e) {
+        console.error("Failed to fetch shifts", e);
+      }
 
       // 4. Fetch Active Vehicles (Sessions without checkout)
       try {
