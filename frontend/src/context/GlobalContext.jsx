@@ -131,7 +131,7 @@ export const GlobalProvider = ({ children }) => {
 
         if (dataArray && dataArray.length >= 0) {
           const active = dataArray
-            .filter(s => !s.checkOutTime)
+            .filter(s => s.sessionStatus === 'ACTIVE')
             .map((session, index) => ({
               id: session.id,
               plate: session.licensePlate || "Không rõ",
