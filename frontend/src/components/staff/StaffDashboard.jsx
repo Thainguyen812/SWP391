@@ -303,7 +303,14 @@ export const StaffDashboard = () => {
               { id: 'CAM-03', name: 'CỔNG RA 1', defaultImage: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80' },
               { id: 'CAM-04', name: 'CỔNG RA 2', defaultImage: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80' }
             ].map((cam, index) => {
-              const vehicle = activeVehicles[index];
+              // Chỉ hiển thị xe trên màn hình Camera nếu xe ĐANG TRONG QUÁ TRÌNH XỬ LÝ tại đúng cổng đó.
+              // Nếu trạng thái là 'Hợp lệ', nghĩa là xe đã đi qua cổng và đang đỗ trong bãi -> Không hiển thị trên Camera nữa.
+              const vehicle = activeVehicles?.find(v => 
+                v.gate && 
+                v.gate.toUpperCase() === cam.name.toUpperCase() && 
+                v.status !== 'Hợp lệ' && 
+                v.status !== 'ACTIVE'
+              );
               const isSelected = vehicle && currentVehicle?.id === vehicle.id;
               
               // Helper to map status to color
