@@ -25,7 +25,7 @@ export const StaffDashboard = () => {
   const [violationPlate, setViolationPlate] = useState('');
   const [violationReason, setViolationReason] = useState('Đỗ sai quy định');
 
-  const { activityLogs, addActivityLog, addSecurityAlert, securityAlerts, currentVehicle, setCurrentVehicle, activeVehicles, totalGates, setTotalGates, removeSecurityAlert } = useGlobalContext();
+  const { activityLogs, addActivityLog, addSecurityAlert, securityAlerts, currentVehicle, setCurrentVehicle, activeVehicles, totalGates, setTotalGates, removeSecurityAlert, isEmergency } = useGlobalContext();
 
   const isManualBarrierOpen = currentVehicle ? manualBarrierStates[currentVehicle.id] || false : false;
 
@@ -113,6 +113,10 @@ export const StaffDashboard = () => {
   }, []);
 
   const handleOpenManualBarrier = () => {
+    if (isEmergency) {
+      notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể thao tác Barrier lúc này.' });
+      return;
+    }
     if (!isManualBarrierOpen) {
       Modal.confirm({
         title: 'Mở Barrier Thủ Công',
