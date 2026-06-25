@@ -82,17 +82,17 @@ export const GlobalProvider = ({ children }) => {
 
     try {
       // 1. Fetch Logs
-      const logsRes = await apiClient.get('/logs');
-      if (logsRes.data && logsRes.data.items && logsRes.data.items.length > 0) {
-        setActivityLogs(logsRes.data.items);
+      const logsData = await apiClient.get('/logs');
+      if (logsData && logsData.items && logsData.items.length > 0) {
+        setActivityLogs(logsData.items);
       } else {
         setActivityLogs([]); // Empty data is fine, do not fallback
       }
 
       // 2. Fetch Transactions
-      const txnRes = await apiClient.get('/revenue/transactions');
-      if (txnRes.data && txnRes.data.items && txnRes.data.items.length > 0) {
-        setTransactions(txnRes.data.items);
+      const txnData = await apiClient.get('/revenue/transactions');
+      if (txnData && txnData.items && txnData.items.length > 0) {
+        setTransactions(txnData.items);
       } else {
         setTransactions([]);
       }
@@ -116,17 +116,17 @@ export const GlobalProvider = ({ children }) => {
 
       // 4. Fetch Active Vehicles (Sessions without checkout)
       try {
-        const sessionRes = await apiClient.get('/sessions');
+        const sessionData = await apiClient.get('/sessions');
         
         let dataArray = [];
-        if (Array.isArray(sessionRes.data)) {
-          dataArray = sessionRes.data;
-        } else if (sessionRes.data && Array.isArray(sessionRes.data.content)) {
-          dataArray = sessionRes.data.content;
-        } else if (sessionRes.data && Array.isArray(sessionRes.data.items)) {
-          dataArray = sessionRes.data.items;
-        } else if (sessionRes.data && Array.isArray(sessionRes.data.data)) {
-          dataArray = sessionRes.data.data;
+        if (Array.isArray(sessionData)) {
+          dataArray = sessionData;
+        } else if (sessionData && Array.isArray(sessionData.content)) {
+          dataArray = sessionData.content;
+        } else if (sessionData && Array.isArray(sessionData.items)) {
+          dataArray = sessionData.items;
+        } else if (sessionData && Array.isArray(sessionData.data)) {
+          dataArray = sessionData.data;
         }
 
         if (dataArray && dataArray.length >= 0) {
@@ -147,7 +147,7 @@ export const GlobalProvider = ({ children }) => {
             }));
           setActiveVehicles(active);
         } else {
-          console.error("sessionRes.data does not contain an array:", sessionRes.data);
+          console.error("sessionData does not contain an array:", sessionData);
           setActiveVehicles([]);
         }
         
