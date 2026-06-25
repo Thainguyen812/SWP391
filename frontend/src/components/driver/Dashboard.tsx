@@ -208,7 +208,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
   const fetchGateScanLogs = async () => {
     try {
-      const r = await fetch('/api/gate/logs', {
+      const r = await fetch('/api/logs', {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const d = await r.json();
