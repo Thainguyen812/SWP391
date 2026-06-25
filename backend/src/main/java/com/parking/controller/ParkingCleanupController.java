@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/parking")
-@Profile({"dev", "test"})
+// @Profile({"dev", "test"})
 public class ParkingCleanupController {
 
     private final ParkingService parkingService;

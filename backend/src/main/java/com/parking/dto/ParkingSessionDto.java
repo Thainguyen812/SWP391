@@ -15,7 +15,8 @@ public class ParkingSessionDto {
     private Boolean isVip;
     private Boolean isSuspicious;
     private String suspiciousReason;
-    
+    private UUID cardId; // <-- Chèn thêm dòng này vào dưới trường private UUID id;
+
     // Additional fields for UI
     private String vehicleBrand;
     private String vehicleColor;
@@ -23,6 +24,7 @@ public class ParkingSessionDto {
 
     public ParkingSessionDto(ParkingSession session, Vehicle vehicle) {
         this.id = session.getId();
+        this.cardId = session.getCardId();
         this.licensePlate = session.getLicensePlate();
         this.assignedZoneId = session.getAssignedZoneId();
         this.checkInTime = session.getCheckInTime();
@@ -35,20 +37,60 @@ public class ParkingSessionDto {
         if (vehicle != null) {
             this.vehicleBrand = vehicle.getBrand();
             this.vehicleColor = vehicle.getColor();
-            this.vehicleModel = (vehicle.getBrand() != null ? vehicle.getBrand() : "") + " " + (vehicle.getBodyShape() != null ? vehicle.getBodyShape() : "");
+            this.vehicleModel = (vehicle.getBrand() != null ? vehicle.getBrand() : "") + " "
+                    + (vehicle.getBodyShape() != null ? vehicle.getBodyShape() : "");
         }
     }
 
-    public UUID getId() { return id; }
-    public String getLicensePlate() { return licensePlate; }
-    public UUID getAssignedZoneId() { return assignedZoneId; }
-    public Instant getCheckInTime() { return checkInTime; }
-    public Instant getCheckOutTime() { return checkOutTime; }
-    public String getSessionStatus() { return sessionStatus; }
-    public Boolean getIsVip() { return isVip; }
-    public Boolean getIsSuspicious() { return isSuspicious; }
-    public String getSuspiciousReason() { return suspiciousReason; }
-    public String getVehicleBrand() { return vehicleBrand; }
-    public String getVehicleColor() { return vehicleColor; }
-    public String getVehicleModel() { return vehicleModel; }
+    public UUID getId() {
+        return id;
+    }
+
+    public String getLicensePlate() {
+        return licensePlate;
+    }
+
+    public UUID getAssignedZoneId() {
+        return assignedZoneId;
+    }
+
+    public Instant getCheckInTime() {
+        return checkInTime;
+    }
+
+    public Instant getCheckOutTime() {
+        return checkOutTime;
+    }
+
+    public String getSessionStatus() {
+        return sessionStatus;
+    }
+
+    public Boolean getIsVip() {
+        return isVip;
+    }
+
+    public Boolean getIsSuspicious() {
+        return isSuspicious;
+    }
+
+    public String getSuspiciousReason() {
+        return suspiciousReason;
+    }
+
+    public String getVehicleBrand() {
+        return vehicleBrand;
+    }
+
+    public String getVehicleColor() {
+        return vehicleColor;
+    }
+
+    public String getVehicleModel() {
+        return vehicleModel;
+    }
+
+    public UUID getCardId() {
+        return cardId;
+    } // <-- CHÈN THÊM DÒNG NÀY VÀO
 }

@@ -81,14 +81,16 @@ public class JwtUtils {
     @SuppressWarnings("unchecked")
     public List<String> getRolesFromToken(String token) {
         Claims claims = Jwts.parserBuilder()
-                .setSigningKey(getSignKey()) // Dùng khóa bí mật để kiểm tra tính toàn vẹn
+                .setSigningKey(getSignKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
 
-        // Đọc ô dữ liệu tên là "roles" đã nhét vào lúc tạo, ép kiểu nó về dạng
-        // List<String>
-        return claims.get("roles", List.class);
+        Object roles = claims.get("roles");
+        if (roles instanceof List<?>) {
+            return (List<String>) roles;
+        }
+        return List.of(); // Trả về rỗng nếu không tìm thấy role
     }
 
     // 5. Kiểm tra tính hợp lệ của token (Hết hạn, sai định dạng, trống...)

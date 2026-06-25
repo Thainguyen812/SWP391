@@ -7,8 +7,17 @@
    <selectorMethod>BASIC</selectorMethod>
    <smartLocatorEnabled>false</smartLocatorEnabled>
    <useRalativeImagePath>false</useRalativeImagePath>
+   <authorizationRequest>
+      <authorizationInfo>
+         <entry>
+            <key>bearerToken</key>
+            <value>${token}</value>
+         </entry>
+      </authorizationInfo>
+      <authorizationType>Bearer</authorizationType>
+   </authorizationRequest>
    <autoUpdateContent>false</autoUpdateContent>
-   <connectionTimeout>-1</connectionTimeout>
+   <connectionTimeout>0</connectionTimeout>
    <followRedirects>true</followRedirects>
    <httpBody></httpBody>
    <httpBodyContent></httpBodyContent>
@@ -18,7 +27,7 @@
       <matchCondition>equals</matchCondition>
       <name>Content-Type</name>
       <type>Main</type>
-      <value>application/json</value>
+      <value>text/plain</value>
       <webElementGuid>d73b9c6a-68eb-4dce-af48-237e171a00eb</webElementGuid>
    </httpHeaderProperties>
    <httpHeaderProperties>
@@ -27,10 +36,10 @@
       <name>Authorization</name>
       <type>Main</type>
       <value>Bearer ${token}</value>
-      <webElementGuid>d73b9c6a-68eb-4dce-af48-237e171a00ec</webElementGuid>
+      <webElementGuid>b61f4ec4-1195-4382-84f3-aef724913755</webElementGuid>
    </httpHeaderProperties>
    <katalonVersion>11.2.1</katalonVersion>
-   <maxResponseSize>-1</maxResponseSize>
+   <maxResponseSize>0</maxResponseSize>
    <migratedVersion>5.4.1</migratedVersion>
    <path></path>
    <restRequestMethod>POST</restRequestMethod>
@@ -41,8 +50,15 @@
    <soapRequestMethod></soapRequestMethod>
    <soapServiceEndpoint></soapServiceEndpoint>
    <soapServiceFunction></soapServiceFunction>
-   <socketTimeout>-1</socketTimeout>
+   <socketTimeout>0</socketTimeout>
    <useServiceInfoFromWsdl>true</useServiceInfoFromWsdl>
+   <variables>
+      <defaultValue>''</defaultValue>
+      <description></description>
+      <id>c1ec021-5e0c-4153-a62c-044ead65c4e5</id>
+      <masked>false</masked>
+      <name>token</name>
+   </variables>
    <verificationScript>import static org.assertj.core.api.Assertions.*
 
 import com.kms.katalon.core.testobject.RequestObject
@@ -56,12 +72,5 @@ import internal.GlobalVariable as GlobalVariable
 RequestObject request = WSResponseManager.getInstance().getCurrentRequest()
 
 ResponseObject response = WSResponseManager.getInstance().getCurrentResponse()</verificationScript>
-   <variables>
-      <defaultValue>''</defaultValue>
-      <description></description>
-      <id>c1ec021-5e0c-4153-a62c-044ead65c4e5</id>
-      <masked>false</masked>
-      <name>token</name>
-   </variables>
    <wsdlAddress></wsdlAddress>
 </WebServiceRequestEntity>

@@ -40,7 +40,7 @@
    <socketTimeout>0</socketTimeout>
    <useServiceInfoFromWsdl>true</useServiceInfoFromWsdl>
    <variables>
-      <defaultValue>'vip_driver1'</defaultValue>
+      <defaultValue>'staff'</defaultValue>
       <description></description>
       <id>a9a026b5-4ef2-47f5-adcf-a1ea1fae0e5f</id>
       <masked>false</masked>

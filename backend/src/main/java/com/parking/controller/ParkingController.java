@@ -69,21 +69,26 @@ public class ParkingController {
     }
 
     // phần 1 / check out VISITOR task 5
-    @PostMapping("/checkout/{cardId}")
-    public ResponseEntity<Transaction> checkout(
-            @PathVariable UUID cardId) {
-        return ResponseEntity.ok(
-                parkingService.checkoutCard(cardId));
+    @PostMapping("/checkout/{identifier}")
+    public ResponseEntity<Transaction> checkout(@PathVariable String identifier) {
+        try {
+            // Nếu truyền vào là UUID (dạng 8-4-4-4-12)
+            UUID cardId = UUID.fromString(identifier);
+            return ResponseEntity.ok(parkingService.checkoutCard(cardId));
+        } catch (IllegalArgumentException e) {
+            // Nếu không phải UUID, hệ thống tự hiểu là Code (ví dụ: "000002")
+            return ResponseEntity.ok(parkingService.checkoutCardByCode(identifier));
+        }
     }
-    
+
     // confirm check out dành cho staff
     @PostMapping("/checkout/confirm/{transactionId}")
     public ResponseEntity<Transaction> confirmCheckout(
-        @PathVariable UUID transactionId) {
+            @PathVariable UUID transactionId) {
 
         return ResponseEntity.ok(
-            parkingService.confirmCheckout(transactionId));
-}
+                parkingService.confirmCheckout(transactionId));
+    }
 
     @PostMapping("/checkout-by-code/{cardCode}")
     public ResponseEntity<Transaction> checkoutByCode(
@@ -92,11 +97,11 @@ public class ParkingController {
                 parkingService.checkoutCardByCode(cardCode));
     }
 
-    @PostMapping("/congestion/checkout") // check out lưu động 
+    @PostMapping("/congestion/checkout") // check out lưu động
     public ResponseEntity<Transaction> congestionCheckout(
             @RequestBody CongestionCheckoutRequest request) {
         return ResponseEntity.ok(
-                parkingService.congestionCheckout(request)); //nhảy qua serviceyml để xử lý 
+                parkingService.congestionCheckout(request)); // nhảy qua serviceyml để xử lý
     }
 
     @GetMapping("/fee/{cardId}")

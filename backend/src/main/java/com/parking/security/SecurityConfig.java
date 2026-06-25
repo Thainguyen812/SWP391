@@ -50,7 +50,9 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/api/v1/parking/find-car")
+                                "/api/v1/parking/find-car",
+                                "/api/v1/parking/cleanup",
+                                "/api/v1/parking/check-in/visitor") // lưu ý cái này
                         .permitAll()
 
                         // Phân quyền (Role-based): Sử dụng .hasAnyRole("STAFF", "MANAGER", "ADMIN")
@@ -58,6 +60,7 @@ public class SecurityConfig {
                         // đổi trạng thái phiên đỗ xe (tránh việc khách hàng tự "hack" trạng thái xe về
                         // COMPLETED).
                         .requestMatchers("/api/blacklisted-cards/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers("/api/v1/parking/checkout/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
 
                         // Tất cả các request còn lại đều phải quẹt thẻ thành công
                         .anyRequest().authenticated());
@@ -78,7 +81,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Mở rộng CORS cho phép tất cả các nguồn kết nối (cần thiết cho deploy demo Cloud)
+        // Mở rộng CORS cho phép tất cả các nguồn kết nối (cần thiết cho deploy demo
+        // Cloud)
         configuration.setAllowedOriginPatterns(Arrays.asList("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));

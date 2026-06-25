@@ -144,11 +144,11 @@ public class ParkingServiceImpl implements ParkingService {
             }
         }
 
-        // Chốt chặn: Nếu không phải là xe VIP hoạt động, cấm tạo session tự động tại làn AI
+        // Chốt chặn: Nếu không phải là xe VIP hoạt động, cấm tạo session tự động tại
+        // làn AI
         if (!isVip) {
             throw new com.parking.exception.ApiExceptions.ForbiddenException(
-                "Phương tiện không có gói VIP hoạt động. Vui lòng di chuyển sang làn thường để quẹt thẻ tạm."
-            );
+                    "Phương tiện không có gói VIP hoạt động. Vui lòng di chuyển sang làn thường để quẹt thẻ tạm.");
         }
 
         // Create session
@@ -746,28 +746,33 @@ public class ParkingServiceImpl implements ParkingService {
     @Override
     @Transactional
     public void cleanupTestData() {
+        // 1. Quét sạch sành sanh mọi phiên đỗ xe test để giải phóng bãi
         List<com.parking.model.ParkingSession> sessions = parkingSessionRepository.findAll();
         for (com.parking.model.ParkingSession ps : sessions) {
-            if ("30A-99999".equals(ps.getLicensePlate()) || "29A-88888".equals(ps.getLicensePlate())) {
-                if (ps.getSessionStatus() == com.parking.model.ParkingSession.SessionStatus.ACTIVE
-                        || ps.getSessionStatus() == com.parking.model.ParkingSession.SessionStatus.PASSED_CONFIRMED) {
-                    if (ps.getAssignedZoneId() != null) {
-                        zoneRepository.findById(ps.getAssignedZoneId()).ifPresent(zone -> {
-                            if (zone.getCurrentOccupied() > 0) {
-                                zone.setCurrentOccupied(zone.getCurrentOccupied() - 1);
-                                zoneRepository.save(zone);
-                            }
-                        });
-                    }
+            // Hoàn trả lại slot trống cho Zone nếu xe đang trong bãi
+            if (ps.getSessionStatus() == com.parking.model.ParkingSession.SessionStatus.ACTIVE
+                    || ps.getSessionStatus() == com.parking.model.ParkingSession.SessionStatus.PASSED_CONFIRMED) {
+                if (ps.getAssignedZoneId() != null) {
+                    zoneRepository.findById(ps.getAssignedZoneId()).ifPresent(zone -> {
+                        if (zone.getCurrentOccupied() > 0) {
+                            zone.setCurrentOccupied(zone.getCurrentOccupied() - 1);
+                            zoneRepository.save(zone);
+                        }
+                    });
                 }
-                parkingSessionRepository.delete(ps);
             }
+            // XÓA HẾT LUÔN, không "if equals" biển số nào hết!
+            parkingSessionRepository.delete(ps);
+            transactionRepository.deleteAll(); // Hoặc xóa theo sessionIds đã cleanup
         }
 
-        cardRepository.findByCardCode("000001").ifPresent(card -> {
+        // 2. CHỖ ÔNG PHẢI UPDATE CƠM NÈ: Cho vòng lặp reset TẤT CẢ các thẻ về AVAILABLE
+        // luôn
+        List<com.parking.model.Card> allCards = cardRepository.findAll();
+        for (com.parking.model.Card card : allCards) {
             card.setStatus(com.parking.model.Card.CardStatus.AVAILABLE);
             cardRepository.save(card);
-        });
+        }
     }
 
     @Override
