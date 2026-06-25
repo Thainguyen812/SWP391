@@ -14,16 +14,10 @@ import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffGateControl = () => {
   const navigate = useNavigate();
-  const { addActivityLog, activeVehicles, currentVehicle, setCurrentVehicle, addActiveVehicle, dailyVolume, setDailyVolume, fetchAllDataFromBackend, totalGates } = useGlobalContext();
-  const [isEmergency, setIsEmergency] = useState(false);
+  const { addActivityLog, activeVehicles, currentVehicle, setCurrentVehicle, addActiveVehicle, dailyVolume, setDailyVolume, fetchAllDataFromBackend, totalGates, isEmergency, setIsEmergency } = useGlobalContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('Tất cả');
-  const [logs, setLogs] = useState([
-    "[OK] L-IN-01: Thẻ VIP xác nhận thành công",
-    "[INFO] L-OUT-01: Chế độ chuyển sang THỦ CÔNG",
-    "[WARN] Cảm biến làn L-IN-02 có độ trễ 200ms",
-    "[INFO] Hệ thống: Sẵn sàng."
-  ]);
+  const [logs, setLogs] = useState([]);
 
   const [manualPlate, setManualPlate] = useState('');
   const [manualCardCode, setManualCardCode] = useState('');
@@ -364,6 +358,7 @@ export const StaffGateControl = () => {
             <div className="flex items-baseline gap-1">
               <span className="text-4xl font-extrabold text-slate-800">
                 {(() => {
+                  if (isEmergency) return 0;
                   const gatesInMaintenance = gates.filter(g => g.mode === 'Bảo trì').length;
                   return Math.max(0, totalGates - gatesInMaintenance);
                 })()}
@@ -373,7 +368,7 @@ export const StaffGateControl = () => {
             <div className="flex gap-1">
               {(() => {
                 const gatesInMaintenance = gates.filter(g => g.mode === 'Bảo trì').length;
-                const activeLanesCount = Math.max(0, totalGates - gatesInMaintenance);
+                const activeLanesCount = isEmergency ? 0 : Math.max(0, totalGates - gatesInMaintenance);
                 const inactiveLanesCount = totalGates - activeLanesCount;
                 return (
                   <>

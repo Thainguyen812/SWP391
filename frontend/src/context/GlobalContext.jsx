@@ -49,6 +49,7 @@ export const GlobalProvider = ({ children }) => {
   const [useMockData, setUseMockData] = useState(false); // Default to Real Data
   const [totalGates, setTotalGates] = useState(6);
   const [activeLocation, setActiveLocation] = useState("toan-he-thong");
+  const [isEmergency, setIsEmergency] = useState(false); // Persistent emergency state
 
   // User and Shift Tracking (Initially Empty/Loading)
   const [currentUser, setCurrentUser] = useState({ name: "Đang tải...", id: "", station: "", avatar: "", shift: "" });
@@ -212,6 +213,7 @@ export const GlobalProvider = ({ children }) => {
     <GlobalContext.Provider value={{ 
       searchValue, setSearchValue, activeLocation, setActiveLocation, totalGates, setTotalGates,
       useMockData, setUseMockData,
+      isEmergency, setIsEmergency,
       currentUser, setCurrentUser, shiftHistory, setShiftHistory,
       transactions, addTransaction,
       activityLogs, addActivityLog,
