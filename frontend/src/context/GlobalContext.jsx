@@ -48,6 +48,7 @@ const FALLBACK_DAILY_VOLUME = 1284;
 
 export const GlobalProvider = ({ children }) => {
   const [searchValue, setSearchValue] = useState("");
+  const [totalGates, setTotalGates] = useState(6);
   const [activeLocation, setActiveLocation] = useState("toan-he-thong");
 
   // User and Shift Tracking (Initially Empty/Loading)
@@ -171,7 +172,7 @@ export const GlobalProvider = ({ children }) => {
 
   return (
     <GlobalContext.Provider value={{ 
-      searchValue, setSearchValue, activeLocation, setActiveLocation,
+      searchValue, setSearchValue, activeLocation, setActiveLocation, totalGates, setTotalGates,
       currentUser, setCurrentUser, shiftHistory, setShiftHistory,
       transactions, addTransaction,
       activityLogs, addActivityLog,

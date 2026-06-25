@@ -25,12 +25,15 @@ export const StaffDashboard = () => {
   const [violationPlate, setViolationPlate] = useState('');
   const [violationReason, setViolationReason] = useState('Đỗ sai quy định');
 
-  const { activityLogs, addActivityLog, addSecurityAlert, securityAlerts, currentVehicle, setCurrentVehicle, activeVehicles } = useGlobalContext();
+  const { activityLogs, addActivityLog, addSecurityAlert, securityAlerts, currentVehicle, setCurrentVehicle, activeVehicles, totalGates, setTotalGates, removeSecurityAlert } = useGlobalContext();
 
   const isManualBarrierOpen = currentVehicle ? manualBarrierStates[currentVehicle.id] || false : false;
 
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
+  const [isGateConfigModalVisible, setIsGateConfigModalVisible] = useState(false);
+  const [newGateCount, setNewGateCount] = useState(totalGates);
+  const [isAlertModalVisible, setIsAlertModalVisible] = useState(false);
 
   // Auto-select first active vehicle on load
   useEffect(() => {
@@ -246,7 +249,7 @@ export const StaffDashboard = () => {
             <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Chờ thanh toán</h4>
             <span className="bg-slate-800 text-white text-[10px] px-2 py-0.5 rounded font-bold">THỦ CÔNG</span>
           </div>
-          <div className="text-4xl font-extrabold text-slate-800 mb-2">0{waitingPaymentCount}</div>
+          <div className="text-4xl font-extrabold text-slate-800 mb-2">{waitingPaymentCount.toString().padStart(2, "0")}</div>
           <div className="text-xs text-slate-500">Cần hỗ trợ tại Cổng ra 2</div>
         </div>
 
@@ -256,7 +259,7 @@ export const StaffDashboard = () => {
             <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Cảnh báo mở</h4>
             <span className="text-red-500 text-3xl font-bold leading-none mt-[-5px]">*</span>
           </div>
-          <div className="text-4xl font-extrabold text-red-600 mb-2">0{alertsCount}</div>
+          <div className="text-4xl font-extrabold text-red-600 mb-2">{alertsCount.toString().padStart(2, "0")}</div>
           <div className="text-xs text-red-500 font-medium">Cần xử lý ngay lập tức</div>
         </div>
       </div>
