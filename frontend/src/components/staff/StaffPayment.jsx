@@ -19,7 +19,7 @@ import { apiClient } from '../../api/apiClient';
 export const StaffPayment = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { transactions, addTransaction, updateShiftStats, addActivityLog, currentVehicle, removeActiveVehicle } = useGlobalContext();
+  const { transactions, addTransaction, updateShiftStats, addActivityLog, currentVehicle, removeActiveVehicle, isEmergency } = useGlobalContext();
   
   const lostCardData = location.state?.lostCardVehicle;
   const isLostCard = location.state?.isLostCard;
@@ -39,6 +39,10 @@ export const StaffPayment = () => {
   const [backendTxn, setBackendTxn] = useState(null);
 
   const handleScanCard = async () => {
+    if (isEmergency) {
+      notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể quét thẻ lúc này.' });
+      return;
+    }
     if (!cardCode) return notification.warning({message: 'Vui lòng nhập hoặc quét mã thẻ'});
     setIsCheckingOut(true);
     try {
@@ -60,6 +64,10 @@ export const StaffPayment = () => {
   };
 
   const handlePayment = () => {
+    if (isEmergency) {
+      notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể thanh toán và mở cổng lúc này.' });
+      return;
+    }
     Modal.confirm({
       title: 'Xác nhận thanh toán',
       content: isLostCard ? `Tiến hành thu ${totalAmount.toLocaleString()} đ (Bao gồm phí đỗ xe và phạt mất thẻ) và mở cổng cho xe ${lpr}?` : `Tiến hành thu phí và mở cổng cho xe ${lpr}?`,
