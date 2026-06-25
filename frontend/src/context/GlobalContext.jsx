@@ -117,16 +117,28 @@ export const GlobalProvider = ({ children }) => {
       // 4. Fetch Active Vehicles (Sessions without checkout)
       try {
         const sessionRes = await apiClient.get('/sessions');
-        if (sessionRes.data && Array.isArray(sessionRes.data)) {
-          const active = sessionRes.data
+        
+        let dataArray = [];
+        if (Array.isArray(sessionRes.data)) {
+          dataArray = sessionRes.data;
+        } else if (sessionRes.data && Array.isArray(sessionRes.data.content)) {
+          dataArray = sessionRes.data.content;
+        } else if (sessionRes.data && Array.isArray(sessionRes.data.items)) {
+          dataArray = sessionRes.data.items;
+        } else if (sessionRes.data && Array.isArray(sessionRes.data.data)) {
+          dataArray = sessionRes.data.data;
+        }
+
+        if (dataArray && dataArray.length >= 0) {
+          const active = dataArray
             .filter(s => !s.checkOutTime)
-            .map(session => ({
+            .map((session, index) => ({
               id: session.id,
               plate: session.licensePlate || "Không rõ",
               type: session.isVip ? "VIP" : "Vãng lai",
               confidence: "99%",
               status: session.isSuspicious ? "Cảnh báo" : "Hợp lệ",
-              gate: session.entryGate || "Cổng vào",
+              gate: session.entryGate || `Cổng vào ${index + 1}`,
               inTime: session.checkInTime ? new Date(session.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
               outTime: "--:--",
               image: session.frontImage || "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80",
@@ -135,8 +147,10 @@ export const GlobalProvider = ({ children }) => {
             }));
           setActiveVehicles(active);
         } else {
+          console.error("sessionRes.data does not contain an array:", sessionRes.data);
           setActiveVehicles([]);
         }
+        
       } catch (e) {
         console.error("Failed to fetch sessions for active vehicles", e);
         setActiveVehicles([]);
