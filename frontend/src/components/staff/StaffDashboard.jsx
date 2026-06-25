@@ -293,8 +293,14 @@ export const StaffDashboard = () => {
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-            {activeVehicles.slice(0, 4).map((vehicle, index) => {
-              const isSelected = currentVehicle?.id === vehicle.id;
+            {[
+              { id: 'CAM-01', name: 'CỔNG VÀO 1', defaultImage: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80' },
+              { id: 'CAM-02', name: 'CỔNG VÀO 2', defaultImage: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80' },
+              { id: 'CAM-03', name: 'CỔNG RA 1', defaultImage: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80' },
+              { id: 'CAM-04', name: 'CỔNG RA 2', defaultImage: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80' }
+            ].map((cam, index) => {
+              const vehicle = activeVehicles[index];
+              const isSelected = vehicle && currentVehicle?.id === vehicle.id;
               
               // Helper to map status to color
               const getStatusBadge = (type, status) => {
@@ -305,29 +311,26 @@ export const StaffDashboard = () => {
 
               return (
                 <div 
-                  key={vehicle.id}
-                  onClick={() => setCurrentVehicle(vehicle)}
-                  className={`relative rounded-lg overflow-hidden border-2 aspect-[16/9] bg-slate-900 group cursor-pointer transition-all ${isSelected ? 'border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)] scale-[1.02] z-10' : 'border-slate-200 hover:border-slate-400 opacity-90 hover:opacity-100'}`}
+                  key={cam.id}
+                  onClick={() => vehicle && setCurrentVehicle(vehicle)}
+                  className={`relative rounded-lg overflow-hidden border-2 aspect-[16/9] bg-slate-900 group ${vehicle ? 'cursor-pointer' : ''} transition-all ${isSelected ? 'border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)] scale-[1.02] z-10' : 'border-slate-200 hover:border-slate-400 opacity-90 hover:opacity-100'}`}
                 >
                   <img 
-                    src={vehicle.image || "https://placehold.co/600x400/1e293b/ffffff?text=Camera+Feed"} 
-                    onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/600x400/1e293b/ffffff?text=Camera+Feed"; }}
-                    alt={`Cam ${index + 1}`} 
-                    className="w-full h-full object-cover opacity-80" 
+                    src={vehicle?.image || cam.defaultImage} 
+                    onError={(e) => { e.target.onerror = null; e.target.src = cam.defaultImage; }}
+                    alt={cam.name} 
+                    className={`w-full h-full object-cover ${vehicle ? 'opacity-80' : 'opacity-40 grayscale'}`} 
                   />
                   
                   <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm">
-                    CAM-0{index + 1}: {vehicle.gate.toUpperCase()}
+                    {cam.id}: {cam.name}
                   </div>
                   
                   {/* Bounding Box Mock based on index to simulate variety */}
-                  {index === 0 && (
+                  {vehicle && index === 0 && (
                     <div className="absolute top-[40%] left-[30%] w-[40%] h-[20%] border-2 border-emerald-400 transition-all duration-300">
                       <div className="absolute -top-6 left-0 bg-emerald-400 text-black text-[10px] font-bold px-1 py-0.5">NHẬN DIỆN BIỂN SỐ</div>
                     </div>
-                  )}
-                  {index === 3 && (
-                    <div className="absolute top-[20%] left-[20%] w-[60%] h-[50%] border-2 border-red-500 transition-all duration-300"></div>
                   )}
 
                   {/* Selected Overlay */}
@@ -338,17 +341,25 @@ export const StaffDashboard = () => {
                     </div>
                   )}
 
-                  <div className={`absolute bottom-0 left-0 w-full p-3 bg-gradient-to-t from-black/90 to-transparent transition-all ${isSelected ? 'from-blue-900/90' : ''}`}>
-                    <div className="flex justify-between items-end">
-                      <div>
-                        <div className={`text-xl font-bold tracking-widest drop-shadow-md ${isSelected ? 'text-blue-100' : 'text-white'}`}>{vehicle.plate}</div>
-                        <div className={`${vehicle.status === 'Hợp lệ' ? 'text-emerald-400' : 'text-red-400'} text-[10px] font-bold uppercase tracking-wider`}>
-                          {vehicle.type === 'Vé tháng' && vehicle.status === 'Lỗi thẻ' ? 'Khớp đặt chỗ: LỖI' : `Độ tin cậy: ${vehicle.confidence}`}
+                  {vehicle ? (
+                    <div className={`absolute bottom-0 left-0 w-full p-3 bg-gradient-to-t from-black/90 to-transparent transition-all ${isSelected ? 'from-blue-900/90' : ''}`}>
+                      <div className="flex justify-between items-end">
+                        <div>
+                          <div className={`text-xl font-bold tracking-widest drop-shadow-md ${isSelected ? 'text-blue-100' : 'text-white'}`}>{vehicle.plate}</div>
+                          <div className={`${vehicle.status === 'Hợp lệ' ? 'text-emerald-400' : 'text-red-400'} text-[10px] font-bold uppercase tracking-wider`}>
+                            {vehicle.type === 'Vé tháng' && vehicle.status === 'Lỗi thẻ' ? 'Khớp đặt chỗ: LỖI' : `Độ tin cậy: ${vehicle.confidence}`}
+                          </div>
                         </div>
+                        {getStatusBadge(vehicle.type, vehicle.status)}
                       </div>
-                      {getStatusBadge(vehicle.type, vehicle.status)}
                     </div>
-                  </div>
+                  ) : (
+                    <div className="absolute bottom-0 left-0 w-full p-3 bg-gradient-to-t from-black/80 to-transparent">
+                      <div className="flex justify-between items-end">
+                        <div className="text-slate-400 font-medium tracking-wider text-sm">KHÔNG CÓ XE</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
