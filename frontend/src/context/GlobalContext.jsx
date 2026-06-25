@@ -114,8 +114,33 @@ export const GlobalProvider = ({ children }) => {
         }).catch(() => setShiftHistory(FALLBACK_SHIFT_HISTORY));
       });
 
-      // 4. Temporarily fallback remaining items that don't have endpoints yet
-      setActiveVehicles(FALLBACK_VEHICLES); 
+      // 4. Fetch Active Vehicles (Sessions without checkout)
+      try {
+        const sessionRes = await apiClient.get('/sessions');
+        if (sessionRes.data && Array.isArray(sessionRes.data)) {
+          const active = sessionRes.data
+            .filter(s => !s.checkOutTime)
+            .map(session => ({
+              id: session.id,
+              plate: session.licensePlate || "Không rõ",
+              type: session.isVip ? "VIP" : "Vãng lai",
+              confidence: "99%",
+              status: session.isSuspicious ? "Cảnh báo" : "Hợp lệ",
+              gate: session.entryGate || "Cổng vào",
+              inTime: session.checkInTime ? new Date(session.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
+              outTime: "--:--",
+              image: session.frontImage || "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80",
+              model: session.vehicleModel || session.vehicleBrand || "Chưa xác định",
+              duration: "Đang vào"
+            }));
+          setActiveVehicles(active);
+        } else {
+          setActiveVehicles([]);
+        }
+      } catch (e) {
+        console.error("Failed to fetch sessions for active vehicles", e);
+        setActiveVehicles([]);
+      } 
       setSecurityAlerts(FALLBACK_SECURITY_ALERTS);
       setShiftStats(FALLBACK_SHIFT_STATS);
       setDailyVolume(FALLBACK_DAILY_VOLUME);
