@@ -39,6 +39,10 @@ export const StaffGateControl = () => {
   };
 
   const handleManualCheckIn = async () => {
+    if (isEmergency) {
+      notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể check-in lúc này.' });
+      return;
+    }
     if (!manualPlate || !manualCardCode) {
       notification.error({ message: 'Lỗi', description: 'Vui lòng nhập đầy đủ biển số xe và mã thẻ!' });
       return;
@@ -84,6 +88,10 @@ export const StaffGateControl = () => {
   };
 
   const handleAiCheckIn = async () => {
+    if (isEmergency) {
+      notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể check-in lúc này.' });
+      return;
+    }
     if (!aiPlate) {
       notification.error({ message: 'Lỗi', description: 'Vui lòng nhập biển số xe!' });
       return;
@@ -199,6 +207,10 @@ export const StaffGateControl = () => {
   };
 
   const handleApprove = (id, plate) => {
+    if (isEmergency) {
+      notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể mở cổng lúc này.' });
+      return;
+    }
     Modal.confirm({
       title: 'Xác nhận mở cổng',
       content: `Mở cổng ${id} cho xe ${plate}?`,
@@ -237,6 +249,10 @@ export const StaffGateControl = () => {
   };
 
   const handleReject = (id, plate) => {
+    if (isEmergency) {
+      notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể thao tác lúc này.' });
+      return;
+    }
     Modal.confirm({
       title: 'Từ chối mở cổng',
       content: `Bạn chắc chắn muốn từ chối xe ${plate} đi qua cổng ${id}?`,
@@ -261,6 +277,10 @@ export const StaffGateControl = () => {
   };
 
   const handleLock = (id) => {
+    if (isEmergency) {
+      notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể thao tác lúc này.' });
+      return;
+    }
     const gate = gates.find(g => g.id === id);
     if (!gate) return;
     
@@ -295,6 +315,10 @@ export const StaffGateControl = () => {
   };
 
   const handleMaintenance = (id) => {
+    if (isEmergency) {
+      notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể thao tác lúc này.' });
+      return;
+    }
     setGates(prev => prev.map(g => {
       if (g.id === id) {
         const isCurrentlyMaintenance = g.mode === "Bảo trì";
