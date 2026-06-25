@@ -276,10 +276,16 @@ export const StaffGateControl = () => {
   };
 
   const handleMaintenance = (id) => {
-    addLog(`${id}: Chuyển sang chế độ bảo trì`, 'WARN');
     setGates(prev => prev.map(g => {
       if (g.id === id) {
-        return { ...g, barrier: "ĐÓNG", barrierColor: "text-red-500", mode: "Bảo trì" };
+        const isCurrentlyMaintenance = g.mode === "Bảo trì";
+        if (isCurrentlyMaintenance) {
+          addLog(`${id}: Đã tắt chế độ bảo trì, chuyển về Tự động`, 'SUCCESS');
+          return { ...g, mode: "Tự động" };
+        } else {
+          addLog(`${id}: Chuyển sang chế độ bảo trì`, 'WARN');
+          return { ...g, barrier: "ĐÓNG", barrierColor: "text-red-500", mode: "Bảo trì" };
+        }
       }
       return g;
     }));
