@@ -42,6 +42,13 @@ export const StaffDashboard = () => {
   // Combine local global context logs (for live interactions) with backend logs
   const displayLogs = [...activityLogs, ...logs];
 
+  const totalGates = 6;
+  const activeGatesCount = activeVehicles ? activeVehicles.length : 0;
+  const pendingProcessingCount = activeVehicles ? activeVehicles.filter(v => v.status !== 'Hợp lệ').length : 0;
+  const waitingPaymentCount = activeVehicles ? activeVehicles.filter(v => v.status === 'Chờ thanh toán' || v.status === 'Lỗi thẻ').length : 0;
+  const alertsCount = securityAlerts ? securityAlerts.length : 0;
+
+
   useEffect(() => {
     const fetchSessions = async () => {
       try {
@@ -224,7 +231,7 @@ export const StaffDashboard = () => {
         {/* Xe chờ xử lý */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
           <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Xe chờ xử lý</h4>
-          <div className="text-4xl font-extrabold text-slate-800 mb-2">12</div>
+          <div className="text-4xl font-extrabold text-slate-800 mb-2">{pendingProcessingCount}</div>
           <div className="text-xs text-emerald-500 font-medium flex items-center gap-1">
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
             +3 xe/phút
@@ -237,7 +244,7 @@ export const StaffDashboard = () => {
             <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Chờ thanh toán</h4>
             <span className="bg-slate-800 text-white text-[10px] px-2 py-0.5 rounded font-bold">THỦ CÔNG</span>
           </div>
-          <div className="text-4xl font-extrabold text-slate-800 mb-2">05</div>
+          <div className="text-4xl font-extrabold text-slate-800 mb-2">0{waitingPaymentCount}</div>
           <div className="text-xs text-slate-500">Cần hỗ trợ tại Cổng ra 2</div>
         </div>
 
@@ -247,7 +254,7 @@ export const StaffDashboard = () => {
             <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Cảnh báo mở</h4>
             <span className="text-red-500 text-3xl font-bold leading-none mt-[-5px]">*</span>
           </div>
-          <div className="text-4xl font-extrabold text-red-600 mb-2">02</div>
+          <div className="text-4xl font-extrabold text-red-600 mb-2">0{alertsCount}</div>
           <div className="text-xs text-red-500 font-medium">Cần xử lý ngay lập tức</div>
         </div>
       </div>
