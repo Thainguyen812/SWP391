@@ -9,7 +9,7 @@ export const TopAppBarSection = () => {
   const searchId = useId();
   const location = useLocation();
   const navigate = useNavigate();
-  const { searchValue, setSearchValue, currentUser, isSimulationEnabled, setIsSimulationEnabled } = useGlobalContext();
+  const { searchValue, setSearchValue, currentUser } = useGlobalContext();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
 
@@ -121,14 +121,6 @@ export const TopAppBarSection = () => {
 
       {/* Right Area: Actions */}
       <div className="flex items-center justify-end gap-4 flex-1">
-        <button 
-          onClick={() => setIsSimulationEnabled(!isSimulationEnabled)}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-colors shadow-sm cursor-pointer ${isSimulationEnabled ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'}`}
-          title="Tự động tạo lượt xe vào/ra để kiểm thử"
-        >
-          <div className={`w-2 h-2 rounded-full ${isSimulationEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></div>
-          Auto-Traffic
-        </button>
         <button 
           className="text-slate-500 hover:text-slate-800 transition-colors cursor-pointer text-[20px]"
           onClick={() => notification.info({ message: "Không có thông báo mới", description: "Hệ thống đang hoạt động bình thường.", placement: "topRight" })}

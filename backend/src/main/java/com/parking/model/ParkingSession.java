@@ -40,6 +40,12 @@ public class ParkingSession {
     @Column(name = "session_status")
     private SessionStatus sessionStatus;
 
+    @Column(name = "entry_gate")
+    private String entryGate;
+
+    @Column(name = "exit_gate")
+    private String exitGate;
+
     private Boolean isVip = false;
     private Boolean isLocked = false;
     private Boolean isSuspicious = false;
@@ -99,6 +105,10 @@ public class ParkingSession {
     public void setCheckOutTime(Instant checkOutTime) { this.checkOutTime = checkOutTime; }
     public SessionStatus getSessionStatus() { return sessionStatus; }
     public void setSessionStatus(SessionStatus sessionStatus) { this.sessionStatus = sessionStatus; }
+    public String getEntryGate() { return entryGate; }
+    public void setEntryGate(String entryGate) { this.entryGate = entryGate; }
+    public String getExitGate() { return exitGate; }
+    public void setExitGate(String exitGate) { this.exitGate = exitGate; }
     public Boolean getIsVip() { return isVip; }
     public void setIsVip(Boolean isVip) { this.isVip = isVip; }
     public Boolean getIsLocked() { return isLocked; }

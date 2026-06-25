@@ -21,7 +21,6 @@ export const GlobalProvider = ({ children }) => {
   const [activityLogs, setActivityLogs] = useState([]);
   const [activeVehicles, setActiveVehicles] = useState([]);
   const [currentVehicle, setCurrentVehicle] = useState(null);
-  const [isSimulationEnabled, setIsSimulationEnabled] = useState(false);
   
   // Security Alerts & Stats (Initially Empty)
   const [securityAlerts, setSecurityAlerts] = useState([]);
@@ -88,7 +87,7 @@ export const GlobalProvider = ({ children }) => {
               type: session.isVip ? "VIP" : "Vãng lai",
               confidence: "99%",
               status: session.isSuspicious ? "Cảnh báo" : "Hợp lệ",
-              gate: session.entryGate || `Cổng vào ${index + 1}`,
+              gate: session.exitGate || session.entryGate || null,
               inTime: session.checkInTime ? new Date(session.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
               outTime: "--:--",
               image: session.frontImage || "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80",
@@ -160,22 +159,6 @@ export const GlobalProvider = ({ children }) => {
     fetchAllDataFromBackend();
   }, [fetchAllDataFromBackend]);
 
-  // Auto-refresh when simulation is enabled
-  useEffect(() => {
-    let intervalId;
-    if (isSimulationEnabled) {
-      intervalId = setInterval(async () => {
-        try {
-          await apiClient.post('/sessions/simulate-traffic');
-          fetchAllDataFromBackend();
-        } catch (e) {
-          console.error("Lỗi khi mô phỏng giao thông", e);
-        }
-      }, 5000); // Poll every 5 seconds
-    }
-    return () => clearInterval(intervalId);
-  }, [isSimulationEnabled, fetchAllDataFromBackend]);
-
   // Actions
   const addTransaction = (newTx) => setTransactions(prev => [newTx, ...prev]);
   const addActivityLog = (newLog) => setActivityLogs(prev => [newLog, ...prev]);
@@ -209,7 +192,7 @@ export const GlobalProvider = ({ children }) => {
 
   return (
     <GlobalContext.Provider value={{        searchValue, setSearchValue, activeLocation, setActiveLocation, totalGates, setTotalGates,
-        isEmergency, setIsEmergency, isSimulationEnabled, setIsSimulationEnabled,
+        isEmergency, setIsEmergency,
       currentUser, setCurrentUser, shiftHistory, setShiftHistory,
       transactions, addTransaction,
       activityLogs, addActivityLog,

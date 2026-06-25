@@ -34,60 +34,7 @@ public class ParkingSessionController {
         this.transactionRepo = transactionRepo;
     }
 
-    @PostMapping("/simulate-traffic")
-    public ResponseEntity<?> simulateTraffic() {
-        boolean isCheckIn = Math.random() > 0.4;
-        
-        if (isCheckIn) {
-            ParkingSession session = new ParkingSession();
-            session.setId(UUID.randomUUID());
-            String[] prefixes = {"51A", "51F", "51G", "51H", "51K", "29A", "30E", "30G"};
-            String prefix = prefixes[(int)(Math.random() * prefixes.length)];
-            int number = 10000 + (int)(Math.random() * 90000);
-            session.setLicensePlate(prefix + "-" + number + ".SIM");
-            session.setCheckInTime(Instant.now());
-            session.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
-            
-            if (Math.random() < 0.1) {
-                session.setIsSuspicious(true);
-                session.setSuspiciousReason("Cảnh báo: Xe có dấu hiệu vi phạm (Mô phỏng)");
-            }
-            
-            List<Zone> zones = zoneRepo.findAll();
-            if (!zones.isEmpty()) {
-                session.setAssignedZoneId(zones.get((int)(Math.random() * zones.size())).getId());
-            } else {
-                session.setAssignedZoneId(UUID.randomUUID());
-            }
-            
-            repo.save(session);
-            return ResponseEntity.ok(java.util.Map.of("action", "CHECK_IN", "plate", session.getLicensePlate()));
-        } else {
-            List<ParkingSession> activeSessions = repo.findAll().stream()
-                .filter(s -> s.getSessionStatus() == ParkingSession.SessionStatus.ACTIVE && s.getLicensePlate().endsWith(".SIM"))
-                .collect(Collectors.toList());
-                
-            if (!activeSessions.isEmpty()) {
-                ParkingSession session = activeSessions.get((int)(Math.random() * activeSessions.length));
-                session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
-                session.setCheckOutTime(Instant.now());
-                repo.save(session);
-                
-                Transaction t = new Transaction();
-                t.setId(UUID.randomUUID());
-                t.setSessionId(session.getId());
-                t.setTotalAmount(new BigDecimal("15000"));
-                t.setPaymentMethod(Transaction.PaymentMethod.CASH);
-                t.setPaymentStatus(Transaction.PaymentStatus.SUCCESS);
-                t.setProcessedAt(Instant.now());
-                t.setIsMobileCheckout(false);
-                transactionRepo.save(t);
-                
-                return ResponseEntity.ok(java.util.Map.of("action", "CHECK_OUT", "plate", session.getLicensePlate()));
-            }
-            return ResponseEntity.ok(java.util.Map.of("action", "NONE", "message", "No simulated active sessions to checkout"));
-        }
-    }
+
 
     private ParkingSessionDto convertToDto(ParkingSession session) {
         Vehicle vehicle = null;
