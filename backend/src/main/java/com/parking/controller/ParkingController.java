@@ -78,12 +78,13 @@ public class ParkingController {
     
     // confirm check out dành cho staff
     @PostMapping("/checkout/confirm/{transactionId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
     public ResponseEntity<Transaction> confirmCheckout(
         @PathVariable UUID transactionId) {
 
         return ResponseEntity.ok(
             parkingService.confirmCheckout(transactionId));
-}
+    }
 
     @PostMapping("/checkout-by-code/{cardCode}")
     public ResponseEntity<Transaction> checkoutByCode(
