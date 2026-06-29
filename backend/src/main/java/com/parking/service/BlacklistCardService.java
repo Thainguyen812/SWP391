@@ -4,8 +4,10 @@ import com.parking.dto.BlacklistCardRequest;
 import com.parking.exception.ApiExceptions;
 import com.parking.model.BlacklistEntry; // Sử dụng Entity mới
 import com.parking.model.ParkingSession;
+import com.parking.model.User;
 import com.parking.repository.BlacklistRepository; // Sử dụng Repository mới
 import com.parking.repository.ParkingSessionRepository;
+import com.parking.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,11 +20,13 @@ public class BlacklistCardService {
 
     private final BlacklistRepository blacklistedCardRepository;
     private final ParkingSessionRepository parkingSessionRepository;
+    private final UserRepository userRepository;
 
     public BlacklistCardService(BlacklistRepository blacklistedCardRepository,
-            ParkingSessionRepository parkingSessionRepository) {
+            ParkingSessionRepository parkingSessionRepository, UserRepository userRepository) {
         this.blacklistedCardRepository = blacklistedCardRepository;
         this.parkingSessionRepository = parkingSessionRepository;
+        this.userRepository = userRepository;
     }
 
     public UUID getCardIdByActiveLicensePlate(String plate) {
@@ -111,7 +115,16 @@ public class BlacklistCardService {
     }
 
     @Transactional
-    public BlacklistEntry processLostCardByPlate(String plate, BlacklistCardRequest request) {
+    public BlacklistEntry processLostCardByPlate(String plate, BlacklistCardRequest request, String username) {
+
+        // 🟢 1. Tự động lấy thông tin nhân viên đăng nhập qua Token bảo mật
+        User currentStaff = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ApiExceptions.BadRequestException(
+                        "Không tìm thấy thông tin nhân viên đăng nhập hệ thống!"));
+
+        // 🟢 2. Ép buộc hệ thống ghi nhận ID "xịn" từ DB (Xóa bỏ đoạn check null ID cũ)
+        request.setBlacklistedBy(currentStaff.getId());
+
         // 1. Chuẩn hóa biển số để tìm đúng xe trong bãi
         String cleanPlate = plate.trim().toUpperCase();
 
@@ -124,12 +137,6 @@ public class BlacklistCardService {
         // 3. Tự động đắp ID từ Database vào request (Triệt tiêu lỗi null ID)
         request.setCardId(activeSession.getCardId());
         request.setSessionId(activeSession.getId());
-
-        // 4. Kiểm tra ID nhân viên (Hệ thống yêu cầu truyền ID từ Client để hỗ trợ
-        // nhiều nhân viên)
-        if (request.getBlacklistedBy() == null) {
-            throw new ApiExceptions.BadRequestException("Thiếu ID nhân viên thực hiện xử lý sự cố!");
-        }
 
         // 5. Chuẩn hóa lý do (Reason) đúng theo Check Constraint của Database
         // Bắt buộc phải là: 'LOST', 'STOLEN', 'DAMAGED', hoặc 'FRAUDULENT'

@@ -4,6 +4,7 @@ import com.parking.dto.BlacklistCardRequest;
 import com.parking.model.BlacklistEntry;
 import com.parking.model.ParkingSession;
 import com.parking.service.BlacklistCardService;
+import org.springframework.security.core.Authentication; // Nhớ import thư viện này
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,24 +31,25 @@ public class BlacklistCardController {
     }
 
     // =====================================================================
-    // ENDPOINT: Tra cứu biển số để tự động khóa thẻ xe tương ứng
+    // ENDPOINT: Tra cứu biển số để tự động khóa thẻ xe tương ứng (Đã Fix Bảo Mật)
     // =====================================================================
     @PostMapping("/block-by-plate")
     public BlacklistEntry blockCardByLicensePlate(
             @RequestParam String plate,
             @RequestParam String reason,
-            @RequestParam UUID staffId) {
+            Authentication authentication) { // <-- 1. ĐÃ THAY ĐỔI: Bỏ staffId, thêm Authentication ở đây
 
-        // 1. Đóng gói các thông tin cơ bản vào DTO
+        // 2. Lấy username của nhân viên đang thao tác trực tiếp từ hệ thống bảo mật
+        String currentStaffUsername = authentication.getName();
+
+        // 3. Đóng gói các thông tin cơ bản vào DTO (Chừa trường BlacklistedBy ra để
+        // Service tự tìm ID xịn)
         BlacklistCardRequest request = new BlacklistCardRequest();
         request.setReason(reason);
-        request.setBlacklistedBy(staffId);
 
-        // 2. Chỉ gọi đúng 1 hàm Service duy nhất
-        // Mọi logic tìm kiếm phiên xe, chuẩn hóa dữ liệu, set ID, set trạng thái
-        // LOST_CARD
-        // đều đã được xử lý bên trong processLostCardByPlate
-        return blacklistCardService.processLostCardByPlate(plate, request);
+        // 4. Truyền thêm currentStaffUsername sang cho hàm Service xử lý tìm ID thật
+        // trong DB
+        return blacklistCardService.processLostCardByPlate(plate, request, currentStaffUsername);
     }
     // =====================================================================
 

@@ -144,11 +144,11 @@ public class ParkingServiceImpl implements ParkingService {
             }
         }
 
-        // Chốt chặn: Nếu không phải là xe VIP hoạt động, cấm tạo session tự động tại làn AI
+        // Chốt chặn: Nếu không phải là xe VIP hoạt động, cấm tạo session tự động tại
+        // làn AI
         if (!isVip) {
             throw new com.parking.exception.ApiExceptions.ForbiddenException(
-                "Phương tiện không có gói VIP hoạt động. Vui lòng di chuyển sang làn thường để quẹt thẻ tạm."
-            );
+                    "Phương tiện không có gói VIP hoạt động. Vui lòng di chuyển sang làn thường để quẹt thẻ tạm.");
         }
 
         // Create session
@@ -923,10 +923,20 @@ public class ParkingServiceImpl implements ParkingService {
         subscription.setStatus(newStatus);
         subscription.setApprovedBy(managerId);
         subscription.setApprovedAt(Instant.now());
+
         if (newStatus == VipSubscription.Status.REJECTED) {
             subscription.setRejectionReason(rejectionReason);
         } else {
             subscription.setRejectionReason(null);
+
+            // BỔ SUNG: Nếu gói được duyệt (ACTIVE), tự động cập nhật trạng thái thanh toán
+            // thành SUCCESS
+            if (newStatus == VipSubscription.Status.ACTIVE) {
+                // Lưu ý: Bạn hãy gõ thử subscription.setPaymentStatus xem IDE có gợi ý không.
+                // Nếu enum hoặc kiểu dữ liệu của nhóm bạn đặt tên khác (ví dụ:
+                // VipSubscription.PaymentStatus.SUCCESS), hãy đổi lại cho khớp nhé.
+                subscription.setPaymentStatus("SUCCESS");
+            }
         }
 
         vipSubscriptionRepository.save(subscription);

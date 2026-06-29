@@ -24,9 +24,17 @@ public class ParkingSessionController {
         this.vehicleRepo = vehicleRepo;
     }
 
+    // 🟢 ĐÃ FIX LỖI ĐỎ: Tìm trực tiếp bằng vehicleId có sẵn trong Entity
     private ParkingSessionDto convertToDto(ParkingSession session) {
         Vehicle vehicle = null;
-        if (session.getLicensePlate() != null) {
+
+        // 1. Kiểm tra nếu có vehicleId thì tìm bằng ID (Luôn nhanh nhất)
+        if (session.getVehicleId() != null) {
+            vehicle = vehicleRepo.findById(session.getVehicleId()).orElse(null);
+        }
+
+        // 2. Dự phòng: Nếu không tìm thấy bằng ID thì mới tìm theo Biển số xe
+        if (vehicle == null && session.getLicensePlate() != null) {
             vehicle = vehicleRepo.findByLicensePlate(session.getLicensePlate()).orElse(null);
         }
         return new ParkingSessionDto(session, vehicle);
@@ -34,20 +42,24 @@ public class ParkingSessionController {
 
     @GetMapping
     public List<ParkingSessionDto> all() {
-        return repo.findAll().stream().map(this::convertToDto).collect(Collectors.toList());
+        return repo.findAllWithVehicle().stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ParkingSessionDto> get(@PathVariable UUID id){
+    public ResponseEntity<ParkingSessionDto> get(@PathVariable UUID id) {
         Optional<ParkingSession> s = repo.findById(id);
         return s.map(this::convertToDto).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ParkingSession create(@RequestBody ParkingSession s){ return repo.save(s); }
+    public ParkingSession create(@RequestBody ParkingSession s) {
+        return repo.save(s);
+    }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ParkingSession> update(@PathVariable UUID id, @RequestBody ParkingSession s){
+    public ResponseEntity<ParkingSession> update(@PathVariable UUID id, @RequestBody ParkingSession s) {
         return repo.findById(id).map(existing -> {
             s.setId(existing.getId());
             return ResponseEntity.ok(repo.save(s));
@@ -55,8 +67,9 @@ public class ParkingSessionController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id){
-        if (!repo.existsById(id)) return ResponseEntity.notFound().build();
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        if (!repo.existsById(id))
+            return ResponseEntity.notFound().build();
         repo.deleteById(id);
         return ResponseEntity.noContent().build();
     }

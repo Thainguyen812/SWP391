@@ -2,6 +2,7 @@ package com.parking.controller;
 
 import com.parking.model.ShiftHistory;
 import com.parking.repository.ShiftHistoryRepository;
+import com.parking.exception.ApiExceptions;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,15 +27,12 @@ public class ShiftController {
     @PostMapping("/handover")
     public ResponseEntity<ShiftHistory> handoverShift(@RequestBody ShiftHistory shift) {
         // Find current active shift and end it
-        List<ShiftHistory> allShifts = shiftRepo.findAll();
-        for (ShiftHistory s : allShifts) {
-            if (s.getIsCurrent() != null && s.getIsCurrent()) {
-                s.setIsCurrent(false);
-                s.setEndTime(LocalDateTime.now());
-                s.setStatus("HOÀN THÀNH");
-                shiftRepo.save(s);
-            }
-        }
+        shiftRepo.findByIsCurrentTrue().ifPresent(activeShift -> {
+            activeShift.setIsCurrent(false);
+            activeShift.setEndTime(LocalDateTime.now());
+            activeShift.setStatus("HOÀN THÀNH");
+            shiftRepo.save(activeShift);
+        });
 
         // Create new shift
         shift.setStartTime(LocalDateTime.now());

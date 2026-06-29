@@ -6,7 +6,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/tickets")
@@ -26,12 +28,18 @@ public class SupportTicketController {
     @PostMapping
     public ResponseEntity<SupportTicket> createTicket(@RequestBody SupportTicket ticket) {
         ticket.setCreatedAt(LocalDateTime.now());
+
         if (ticket.getStatus() == null) {
             ticket.setStatus("Chờ xử lý");
         }
+
+        // 🟢 VÁ LỖI TICKET CODE COLLISION: Sinh mã duy nhất dạng TK-YYYYMMDD-XXXX
         if (ticket.getTicketCode() == null) {
-            ticket.setTicketCode("#TK-" + (int)(Math.random() * 10000));
+            String datePart = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDateTime.now());
+            String randomPart = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+            ticket.setTicketCode("TK-" + datePart + "-" + randomPart);
         }
+
         SupportTicket saved = ticketRepo.save(ticket);
         return ResponseEntity.ok(saved);
     }
@@ -42,6 +50,7 @@ public class SupportTicketController {
         if (ticket == null) {
             return ResponseEntity.notFound().build();
         }
+
         ticket.setStatus("Đã xử lý");
         ticket.setResolvedAt(LocalDateTime.now());
         ticketRepo.save(ticket);

@@ -34,17 +34,6 @@ public class VipController {
         return vipService.getPending();
     }
 
-    @PutMapping("/{id}/approve")
-    @PreAuthorize("hasRole('MANAGER')") // Chỉ quản lý được duyệt
-    public VipSubscription approve(@PathVariable UUID id) {
-        return vipService.approve(id);
-    }
-
-    @PutMapping("/{id}/reject")
-    public VipSubscription reject(@PathVariable UUID id) {
-        return vipService.reject(id);
-    }
-
     @PostMapping("/register")
     @PreAuthorize("hasRole('DRIVER')") // Chỉ tài xế VIP được đăng ký
     public VipSubscription register(@RequestBody VipRegistrationRequest request) {
