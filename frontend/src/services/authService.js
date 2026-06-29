@@ -42,6 +42,11 @@ export const authService = {
           localStorage.setItem('user', JSON.stringify(user));
         }
 
+        // Xóa dữ liệu cache của người dùng cũ để tránh hiển thị chéo dữ liệu
+        localStorage.removeItem('urbanpark_user_vehicles');
+        localStorage.removeItem('urbanpark_user_balance');
+        localStorage.removeItem('urbanpark_user_transactions');
+
         return { success: true, user: user };
       } else {
         return { success: false, message: "Phản hồi từ server không chứa token." };
@@ -54,7 +59,7 @@ export const authService = {
     }
   },
 
-  register: async (username, password, fullName, email, phone) => {
+  register: async (username, password, fullName, email, phone, otp) => {
     try {
       const response = await apiClient.post('/auth/register', {
         username,
@@ -62,6 +67,7 @@ export const authService = {
         fullName,
         email,
         phone,
+        otp,
         role: "DRIVER" // Mặc định đăng ký từ Driver App là tài xế (DRIVER)
       });
       return { success: true, data: response };
@@ -72,11 +78,49 @@ export const authService = {
     }
   },
 
+  sendOtp: async (email) => {
+    try {
+      const response = await apiClient.post('/auth/send-otp', { email });
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Lỗi gửi OTP:', error);
+      const message = error.response?.data?.message || error.message || "Không thể gửi OTP!";
+      return { success: false, message: message };
+    }
+  },
+
+  verifyOtp: async (email, otp) => {
+    try {
+      const response = await apiClient.post('/auth/verify-otp', { email, otp });
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Lỗi xác thực OTP:', error);
+      const message = error.response?.data?.message || error.message || "Mã OTP không đúng hoặc đã hết hạn!";
+      return { success: false, message: message };
+    }
+  },
+
+  resetPassword: async (email, otp, newPassword) => {
+    try {
+      const response = await apiClient.post('/auth/reset-password', { email, otp, newPassword });
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Lỗi khôi phục mật khẩu:', error);
+      const message = error.response?.data?.message || error.message || "Không thể khôi phục mật khẩu!";
+      return { success: false, message: message };
+    }
+  },
+
   logout: () => {
     // Xóa toàn bộ token và thông tin người dùng khỏi localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
+    
+    // Xóa dữ liệu cache của tài xế để tránh hiển thị chéo giữa các tài khoản
+    localStorage.removeItem('urbanpark_user_vehicles');
+    localStorage.removeItem('urbanpark_user_balance');
+    localStorage.removeItem('urbanpark_user_transactions');
     
     // Điều hướng về trang login
     window.location.href = '/login';

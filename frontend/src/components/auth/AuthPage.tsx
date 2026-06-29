@@ -95,7 +95,6 @@ export const AuthPage = () => {
   // OTP Countdown & verification state
   const [otpSent, setOtpSent] = useState(false);
   const [otpTimer, setOtpTimer] = useState(0);
-  const [expectedOtp, setExpectedOtp] = useState('');
 
   // UI States & feedback
   const [errors, setErrors] = useState({});
@@ -105,7 +104,7 @@ export const AuthPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Forgot Password values
-  const [forgotPhone, setForgotPhone] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
   const [forgotPass, setForgotPass] = useState('');
   const [forgotConfirmPass, setForgotConfirmPass] = useState('');
   const [showForgotPass, setShowForgotPass] = useState(false);
@@ -113,7 +112,6 @@ export const AuthPage = () => {
 
   const [forgotOtpSent, setForgotOtpSent] = useState(false);
   const [forgotOtpTimer, setForgotOtpTimer] = useState(0);
-  const [forgotExpectedOtp, setForgotExpectedOtp] = useState('');
   const [forgotOtp, setForgotOtp] = useState('');
 
   // Handle countdown trigger for simulated SMS OTP
@@ -147,38 +145,40 @@ export const AuthPage = () => {
   };
 
   // Click handler to request OTP
-  const handleRequestOtp = (e) => {
+  const handleRequestOtp = async (e) => {
     e.preventDefault();
     
-    // Clear old errors related to phone
+    // Clear old errors related to email
     const newErrors = { ...errors };
-    delete newErrors.phone;
+    delete newErrors.email;
     
-    // Telephone validation (Vietnam numbers typically starting with 0 and having 10 digits)
-    const phoneNoSpaces = phone.replace(/\s+/g, '');
-    const vietnamPhoneRegex = /^(0[35789])[0-9]{8}$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     
-    if (!phoneNoSpaces) {
-      newErrors.phone = 'Vui lòng nhập số điện thoại';
+    if (!email) {
+      newErrors.email = 'Vui lòng nhập địa chỉ email';
       setErrors(newErrors);
-      showNotification('Vui lòng cung cấp số điện thoại.', 'error');
+      showNotification('Vui lòng cung cấp địa chỉ email.', 'error');
       return;
-    } else if (!vietnamPhoneRegex.test(phoneNoSpaces)) {
-      newErrors.phone = 'Số điện thoại không đúng định dạng (Ví dụ: 0901234567)';
+    } else if (!emailRegex.test(email)) {
+      newErrors.email = 'Địa chỉ email không hợp lệ';
       setErrors(newErrors);
-      showNotification('Định dạng số điện thoại chưa hỗ trợ.', 'error');
+      showNotification('Địa chỉ email không đúng định dạng.', 'error');
       return;
     }
 
     setErrors(newErrors);
+    setIsSubmitting(true);
     
-    // Simulate API request to send SMS OTP
-    const mockOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setExpectedOtp(mockOtp);
-    setOtpSent(true);
-    setOtpTimer(60);
+    const res = await authService.sendOtp(email.trim());
+    setIsSubmitting(false);
     
-    showNotification(`Đã gửi mã xác thực tới số ${phone}. Nhập mã: ${mockOtp} để thử nghiệm!`, 'success');
+    if (res.success) {
+      setOtpSent(true);
+      setOtpTimer(60);
+      showNotification('Đã gửi mã xác thực tới email của bạn. Vui lòng kiểm tra hộp thư!', 'success');
+    } else {
+      showNotification(res.message || 'Không thể gửi mã xác thực. Vui lòng thử lại!', 'error');
+    }
   };
 
   // Form validations
@@ -192,16 +192,17 @@ export const AuthPage = () => {
     }
 
     const phoneNoSpaces = phone.replace(/\s+/g, '');
+    const vietnamPhoneRegex = /^(0[35789])[0-9]{8}$/;
     if (!phoneNoSpaces) {
       newErrors.phone = 'Vui lòng nhập số điện thoại';
+    } else if (!vietnamPhoneRegex.test(phoneNoSpaces)) {
+      newErrors.phone = 'Số điện thoại không đúng định dạng (Ví dụ: 0901234567)';
     }
 
     if (!otpSent) {
-      newErrors.otp = 'Chưa xác nhận OTP';
+      newErrors.otp = 'Chưa nhận OTP';
     } else if (!otp) {
       newErrors.otp = 'Vui lòng nhập mã xác thực OTP';
-    } else if (otp !== expectedOtp) {
-      newErrors.otp = 'Mã xác thực OTP không chính xác';
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -253,7 +254,8 @@ export const AuthPage = () => {
         password,
         name.trim(), // fullName
         email.trim(),
-        phoneClean // phone
+        phoneClean, // phone
+        otp.trim() // otp
       );
 
       setIsSubmitting(false);
@@ -271,33 +273,37 @@ export const AuthPage = () => {
   };
 
   // Click handler to request OTP for forgot password
-  const handleRequestForgotOtp = (e) => {
+  const handleRequestForgotOtp = async (e) => {
     e.preventDefault();
     
-    const phoneNoSpaces = forgotPhone.replace(/\s+/g, '');
-    const vietnamPhoneRegex = /^(0[35789])[0-9]{8}$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     
-    if (!phoneNoSpaces) {
-      showNotification('Vui lòng cung cấp số điện thoại.', 'error');
+    if (!forgotEmail) {
+      showNotification('Vui lòng cung cấp địa chỉ email.', 'error');
       return;
-    } else if (!vietnamPhoneRegex.test(phoneNoSpaces)) {
-      showNotification('Định dạng số điện thoại chưa hỗ trợ.', 'error');
+    } else if (!emailRegex.test(forgotEmail)) {
+      showNotification('Địa chỉ email không đúng định dạng.', 'error');
       return;
     }
 
-    const mockOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setForgotExpectedOtp(mockOtp);
-    setForgotOtpSent(true);
-    setForgotOtpTimer(60);
-    
-    showNotification(`Đã gửi mã xác thực tới số ${forgotPhone}. Nhập mã: ${mockOtp} để thử nghiệm!`, 'success');
+    setIsSubmitting(true);
+    const res = await authService.sendOtp(forgotEmail.trim());
+    setIsSubmitting(false);
+
+    if (res.success) {
+      setForgotOtpSent(true);
+      setForgotOtpTimer(60);
+      showNotification('Đã gửi mã xác thực tới email của bạn. Vui lòng kiểm tra hộp thư!', 'success');
+    } else {
+      showNotification(res.message || 'Không thể gửi mã xác thực. Vui lòng thử lại!', 'error');
+    }
   };
 
   // Handle Forgot Password Submission
   const handleForgotPasswordSubmit = async (e) => {
     e.preventDefault();
-    if (!forgotPhone) {
-      showNotification('Vui lòng điền số điện thoại', 'error');
+    if (!forgotEmail) {
+      showNotification('Vui lòng điền địa chỉ email', 'error');
       return;
     }
     
@@ -306,9 +312,6 @@ export const AuthPage = () => {
       return;
     } else if (!forgotOtp) {
       showNotification('Vui lòng nhập mã xác thực OTP', 'error');
-      return;
-    } else if (forgotOtp !== forgotExpectedOtp) {
-      showNotification('Mã xác thực OTP không chính xác', 'error');
       return;
     }
 
@@ -322,22 +325,24 @@ export const AuthPage = () => {
     }
 
     setIsSubmitting(true);
-    // Mock API call to reset password
-    await new Promise(resolve => setTimeout(resolve, 800));
+    const result = await authService.resetPassword(forgotEmail.trim(), forgotOtp.trim(), forgotPass);
     setIsSubmitting(false);
 
-    showNotification('Khôi phục mật khẩu thành công! Bạn có thể đăng nhập ngay bây giờ.', 'success');
-    
-    // Reset form and go back to login
-    setForgotPhone('');
-    setForgotPass('');
-    setForgotConfirmPass('');
-    setForgotOtp('');
-    setForgotOtpSent(false);
-    setForgotOtpTimer(0);
-    setForgotExpectedOtp('');
-    setIsForgotPassword(false);
-    setIsSignUp(false);
+    if (result.success) {
+      showNotification('Khôi phục mật khẩu thành công! Bạn có thể đăng nhập ngay bây giờ.', 'success');
+      
+      // Reset form and go back to login
+      setForgotEmail('');
+      setForgotPass('');
+      setForgotConfirmPass('');
+      setForgotOtp('');
+      setForgotOtpSent(false);
+      setForgotOtpTimer(0);
+      setIsForgotPassword(false);
+      setIsSignUp(false);
+    } else {
+      showNotification(result.message || 'Khôi phục mật khẩu thất bại.', 'error');
+    }
   };
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -382,7 +387,6 @@ export const AuthPage = () => {
     setConfirmPassword('');
     setAgreeTerms(false);
     setOtpSent(false);
-    setExpectedOtp('');
     setOtpTimer(0);
     setErrors({});
     setIsRegistered(false);
@@ -568,20 +572,20 @@ export const AuthPage = () => {
                     Khôi phục mật khẩu
                   </h2>
                   <p className="text-[14px] text-slate-500 mt-1 leading-relaxed">
-                    Xác minh số điện thoại để đặt lại mật khẩu mới cho tài khoản của bạn.
+                    Xác minh địa chỉ email để đặt lại mật khẩu mới cho tài khoản của bạn.
                   </p>
                 </div>
 
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
                     <InputField
-                      id="forgot-phone"
-                      label="SỐ ĐIỆN THOẠI ĐÃ ĐĂNG KÝ"
-                      placeholder="090 123 4567"
-                      type="tel"
-                      value={forgotPhone}
-                      onChange={(e) => setForgotPhone(e.target.value)}
-                      icon={<Smartphone className="w-4 h-4" />}
+                      id="forgot-email"
+                      label="ĐỊA CHỈ EMAIL ĐÃ ĐĂNG KÝ"
+                      placeholder="name@example.com"
+                      type="email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      icon={<Mail className="w-4 h-4" />}
                       disabled={isSubmitting || forgotOtpSent}
                     />
                   </div>
@@ -705,29 +709,29 @@ export const AuthPage = () => {
                   disabled={isSubmitting}
                 />
 
-                {/* 2. Phone field + Get OTP side-by-side Button */}
+                {/* 2. Email field + Get OTP side-by-side Button */}
                 <div className="w-full">
-                  <label htmlFor="reg-phone" className="block text-[11px] font-bold tracking-wider text-slate-700 uppercase mb-1.5">
-                    Số điện thoại
+                  <label htmlFor="reg-email" className="block text-[11px] font-bold tracking-wider text-slate-700 uppercase mb-1.5">
+                    Địa chỉ email
                   </label>
                   <div className="flex gap-2 items-start">
                     <div className="relative rounded-md shadow-xs flex-1">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Smartphone className="w-4 h-4" />
+                        <Mail className="w-4 h-4" />
                       </div>
                       <input
-                        id="reg-phone"
-                        type="tel"
-                        placeholder="090 123 4567"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
+                        id="reg-email"
+                        type="email"
+                        placeholder="name@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         disabled={isSubmitting || otpSent}
                         className={`
                           block w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 
                           text-[14px] text-slate-800 placeholder-slate-400/80 outline-hidden transition-all duration-200
                           focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50
                           disabled:bg-slate-50 disabled:text-slate-400
-                          ${errors.phone ? 'border-red-300 focus:border-red-500' : ''}
+                          ${errors.email ? 'border-red-300 focus:border-red-500' : ''}
                         `}
                       />
                     </div>
@@ -747,8 +751,8 @@ export const AuthPage = () => {
                       {otpTimer > 0 ? `Gửi lại (${otpTimer}s)` : 'Nhận mã OTP'}
                     </button>
                   </div>
-                  {errors.phone && (
-                    <span className="block text-xs text-red-500 mt-1">{errors.phone}</span>
+                  {errors.email && (
+                    <span className="block text-xs text-red-500 mt-1">{errors.email}</span>
                   )}
                 </div>
 
@@ -770,16 +774,16 @@ export const AuthPage = () => {
                   </motion.div>
                 )}
 
-                {/* 4. Contact Email Address */}
+                {/* 4. Phone number input (normal field) */}
                 <InputField
-                  id="reg-email"
-                  label="Địa chỉ email"
-                  placeholder="name@example.com"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  icon={<Mail className="w-4 h-4" />}
-                  error={errors.email}
+                  id="reg-phone"
+                  label="Số điện thoại"
+                  placeholder="090 123 4567"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  icon={<Smartphone className="w-4 h-4" />}
+                  error={errors.phone}
                   disabled={isSubmitting}
                 />
 

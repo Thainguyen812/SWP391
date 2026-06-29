@@ -155,22 +155,36 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         headers: { 'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}` }
       });
       const data = await response.json();
-      if (data.success && Array.isArray(data.data)) {
-        const mapped: UserVehicle[] = data.data.map((v: any, index: number) => ({
-          id: v.id || `veh-${v.plate}`,
-          plate: v.plate,
-          name: v.name,
-          type: v.type === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
-                v.type === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
-                'Ô tô gầm thấp 4-5 chỗ',
-          regDate: '12/10/2023',
-          isActive: true,
-          image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
-          isLocked: v.isLocked
-        }));
+      const vehicleList = Array.isArray(data) ? data : (data && data.success && Array.isArray(data.data) ? data.data : null);
+      if (vehicleList) {
+        const mapped: UserVehicle[] = vehicleList.map((v: any, index: number) => {
+          const sizeType = v.vehicleSize || v.type || 'SEDAN_HATCHBACK';
+          const sizeLabel = sizeType === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
+                            sizeType === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
+                            sizeType === 'EV_CAR' ? 'Xe điện' :
+                            'Ô tô gầm thấp 4-5 chỗ';
+          
+          let regDate = '30/06/2026';
+          if (v.createdAt) {
+            try {
+              const d = new Date(v.createdAt);
+              regDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+            } catch (err) {}
+          }
+          
+          return {
+            id: v.id || `veh-${v.licensePlate || v.plate}`,
+            plate: v.licensePlate || v.plate,
+            name: v.brand || v.name || 'Phương tiện',
+            type: sizeLabel,
+            regDate: regDate,
+            isActive: v.isActive !== false && v.active !== false,
+            image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
+            isLocked: v.isLocked || false
+          };
+        });
         setVehicles(mapped);
         
-        // Auto-initialize first selection if needed
         if (mapped.length > 0 && (!selectedVehId || !mapped.some(mv => mv.id === selectedVehId))) {
           setSelectedVehId(mapped[0].id);
         }
@@ -191,82 +205,12 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (err) {
         console.error(err);
       }
     }
-    
-    // Generate realistic seeded transactions relative to current date
-    const now = new Date();
-    const formatDate = (d: Date) => {
-      const day = String(d.getDate()).padStart(2, '0');
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const year = d.getFullYear();
-      return `${day}/${month}/${year}`;
-    };
-    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
-    const lastMonth = new Date(now); lastMonth.setMonth(now.getMonth() - 1);
-    const threeMonthsAgo = new Date(now); threeMonthsAgo.setMonth(now.getMonth() - 3);
-    const lastYear = new Date(now); lastYear.setFullYear(now.getFullYear() - 1);
-    const twoYearsAgo = new Date(now); twoYearsAgo.setFullYear(now.getFullYear() - 2);
-
-    return [
-      {
-        id: 'TXN-8761',
-        date: 'Vừa xong',
-        type: 'Nạp ví VNPAY',
-        plate: '-',
-        fee: '+$50.00',
-        isEntry: true,
-        status: 'Thành công'
-      },
-      {
-        id: 'TXN-8762',
-        date: formatDate(yesterday),
-        type: 'Xe ô tô vào bãi',
-        plate: '30A-99999',
-        fee: '-$2.00',
-        isEntry: false,
-        status: 'Thành công'
-      },
-      {
-        id: 'TXN-8763',
-        date: formatDate(lastMonth),
-        type: 'Đăng kí Thẻ Tháng VIP',
-        plate: '30A-99999',
-        fee: '-$40.00',
-        isEntry: false,
-        status: 'Thành công'
-      },
-      {
-        id: 'TXN-8764',
-        date: formatDate(threeMonthsAgo),
-        type: 'Nạp ví VNPAY',
-        plate: '-',
-        fee: '+$100.00',
-        isEntry: true,
-        status: 'Thành công'
-      },
-      {
-        id: 'TXN-8765',
-        date: formatDate(lastYear),
-        type: 'Xe ô tô vào bãi',
-        plate: '29A-11111',
-        fee: '-$2.00',
-        isEntry: false,
-        status: 'Thành công'
-      },
-      {
-        id: 'TXN-8766',
-        date: formatDate(twoYearsAgo),
-        type: 'Đăng kí Thẻ Tháng VIP',
-        plate: '29A-11111',
-        fee: '-$40.00',
-        isEntry: false,
-        status: 'Thành công'
-      }
-    ];
+    return [];
   });
 
   // Current parked vehicle mock details
@@ -448,27 +392,90 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   };
 
   // Add Vehicle helper
-  const handleAddVehicle = (e: React.FormEvent) => {
+  const handleAddVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPlate.trim()) {
       triggerToast('Vui lòng điền biển số xe!', 'error');
       return;
     }
-    const modelItem: UserVehicle = {
-      id: `veh-${Date.now()}`,
-      plate: newPlate.toUpperCase(),
-      name: newName.trim() || 'Phương tiện mới',
-      type: newType,
-      regDate: new Date().toLocaleDateString('vi-VN'),
+
+    let ownerId = null;
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        ownerId = JSON.parse(userStr).id;
+      }
+    } catch (err) {
+      console.error("Lỗi lấy thông tin user:", err);
+    }
+
+    if (!ownerId) {
+      triggerToast('Phiên làm việc lỗi. Vui lòng đăng nhập lại!', 'error');
+      return;
+    }
+
+    let sizeType = 'SEDAN_HATCHBACK';
+    if (newType === 'Xe 7 chỗ' || newType === 'Xe 9 chỗ') {
+      sizeType = 'SUV_CUV_MPV';
+    } else if (newType === 'Xe 16 chỗ') {
+      sizeType = 'LARGE_VAN_MINIBUS';
+    }
+
+    const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+
+    const payload = {
+      id: uuid,
+      ownerId: ownerId,
+      licensePlate: newPlate.toUpperCase().trim(),
+      vehicleSize: sizeType,
+      brand: newName.trim() || 'Phương tiện mới',
+      color: 'WHITE',
+      colorRgb: '#FFFFFF',
+      bodyShape: 'SEDAN',
       isActive: true,
-      image: '',
-      isLocked: false
+      fuelType: 'GASOLINE'
     };
-    setVehicles(prev => [...prev, modelItem]);
-    setNewPlate('');
-    setNewName('');
-    setAddVehicleModalOpen(false);
-    triggerToast(`Đăng ký thêm phương tiện ${modelItem.plate} thành công!`, 'success');
+
+    try {
+      const response = await fetch('/api/vehicles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error('Thêm xe thất bại. Biển số xe có thể đã tồn tại!');
+      }
+
+      const savedVehicle = await response.json();
+      
+      const modelItem: UserVehicle = {
+        id: savedVehicle.id,
+        plate: savedVehicle.licensePlate,
+        name: savedVehicle.brand,
+        type: newType,
+        regDate: new Date().toLocaleDateString('vi-VN'),
+        isActive: true,
+        image: '',
+        isLocked: false
+      };
+
+      setVehicles(prev => [...prev, modelItem]);
+      setNewPlate('');
+      setNewName('');
+      setAddVehicleModalOpen(false);
+      triggerToast(`Đăng ký thêm phương tiện ${modelItem.plate} thành công!`, 'success');
+      
+      fetchVehiclesFromApi();
+    } catch (error: any) {
+      triggerToast(error.message || 'Thêm xe thất bại, vui lòng kiểm tra lại!', 'error');
+    }
   };
 
   // Lock/Unlock Anti-theft vehicle
@@ -1049,7 +1056,21 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         {/* Rendering dynamic custom QR design vector mapping */}
                         {(() => {
                           const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
-                          if (!activeVeh) return null;
+                          if (!activeVeh) {
+                            return (
+                              <div className="bg-orange-50/50 rounded-2xl border border-dashed border-orange-200 p-8 flex flex-col items-center justify-center text-center space-y-3 mt-4 animate-fade-in">
+                                <div className="p-3 bg-orange-100 rounded-full text-orange-600">
+                                  <QrCode className="w-8 h-8 animate-pulse" />
+                                </div>
+                                <div className="space-y-1">
+                                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide">Chưa có phương tiện</h4>
+                                  <p className="text-[11px] text-slate-500 max-w-[240px] leading-relaxed">
+                                    Vui lòng nhấn nút <strong>"Thêm xe mới"</strong> ở cột bên trái để đăng ký biển số xe của bạn và hiển thị mã QR.
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          }
                           const qrValueString = `${activeVeh.plate}|${qrDirection}|${Date.now()}`;
                           return (
                             <div className="bg-slate-50 rounded-2xl border border-slate-150 p-5 flex flex-col items-center justify-center space-y-4">
