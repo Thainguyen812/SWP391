@@ -105,7 +105,7 @@ export const OtpInput: React.FC<OtpInputProps> = ({ value, onChange, disabled })
       
       <div className="flex items-center gap-1.5 text-slate-500 text-[12px]">
         <Info id="otp-info" className="w-[14px] h-[14px] text-blue-500 shrink-0" />
-        <span>Mã đã được gửi qua SMS.</span>
+        <span>Mã đã được gửi qua Gmail.</span>
       </div>
     </div>
   );

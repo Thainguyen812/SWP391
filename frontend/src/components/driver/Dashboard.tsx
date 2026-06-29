@@ -180,7 +180,31 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   const [showAddBranchModal, setShowAddBranchModal] = useState(false);
   const [branches, setBranches] = useState<any[]>(() => {
     const saved = localStorage.getItem('urbanpark_manager_branches');
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.length >= 2) return parsed;
+        if (parsed.length === 1 && parsed[0].id === 'br-1') {
+          return [
+            parsed[0],
+            {
+              id: 'br-2',
+              name: 'Cơ sở Landmark 81 (CS 02)',
+              address: '208 Nguyễn Hữu Cảnh, Bình Thạnh',
+              status: 'Hoạt động',
+              capacity: 600,
+              occupied: 546,
+              cars: '200 / 250',
+              motorbikes: '346 / 350',
+              updateTime: 'Cập nhật 2 phút trước'
+            }
+          ];
+        }
+        return parsed;
+      } catch (e) {
+        // fallback
+      }
+    }
     return [
       {
         id: 'br-1',
@@ -192,6 +216,17 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
         cars: '120 / 150',
         motorbikes: '222 / 250',
         updateTime: 'Cập nhật 1 phút trước'
+      },
+      {
+        id: 'br-2',
+        name: 'Cơ sở Landmark 81 (CS 02)',
+        address: '208 Nguyễn Hữu Cảnh, Bình Thạnh',
+        status: 'Hoạt động',
+        capacity: 600,
+        occupied: 546,
+        cars: '200 / 250',
+        motorbikes: '346 / 350',
+        updateTime: 'Cập nhật 2 phút trước'
       }
     ];
   });
@@ -421,6 +456,14 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     localStorage.setItem('urbanpark_manager_branches', JSON.stringify(branches));
   }, [branches]);
 
+  useEffect(() => {
+    if (activeFacility === 'cs2') {
+      setGateActiveName('Bốt Gác Landmark 1');
+    } else {
+      setGateActiveName('Bốt Gác Cổng Trực 1');
+    }
+  }, [activeFacility]);
+
   // HR Staff List and live performance metrics (Screenshot 5 Replication)
   const [staff, setStaff] = useState<StaffMember[]>([
     { id: 'STF-01', name: 'Trần Thị Bé', avatar: 'B', role: 'Giám sát Cổng vào 1', gate: 'Cổng Vào 01', swipes: 342, status: 'ONLINE', leaveHours: '06:00 - 14:00', keyLabel: '8892' },
@@ -458,10 +501,13 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
   // Hardware switches status for Technical Config
   const [gateBarriers, setGateBarriers] = useState([
-    { gateId: 'GATE-IN-01', name: 'Cổng Vào 01 (LPR-C01)', open: false, isOperating: false },
-    { gateId: 'GATE-IN-02', name: 'Cổng Vào 02 (LPR-C02)', open: false, isOperating: false },
-    { gateId: 'GATE-OUT-01', name: 'Cổng Ra 01 (LPR-C03)', open: true, isOperating: false },
-    { gateId: 'GATE-OUT-02', name: 'Cổng Ra 02 (LPR-C04)', open: false, isOperating: false }
+    { gateId: 'GATE-IN-01', name: 'CS1 - Cổng Vào 01 (LPR-C01)', open: false, isOperating: false, branchId: 'cs1' },
+    { gateId: 'GATE-IN-02', name: 'CS1 - Cổng Vào 02 (LPR-C02)', open: false, isOperating: false, branchId: 'cs1' },
+    { gateId: 'GATE-OUT-01', name: 'CS1 - Cổng Ra 01 (LPR-C03)', open: true, isOperating: false, branchId: 'cs1' },
+    { gateId: 'GATE-OUT-02', name: 'CS1 - Cổng Ra 02 (LPR-C04)', open: false, isOperating: false, branchId: 'cs1' },
+    { gateId: 'GATE-IN-03', name: 'CS2 - Landmark Cổng A1', open: false, isOperating: false, branchId: 'cs2' },
+    { gateId: 'GATE-IN-04', name: 'CS2 - Landmark Cổng B2', open: false, isOperating: false, branchId: 'cs2' },
+    { gateId: 'GATE-OUT-03', name: 'CS2 - Landmark Cổng Ra', open: false, isOperating: false, branchId: 'cs2' }
   ]);
 
   // Blacklist Database
@@ -493,15 +539,26 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     const saved = localStorage.getItem('urbanpark_customers_list');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed.some((c: any) => c.expiryDate === '31/12/2024' || c.expiryDate === '15/11/2023' || c.expiryDate === '01/10/2023')) {
+          localStorage.removeItem('urbanpark_customers_list');
+        } else {
+          return parsed;
+        }
       } catch (err) {
         console.error("Failed parsing custom customers list:", err);
       }
     }
+    const dFuture1 = new Date(); dFuture1.setMonth(dFuture1.getMonth() + 6);
+    const dFuture2 = new Date(); dFuture2.setMonth(dFuture2.getMonth() + 3);
+    const dPast = new Date(); dPast.setMonth(dPast.getMonth() - 2);
+    
+    const fmt = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    
     return [
-      { id: 'CUST-001', name: 'Nguyễn Văn An', phone: '090 123 4567', plate: '51F-123.45', cardType: 'VIP', status: 'ACTIVE', expiryDate: '31/12/2024' },
-      { id: 'CUST-002', name: 'Trần Thị Bích', phone: '091 987 6543', plate: '30A-987.65', cardType: 'Tháng', status: 'ACTIVE', expiryDate: '15/11/2023' },
-      { id: 'CUST-003', name: 'Lê Hữu Trí', phone: '093 765 4321', plate: '43C-112.22', cardType: 'Tháng', status: 'EXPIRED', expiryDate: '01/10/2023' },
+      { id: 'CUST-001', name: 'Nguyễn Văn An', phone: '090 123 4567', plate: '51F-123.45', cardType: 'VIP', status: 'ACTIVE', expiryDate: fmt(dFuture1) },
+      { id: 'CUST-002', name: 'Trần Thị Bích', phone: '091 987 6543', plate: '30A-987.65', cardType: 'Tháng', status: 'ACTIVE', expiryDate: fmt(dFuture2) },
+      { id: 'CUST-003', name: 'Lê Hữu Trí', phone: '093 765 4321', plate: '43C-112.22', cardType: 'Tháng', status: 'EXPIRED', expiryDate: fmt(dPast) },
       { id: 'CUST-004', name: 'Vãng lai (Ticket #99281)', phone: '-', plate: '60B-555.44', cardType: 'Guest', status: 'IN_PARK', expiryDate: 'N/A' }
     ];
   });
@@ -537,6 +594,37 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   const formattedRevenue = (45.2 * statsMultiplier).toFixed(1);
   const formattedCarsCount = Math.round(1248 * statsMultiplier).toLocaleString();
   const formattedFullCapacityPercent = activeFacility === 'cs1' ? 78 : activeFacility === 'cs2' ? 91 : 85;
+
+  const filteredBranches = branches.filter(branch => {
+    if (activeFacility === 'cs1') {
+      return branch.id === 'br-1' || branch.name.toLowerCase().includes('vincom') || branch.name.toLowerCase().includes('cs 01') || branch.name.toLowerCase().includes('cs1') || branch.name.toLowerCase().includes('cơ sở 01') || branch.name.toLowerCase().includes('cơ sở 1');
+    } else if (activeFacility === 'cs2') {
+      return branch.id === 'br-2' || branch.name.toLowerCase().includes('landmark') || branch.name.toLowerCase().includes('cs 02') || branch.name.toLowerCase().includes('cs2') || branch.name.toLowerCase().includes('cơ sở 02') || branch.name.toLowerCase().includes('cơ sở 2');
+    }
+    return true;
+  });
+
+  const totalCapacity = filteredBranches.reduce((sum, b) => sum + (b.capacity || 0), 0);
+  const totalOccupied = filteredBranches.reduce((sum, b) => sum + (b.occupied || 0), 0);
+  const overallPercentage = totalCapacity === 0 ? 0 : Math.round((totalOccupied / totalCapacity) * 100);
+  const activeCount = activeFacility === 'all' ? 11 : activeFacility === 'cs1' ? 5 : 6;
+  const maintenanceCount = activeFacility === 'all' ? 1 : activeFacility === 'cs1' ? 0 : 1;
+
+  const filteredScanLogs = liveScanLogs.filter(log => {
+    const gateName = log.gate || '';
+    if (activeFacility === 'cs1') {
+      return gateName.toLowerCase().includes('cổng trực') || gateName.toLowerCase().includes('cổng vào') || gateName.toLowerCase().includes('cổng ra') || gateName.toLowerCase().includes('cs1');
+    } else if (activeFacility === 'cs2') {
+      return gateName.toLowerCase().includes('landmark') || gateName.toLowerCase().includes('cs2');
+    }
+    return true;
+  });
+
+  const filteredBarriers = gateBarriers.filter(b => {
+    if (activeFacility === 'cs1') return b.branchId === 'cs1';
+    if (activeFacility === 'cs2') return b.branchId === 'cs2';
+    return true;
+  });
 
   // LPR Automatic Vehicle Simulation runner (adds / removes cars interactively)
   const [mockLprPlateInput, setMockLprPlateInput] = useState('');
@@ -1263,14 +1351,16 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 border-b border-slate-150 dark:border-slate-800 text-left">
                       <div className="space-y-1 block">
                         <div className="text-[10px] uppercase font-black tracking-widest text-slate-400 dark:text-slate-500">
-                          Bốt điều hành &gt; Trực Cổng Chính v1
+                          Bốt điều hành &gt; {activeFacility === 'cs1' ? 'Cơ sở 01' : activeFacility === 'cs2' ? 'Cơ sở 02' : 'Toàn hệ thống'}
                         </div>
                         <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-sans flex items-center gap-2">
                           <ShieldAlert className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                           Tiểu Khu Trực Cổng & Kiểm Soát Phương Tiện
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-bold font-sans">
-                          Thiết kế giao diện nhập liệu thông minh cho nhân viên gác cổng, gọi trực tiếp API Backend.
+                          Thiết kế giao diện nhập liệu thông minh cho nhân viên gác cổng - {
+                            activeFacility === 'cs1' ? 'Cơ sở 01 (Vincom Center)' : activeFacility === 'cs2' ? 'Cơ sở 02 (Landmark 81)' : 'Toàn hệ thống'
+                          }
                         </p>
                       </div>
                       
@@ -1299,9 +1389,20 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                                 onChange={(e) => setGateActiveName(e.target.value)}
                                 className="w-full p-3 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800/80 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-250 transition-colors focus:ring-2 focus:ring-blue-500 outline-none"
                               >
-                                <option value="Bốt Gác Cổng Trực 1">Bốt Gác Cổng Vào chính B1 (HQ)</option>
-                                <option value="Bốt Gác Cổng Trực 2">Bốt Gác Cổng Vào phụ G2</option>
-                                <option value="Bốt Gác Cổng Trực 3">Bốt Gác Cổng Ra chính v1</option>
+                                {(activeFacility === 'all' || activeFacility === 'cs1') && (
+                                  <>
+                                    <option value="Bốt Gác Cổng Trực 1">CS1 - Bốt Gác Cổng Vào chính B1 (HQ)</option>
+                                    <option value="Bốt Gác Cổng Trực 2">CS1 - Bốt Gác Cổng Vào phụ G2</option>
+                                    <option value="Bốt Gác Cổng Trực 3">CS1 - Bốt Gác Cổng Ra chính v1</option>
+                                  </>
+                                )}
+                                {(activeFacility === 'all' || activeFacility === 'cs2') && (
+                                  <>
+                                    <option value="Bốt Gác Landmark 1">CS2 - Bốt Gác Landmark Cổng Vào A1</option>
+                                    <option value="Bốt Gác Landmark 2">CS2 - Bốt Gác Landmark Cổng Vào B2</option>
+                                    <option value="Bốt Gác Landmark 3">CS2 - Bốt Gác Landmark Cổng Ra chính</option>
+                                  </>
+                                )}
                               </select>
                             </div>
 
@@ -1405,13 +1506,13 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                           </div>
 
                           <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                            {liveScanLogs.length === 0 ? (
+                            {filteredScanLogs.length === 0 ? (
                               <div className="py-16 text-center text-xs text-slate-400 dark:text-slate-550 space-y-2">
                                 <QrCode className="w-12 h-12 text-slate-200 dark:text-slate-800 mx-auto" />
                                 <p>Chưa có dữ liệu thông xe nào trong bão gác chính của cơ sở ngày hôm nay.</p>
                               </div>
                             ) : (
-                              liveScanLogs.map(log => {
+                              filteredScanLogs.map(log => {
                                 const isBlocked = log.status === "Bị chặn (Khóa)";
                                 return (
                                   <div
@@ -3133,7 +3234,9 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                                     <div className="flex justify-end gap-3.5 text-[11px] font-bold">
                                       <button 
                                         onClick={() => {
-                                          const nextExpiry = '31/12/2024';
+                                           const d = new Date();
+                                           d.setFullYear(d.getFullYear() + 1);
+                                           const nextExpiry = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
                                           if (nextExpiry && nextExpiry.trim()) {
                                             setCustomerList(prev => prev.map(c => c.id === cust.id ? { ...c, expiryDate: nextExpiry.trim(), status: 'ACTIVE' } : c));
                                             triggerToast(`Gia hạn thành công tài khoản thẻ cho ${cust.name} đến ngày ${nextExpiry.trim()}`, "success");
@@ -3230,7 +3333,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                               </div>
                               <div className="space-y-1 block">
                                 <label className="text-[10px] font-extrabold uppercase text-slate-450">Hạn sử dụng</label>
-                                <input id="cust-expiry" type="text" defaultValue="31/12/2024" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                                <input id="cust-expiry" type="text" defaultValue={(() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`; })()} className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
                               </div>
                             </div>
                           </div>
