@@ -58,6 +58,8 @@ public class SecurityController {
         result.put("adminCount", 2);
         result.put("managerCount", 5);
         result.put("staffCount", 25);
+        result.put("driverCount", 1200);
+        result.put("recentChanges", 15);
         return result;
     }
 

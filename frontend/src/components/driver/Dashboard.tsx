@@ -212,8 +212,8 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const d = await r.json();
-      if (d.success && Array.isArray(d.data)) {
-        setLiveScanLogs(d.data);
+      if (d && Array.isArray(d.items)) {
+        setLiveScanLogs(d.items);
       }
     } catch (e) {
       console.warn("Error background polling gate logs:", e);

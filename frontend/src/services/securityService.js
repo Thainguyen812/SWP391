@@ -1,7 +1,7 @@
 import { apiClient } from '../api/apiClient';
 
 const MOCK_DELAY = 800;
-const isMock = true; // B?t bu?c dùng Mock vì Backend chua làm API này
+const isMock = false; // B?t bu?c dùng Mock vì Backend chua làm API này
 
 export const securityService = {
   getSecurityPolicies: async () => {
@@ -25,7 +25,7 @@ export const securityService = {
 
   getRBACStats: async () => {
     if (!isMock) {
-      return apiClient.get('/security/rbac-stats');
+      return apiClient.get('/security/stats');
     }
 
     return new Promise((resolve) => {

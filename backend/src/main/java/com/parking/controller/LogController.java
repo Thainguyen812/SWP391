@@ -26,7 +26,7 @@ public class LogController {
             Map<String, Object> item = new HashMap<>();
             item.put("plate", s.getLicensePlate());
             item.put("model", "Xe " + (s.getIsVip() != null && s.getIsVip() ? "VIP" : "Vãng lai"));
-            item.put("type", s.getIsVip() != null && s.getIsVip() ? "VIP" : "VÉ NGÀY");
+            item.put("type", s.getIsVip() != null && s.getIsVip() ? "VIP" : "VÃNG LAI");
             item.put("gate", "Cổng chính");
             
             boolean isCheckOut = s.getCheckOutTime() != null;
@@ -70,5 +70,29 @@ public class LogController {
         stats.put("errorCount", 12);
         stats.put("warningCount", 45);
         return stats;
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<String> exportLogs(@RequestParam(required = false) String keyword,
+                                             @RequestParam(required = false) String eventType) {
+        StringBuilder csv = new StringBuilder();
+        csv.append("Biển số,Loại xe,Loại khách,Cổng,Hành động,Thời gian,Trạng thái\n");
+        
+        List<ParkingSession> sessions = sessionRepo.findTop10ByOrderByUpdatedAtDesc();
+        for (ParkingSession s : sessions) {
+            csv.append(s.getLicensePlate() != null ? s.getLicensePlate() : "").append(",");
+            csv.append("Xe ").append(s.getIsVip() != null && s.getIsVip() ? "VIP" : "Vãng lai").append(",");
+            csv.append(s.getIsVip() != null && s.getIsVip() ? "VIP" : "VÃNG LAI").append(",");
+            csv.append("Cổng chính").append(",");
+            csv.append(s.getSessionStatus() == com.parking.model.ParkingSession.SessionStatus.ACTIVE ? "Vào" : "Ra").append(",");
+            csv.append(s.getUpdatedAt() != null ? s.getUpdatedAt().toString() : "").append(",");
+            csv.append(s.getSessionStatus() != null ? s.getSessionStatus().name() : "").append("\n");
+        }
+        
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.add("Content-Disposition", "attachment; filename=logs.csv");
+        headers.add("Content-Type", "text/csv; charset=UTF-8");
+        
+        return new ResponseEntity<>(csv.toString(), headers, org.springframework.http.HttpStatus.OK);
     }
 }

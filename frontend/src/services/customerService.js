@@ -1,7 +1,7 @@
 import { apiClient } from '../api/apiClient';
 
 const MOCK_DELAY = 800;
-const isMock = true; // B?t bu?c dùng Mock vì Backend chua làm API này
+const isMock = false; // B?t bu?c dùng Mock vì Backend chua làm API này
 
 // Mock DB Ä‘á»ƒ xá»­ lÃ½ tráº¡ng thÃ¡i khi ngÆ°á»i dÃ¹ng Approve/Reject
 let mockCustomers = [
@@ -59,7 +59,7 @@ export const customerService = {
     try {
       if (!isMock) {
         const response = await apiClient.get('/users');
-        const realData = response.data.map(u => ({
+        const realData = response.map(u => ({
           id: u.id,
           name: u.fullName || u.username,
           phone: u.phone || "N/A",
@@ -101,7 +101,7 @@ export const customerService = {
 
   approveVipSubscription: async (id, isApproved = true) => {
     if (!isMock) {
-      return apiClient.post(`/vip/${id}/approve`, { approved: isApproved });
+      return apiClient.post(`/v1/vip/${id}/approve`, { approved: isApproved });
     }
     return new Promise((resolve, reject) => {
       setTimeout(() => {

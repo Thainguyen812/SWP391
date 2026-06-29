@@ -1,6 +1,6 @@
 import { apiClient } from '../api/apiClient';
 
-const isMock = true; // B?t bu?c dùng Mock vì Backend chua làm API này
+const isMock = false; // B?t bu?c dùng Mock vì Backend chua làm API này
 const MOCK_DELAY = 800;
 
 export const logService = {
@@ -142,7 +142,14 @@ export const logService = {
   // Xuáº¥t bÃ¡o cÃ¡o logs
   exportLogs: async (params = {}) => {
     if (!isMock) {
-      return apiClient.get('/logs/export', { params, responseType: 'blob' });
+      const blob = await apiClient.get('/logs/export', { params, responseType: 'blob' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'logs.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+      return { success: true, message: "Export file CSV thành công", fileUrl: "Đã tải xuống" };
     }
     
     return new Promise((resolve) => {

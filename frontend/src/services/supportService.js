@@ -21,7 +21,7 @@ export const supportService = {
 
   resolveTicket: async (id) => {
     try {
-      return await apiClient.put(/tickets//resolve);
+      return await apiClient.put(`/tickets/${id}/resolve`);
     } catch (error) {
       console.error("Failed to resolve ticket:", error);
       return null;

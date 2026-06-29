@@ -16,7 +16,19 @@ public class VehicleController {
     public VehicleController(VehicleRepository repo){ this.repo = repo; }
 
     @GetMapping
-    public List<Vehicle> all(){ return repo.findAll(); }
+    public java.util.Map<String, Object> all(){ 
+        List<Map<String, Object>> mapped = new java.util.ArrayList<>();
+        for (Vehicle v : repo.findAll()) {
+            Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", v.getId());
+            map.put("plate", v.getLicensePlate());
+            map.put("name", v.getBrand() != null ? v.getBrand() : "Xe của tôi");
+            map.put("type", v.getVehicleSize());
+            map.put("isLocked", false);
+            mapped.add(map);
+        }
+        return java.util.Map.of("success", true, "data", mapped);
+    }
 
     @GetMapping("/{id}")
     public ResponseEntity<Vehicle> get(@PathVariable UUID id){ // SỬA THÀNH UUID
