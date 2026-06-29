@@ -11,20 +11,34 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.parking.dto.VehicleRegistrationRequest;
 import com.parking.model.User;
 import com.parking.repository.UserRepository;
+
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import java.security.Principal;
+import java.time.Instant;
+import jakarta.validation.Valid;
+
 
 @RestController
 @RequestMapping("/api/vehicles")
 public class VehicleController {
-    private final VehicleRepository repo;
-    private final UserRepository userRepo;
 
-    public VehicleController(VehicleRepository repo, UserRepository userRepo){ 
-        this.repo = repo; 
-        this.userRepo = userRepo;
-    }
+
+private final VehicleRepository repo;
+private final UserRepository userRepo;
+
+public VehicleController(
+        VehicleRepository repo,
+        UserRepository userRepo) {
+
+    this.repo = repo;
+    this.userRepo = userRepo;
+}
+
 
     @GetMapping
     public java.util.Map<String, Object> all(Principal principal){ 
@@ -60,17 +74,57 @@ public class VehicleController {
         return v.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @PostMapping
-    public Vehicle create(@RequestBody Vehicle vehicle) {
-        if (vehicle.getCreatedAt() == null) {
-            vehicle.setCreatedAt(java.time.Instant.now());
-        }
-        if (vehicle.getUpdatedAt() == null) {
-            vehicle.setUpdatedAt(java.time.Instant.now());
-        }
-        return repo.save(vehicle);
-    }
 
+    // @PostMapping
+    // public Vehicle create(@RequestBody Vehicle vehicle){ return repo.save(vehicle); }
+//(Cải thiện lại logic khi đăng ký xe (hàm post ))
+
+    @PostMapping
+    public Vehicle create(@Valid @RequestBody VehicleRegistrationRequest request) {
+    Authentication authentication =
+            SecurityContextHolder.getContext().getAuthentication();
+
+    String username = authentication.getName();
+
+    User owner = userRepo
+            .findByUsername(username)
+            .orElseThrow(() ->
+                    new RuntimeException("User không tồn tại"));
+
+    if (repo.findByLicensePlate(request.getLicensePlate()).isPresent()) {
+        throw new RuntimeException("Biển số xe đã được đăng ký.");
+}                
+    Vehicle vehicle = new Vehicle();
+
+    vehicle.setId(UUID.randomUUID());
+
+    vehicle.setOwnerId(owner.getId());
+
+    vehicle.setLicensePlate(request.getLicensePlate());
+
+    vehicle.setVehicleSize(request.getVehicleSize());
+
+    vehicle.setColor(request.getColor());
+
+    vehicle.setColorRgb(request.getColorRgb());
+
+    vehicle.setBodyShape(request.getBodyShape());
+
+    vehicle.setBrand(request.getBrand());
+
+    vehicle.setFuelType(request.getFuelType());
+
+    vehicle.setViolationCount(0);
+
+    vehicle.setActive(true);
+
+    vehicle.setCreatedAt(Instant.now());
+
+    vehicle.setUpdatedAt(Instant.now());
+
+    return repo.save(vehicle);
+}
+    
     @PutMapping("/{id}")
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody Vehicle vehicle, Principal principal) { // SỬA THÀNH UUID
         if (principal == null) {
