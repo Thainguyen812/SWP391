@@ -29,11 +29,13 @@ public class VipController {
     }
 
     @GetMapping("/pending")
+    @PreAuthorize("hasRole('MANAGER')") // Chỉ quản lý được xem danh sách chờ
     public List<VipSubscription> getPending() {
         return vipService.getPending();
     }
 
     @PutMapping("/{id}/approve")
+    @PreAuthorize("hasRole('MANAGER')") // Chỉ quản lý được duyệt
     public VipSubscription approve(@PathVariable UUID id) {
         return vipService.approve(id);
     }
@@ -44,6 +46,7 @@ public class VipController {
     }
 
     @PostMapping("/register")
+    @PreAuthorize("hasRole('DRIVER')") // Chỉ tài xế VIP được đăng ký
     public VipSubscription register(@RequestBody VipRegistrationRequest request) {
         return vipService.register(request);
     }
@@ -53,8 +56,9 @@ public class VipController {
     public ResponseEntity<?> approveVip(@PathVariable UUID id, Principal principal) {
         String username = principal.getName();
         User manager = userRepository.findByUsername(username)
-                .orElseThrow(() -> new com.parking.exception.ApiExceptions.NotFoundException("Không tìm thấy thông tin quản lý"));
-        
+                .orElseThrow(() -> new com.parking.exception.ApiExceptions.NotFoundException(
+                        "Không tìm thấy thông tin quản lý"));
+
         parkingService.approveVipSubscription(id, "ACTIVE", null, manager.getId());
         return ResponseEntity.ok("Phê duyệt hồ sơ đăng ký VIP thành công!");
     }
@@ -64,8 +68,9 @@ public class VipController {
     public ResponseEntity<?> rejectVip(@PathVariable UUID id, @RequestBody RejectRequest req, Principal principal) {
         String username = principal.getName();
         User manager = userRepository.findByUsername(username)
-                .orElseThrow(() -> new com.parking.exception.ApiExceptions.NotFoundException("Không tìm thấy thông tin quản lý"));
-        
+                .orElseThrow(() -> new com.parking.exception.ApiExceptions.NotFoundException(
+                        "Không tìm thấy thông tin quản lý"));
+
         parkingService.approveVipSubscription(id, "REJECTED", req.getReason(), manager.getId());
         return ResponseEntity.ok("Từ chối hồ sơ đăng ký VIP thành công!");
     }
