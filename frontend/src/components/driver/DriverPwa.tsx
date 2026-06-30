@@ -1928,7 +1928,23 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           SỐ TIỀN THANH TOÁN THÁNG NÀY
                         </span>
                         <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
-                          $128.50
+                          ${(() => {
+                            let sumUSD = 0;
+                            transactions.forEach(tx => {
+                              if (tx.isEntry === false) {
+                                const feeStr = tx.fee.replace(/[-+$₫]/g, '').replace(/,/g, '').trim();
+                                const value = parseFloat(feeStr);
+                                if (!isNaN(value)) {
+                                  if (tx.fee.includes('₫')) {
+                                    sumUSD += value / 25000;
+                                  } else {
+                                    sumUSD += value;
+                                  }
+                                }
+                              }
+                            });
+                            return sumUSD.toFixed(2);
+                          })()}
                         </div>
                       </div>
                       <div className="mt-3">
