@@ -121,6 +121,7 @@ const isTxDateInFilter = (txDateStr: string, filter: string) => {
 };
 
 export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }: DriverPwaProps) {
+  const handleLogout = onLogout;
   // ----------------------------------------------------
   // --- CORE SYSTEM STATES & SEEDS ---
   // ----------------------------------------------------
