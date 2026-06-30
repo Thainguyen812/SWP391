@@ -19,6 +19,12 @@ export const authService = {
       const mockUser = { id: 'mock-id', username, role, fullName };
       localStorage.setItem('token', 'mock-jwt-token-12345');
       localStorage.setItem('user', JSON.stringify(mockUser));
+
+      // Xóa dữ liệu cache của người dùng cũ để tránh hiển thị chéo dữ liệu
+      localStorage.removeItem('urbanpark_user_vehicles');
+      localStorage.removeItem('urbanpark_user_balance');
+      localStorage.removeItem('urbanpark_user_transactions');
+
       return { success: true, user: mockUser };
     }
 
@@ -70,6 +76,11 @@ export const authService = {
         otp,
         role: "DRIVER" // Mặc định đăng ký từ Driver App là tài xế (DRIVER)
       });
+      // Xóa dữ liệu cache của trình duyệt để đảm bảo tài khoản mới tạo 100% trống dữ liệu
+      localStorage.removeItem('urbanpark_user_vehicles');
+      localStorage.removeItem('urbanpark_user_balance');
+      localStorage.removeItem('urbanpark_user_transactions');
+
       return { success: true, data: response };
     } catch (error) {
       console.error('Lỗi đăng ký:', error);
