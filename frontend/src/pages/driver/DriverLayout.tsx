@@ -157,18 +157,23 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       });
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
-        const mapped: UserVehicle[] = data.data.map((v: any, index: number) => ({
-          id: v.id || `veh-${v.plate}`,
-          plate: v.plate,
-          name: v.name,
-          type: v.type === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
-                v.type === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
-                'Ô tô gầm thấp 4-5 chỗ',
-          regDate: '12/10/2023',
-          isActive: true,
-          image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
-          isLocked: v.isLocked
-        }));
+        const mapped: UserVehicle[] = data.data.map((v: any, index: number) => {
+          const existingLocal = vehicles.find(lv => lv.plate === v.plate);
+          return {
+            id: v.id || `veh-${v.plate}`,
+            plate: v.plate,
+            name: v.name,
+            type: v.type === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
+                  v.type === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
+                  'Ô tô gầm thấp 4-5 chỗ',
+            regDate: '12/10/2023',
+            isActive: true,
+            image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
+            isLocked: existingLocal ? existingLocal.isLocked : (v.isLocked || false),
+            activeSubscription: existingLocal ? existingLocal.activeSubscription : undefined,
+            subscriptionExpiry: existingLocal ? existingLocal.subscriptionExpiry : undefined
+          };
+        });
         setVehicles(mapped);
         
         // Auto-initialize first selection if needed
@@ -230,6 +235,13 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   const [newPlate, setNewPlate] = useState('');
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState('Ô tô gầm thấp 4-5 chỗ');
+
+  // Edit Vehicle Modal controls
+  const [editVehicleModalOpen, setEditVehicleModalOpen] = useState(false);
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
+  const [editPlate, setEditPlate] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editType, setEditType] = useState('Ô tô gầm thấp 4-5 chỗ');
 
   // VIP Step Subscription State
   const [regStep, setRegStep] = useState<1 | 2 | 3>(2); // Default on select package for full mockup fidelity
@@ -396,27 +408,194 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   };
 
   // Add Vehicle helper
-  const handleAddVehicle = (e: React.FormEvent) => {
+  const handleAddVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPlate.trim()) {
       triggerToast('Vui lòng điền biển số xe!', 'error');
       return;
     }
-    const modelItem: UserVehicle = {
-      id: `veh-${Date.now()}`,
-      plate: newPlate.toUpperCase(),
-      name: newName.trim() || 'Phương tiện mới',
-      type: newType,
-      regDate: new Date().toLocaleDateString('vi-VN'),
+
+    let ownerId = null;
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        ownerId = JSON.parse(userStr).id;
+      }
+    } catch (err) {
+      console.error("Lỗi lấy thông tin user:", err);
+    }
+
+    let sizeType = 'SEDAN_HATCHBACK';
+    if (newType === 'Xe 7 chỗ' || newType === 'Xe 9 chỗ') {
+      sizeType = 'SUV_CUV_MPV';
+    } else if (newType === 'Xe 16 chỗ') {
+      sizeType = 'LARGE_VAN_MINIBUS';
+    }
+
+    const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+
+    const payload = {
+      id: uuid,
+      ownerId: ownerId,
+      licensePlate: newPlate.toUpperCase().trim(),
+      vehicleSize: sizeType,
+      brand: newName.trim() || 'Phương tiện mới',
+      color: 'WHITE',
+      colorRgb: '#FFFFFF',
+      bodyShape: 'SEDAN',
       isActive: true,
-      image: '',
-      isLocked: false
+      fuelType: 'GASOLINE'
     };
-    setVehicles(prev => [...prev, modelItem]);
-    setNewPlate('');
-    setNewName('');
-    setAddVehicleModalOpen(false);
-    triggerToast(`Đăng ký thêm phương tiện ${modelItem.plate} thành công!`, 'success');
+
+    if (isOffline) {
+      const modelItem: UserVehicle = {
+        id: uuid,
+        plate: newPlate.toUpperCase().trim(),
+        name: newName.trim() || 'Phương tiện mới',
+        type: newType,
+        regDate: new Date().toLocaleDateString('vi-VN'),
+        isActive: true,
+        image: '',
+        isLocked: false
+      };
+      setVehicles(prev => [...prev, modelItem]);
+      setNewPlate('');
+      setNewName('');
+      setAddVehicleModalOpen(false);
+      triggerToast(`Đăng ký thêm phương tiện ${modelItem.plate} thành công (Ngoại tuyến)!`, 'success');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/vehicles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error('Thêm xe thất bại. Biển số xe có thể đã tồn tại!');
+      }
+
+      const savedVehicle = await response.json();
+      
+      const modelItem: UserVehicle = {
+        id: savedVehicle.id,
+        plate: savedVehicle.licensePlate || savedVehicle.plate,
+        name: savedVehicle.brand || savedVehicle.name,
+        type: newType,
+        regDate: new Date().toLocaleDateString('vi-VN'),
+        isActive: true,
+        image: '',
+        isLocked: false
+      };
+
+      setVehicles(prev => [...prev, modelItem]);
+      setNewPlate('');
+      setNewName('');
+      setAddVehicleModalOpen(false);
+      triggerToast(`Đăng ký thêm phương tiện ${modelItem.plate} thành công!`, 'success');
+      
+      fetchVehiclesFromApi();
+    } catch (error: any) {
+      triggerToast(error.message || 'Thêm xe thất bại, vui lòng kiểm tra lại!', 'error');
+    }
+  };
+
+  // Edit Vehicle helper
+  const handleEditVehicle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVehicleId) return;
+    if (!editPlate.trim()) {
+      triggerToast('Vui lòng điền biển số xe!', 'error');
+      return;
+    }
+
+    let ownerId = null;
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        ownerId = JSON.parse(userStr).id;
+      }
+    } catch (err) {
+      console.error("Lỗi lấy thông tin user:", err);
+    }
+
+    let sizeType = 'SEDAN_HATCHBACK';
+    if (editType === 'Xe 7 chỗ' || editType === 'Xe 9 chỗ') {
+      sizeType = 'SUV_CUV_MPV';
+    } else if (editType === 'Xe 16 chỗ') {
+      sizeType = 'LARGE_VAN_MINIBUS';
+    }
+
+    const payload = {
+      id: editingVehicleId,
+      ownerId: ownerId,
+      licensePlate: editPlate.toUpperCase().trim(),
+      vehicleSize: sizeType,
+      brand: editName.trim() || 'Phương tiện',
+      color: 'WHITE',
+      colorRgb: '#FFFFFF',
+      bodyShape: 'SEDAN',
+      isActive: true,
+      fuelType: 'GASOLINE'
+    };
+
+    if (isOffline) {
+      setVehicles(prev => prev.map(v => {
+        if (v.id === editingVehicleId) {
+          return {
+            ...v,
+            plate: editPlate.toUpperCase().trim(),
+            name: editName.trim() || 'Phương tiện',
+            type: editType
+          };
+        }
+        return v;
+      }));
+      setEditVehicleModalOpen(false);
+      triggerToast('Đã sửa phương tiện thành công (Chế độ Ngoại tuyến)!', 'success');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/vehicles/${editingVehicleId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const savedVehicle = await response.json();
+        setVehicles(prev => prev.map(v => {
+          if (v.id === editingVehicleId) {
+            return {
+              ...v,
+              id: savedVehicle.id,
+              plate: editPlate.toUpperCase().trim(),
+              name: editName.trim() || 'Phương tiện',
+              type: editType
+            };
+          }
+          return v;
+        }));
+        setEditVehicleModalOpen(false);
+        triggerToast('Cập nhật phương tiện thành công!', 'success');
+      } else {
+        triggerToast('Không thể cập nhật phương tiện. Vui lòng thử lại!', 'error');
+      }
+    } catch (err) {
+      triggerToast('Lỗi kết nối API Backend!', 'error');
+    }
   };
 
   // Lock/Unlock Anti-theft vehicle
@@ -472,13 +651,13 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       return;
     }
     if (paymentMethod === 'wallet') {
-      const neededUSD = selectedPackPrice === 50000 ? 2.0 : 40.0;
+      const neededUSD = selectedPackPrice / 25000;
       if (balance < neededUSD) {
         triggerToast(`⚠️ Thất bại: Số dư ví không đủ! Cần $${neededUSD.toFixed(2)}, Số dư hiện tại: $${balance.toFixed(2)}`, 'error');
         return;
       }
       setBalance(prev => prev - neededUSD);
-      const formattedPrice = selectedPackPrice === 50000 ? '50,000₫' : '1,000,000₫';
+      const formattedPrice = selectedPackPrice.toLocaleString('vi-VN') + '₫';
       const newTx: TransactionItem = {
         id: `txn-${Date.now()}`,
         date: 'Vừa xong',
@@ -494,7 +673,13 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       setVehicles(prev => prev.map(v => {
         if (v.plate === selectedVehicleForVIP) {
           const expiryDate = new Date();
-          if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
+          if (selectedPackLabel.includes('3 Tháng')) {
+            expiryDate.setMonth(expiryDate.getMonth() + 3);
+          } else if (selectedPackLabel.includes('6 Tháng')) {
+            expiryDate.setMonth(expiryDate.getMonth() + 6);
+          } else if (selectedPackLabel.includes('1 Năm')) {
+            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+          } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
             expiryDate.setMonth(expiryDate.getMonth() + 1);
           } else {
             expiryDate.setDate(expiryDate.getDate() + 1);
@@ -559,7 +744,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       triggerToast(`Nạp thành công $${selectedPackPrice.toFixed(2)} vào ví điện tử!`, 'success');
     } else {
       // Deduct from balance for simulation if desired, or let balance stay. Let's add a fresh transaction
-      const formattedPrice = selectedPackPrice === 50000 ? '50,000₫' : '1,000,000₫';
+      const formattedPrice = selectedPackPrice.toLocaleString('vi-VN') + '₫';
       const newTx: TransactionItem = {
         id: `txn-${Date.now()}`,
         date: 'Vừa xong',
@@ -575,7 +760,13 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       setVehicles(prev => prev.map(v => {
         if (v.plate === selectedVehicleForVIP) {
           const expiryDate = new Date();
-          if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
+          if (selectedPackLabel.includes('3 Tháng')) {
+            expiryDate.setMonth(expiryDate.getMonth() + 3);
+          } else if (selectedPackLabel.includes('6 Tháng')) {
+            expiryDate.setMonth(expiryDate.getMonth() + 6);
+          } else if (selectedPackLabel.includes('1 Năm')) {
+            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+          } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
             expiryDate.setMonth(expiryDate.getMonth() + 1);
           } else {
             expiryDate.setDate(expiryDate.getDate() + 1);
@@ -845,7 +1036,13 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               billingTimeFilter, setBillingTimeFilter, billingTypeFilter, setBillingTypeFilter,
               searchSupportQuery, setSearchSupportQuery, expandedFaq, setExpandedFaq,
               ticketTopic, setTicketTopic, ticketMessage, setTicketMessage,
-              ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout
+              ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout,
+              editVehicleModalOpen, setEditVehicleModalOpen,
+              editingVehicleId, setEditingVehicleId,
+              editPlate, setEditPlate,
+              editName, setEditName,
+              editType, setEditType,
+              handleEditVehicle
             }} />
 
             </AnimatePresence>
@@ -950,6 +1147,99 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
                       className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
                     >
                       Thêm xe mới
+                    </button>
+                  </div>
+
+                </form>
+              </div>
+
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ==================================================== */}
+      {/* 5. MODAL ELEMENT: EDIT VEHICLE */}
+      {/* ==================================================== */}
+      <AnimatePresence>
+        {editVehicleModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-white rounded-3xl w-full max-w-md border border-slate-200/80 shadow-2xl p-6 relative overflow-hidden"
+            >
+              <button 
+                onClick={() => setEditVehicleModalOpen(false)}
+                className="absolute top-5 right-5 p-1 text-slate-400 hover:text-slate-650 bg-slate-50 hover:bg-slate-100 rounded-full"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="space-y-4 text-left">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight leading-none">Chỉnh sửa phương tiện</h3>
+                  <p className="text-slate-400 text-xs mt-1">Cập nhật thông tin chi tiết xe ô tô của bạn.</p>
+                </div>
+
+                <form onSubmit={handleEditVehicle} className="space-y-4 text-xs font-sans">
+                  
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Biển số xe (Ví dụ: 30G-123.45)</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Nhập biển số..."
+                      value={editPlate}
+                      onChange={e => setEditPlate(e.target.value)}
+                      className="w-full p-2.5 border rounded-lg font-mono font-bold bg-slate-50 border-slate-200 text-slate-850 focus:bg-white focus:border-blue-500 outline-hidden"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Tên xe / Model (Ví dụ: Toyota Camry)</label>
+                    <input
+                      type="text"
+                      placeholder="Nhập tên hãng xe..."
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      className="w-full p-2.5 border rounded-lg font-bold bg-slate-50 border-slate-200 text-slate-850 focus:bg-white focus:border-blue-500 outline-hidden"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Loại phương tiện</label>
+                    <select
+                      value={editType}
+                      onChange={e => setEditType(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 border rounded-lg font-bold border-slate-200 text-slate-850 outline-hidden"
+                    >
+                      <option value="Ô tô gầm thấp 4-5 chỗ">🚗 Ô tô gầm thấp 4-5 chỗ</option>
+                      <option value="Xe 7 chỗ">🚙 Xe 7 chỗ</option>
+                      <option value="Xe 9 chỗ">🚐 Xe 9 chỗ</option>
+                      <option value="Xe 16 chỗ">🚌 Xe 16 chỗ</option>
+                    </select>
+                  </div>
+
+                  <div className="flex gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditVehicleModalOpen(false)}
+                      className="flex-1 py-3 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                    >
+                      Huỷ bỏ
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
+                    >
+                      Cập nhật xe
                     </button>
                   </div>
 
