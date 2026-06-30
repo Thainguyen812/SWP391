@@ -2044,7 +2044,17 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                               
                               // Filter by type
                               if (billingTypeFilter === 'Tất cả') return true;
-                              return tx.type.toLowerCase().trim() === billingTypeFilter.toLowerCase().trim();
+                              const typeLower = tx.type.toLowerCase();
+                              if (billingTypeFilter === 'Vé ngày') {
+                                return typeLower.includes('vé ngày') || typeLower.includes('ngày') || typeLower.includes('daily');
+                              }
+                              if (billingTypeFilter === 'Vé tháng') {
+                                return typeLower.includes('vé tháng') || typeLower.includes('tháng') || typeLower.includes('vip') || typeLower.includes('monthly');
+                              }
+                              if (billingTypeFilter === 'Nạp tiền') {
+                                return typeLower.includes('nạp') || typeLower.includes('topup') || typeLower.includes('top up');
+                              }
+                              return typeLower.includes(billingTypeFilter.toLowerCase().trim());
                             })
                             .map(tx => {
                               const statusStyle = 
