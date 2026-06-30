@@ -3,11 +3,26 @@ import { apiClient } from '../api/apiClient';
 const isMock = import.meta.env.VITE_USE_MOCK_API === 'true';
 
 export const authService = {
-  login: async (username, password) => {
+  login: async (username, password, otp = null) => {
     if (isMock) {
       await new Promise(resolve => setTimeout(resolve, 600)); // fake delay
       if (password !== '123456') {
         return { success: false, message: "Mật khẩu sai (Mock API chấp nhận pass: 123456)" };
+      }
+
+      // Nếu chưa nhập OTP trong Mock Mode, trả về yêu cầu OTP
+      if (!otp) {
+        return { 
+          success: true, 
+          requiresOtp: true, 
+          email: username.includes('@') ? username : `${username}@urbanpark.com`, 
+          message: "Mã OTP đã được gửi về email (Mock API)." 
+        };
+      }
+
+      // Mock OTP mặc định là 123456
+      if (otp !== '123456') {
+        return { success: false, message: "Mã OTP mock không chính xác (Vui lòng nhập 123456)" };
       }
 
       let role = 'ADMIN';
@@ -16,7 +31,14 @@ export const authService = {
       else if (username === 'manager') { role = 'MANAGER'; fullName = 'Parking Manager'; }
       else if (username.includes('driver')) { role = 'DRIVER'; fullName = 'Driver User'; }
 
-      const mockUser = { id: 'mock-id', username, role, fullName };
+      const mockUser = { 
+        id: 'mock-id', 
+        username, 
+        role, 
+        fullName,
+        email: username.includes('@') ? username : `${username}@urbanpark.com`,
+        phone: username.match(/^\d+$/) ? username : '0912345678'
+      };
       localStorage.setItem('token', 'mock-jwt-token-12345');
       localStorage.setItem('user', JSON.stringify(mockUser));
 
@@ -29,11 +51,22 @@ export const authService = {
     }
 
     try {
-      // Bắn dữ liệu username/password sang Backend
+      // Bắn dữ liệu username/password/otp sang Backend
       const response = await apiClient.post('/auth/login', {
         username: username,
-        password: password
+        password: password,
+        otp: otp
       });
+
+      // Nếu Backend phản hồi cần mã OTP
+      if (response && response.requiresOtp) {
+        return {
+          success: true,
+          requiresOtp: true,
+          email: response.email,
+          message: response.message
+        };
+      }
 
       // Nếu thành công (API trả về data có token)
       if (response && response.accessToken) {
@@ -132,6 +165,10 @@ export const authService = {
     localStorage.removeItem('urbanpark_user_vehicles');
     localStorage.removeItem('urbanpark_user_balance');
     localStorage.removeItem('urbanpark_user_transactions');
+    localStorage.removeItem('urbanpark_user_name');
+    localStorage.removeItem('urbanpark_user_phone');
+    localStorage.removeItem('urbanpark_user_email');
+    localStorage.removeItem('urbanpark_user_address');
     
     // Điều hướng về trang login
     window.location.href = '/login';

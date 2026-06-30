@@ -9,14 +9,33 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.parking.model.User;
+import com.parking.repository.UserRepository;
+import java.security.Principal;
+
 @RestController
 @RequestMapping("/api/vehicles")
 public class VehicleController {
     private final VehicleRepository repo;
-    public VehicleController(VehicleRepository repo){ this.repo = repo; }
+    private final UserRepository userRepo;
+
+    public VehicleController(VehicleRepository repo, UserRepository userRepo){ 
+        this.repo = repo; 
+        this.userRepo = userRepo;
+    }
 
     @GetMapping
-    public List<Vehicle> all(){ return repo.findAll(); }
+    public List<Vehicle> all(Principal principal){ 
+        if (principal == null) {
+            return repo.findAll();
+        }
+        String username = principal.getName();
+        Optional<User> u = userRepo.findByUsername(username);
+        if (u.isPresent()) {
+            return repo.findByOwnerId(u.get().getId());
+        }
+        return List.of();
+    }
 
     @GetMapping("/{id}")
     public ResponseEntity<Vehicle> get(@PathVariable UUID id){ // SỬA THÀNH UUID
@@ -25,12 +44,40 @@ public class VehicleController {
     }
 
     @PostMapping
-    public Vehicle create(@RequestBody Vehicle vehicle){ return repo.save(vehicle); }
+    public Vehicle create(@RequestBody Vehicle vehicle){ 
+        if (vehicle.getCreatedAt() == null) {
+            vehicle.setCreatedAt(java.time.Instant.now());
+        }
+        if (vehicle.getUpdatedAt() == null) {
+            vehicle.setUpdatedAt(java.time.Instant.now());
+        }
+        return repo.save(vehicle); 
+    }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Vehicle> update(@PathVariable UUID id, @RequestBody Vehicle vehicle){ // SỬA THÀNH UUID
-        return repo.findById(id).map(existing -> {
+    public ResponseEntity<Vehicle> update(@PathVariable String id, @RequestBody Vehicle vehicle){
+        UUID uuid = null;
+        try {
+            uuid = UUID.fromString(id);
+        } catch (IllegalArgumentException e) {
+            // ID is not a valid UUID (e.g. mock ID "veh-1")
+        }
+
+        Optional<Vehicle> existingOpt = Optional.empty();
+        if (uuid != null) {
+            existingOpt = repo.findById(uuid);
+        }
+        
+        if (existingOpt.isEmpty() && vehicle.getLicensePlate() != null) {
+            existingOpt = repo.findByLicensePlate(vehicle.getLicensePlate());
+        }
+
+        return existingOpt.map(existing -> {
             vehicle.setId(existing.getId());
+            if (vehicle.getCreatedAt() == null) {
+                vehicle.setCreatedAt(existing.getCreatedAt() != null ? existing.getCreatedAt() : java.time.Instant.now());
+            }
+            vehicle.setUpdatedAt(java.time.Instant.now());
             return ResponseEntity.ok(repo.save(vehicle));
         }).orElseGet(() -> ResponseEntity.notFound().build());
     }

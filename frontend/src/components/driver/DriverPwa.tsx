@@ -43,6 +43,7 @@ interface DriverPwaProps {
     name: string;
     phone: string;
     role: string;
+    email?: string;
   };
   accessToken: string | null;
   onLogout: () => void;
@@ -120,6 +121,37 @@ const isTxDateInFilter = (txDateStr: string, filter: string) => {
   }
 };
 
+const VEHICLE_PRICING: Record<string, { day: number; month: number; month3: number; month6: number; year: number }> = {
+  'Ô tô gầm thấp 4-5 chỗ': {
+    day: 50000,
+    month: 1000000,
+    month3: 2700000,
+    month6: 5000000,
+    year: 9000000
+  },
+  'Xe 7 chỗ': {
+    day: 70000,
+    month: 1400000,
+    month3: 3800000,
+    month6: 7000000,
+    year: 12500000
+  },
+  'Xe 9 chỗ': {
+    day: 70000,
+    month: 1400000,
+    month3: 3800000,
+    month6: 7000000,
+    year: 12500000
+  },
+  'Xe 16 chỗ': {
+    day: 100000,
+    month: 2000000,
+    month3: 5400000,
+    month6: 10000000,
+    year: 18000000
+  }
+};
+
 export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: DriverPwaProps) {
   const getNowFormatted = () => {
     const d = new Date();
@@ -193,6 +225,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
             } catch (err) {}
           }
           
+          // Tìm xe cục bộ hiện tại để giữ lại thông tin đăng ký gói cước và trạng thái khoá
+          const existingLocal = vehicles.find(lv => lv.plate === (v.licensePlate || v.plate));
+          
           return {
             id: v.id || `veh-${v.licensePlate || v.plate}`,
             plate: v.licensePlate || v.plate,
@@ -201,7 +236,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
             regDate: regDate,
             isActive: v.isActive !== false && v.active !== false,
             image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
-            isLocked: v.isLocked || false
+            isLocked: existingLocal ? existingLocal.isLocked : (v.isLocked || false),
+            activeSubscription: existingLocal ? existingLocal.activeSubscription : undefined,
+            subscriptionExpiry: existingLocal ? existingLocal.subscriptionExpiry : undefined
           };
         });
         setVehicles(mapped);
@@ -248,6 +285,13 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState('Ô tô gầm thấp 4-5 chỗ');
 
+  // Edit Vehicle Modal controls
+  const [editVehicleModalOpen, setEditVehicleModalOpen] = useState(false);
+  const [editingVehicleId, setEditingVehicleId] = useState<string | null>(null);
+  const [editPlate, setEditPlate] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editType, setEditType] = useState('Ô tô gầm thấp 4-5 chỗ');
+
   // VIP Step Subscription State
   const [regStep, setRegStep] = useState<1 | 2 | 3>(2); // Default on select package for full mockup fidelity
   const [selectedVehicleForVIP, setSelectedVehicleForVIP] = useState('');
@@ -268,11 +312,46 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const oscillator2Ref = useRef<OscillatorNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
 
+  // Auto-initialize selected vehicle plate for VIP if empty
+  useEffect(() => {
+    if (vehicles.length > 0 && !selectedVehicleForVIP) {
+      setSelectedVehicleForVIP(vehicles[0].plate);
+    }
+  }, [vehicles, selectedVehicleForVIP]);
+
+  // Synchronize package price whenever selected vehicle, package label, or vehicles change
+  useEffect(() => {
+    if (!selectedVehicleForVIP) return;
+    const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
+    const type = targetVeh ? targetVeh.type : 'Ô tô gầm thấp 4-5 chỗ';
+    const pricing = VEHICLE_PRICING[type] || VEHICLE_PRICING['Ô tô gầm thấp 4-5 chỗ'];
+    
+    if (selectedPackLabel.includes('1 Năm') || selectedPackLabel.includes('1 năm')) {
+      setSelectedPackPrice(pricing.year);
+    } else if (selectedPackLabel.includes('6 Tháng') || selectedPackLabel.includes('6 tháng')) {
+      setSelectedPackPrice(pricing.month6);
+    } else if (selectedPackLabel.includes('3 Tháng') || selectedPackLabel.includes('3 tháng')) {
+      setSelectedPackPrice(pricing.month3);
+    } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
+      setSelectedPackPrice(pricing.month);
+    } else {
+      setSelectedPackPrice(pricing.day);
+    }
+  }, [selectedVehicleForVIP, selectedPackLabel, vehicles]);
+
   // Profile Edit
-  const [profileName, setProfileName] = useState(user.name);
-  const [profilePhone, setProfilePhone] = useState(user.phone);
-  const [profileEmail, setProfileEmail] = useState('nguyen.van@urbanpark.com');
-  const [profileAddress, setProfileAddress] = useState('123 Đường Lê Lợi, Quận 1, TP.HCM');
+  const [profileName, setProfileName] = useState(() => {
+    return localStorage.getItem('urbanpark_user_name') || user.name;
+  });
+  const [profilePhone, setProfilePhone] = useState(() => {
+    return localStorage.getItem('urbanpark_user_phone') || user.phone;
+  });
+  const [profileEmail, setProfileEmail] = useState(() => {
+    return localStorage.getItem('urbanpark_user_email') || user.email || '';
+  });
+  const [profileAddress, setProfileAddress] = useState(() => {
+    return localStorage.getItem('urbanpark_user_address') || '';
+  });
   
   // Extra settings states for absolute design fidelity
   const [is2faEnabled, setIs2faEnabled] = useState(true);
@@ -499,6 +578,100 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     }
   };
 
+  const handleEditVehicle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVehicleId) return;
+    if (!editPlate.trim()) {
+      triggerToast('Vui lòng điền biển số xe!', 'error');
+      return;
+    }
+
+    let ownerId = null;
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        ownerId = JSON.parse(userStr).id;
+      }
+    } catch (err) {
+      console.error("Lỗi lấy thông tin user:", err);
+    }
+
+    if (!ownerId) {
+      triggerToast('Phiên làm việc lỗi. Vui lòng đăng nhập lại!', 'error');
+      return;
+    }
+
+    let sizeType = 'SEDAN_HATCHBACK';
+    if (editType === 'Xe 7 chỗ' || editType === 'Xe 9 chỗ') {
+      sizeType = 'SUV_CUV_MPV';
+    } else if (editType === 'Xe 16 chỗ') {
+      sizeType = 'LARGE_VAN_MINIBUS';
+    }
+
+    const payload = {
+      id: editingVehicleId,
+      ownerId: ownerId,
+      licensePlate: editPlate.toUpperCase().trim(),
+      vehicleSize: sizeType,
+      brand: editName.trim() || 'Phương tiện',
+      color: 'WHITE',
+      colorRgb: '#FFFFFF',
+      bodyShape: 'SEDAN',
+      isActive: true,
+      fuelType: 'GASOLINE'
+    };
+
+    if (isOffline) {
+      setVehicles(prev => prev.map(v => {
+        if (v.id === editingVehicleId) {
+          return {
+            ...v,
+            plate: editPlate.toUpperCase().trim(),
+            name: editName.trim() || 'Phương tiện',
+            type: editType
+          };
+        }
+        return v;
+      }));
+      setEditVehicleModalOpen(false);
+      triggerToast('Đã sửa phương tiện thành công (Chế độ Ngoại tuyến)!', 'success');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/vehicles/${editingVehicleId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const savedVehicle = await response.json();
+        setVehicles(prev => prev.map(v => {
+          if (v.id === editingVehicleId) {
+            return {
+              ...v,
+              id: savedVehicle.id,
+              plate: editPlate.toUpperCase().trim(),
+              name: editName.trim() || 'Phương tiện',
+              type: editType
+            };
+          }
+          return v;
+        }));
+        setEditVehicleModalOpen(false);
+        triggerToast('Cập nhật phương tiện thành công!', 'success');
+      } else {
+        triggerToast('Không thể cập nhật phương tiện. Vui lòng thử lại!', 'error');
+      }
+    } catch (err) {
+      triggerToast('Lỗi kết nối API Backend!', 'error');
+    }
+  };
+
   // Lock/Unlock Anti-theft vehicle
   const toggleVehicleLock = (id: string, plate: string) => {
     setVehicles(prev => prev.map(v => {
@@ -573,7 +746,13 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       setVehicles(prev => prev.map(v => {
         if (v.plate === selectedVehicleForVIP) {
           const expiryDate = new Date();
-          if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
+          if (selectedPackLabel.includes('1 Năm') || selectedPackLabel.includes('1 năm')) {
+            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+          } else if (selectedPackLabel.includes('3 Tháng') || selectedPackLabel.includes('3 tháng')) {
+            expiryDate.setMonth(expiryDate.getMonth() + 3);
+          } else if (selectedPackLabel.includes('6 Tháng') || selectedPackLabel.includes('6 tháng')) {
+            expiryDate.setMonth(expiryDate.getMonth() + 6);
+          } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
             expiryDate.setMonth(expiryDate.getMonth() + 1);
           } else {
             expiryDate.setDate(expiryDate.getDate() + 1);
@@ -653,7 +832,13 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       setVehicles(prev => prev.map(v => {
         if (v.plate === selectedVehicleForVIP) {
           const expiryDate = new Date();
-          if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
+          if (selectedPackLabel.includes('1 Năm') || selectedPackLabel.includes('1 năm')) {
+            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+          } else if (selectedPackLabel.includes('3 Tháng') || selectedPackLabel.includes('3 tháng')) {
+            expiryDate.setMonth(expiryDate.getMonth() + 3);
+          } else if (selectedPackLabel.includes('6 Tháng') || selectedPackLabel.includes('6 tháng')) {
+            expiryDate.setMonth(expiryDate.getMonth() + 6);
+          } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
             expiryDate.setMonth(expiryDate.getMonth() + 1);
           } else {
             expiryDate.setDate(expiryDate.getDate() + 1);
@@ -1636,10 +1821,16 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             </button>
 
                             <button 
-                              onClick={() => triggerToast(`Thẻ xe của phương tiện ${v.plate} được cấp mới đầy đủ!`, 'info')}
+                              onClick={() => {
+                                setEditingVehicleId(v.id);
+                                setEditPlate(v.plate);
+                                setEditName(v.name);
+                                setEditType(v.type);
+                                setEditVehicleModalOpen(true);
+                              }}
                               className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs rounded-xl cursor-pointer transition-all"
                             >
-                              Chi tiết
+                              Sửa
                             </button>
                           </div>
 
@@ -1777,28 +1968,69 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         </strong>
 
                         <div className="space-y-3.5">
-                          {[
-                            { 
-                              id: 'pkg-1', 
-                              label: 'Vé Ngày', 
-                              price: 50000, 
-                              desc: 'Giá trị trong 24 giờ kể từ thời điểm đăng ký.', 
-                              badge: 'RA VÀO NHIỀU LẦN', 
-                              features: [] 
-                            },
-                            { 
-                              id: 'pkg-2', 
-                              label: 'Thẻ Tháng VIP', 
-                              price: 1000000, 
-                              desc: 'Giải pháp tối ưu cho cư dân và nhân viên văn phòng.', 
-                              badge: 'PHỔ BIẾN', 
-                              features: [
-                                'Chỗ đỗ xe cố định (Tầng B1)',
-                                'Rửa xe miễn phí 1 lần/tháng',
-                                'Hỗ trợ kỹ thuật 24/7 tức thì'
-                              ] 
-                            }
-                          ].map(pkg => {
+                          {(() => {
+                            const selectedVehicleObj = vehicles.find(v => v.plate === selectedVehicleForVIP);
+                            const selectedVehicleType = selectedVehicleObj ? selectedVehicleObj.type : 'Ô tô gầm thấp 4-5 chỗ';
+                            const pricing = VEHICLE_PRICING[selectedVehicleType] || VEHICLE_PRICING['Ô tô gầm thấp 4-5 chỗ'];
+                            return [
+                              { 
+                                id: 'pkg-1', 
+                                label: 'Vé Ngày', 
+                                price: pricing.day, 
+                                desc: 'Giá trị trong 24 giờ kể từ thời điểm đăng ký.', 
+                                badge: 'RA VÀO NHIỀU LẦN', 
+                                features: [] 
+                              },
+                              { 
+                                id: 'pkg-2', 
+                                label: 'Thẻ Tháng VIP', 
+                                price: pricing.month, 
+                                desc: 'Giải pháp tối ưu cho cư dân và nhân viên văn phòng.', 
+                                badge: 'PHỔ BIẾN', 
+                                features: [
+                                  'Chỗ đỗ xe cố định (Tầng B1)',
+                                  'Rửa xe miễn phí 1 lần/tháng',
+                                  'Hỗ trợ kỹ thuật 24/7 tức thì'
+                                ] 
+                              },
+                              { 
+                                id: 'pkg-3', 
+                                label: 'Thẻ 3 Tháng VIP', 
+                                price: pricing.month3, 
+                                desc: 'Gói tiết kiệm 3 tháng cho hội viên thân thiết.', 
+                                badge: 'TIẾT KIỆM', 
+                                features: [
+                                  'Chỗ đỗ xe cố định (Tầng B1)',
+                                  'Rửa xe miễn phí 1 lần/tháng',
+                                  'Hỗ trợ kỹ thuật 24/7 tức thì'
+                                ] 
+                              },
+                              { 
+                                id: 'pkg-4', 
+                                label: 'Thẻ 6 Tháng VIP', 
+                                price: pricing.month6, 
+                                desc: 'Gói nửa năm với nhiều ưu đãi đặc quyền.', 
+                                badge: 'ƯU ĐÃI LỚN', 
+                                features: [
+                                  'Chỗ đỗ xe cố định (Tầng B1)',
+                                  'Rửa xe miễn phí 1 lần/tháng',
+                                  'Hỗ trợ kỹ thuật 24/7 tức thì'
+                                ] 
+                              },
+                              { 
+                                id: 'pkg-5', 
+                                label: 'Thẻ 1 Năm VIP', 
+                                price: pricing.year, 
+                                desc: 'Gói trọn gói 1 năm - giải pháp đỗ xe hoàn hảo.', 
+                                badge: 'SIÊU TIẾT KIỆM', 
+                                features: [
+                                  'Chỗ đỗ xe cố định (Tầng B1)',
+                                  'Rửa xe miễn phí 1 lần/tháng',
+                                  'Hỗ trợ kỹ thuật 24/7 tức thì'
+                                ] 
+                              }
+                            ];
+                          })().map(pkg => {
                             const isSelected = selectedPackLabel === pkg.label;
                             return (
                               <div
@@ -2161,7 +2393,28 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       </p>
                     </div>
                     <button 
-                      onClick={() => triggerToast('Đã lưu mọi thay đổi thiết lập tài khoản thành công!', 'success')}
+                      onClick={() => {
+                        localStorage.setItem('urbanpark_user_name', profileName);
+                        localStorage.setItem('urbanpark_user_phone', profilePhone);
+                        localStorage.setItem('urbanpark_user_email', profileEmail);
+                        localStorage.setItem('urbanpark_user_address', profileAddress);
+                        
+                        // Cập nhật lại thông tin user trong local storage để các nơi khác trong app đồng bộ
+                        const savedUserStr = localStorage.getItem('user');
+                        if (savedUserStr) {
+                          try {
+                            const parsed = JSON.parse(savedUserStr);
+                            parsed.fullName = profileName;
+                            parsed.phone = profilePhone;
+                            parsed.email = profileEmail;
+                            localStorage.setItem('user', JSON.stringify(parsed));
+                          } catch (e) {
+                            console.error(e);
+                          }
+                        }
+                        
+                        triggerToast('Đã lưu mọi thay đổi thiết lập tài khoản thành công!', 'success');
+                      }}
                       className="px-5 py-2.5 bg-slate-900 border border-slate-800 hover:bg-black text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer self-stretch sm:self-auto"
                     >
                       Lưu thay đổi
@@ -2829,6 +3082,99 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
                     >
                       Thêm xe mới
+                    </button>
+                  </div>
+
+                </form>
+              </div>
+
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ==================================================== */}
+      {/* 5. MODAL ELEMENT: EDIT VEHICLE */}
+      {/* ==================================================== */}
+      <AnimatePresence>
+        {editVehicleModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-white rounded-3xl w-full max-w-md border border-slate-200/80 shadow-2xl p-6 relative overflow-hidden"
+            >
+              <button 
+                onClick={() => setEditVehicleModalOpen(false)}
+                className="absolute top-5 right-5 p-1 text-slate-400 hover:text-slate-650 bg-slate-50 hover:bg-slate-100 rounded-full"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="space-y-4 text-left">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight leading-none">Chỉnh sửa phương tiện</h3>
+                  <p className="text-slate-400 text-xs mt-1">Cập nhật thông tin chi tiết xe ô tô của bạn.</p>
+                </div>
+
+                <form onSubmit={handleEditVehicle} className="space-y-4 text-xs font-sans">
+                  
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Biển số xe (Ví dụ: 30G-123.45)</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Nhập biển số..."
+                      value={editPlate}
+                      onChange={e => setEditPlate(e.target.value)}
+                      className="w-full p-2.5 border rounded-lg font-mono font-bold bg-slate-50 border-slate-200 text-slate-850 focus:bg-white focus:border-blue-500 outline-hidden"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Tên xe / Model (Ví dụ: Toyota Camry)</label>
+                    <input
+                      type="text"
+                      placeholder="Nhập tên hãng xe..."
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      className="w-full p-2.5 border rounded-lg font-bold bg-slate-50 border-slate-200 text-slate-850 focus:bg-white focus:border-blue-500 outline-hidden"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Loại phương tiện</label>
+                    <select
+                      value={editType}
+                      onChange={e => setEditType(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 border rounded-lg font-bold border-slate-200 text-slate-850 outline-hidden"
+                    >
+                      <option value="Ô tô gầm thấp 4-5 chỗ">🚗 Ô tô gầm thấp 4-5 chỗ</option>
+                      <option value="Xe 7 chỗ">🚙 Xe 7 chỗ</option>
+                      <option value="Xe 9 chỗ">🚐 Xe 9 chỗ</option>
+                      <option value="Xe 16 chỗ">🚌 Xe 16 chỗ</option>
+                    </select>
+                  </div>
+
+                  <div className="flex gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditVehicleModalOpen(false)}
+                      className="flex-1 py-3 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                    >
+                      Huỷ bỏ
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
+                    >
+                      Cập nhật xe
                     </button>
                   </div>
 

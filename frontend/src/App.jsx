@@ -90,12 +90,23 @@ const RootRedirect = () => {
 };
 
 const DriverAppWrapper = () => {
-  const user = authService.getUser() || { username: 'driver', fullName: 'Tài xế', role: 'DRIVER' };
+  const user = authService.getUser() || { 
+    username: 'driver', 
+    fullName: 'Tài xế', 
+    role: 'DRIVER',
+    email: 'driver@urbanpark.com',
+    phone: '0912345678'
+  };
   const navigate = useNavigate();
   
   return (
     <DriverPwa 
-      user={{ phone: user.username, name: user.fullName, role: user.role }}
+      user={{ 
+        phone: user.phone || user.username, 
+        name: user.fullName, 
+        role: user.role,
+        email: user.email
+      }}
       accessToken={localStorage.getItem('token')}
       onLogout={() => {
         authService.logout();
