@@ -1400,8 +1400,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 date: 'Vừa xong',
                                 type: 'Xe ô tô vào bãi',
                                 plate: vehicles[0]?.plate || '30G-123.45',
-                                fee: '$2.00',
-                                isEntry: true,
+                                fee: '-50,000₫',
+                                isEntry: false,
                                 status: 'Thành công'
                               };
                               setTransactions(prev => [newTx, ...prev]);
@@ -1419,22 +1419,22 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 triggerToast('Lỗi: Không thể nạp ví ở chế độ Ngoại tuyến!', 'error');
                                 return;
                               }
-                              setBalance(prev => prev + 50.0);
+                              setBalance(prev => prev + 500000);
                               const newTx: TransactionItem = {
                                 id: `TXN-${Math.floor(1000 + Math.random() * 9000)}`,
                                 date: 'Vừa xong',
                                 type: 'Nạp ví VNPAY',
                                 plate: '-',
-                                fee: '+$50.00',
+                                fee: '+500,000₫',
                                 isEntry: true,
                                 status: 'Thành công'
                               };
                               setTransactions(prev => [newTx, ...prev]);
-                              triggerToast('Giả lập: Nạp thêm $50.00 vào số dư ví thành công!', 'success');
+                              triggerToast('Giả lập: Nạp thêm 500,000₫ vào số dư ví thành công!', 'success');
                             }}
                             className="p-1.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-[10px] rounded-lg transition-all text-center cursor-pointer"
                           >
-                            Nạp ví VNPAY $50
+                            Nạp ví VNPAY 500k
                           </button>
                         </div>
                       </div>
@@ -1452,12 +1452,12 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           <button
                             type="button"
                             onClick={() => {
-                              setBalance(0.15);
-                              triggerToast('Giả lập: Đã hạ ví về mức cực thấp ($0.15)!', 'error');
+                              setBalance(1000);
+                              triggerToast('Giả lập: Đã hạ ví về mức cực thấp (1,000₫)!', 'error');
                             }}
                             className="p-1.5 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-[10px] rounded-lg transition-all text-center cursor-pointer"
                           >
-                            Hạ số dư ví về $0.15
+                            Hạ số dư ví về 1k
                           </button>
 
                           <button
@@ -1877,7 +1877,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             onChange={(e) => setPaymentMethod(e.target.value as 'wallet' | 'vnpay')}
                             className="w-full p-2.5 bg-slate-50 hover:bg-slate-100 text-xs font-bold rounded-lg border border-slate-200 text-slate-850"
                           >
-                            <option value="wallet">Ví UrbanPark (Số dư: ${balance.toFixed(2)})</option>
+                            <option value="wallet">Ví UrbanPark (Số dư: {balance.toLocaleString('vi-VN')}₫)</option>
                             <option value="vnpay">Thẻ thanh toán nội địa VNPAY Sandbox</option>
                           </select>
                         </div>
@@ -1928,22 +1928,22 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           SỐ TIỀN THANH TOÁN THÁNG NÀY
                         </span>
                         <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
-                          ${(() => {
-                            let sumUSD = 0;
+                          {(() => {
+                            let sumVND = 0;
                             transactions.forEach(tx => {
                               if (tx.isEntry === false) {
                                 const feeStr = tx.fee.replace(/[-+$₫]/g, '').replace(/,/g, '').trim();
                                 const value = parseFloat(feeStr);
                                 if (!isNaN(value)) {
-                                  if (tx.fee.includes('₫')) {
-                                    sumUSD += value / 25000;
+                                  if (tx.fee.includes('$')) {
+                                    sumVND += value * 25000;
                                   } else {
-                                    sumUSD += value;
+                                    sumVND += value;
                                   }
                                 }
                               }
                             });
-                            return sumUSD.toFixed(2);
+                            return sumVND.toLocaleString('vi-VN') + '₫';
                           })()}
                         </div>
                       </div>
@@ -2294,7 +2294,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             Số dư khả dụng
                           </span>
                           <strong className="text-3xl font-black font-mono tracking-tight block mt-1">
-                            ${balance.toFixed(2)}
+                            {balance.toLocaleString('vi-VN')}₫
                           </strong>
 
                           <button 
@@ -2304,7 +2304,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 triggerToast('Lỗi: Không thể nạp tiền vào ví ở chế độ Ngoại tuyến!', 'error');
                                 return;
                               }
-                              setSelectedPackPrice(50.00);
+                              setSelectedPackPrice(500000);
                               setSelectedPackLabel('Nạp tiền vào ví điện tử UrbanPark');
                               setVnpayStep('info');
                               setVnpayModalOpen(true);
