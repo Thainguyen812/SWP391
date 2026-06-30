@@ -82,7 +82,8 @@ const isTxDateInFilter = (txDateStr: string, filter: string) => {
   if (txDateStr === 'Vừa xong') {
     txDate = today;
   } else {
-    const parts = txDateStr.split('/');
+    const datePart = txDateStr.split(' ')[0];
+    const parts = datePart.split('/');
     if (parts.length !== 3) return true;
     txDate = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
   }
@@ -120,6 +121,17 @@ const isTxDateInFilter = (txDateStr: string, filter: string) => {
 };
 
 export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: DriverPwaProps) {
+  const getNowFormatted = () => {
+    const d = new Date();
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const seconds = String(d.getSeconds()).padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+  };
+
   // ----------------------------------------------------
   // --- CORE SYSTEM STATES & SEEDS ---
   // ----------------------------------------------------
@@ -540,16 +552,15 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       return;
     }
     if (paymentMethod === 'wallet') {
-      const neededUSD = selectedPackPrice === 50000 ? 2.0 : 40.0;
-      if (balance < neededUSD) {
-        triggerToast(`⚠️ Thất bại: Số dư ví không đủ! Cần $${neededUSD.toFixed(2)}, Số dư hiện tại: $${balance.toFixed(2)}`, 'error');
+      if (balance < selectedPackPrice) {
+        triggerToast(`⚠️ Thất bại: Số dư ví không đủ! Cần ${selectedPackPrice.toLocaleString('vi-VN')}₫, Số dư hiện tại: ${balance.toLocaleString('vi-VN')}₫`, 'error');
         return;
       }
-      setBalance(prev => prev - neededUSD);
-      const formattedPrice = selectedPackPrice === 50000 ? '50,000₫' : '1,000,000₫';
+      setBalance(prev => prev - selectedPackPrice);
+      const formattedPrice = selectedPackPrice.toLocaleString('vi-VN') + '₫';
       const newTx: TransactionItem = {
         id: `txn-${Date.now()}`,
-        date: 'Vừa xong',
+        date: getNowFormatted(),
         type: `Đăng kí ${selectedPackLabel} (Ví UrbanPark)`,
         plate: selectedVehicleForVIP,
         fee: `-${formattedPrice}`,
@@ -616,21 +627,20 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       setBalance(prev => prev + selectedPackPrice);
       const newTx: TransactionItem = {
         id: `txn-${Date.now()}`,
-        date: 'Vừa xong',
+        date: getNowFormatted(),
         type: 'Nạp ví VNPAY',
         plate: '-',
-        fee: `+$${selectedPackPrice.toFixed(2)}`,
+        fee: `+${selectedPackPrice.toLocaleString('vi-VN')}₫`,
         isEntry: true,
         status: 'Thành công'
       };
       setTransactions(prev => [newTx, ...prev]);
-      triggerToast(`Nạp thành công $${selectedPackPrice.toFixed(2)} vào ví điện tử!`, 'success');
+      triggerToast(`Nạp thành công ${selectedPackPrice.toLocaleString('vi-VN')}₫ vào ví điện tử!`, 'success');
     } else {
-      // Deduct from balance for simulation if desired, or let balance stay. Let's add a fresh transaction
-      const formattedPrice = selectedPackPrice === 50000 ? '50,000₫' : '1,000,000₫';
+      const formattedPrice = selectedPackPrice.toLocaleString('vi-VN') + '₫';
       const newTx: TransactionItem = {
         id: `txn-${Date.now()}`,
-        date: 'Vừa xong',
+        date: getNowFormatted(),
         type: `Đăng kí ${selectedPackLabel}`,
         plate: selectedVehicleForVIP,
         fee: `-${formattedPrice}`,
@@ -1406,7 +1416,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                               // Add ticket log
                               const newTx: TransactionItem = {
                                 id: `TXN-${Math.floor(1000 + Math.random() * 9000)}`,
-                                date: 'Vừa xong',
+                                date: getNowFormatted(),
                                 type: 'Xe ô tô vào bãi',
                                 plate: vehicles[0]?.plate || '30G-123.45',
                                 fee: '-50,000₫',
@@ -1431,7 +1441,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                               setBalance(prev => prev + 500000);
                               const newTx: TransactionItem = {
                                 id: `TXN-${Math.floor(1000 + Math.random() * 9000)}`,
-                                date: 'Vừa xong',
+                                date: getNowFormatted(),
                                 type: 'Nạp ví VNPAY',
                                 plate: '-',
                                 fee: '+500,000₫',
