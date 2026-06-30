@@ -35,8 +35,10 @@ apiClient.interceptors.response.use(
   (error) => {
     // Bắt các mã lỗi phổ biến (401: Hết phiên, 403: Không có quyền...)
     if (error.response) {
+      // Chỉ bắt 401 (Hết phiên/Token lỗi) để đá ra ngoài.
+      // Bỏ 403 (Không có quyền) vì có thể nhân viên vô tình gọi API của Quản lý thì chỉ cần báo lỗi chứ không nên đá ra ngoài.
       if (error.response.status === 401) {
-        console.error("Phiên đăng nhập hết hạn hoặc Token không hợp lệ. Đang đá văng về màn hình Login...");
+        console.error("Phiên đăng nhập hết hạn hoặc Token không hợp lệ. Đang điều hướng về màn hình Login...");
         // Tự động xóa token lỗi
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');

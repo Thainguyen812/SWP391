@@ -39,6 +39,9 @@ public class Vehicle {
     @Column(name = "fuel_type", nullable = false)
     private String fuelType = "GASOLINE";
 
+    @Column(name = "is_locked", nullable = false)
+    private boolean isLocked = false;
+
     @Column(name = "created_at")
     private Instant createdAt;
 
@@ -74,6 +77,8 @@ public class Vehicle {
     public void setFuelType(String fuelType) { this.fuelType = fuelType; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public boolean isLocked() { return isLocked; }
+    public void setLocked(boolean locked) { isLocked = locked; }
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
 }

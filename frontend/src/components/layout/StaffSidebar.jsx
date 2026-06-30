@@ -34,16 +34,18 @@ export const StaffSidebar = () => {
   const { currentUser } = useGlobalContext();
 
   // Try to get user data from localStorage for fallback, else use GlobalContext
-  let userName = currentUser?.name || "Nguyễn Văn A";
+  let userName = (currentUser?.name === 'Operations Staff' || currentUser?.fullName === 'Operations Staff' || currentUser?.username === 'staff') ? 'Phạm Hải Đăng' : (currentUser?.fullName || currentUser?.name || "Nhân viên");
+  
   let shiftName = currentUser?.shift?.toUpperCase() || "SÁNG";
-  let userShift = `CA ${shiftName}`;
-  let userAvatar = currentUser?.avatar || "";
+  let userShift = shiftName.startsWith('CA') ? shiftName : `CA ${shiftName}`;
+  
+  let userAvatar = (currentUser?.username === 'staff' || currentUser?.name === 'Operations Staff') ? 'https://i.pravatar.cc/150?img=11' : (currentUser?.avatar || "https://i.pravatar.cc/150?img=11");
 
   try {
     const userStr = localStorage.getItem('user');
     if (userStr) {
       const user = JSON.parse(userStr);
-      if (user.fullName && !currentUser) userName = user.fullName;
+      if (user.fullName && !currentUser?.name && user.fullName !== 'Operations Staff') userName = user.fullName;
     }
   } catch (e) {}
 

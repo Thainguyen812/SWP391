@@ -1,17 +1,11 @@
 {
-    "sqltools.connections": [
+    "java.configuration.runtimes": [
         {
-            "ssh": "Disabled",
-            "previewLimit": 50,
-            "server": "localhost",
-            "port": 5433,
-            "driver": "PostgreSQL",
-            "name": "ParkingBuilding_System",
-            "database": "parking_db",
-            "username": "parking_user",
-            "password": " ParkingDB@2024!"
+            "name": "JavaSE-17",
+            "path": "C:\\Program Files\\Microsoft\\jdk-17.0.19.10-hotspot",
+            "default": true
         }
     ],
-    "java.compile.nullAnalysis.mode": "automatic",
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.jdt.ls.java.home": "C:\\Program Files\\Microsoft\\jdk-17.0.19.10-hotspot",
+    "java.compile.nullAnalysis.mode": "automatic"
 }

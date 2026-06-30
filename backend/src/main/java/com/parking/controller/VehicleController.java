@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,16 +26,31 @@ public class VehicleController {
     }
 
     @GetMapping
-    public List<Vehicle> all(Principal principal){ 
+    public java.util.Map<String, Object> all(Principal principal){ 
+        List<Vehicle> list;
         if (principal == null) {
-            return repo.findAll();
+            list = repo.findAll();
+        } else {
+            String username = principal.getName();
+            Optional<User> u = userRepo.findByUsername(username);
+            if (u.isPresent()) {
+                list = repo.findByOwnerId(u.get().getId());
+            } else {
+                list = List.of();
+            }
         }
-        String username = principal.getName();
-        Optional<User> u = userRepo.findByUsername(username);
-        if (u.isPresent()) {
-            return repo.findByOwnerId(u.get().getId());
+
+        List<java.util.Map<String, Object>> mapped = new java.util.ArrayList<>();
+        for (Vehicle v : list) {
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", v.getId());
+            map.put("plate", v.getLicensePlate());
+            map.put("name", v.getBrand() != null ? v.getBrand() : "Xe của tôi");
+            map.put("type", v.getVehicleSize());
+            map.put("isLocked", v.isLocked());
+            mapped.add(map);
         }
-        return List.of();
+        return java.util.Map.of("success", true, "data", mapped);
     }
 
     @GetMapping("/{id}")
@@ -92,8 +108,16 @@ public class VehicleController {
     @PostMapping("/lock")
     public ResponseEntity<?> lockVehicle(@RequestBody VehicleLockRequest request) {
         boolean isLocked = request.getIsLocked() != null && request.getIsLocked();
-        String msg = isLocked ? "Kich hoat radar khoa banh thanh cong cho xe " + request.getPlate() + "!" 
-                              : "Da mo khoa an ninh cho xe " + request.getPlate() + ". Xe co the xuat bai!";
+        
+        Optional<Vehicle> optVehicle = repo.findByLicensePlate(request.getPlate());
+        if (optVehicle.isPresent()) {
+            Vehicle v = optVehicle.get();
+            v.setLocked(isLocked);
+            repo.save(v);
+        }
+
+        String msg = isLocked ? "Kích hoạt radar khóa bánh thành công cho xe " + request.getPlate() + "!" 
+                              : "Đã mở khóa an ninh cho xe " + request.getPlate() + ". Xe có thể xuất bãi!";
         return ResponseEntity.ok(java.util.Map.of("success", true, "message", msg));
     }
 

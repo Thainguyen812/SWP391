@@ -8,11 +8,11 @@
    <smartLocatorEnabled>false</smartLocatorEnabled>
    <useRalativeImagePath>false</useRalativeImagePath>
    <autoUpdateContent>false</autoUpdateContent>
-   <connectionTimeout>-1</connectionTimeout>
+   <connectionTimeout>0</connectionTimeout>
    <followRedirects>true</followRedirects>
    <httpBody></httpBody>
    <httpBodyContent>{
-  &quot;text&quot;: &quot;{\n  \&quot;plate\&quot;: \&quot;${plate}\&quot;,\n  \&quot;confidence_score\&quot;: ${confidence},\n  \&quot;vehicle_type\&quot;: \&quot;${vehicleType}\&quot;,\n  \&quot;image_url\&quot;: \&quot;${imageUrl}\&quot;\n}&quot;,
+  &quot;text&quot;: &quot;{\n  \&quot;plate\&quot;: \&quot;30A-99999\&quot;,\n  \&quot;confidence_score\&quot;: 95.0,\n  \&quot;vehicle_type\&quot;: \&quot;FAMILY_CAR\&quot;,\n  \&quot;image_url\&quot;: \&quot;http://mock-storage/30A-99999_in.jpg\&quot;\n}&quot;,
   &quot;contentType&quot;: &quot;application/json&quot;,
   &quot;charset&quot;: &quot;UTF-8&quot;
 }</httpBodyContent>
@@ -25,8 +25,16 @@
       <value>application/json</value>
       <webElementGuid>aac6003d-f6c9-453a-a5e2-8b07df1ef68b</webElementGuid>
    </httpHeaderProperties>
+   <httpHeaderProperties>
+      <isSelected>true</isSelected>
+      <matchCondition>equals</matchCondition>
+      <name>Authorization</name>
+      <type>Main</type>
+      <value>Bearer ${token}</value>
+      <webElementGuid>ac1af442-6ed6-4bbb-92b4-7a639add7246</webElementGuid>
+   </httpHeaderProperties>
    <katalonVersion>11.2.1</katalonVersion>
-   <maxResponseSize>-1</maxResponseSize>
+   <maxResponseSize>0</maxResponseSize>
    <migratedVersion>5.4.1</migratedVersion>
    <path></path>
    <restRequestMethod>POST</restRequestMethod>
@@ -37,7 +45,7 @@
    <soapRequestMethod></soapRequestMethod>
    <soapServiceEndpoint></soapServiceEndpoint>
    <soapServiceFunction></soapServiceFunction>
-   <socketTimeout>-1</socketTimeout>
+   <socketTimeout>0</socketTimeout>
    <useServiceInfoFromWsdl>true</useServiceInfoFromWsdl>
    <variables>
       <defaultValue>'30A-99999'</defaultValue>
@@ -66,6 +74,13 @@
       <id>1d8b4f87-9321-4768-910c-bccbffde6da8</id>
       <masked>false</masked>
       <name>imageUrl</name>
+   </variables>
+   <variables>
+      <defaultValue>''</defaultValue>
+      <description></description>
+      <id>8bfd18c5-43ef-486e-bbe2-f0f3784009d9</id>
+      <masked>false</masked>
+      <name>token</name>
    </variables>
    <verificationScript>import static org.assertj.core.api.Assertions.*
 

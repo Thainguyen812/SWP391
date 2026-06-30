@@ -12,12 +12,16 @@ import com.parking.service.EmailService;
 import org.springframework.beans.factory.annotation.Qualifier; // Thêm import này
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import com.parking.model.User;
+import com.parking.repository.UserRepository;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
+
 import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -27,20 +31,48 @@ public class AuthController {
     private final UserDetailsService userDetailsService;
     private final OtpService otpService;
     private final EmailService emailService;
+    private final UserRepository userRepo;
 
-    // Sử dụng @Qualifier để chỉ định đích danh Spring nạp customUserDetailsService
-    // vào đây
     public AuthController(
             AuthService authService,
             JwtUtils jwtUtils,
             @Qualifier("customUserDetailsService") UserDetailsService userDetailsService,
             OtpService otpService,
-            EmailService emailService) {
+            EmailService emailService,
+            UserRepository userRepo) {
         this.authService = authService;
         this.jwtUtils = jwtUtils;
         this.userDetailsService = userDetailsService;
         this.otpService = otpService;
         this.emailService = emailService;
+        this.userRepo = userRepo;
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getMe() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Chưa đăng nhập");
+        }
+        
+        String username = auth.getName();
+        User user = userRepo.findByUsername(username).orElse(null);
+        
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Không tìm thấy user");
+        }
+        
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("id", user.getId().toString());
+        userData.put("name", user.getFullName());
+        userData.put("username", user.getUsername());
+        userData.put("role", user.getRole().toString());
+        userData.put("station", "Cổng chính (Auto)"); // Giả lập station nếu user chưa có field này
+        userData.put("shift", "Ca trực chung");       // Giả lập shift nếu user chưa có field này
+        userData.put("avatar", "https://api.dicebear.com/7.x/avataaars/svg?seed=" + user.getUsername());
+        
+        return ResponseEntity.ok(userData);
+>>>>>>> origin/main
     }
 
     // 1. API ĐĂNG NHẬP

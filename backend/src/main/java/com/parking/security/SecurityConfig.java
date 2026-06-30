@@ -32,19 +32,12 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // Cấu hình CORS cho phép gọi từ các origin Frontend được chỉ định
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // 1. Tắt CSRF bằng cú pháp Lambda mới (Spring Boot 3 bắt buộc)
                 .csrf(csrf -> csrf.disable())
-
-                // 2. Cấu hình Session Stateless (Không lưu trạng thái phiên làm việc trên
-                // Server)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // 3. Cấu hình các cổng API ra vào
                 .authorizeHttpRequests(auth -> auth
-                        // Giữ nguyên các đường dẫn công khai (Cho phép vào thẳng không cần Token)
-                        // Bao gồm cả OpenAPI / Swagger UI
+                        // 1. Các API công khai hoàn toàn công cộng
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/v3/api-docs/**",
@@ -53,19 +46,31 @@ public class SecurityConfig {
                                 "/api/v1/parking/find-car")
                         .permitAll()
 
-                        // Phân quyền (Role-based): Sử dụng .hasAnyRole("STAFF", "MANAGER", "ADMIN")
-                        // đảm bảo rằng chỉ những người dùng có chức danh phù hợp mới được quyền thay
-                        // đổi trạng thái phiên đỗ xe (tránh việc khách hàng tự "hack" trạng thái xe về
-                        // COMPLETED).
-                        .requestMatchers("/api/blacklisted-cards/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
+                        // 2. Phân vùng API chỉ dành riêng cho ADMIN
+                        .requestMatchers("/api/users/**").hasRole("ADMIN")
+                        .requestMatchers("/api/security/**").hasRole("ADMIN")
 
-                        // Tất cả các request còn lại đều phải quẹt thẻ thành công
+                        // 3. Phân vùng API dành cho Quản lý (MANAGER) và Nhân viên (STAFF)
+                        .requestMatchers("/api/logs/**").hasAnyRole("ADMIN", "MANAGER", "STAFF")
+
+                        // 3. Phân vùng API dành cho Quản lý (MANAGER)
+                        .requestMatchers("/api/revenue/shift-stats", "/api/revenue/transactions", "/api/revenue/transactions/**").hasAnyRole("MANAGER", "STAFF")
+                        .requestMatchers("/api/revenue/**").hasRole("MANAGER")
+                        .requestMatchers("/api/dashboard/**").hasRole("MANAGER")
+                        .requestMatchers("/api/settings/**").hasRole("MANAGER")
+
+                        // 4. Phân vùng API dùng chung cho lực lượng vận hành (STAFF và MANAGER)
+                        .requestMatchers("/api/blacklisted-cards/**").hasAnyRole("STAFF", "MANAGER")
+                        .requestMatchers("/api/tickets/**").hasAnyRole("STAFF", "MANAGER")
+                        .requestMatchers("/api/shifts/**", "/api/personnel/**").hasAnyRole("STAFF", "MANAGER")
+                        .requestMatchers("/api/monitoring/**").hasAnyRole("STAFF", "MANAGER")
+                        .requestMatchers("/api/camera/**").hasAnyRole("STAFF", "MANAGER")
+
+                        // 5. Toàn bộ các API còn lại (bao gồm /api/v1/parking/** và /api/vehicles/**)
+                        // Sẽ được kiểm soát chi tiết bằng @PreAuthorize tại Controller
                         .anyRequest().authenticated());
 
-        // 4. Chèn máy quét thẻ JwtAuthFilter của bạn vào chạy trước bộ lọc mặc định của
-        // Spring
         http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
 
@@ -78,7 +83,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Mở rộng CORS cho phép tất cả các nguồn kết nối (cần thiết cho deploy demo Cloud)
+        // Mở rộng CORS cho phép tất cả các nguồn kết nối (cần thiết cho deploy demo
+        // Cloud)
         configuration.setAllowedOriginPatterns(Arrays.asList("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));

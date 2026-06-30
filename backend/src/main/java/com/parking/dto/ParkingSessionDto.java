@@ -9,9 +9,12 @@ public class ParkingSessionDto {
     private UUID id;
     private String licensePlate;
     private UUID assignedZoneId;
+    private UUID cardId;
     private Instant checkInTime;
     private Instant checkOutTime;
     private String sessionStatus;
+    private String entryGate;
+    private String exitGate;
     private Boolean isVip;
     private Boolean isSuspicious;
     private String suspiciousReason;
@@ -25,9 +28,12 @@ public class ParkingSessionDto {
         this.id = session.getId();
         this.licensePlate = session.getLicensePlate();
         this.assignedZoneId = session.getAssignedZoneId();
+        this.cardId = session.getCardId();
         this.checkInTime = session.getCheckInTime();
         this.checkOutTime = session.getCheckOutTime();
         this.sessionStatus = session.getSessionStatus() != null ? session.getSessionStatus().name() : null;
+        this.entryGate = session.getEntryGate();
+        this.exitGate = session.getExitGate();
         this.isVip = session.getIsVip();
         this.isSuspicious = session.getIsSuspicious();
         this.suspiciousReason = session.getSuspiciousReason();
@@ -42,9 +48,12 @@ public class ParkingSessionDto {
     public UUID getId() { return id; }
     public String getLicensePlate() { return licensePlate; }
     public UUID getAssignedZoneId() { return assignedZoneId; }
+    public UUID getCardId() { return cardId; }
     public Instant getCheckInTime() { return checkInTime; }
     public Instant getCheckOutTime() { return checkOutTime; }
     public String getSessionStatus() { return sessionStatus; }
+    public String getEntryGate() { return entryGate; }
+    public String getExitGate() { return exitGate; }
     public Boolean getIsVip() { return isVip; }
     public Boolean getIsSuspicious() { return isSuspicious; }
     public String getSuspiciousReason() { return suspiciousReason; }

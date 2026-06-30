@@ -13,7 +13,7 @@ export const TopAppBarSection = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
 
-  const searchRoutes = [
+  const searchRoutes = currentUser?.role === 'STAFF' ? [
     { path: '/staff-dashboard', label: 'Bảng điều khiển', keywords: ['bảng điều khiển', 'dashboard', 'trang chủ'] },
     { path: '/staff-gate-control', label: 'Điều khiển Cổng', keywords: ['điều khiển', 'cổng', 'gate', 'mở cổng'] },
     { path: '/staff-monitoring', label: 'Giám sát Camera', keywords: ['giám sát', 'camera', 'ai', 'video'] },
@@ -21,37 +21,63 @@ export const TopAppBarSection = () => {
     { path: '/staff-security', label: 'Cảnh báo An ninh', keywords: ['an ninh', 'cảnh báo', 'security', 'vi phạm'] },
     { path: '/staff-lost-card', label: 'Báo mất thẻ', keywords: ['mất thẻ', 'báo mất', 'lost card'] },
     { path: '/staff-transactions', label: 'Lịch sử giao dịch', keywords: ['giao dịch', 'lịch sử', 'history', 'hóa đơn'] },
-    { path: '/staff-settings', label: 'Cài đặt hệ thống', keywords: ['cài đặt', 'settings', 'hệ thống', 'cấu hình'] }
+    { path: '/staff-settings', label: 'Cài đặt hệ thống', keywords: ['cài đặt', 'settings', 'hệ thống', 'cấu hình', 'giao ca'] }
+  ] : [
+    { path: '/overview', label: 'Tổng quan hệ thống', keywords: ['tổng quan', 'overview', 'dashboard', 'bảng điều khiển'] },
+    { path: '/monitoring', label: 'Giám sát bãi đỗ', keywords: ['giám sát', 'camera', 'ai', 'bãi đỗ'] },
+    { path: '/revenue', label: 'Quản lý doanh thu', keywords: ['doanh thu', 'revenue', 'tài chính', 'tiền'] },
+    { path: '/customers', label: 'Quản lý khách hàng', keywords: ['khách hàng', 'customer', 'người dùng', 'vé tháng', 'vip'] },
+    { path: '/staff', label: 'Quản lý nhân sự', keywords: ['nhân sự', 'nhân viên', 'staff', 'ca trực'] },
+    { path: '/transactions', label: 'Tra cứu giao dịch', keywords: ['giao dịch', 'tra cứu', 'history', 'hóa đơn'] },
+    { path: '/settings', label: 'Cài đặt hệ thống', keywords: ['cài đặt', 'settings', 'hệ thống', 'cấu hình'] },
+    { path: '/support', label: 'Hỗ trợ khách hàng', keywords: ['hỗ trợ', 'support', 'cskh', 'ticket'] },
+    { path: '/admin', label: 'Quản trị (Legacy)', keywords: ['admin', 'quản trị'] }
   ];
 
   const filteredRoutes = searchValue 
     ? searchRoutes.filter(r => r.keywords.some(kw => kw.includes(searchValue.toLowerCase()) || searchValue.toLowerCase().includes(kw)))
     : [];
 
-  const handleSearchSelect = (path) => {
-    navigate(path);
-    setSearchValue('');
+  if (searchValue) {
+    const isStaff = currentUser?.role === 'STAFF';
+    filteredRoutes.push({
+      path: isStaff ? '/staff-transactions' : '/transactions',
+      label: `Tra cứu biển số / mã giao dịch "${searchValue}"`,
+      icon: 'search',
+      preserveSearch: true
+    });
+  }
+
+  const handleSearchSelect = (route) => {
+    navigate(route.path);
+    if (!route.preserveSearch) {
+      setSearchValue('');
+    }
     setShowSearchDropdown(false);
   };
 
   let pageTitle = 'Trang chủ';
-  if (location.pathname === '/staff-dashboard') {
-    pageTitle = 'Bảng điều khiển';
-  } else if (location.pathname === '/staff-gate-control') {
-    pageTitle = 'Điều khiển cổng';
-  } else if (location.pathname === '/staff-payment') {
-    pageTitle = 'Thanh toán đỗ xe';
-  } else if (location.pathname === '/staff-monitoring') {
-    pageTitle = 'Giám sát camera';
-  } else if (location.pathname === '/staff-security') {
-    pageTitle = 'Cảnh báo an ninh';
-  } else if (location.pathname === '/staff-lost-card') {
-    pageTitle = 'Báo mất thẻ';
-  } else if (location.pathname === '/staff-transactions') {
-    pageTitle = 'Lịch sử giao dịch';
-  } else if (location.pathname === '/staff-settings') {
-    pageTitle = 'Bàn giao ca';
-  }
+  
+  // Staff pages
+  if (location.pathname === '/staff-dashboard') pageTitle = 'Bảng điều khiển';
+  else if (location.pathname === '/staff-gate-control') pageTitle = 'Điều khiển cổng';
+  else if (location.pathname === '/staff-payment') pageTitle = 'Thanh toán đỗ xe';
+  else if (location.pathname === '/staff-monitoring') pageTitle = 'Giám sát camera';
+  else if (location.pathname === '/staff-security') pageTitle = 'Cảnh báo an ninh';
+  else if (location.pathname === '/staff-lost-card') pageTitle = 'Báo mất thẻ';
+  else if (location.pathname === '/staff-transactions') pageTitle = 'Lịch sử giao dịch';
+  else if (location.pathname === '/staff-settings') pageTitle = 'Bàn giao ca';
+  
+  // Manager pages
+  else if (location.pathname === '/overview') pageTitle = 'Tổng quan hệ thống';
+  else if (location.pathname === '/monitoring') pageTitle = 'Giám sát bãi đỗ';
+  else if (location.pathname === '/revenue') pageTitle = 'Quản lý doanh thu';
+  else if (location.pathname === '/customers') pageTitle = 'Quản lý khách hàng';
+  else if (location.pathname === '/staff') pageTitle = 'Quản lý nhân sự';
+  else if (location.pathname === '/transactions') pageTitle = 'Tra cứu giao dịch';
+  else if (location.pathname === '/settings') pageTitle = 'Cài đặt hệ thống';
+  else if (location.pathname === '/support') pageTitle = 'Hỗ trợ khách hàng';
+  else if (location.pathname === '/admin') pageTitle = 'Admin Dashboard';
 
   const toggleDarkMode = () => {
     const newMode = !isDarkMode;
@@ -87,10 +113,10 @@ export const TopAppBarSection = () => {
             onBlur={() => setTimeout(() => setShowSearchDropdown(false), 200)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && filteredRoutes.length > 0) {
-                handleSearchSelect(filteredRoutes[0].path);
+                handleSearchSelect(filteredRoutes[0]);
               }
             }}
-            placeholder="Tìm biển số, khu vực..."
+            placeholder="Tìm biển số, giao dịch, chức năng..."
             className="w-full bg-[#f8fafc] border border-slate-200 placeholder-slate-400 text-slate-600 text-sm pl-11 pr-4 py-2.5 rounded-xl focus:outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
             autoComplete="off"
           />
@@ -102,10 +128,12 @@ export const TopAppBarSection = () => {
                     <li 
                       key={idx}
                       className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-sm text-slate-700 border-b border-slate-100 last:border-0"
-                      onClick={() => handleSearchSelect(route.path)}
+                      onClick={() => handleSearchSelect(route)}
                     >
-                      <SearchOutlined className="mr-2 text-slate-400" />
-                      {route.label}
+                      <SearchOutlined className={`mr-2 ${route.icon === 'search' ? 'text-blue-500' : 'text-slate-400'}`} />
+                      <span className={route.icon === 'search' ? 'text-blue-600 font-medium' : ''}>
+                        {route.label}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -132,11 +160,15 @@ export const TopAppBarSection = () => {
         </button>
         <div className="flex items-center gap-2 ml-2">
           <div className="hidden md:flex flex-col items-end">
-            <span className="text-sm font-bold text-slate-800">{currentUser?.name || "Nhân viên"}</span>
-            <span className="text-xs text-slate-500">{currentUser?.id || "NV-0000"}</span>
+            <span className="text-sm font-bold text-slate-800">
+              {(currentUser?.name === 'Operations Staff' || currentUser?.fullName === 'Operations Staff' || (!currentUser?.name && !currentUser?.fullName)) ? 'Phạm Hải Đăng' : (currentUser?.fullName || currentUser?.name || "Nhân viên")}
+            </span>
+            <span className="text-xs text-slate-500 max-w-[120px] truncate" title={currentUser?.id}>
+              {currentUser?.username === 'staff' ? 'NV015' : (currentUser?.username || (currentUser?.id ? currentUser.id.substring(0, 8).toUpperCase() : "NV-0000"))}
+            </span>
           </div>
-          <button className="w-9 h-9 rounded-full overflow-hidden border border-slate-200 cursor-pointer shadow-sm">
-            <img src={currentUser?.avatar || "https://i.pravatar.cc/150?img=11"} alt="Avatar" className="w-full h-full object-cover" />
+          <button className="w-9 h-9 rounded-full overflow-hidden border border-slate-200 cursor-pointer shadow-sm flex-shrink-0">
+            <img src={(currentUser?.username === 'staff' || currentUser?.name === 'Operations Staff') ? 'https://i.pravatar.cc/150?img=11' : (currentUser?.avatar || "https://i.pravatar.cc/150?img=11")} alt="Avatar" className="w-full h-full object-cover" />
           </button>
         </div>
       </div>

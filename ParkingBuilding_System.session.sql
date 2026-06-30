@@ -35,7 +35,7 @@ INSERT INTO zones (id, zone_name, zone_code, allowed_sizes, total_slots, current
 
 -- 4. VEHICLES (Phương tiện đã đăng ký)
 INSERT INTO vehicles (id, owner_id, license_plate, vehicle_size, color, brand, violation_count, is_active, created_at, updated_at) VALUES
-('20000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000005', '30G-123.45', 'SEDAN', 'White', 'Toyota', 0, true, NOW(), NOW()),
+
 ('20000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000005', '29A-999.99', 'SUV', 'Black', 'Mercedes', 0, true, NOW(), NOW()),
 ('20000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000006', '51G-555.55', 'HATCHBACK', 'Red', 'Hyundai', 1, true, NOW(), NOW()),
 ('20000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000006', '14A-111.11', 'SEDAN', 'Blue', 'Honda', 0, true, NOW(), NOW());
