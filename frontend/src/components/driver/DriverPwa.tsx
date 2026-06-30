@@ -128,7 +128,16 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'vnpay'>('wallet');
   const [balance, setBalance] = useState<number>(() => {
     const saved = localStorage.getItem('urbanpark_user_balance');
-    return saved ? parseFloat(saved) : 0; // Default to 0 for new users
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed)) {
+        if (parsed === 10) return 250000;
+        if (parsed === 500010) return 750000;
+        if (parsed < 1000 && parsed > 0) return parsed * 25000;
+        return parsed;
+      }
+    }
+    return 0; // Default to 0 for new users
   });
 
   const [selectedVehId, setSelectedVehId] = useState<string>('veh-1');
@@ -839,7 +848,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
               {/* Wallet Balance representation */}
               <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200/80 rounded-full text-xs font-mono font-bold text-slate-700">
                 <span className="text-[10px] text-slate-400 font-sans tracking-wide">Số dư ví:</span>
-                <span className="text-blue-600 font-black">${balance.toFixed(2)}</span>
+                <span className="text-blue-600 font-black">{balance.toLocaleString('vi-VN')}₫</span>
               </div>
 
               {/* Action bells */}
