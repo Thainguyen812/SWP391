@@ -40,6 +40,12 @@ public class ParkingSession {
     @Column(name = "session_status")
     private SessionStatus sessionStatus;
 
+    @Column(name = "entry_gate")
+    private String entryGate;
+
+    @Column(name = "exit_gate")
+    private String exitGate;
+
     private Boolean isVip = false;
     private Boolean isLocked = false;
     private Boolean isSuspicious = false;
@@ -50,6 +56,9 @@ public class ParkingSession {
 
     @Column(name = "override_reason")
     private String overrideReason;
+
+    @Column(name = "qr_fallback_used", nullable = false)
+    private Boolean qrFallbackUsed = false;
 
     @Column(name = "mobile_checkout_staff_id")
     private UUID mobileCheckoutStaffId;
@@ -63,7 +72,6 @@ public class ParkingSession {
     @Column(name = "mobile_checkout_photo")
     private String mobileCheckoutPhoto;
 
-    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "lost_card_proof_photos")
     private String lostCardProofPhotos;
 
@@ -99,6 +107,10 @@ public class ParkingSession {
     public void setCheckOutTime(Instant checkOutTime) { this.checkOutTime = checkOutTime; }
     public SessionStatus getSessionStatus() { return sessionStatus; }
     public void setSessionStatus(SessionStatus sessionStatus) { this.sessionStatus = sessionStatus; }
+    public String getEntryGate() { return entryGate; }
+    public void setEntryGate(String entryGate) { this.entryGate = entryGate; }
+    public String getExitGate() { return exitGate; }
+    public void setExitGate(String exitGate) { this.exitGate = exitGate; }
     public Boolean getIsVip() { return isVip; }
     public void setIsVip(Boolean isVip) { this.isVip = isVip; }
     public Boolean getIsLocked() { return isLocked; }
@@ -107,6 +119,8 @@ public class ParkingSession {
     public void setIsSuspicious(Boolean isSuspicious) { this.isSuspicious = isSuspicious; }
     public String getSuspiciousReason() { return suspiciousReason; }
     public void setSuspiciousReason(String suspiciousReason) { this.suspiciousReason = suspiciousReason; }
+    public Boolean getQrFallbackUsed() { return qrFallbackUsed; }
+    public void setQrFallbackUsed(Boolean qrFallbackUsed) { this.qrFallbackUsed = qrFallbackUsed; }
     public UUID getOverrideByStaff() { return overrideByStaff; }
     public void setOverrideByStaff(UUID overrideByStaff) { this.overrideByStaff = overrideByStaff; }
     public String getOverrideReason() { return overrideReason; }

@@ -13,6 +13,8 @@ public class ParkingSessionDto {
     private Instant checkInTime;
     private Instant checkOutTime;
     private String sessionStatus;
+    private String entryGate;
+    private String exitGate;
     private Boolean isVip;
     private Boolean isSuspicious;
     private String suspiciousReason;
@@ -30,6 +32,8 @@ public class ParkingSessionDto {
         this.checkInTime = session.getCheckInTime();
         this.checkOutTime = session.getCheckOutTime();
         this.sessionStatus = session.getSessionStatus() != null ? session.getSessionStatus().name() : null;
+        this.entryGate = session.getEntryGate();
+        this.exitGate = session.getExitGate();
         this.isVip = session.getIsVip();
         this.isSuspicious = session.getIsSuspicious();
         this.suspiciousReason = session.getSuspiciousReason();
@@ -48,6 +52,8 @@ public class ParkingSessionDto {
     public Instant getCheckInTime() { return checkInTime; }
     public Instant getCheckOutTime() { return checkOutTime; }
     public String getSessionStatus() { return sessionStatus; }
+    public String getEntryGate() { return entryGate; }
+    public String getExitGate() { return exitGate; }
     public Boolean getIsVip() { return isVip; }
     public Boolean getIsSuspicious() { return isSuspicious; }
     public String getSuspiciousReason() { return suspiciousReason; }
