@@ -74,9 +74,13 @@ this.userRepo = userRepo;
     }
 
 
+
+    //ĐĂNG KÝ XE MỚI 
     @PostMapping
     public Vehicle create(@Valid @RequestBody VehicleRegistrationRequest request) {
-    Authentication authentication =
+    
+        // KTRA XEM BIỂN SỐ XE NÀY ĐÃ DC ĐĂNG KÝ CHƯA 
+        Authentication authentication =
             SecurityContextHolder.getContext().getAuthentication();
 
     String username = authentication.getName();
@@ -120,7 +124,7 @@ this.userRepo = userRepo;
     return repo.save(vehicle);
 }
 
-
+//SỬA THÔNG TIN XE 
     @PutMapping("/{id}") // chỉ sửa dc những thông tin của vehicle bên post
     public ResponseEntity<Vehicle> update(
         @PathVariable UUID id,
@@ -165,15 +169,33 @@ this.userRepo = userRepo;
 
     }).orElseGet(() -> ResponseEntity.notFound().build());
 }
+//LẤY THÔNG TIN TÀI KHOẢN ĐANG ĐĂNG NHẬP
+@DeleteMapping("/{id}")
+public ResponseEntity<?> delete(@PathVariable UUID id){
+    return repo.findById(id).map(vehicle -> {
 
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('MANAGER')")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) { // SỬA THÀNH UUID
-        if (!repo.existsById(id))
-            return ResponseEntity.notFound().build();
-        repo.deleteById(id);
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        String username = authentication.getName();
+
+User currentUser = userRepo
+        .findByUsername(username)
+        .orElseThrow(() ->
+                new RuntimeException("User không tồn tại."));
+        
+        // KIỂM TRA NGƯỜI ĐĂNG NHẬP CÓ PHẢI CHỦ XE KHÔNG
+        if (!vehicle.getOwnerId().equals(currentUser.getId())) {
+            throw new RuntimeException("Bạn không có quyền xóa xe này.");
+        }
+
+        repo.delete(vehicle);
+
+
         return ResponseEntity.noContent().build();
-    }
+
+    }).orElseGet(() -> ResponseEntity.notFound().build());
+}
 
     @PostMapping("/lock")
     public ResponseEntity<?> lockVehicle(@RequestBody VehicleLockRequest request) {
