@@ -1,31 +1,38 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { AuthPage } from './components/auth/AuthPage';
+import { AuthPage } from './pages/auth/AuthPage';
 import { authService } from './services/authService';
-import { SystemOverviewSection } from './components/manager/dashboard/Dashboard_Main';
-import { MonitoringPage } from './components/manager/monitoring/Monitoring_Main';
-import { RevenuePage } from './components/manager/revenue/Revenue_Main';
-import { CustomerPage } from './components/manager/customers/Customer_Main';
-import { SettingsMain } from './components/manager/settings/Settings_Main';
-import { PersonnelMain } from './components/manager/personnel/Personnel_Main';
-import { SecurityMain } from './components/manager/security/Security_Main';
-import { LogsMain } from './components/manager/logs/Logs_Main';
-import { HandoverMain } from './components/manager/handover/Handover_Main';
-import { SupportMain } from './components/manager/support/Support_Main';
-import { TransactionHistory } from './components/manager/transactions/TransactionHistory';
-import { StaffDashboard } from './components/staff/StaffDashboard';
-import { StaffGateControl } from './components/staff/StaffGateControl';
-import { StaffPayment } from './components/staff/StaffPayment';
-import { StaffMonitoring } from './components/staff/StaffMonitoring';
-import { StaffSecurityAlerts } from './components/staff/StaffSecurityAlerts';
-import { StaffLostCard } from './components/staff/StaffLostCard';
-import { StaffSettings } from './components/staff/StaffSettings';
-import { StaffSupport } from './components/staff/StaffSupport';
+import { SystemOverviewSection } from './pages/manager/dashboard/Dashboard_Main';
+import { MonitoringPage } from './pages/manager/monitoring/Monitoring_Main';
+import { RevenuePage } from './pages/manager/revenue/Revenue_Main';
+import { CustomerPage } from './pages/manager/customers/Customer_Main';
+import { SettingsMain } from './pages/manager/settings/Settings_Main';
+import { PersonnelMain } from './pages/manager/personnel/Personnel_Main';
+import { SecurityMain } from './pages/manager/security/Security_Main';
+import { LogsMain } from './pages/manager/logs/Logs_Main';
+import { HandoverMain } from './pages/manager/handover/Handover_Main';
+import { SupportMain } from './pages/manager/support/Support_Main';
+import { TransactionHistory } from './pages/manager/transactions/TransactionHistory';
+import { StaffDashboard } from './pages/staff/StaffDashboard';
+import { StaffGateControl } from './pages/staff/StaffGateControl';
+import { StaffPayment } from './pages/staff/StaffPayment';
+import { StaffMonitoring } from './pages/staff/StaffMonitoring';
+import { StaffSecurityAlerts } from './pages/staff/StaffSecurityAlerts';
+import { StaffLostCard } from './pages/staff/StaffLostCard';
+import { StaffSettings } from './pages/staff/StaffSettings';
+import { StaffSupport } from './pages/staff/StaffSupport';
 import StaffLayout from './components/layout/StaffLayout';
-import { DriverPwa } from './components/driver/DriverPwa';
-import { Dashboard as LegacyDashboard } from './components/driver/Dashboard';
-import { useNavigate } from 'react-router-dom';
+import { DriverLayout } from './pages/driver/DriverLayout';
+import { DriverDashboardPanel } from './pages/driver/DriverDashboardPanel';
+import { DriverHome } from './pages/driver/DriverHome';
+import { DriverVehicles } from './pages/driver/DriverVehicles';
+import { DriverVipReg } from './pages/driver/DriverVipReg';
+import { DriverBilling } from './pages/driver/DriverBilling';
+import { DriverSettings } from './pages/driver/DriverSettings';
+import { DriverSupport } from './pages/driver/DriverSupport';
+
+import { Dashboard as LegacyDashboard } from './pages/admin/AdminDashboard';
 import { GlobalProvider } from './context/GlobalContext';
 
 const ProtectedPage = ({ children, allowedRoles }) => (
@@ -94,7 +101,7 @@ const DriverAppWrapper = () => {
   const navigate = useNavigate();
   
   return (
-    <DriverPwa 
+    <DriverLayout 
       user={{ phone: user.username, name: user.fullName, role: user.role }}
       accessToken={localStorage.getItem('token')}
       onLogout={() => {
@@ -182,11 +189,16 @@ function App() {
         <Route path="/staff-support" element={<StaffProtectedPage><StaffSupport /></StaffProtectedPage>} />
 
         {/* Nhóm Khách hàng (Driver) */}
-        <Route path="/driver" element={
-          <DriverPage>
-            <DriverAppWrapper />
-          </DriverPage>
-        } />
+        <Route path="/driver" element={<DriverPage><DriverAppWrapper /></DriverPage>}>
+          <Route index element={<Navigate to="home" replace />} />
+          <Route path="panel" element={<DriverDashboardPanel />} />
+          <Route path="home" element={<DriverHome />} />
+          <Route path="vehicles" element={<DriverVehicles />} />
+          <Route path="vip" element={<DriverVipReg />} />
+          <Route path="billing" element={<DriverBilling />} />
+          <Route path="settings" element={<DriverSettings />} />
+          <Route path="support" element={<DriverSupport />} />
+        </Route>
 
         {/* Catch-all */}
         <Route path="*" element={

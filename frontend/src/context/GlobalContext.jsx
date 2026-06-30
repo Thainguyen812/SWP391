@@ -21,6 +21,7 @@ export const GlobalProvider = ({ children }) => {
   const [activityLogs, setActivityLogs] = useState([]);
   const [activeVehicles, setActiveVehicles] = useState([]);
   const [currentVehicle, setCurrentVehicle] = useState(null);
+  const [recentlyProcessed, setRecentlyProcessed] = useState([]); // [{plate, action}] // Hide plates temporarily to prevent flashing
   
   // Security Alerts & Stats (Initially Empty)
   const [securityAlerts, setSecurityAlerts] = useState([]);
@@ -34,26 +35,25 @@ export const GlobalProvider = ({ children }) => {
       try {
         const logsData = await apiClient.get('/logs');
         if (logsData && logsData.items && logsData.items.length > 0) {
-          setActivityLogs(logsData.items);
-        } else {
-          setActivityLogs([]);
+          setActivityLogs(prev => {
+            const manualLogs = prev.filter(log => log.isManual);
+            // Simple deduplication based on plate and time to avoid showing same event twice
+            const fetchedLogs = logsData.items.filter(fetched => !manualLogs.some(m => m.plate === fetched.plate && m.action === fetched.action));
+            return [...manualLogs, ...fetchedLogs];
+          });
         }
       } catch (e) {
         console.error("Failed to fetch logs", e);
-        setActivityLogs([]);
       }
 
       // 2. Fetch Transactions
       try {
-        const txnData = await apiClient.get('/revenue/transactions');
-        if (txnData && txnData.items && txnData.items.length > 0) {
-          setTransactions(txnData.items);
-        } else {
-          setTransactions([]);
-        }
+          const txnData = await apiClient.get(`/revenue/transactions?_t=${new Date().getTime()}`);
+          if (txnData && txnData.items && txnData.items.length > 0) {
+            setTransactions(txnData.items);
+          }
       } catch (e) {
         console.error("Failed to fetch transactions", e);
-        setTransactions([]);
       }
       
       // 3. Fetch Shifts
@@ -95,20 +95,54 @@ export const GlobalProvider = ({ children }) => {
         if (dataArray && dataArray.length >= 0) {
           const active = dataArray
             .filter(s => s.sessionStatus === 'ACTIVE')
-            .map((session, index) => ({
-              id: session.id,
-              plate: session.licensePlate || "Không rõ",
-              type: session.isVip ? "VIP" : "Vãng lai",
-              confidence: "99%",
-              status: session.isSuspicious ? "Cảnh báo" : "Hợp lệ",
-              gate: session.exitGate || session.entryGate || null,
-              inTime: session.checkInTime ? new Date(session.checkInTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
-              outTime: "--:--",
-              image: session.frontImage || "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80",
-              model: session.vehicleModel || session.vehicleBrand || "Chưa xác định",
-              duration: "Đang vào"
-            }));
-          setActiveVehicles(active);
+            .map((session, index) => {
+              const checkInTime = session.checkInTime ? new Date(session.checkInTime) : null;
+              let durationStr = "Đang vào";
+              if (checkInTime && !isNaN(checkInTime.getTime())) {
+                const diffMs = Date.now() - checkInTime.getTime();
+                const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                durationStr = `${hours}h ${minutes}m`;
+              }
+                const carImages = [
+                  "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80",
+                  "https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=600&q=80",
+                  "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80",
+                  "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80",
+                  "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?auto=format&fit=crop&w=600&q=80",
+                  "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=600&q=80",
+                  "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=600&q=80",
+                  "https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?auto=format&fit=crop&w=600&q=80"
+                ];
+                const charSum = (session.licensePlate || "A").split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+                const uniqueImage = carImages[charSum % carImages.length];
+
+              return {
+                id: session.id,
+                plate: session.licensePlate || "Không rõ",
+                type: (session.isVip || session.vip) ? "VIP" : "Vãng lai",
+                confidence: "99%",
+                status: (session.isSuspicious || session.suspicious) ? "Lỗi thẻ" : (session.exitGate && !(session.isVip || session.vip) ? "Chờ thanh toán" : "Hợp lệ"),
+                gate: session.exitGate || session.entryGate || null,
+                inTime: checkInTime && !isNaN(checkInTime.getTime()) ? checkInTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
+                timestamp: checkInTime ? checkInTime.getTime() : 0,
+                outTime: "--:--",
+                image: session.mobileCheckoutPhoto || uniqueImage,
+                model: session.vehicleModel || session.vehicleBrand || "Chưa xác định",
+                duration: durationStr
+              };
+            });
+
+          setRecentlyProcessed(rp => {
+            const exitPlates = rp.filter(r => r.action === 'exit').map(r => r.plate);
+            const entryPlates = rp.filter(r => r.action === 'entry').map(r => r.plate);
+            
+            let newActive = active.filter(v => !exitPlates.includes(v.plate));
+            newActive = newActive.map(v => entryPlates.includes(v.plate) ? { ...v, gate: null } : v);
+            
+            setActiveVehicles(newActive.sort((a, b) => b.timestamp - a.timestamp));
+            return rp;
+          });
         } else {
           setActiveVehicles([]);
         }
@@ -129,10 +163,16 @@ export const GlobalProvider = ({ children }) => {
       // 6. Fetch Security Alerts
       try {
         const alerts = await apiClient.get('/security/alerts');
-        setSecurityAlerts(alerts || []);
+        if (alerts) {
+          setSecurityAlerts(prev => {
+            const manualAlerts = prev.filter(alert => alert.isManual);
+            const fetchedAlerts = alerts.filter(fetched => !manualAlerts.some(m => m.id === fetched.id));
+            return [...manualAlerts, ...fetchedAlerts];
+          });
+        }
       } catch (e) {
         console.error("Failed to fetch security alerts", e);
-        setSecurityAlerts([]);
+        setSecurityAlerts(prev => prev.filter(alert => alert.isManual));
       }
 
       // 7. Fetch Shift Stats
@@ -171,14 +211,39 @@ export const GlobalProvider = ({ children }) => {
   // Use fetchAllDataFromBackend in useEffect
   useEffect(() => {
     fetchAllDataFromBackend();
+    const interval = setInterval(fetchAllDataFromBackend, 3000);
+    return () => clearInterval(interval);
   }, [fetchAllDataFromBackend]);
 
   // Actions
-  const addTransaction = (newTx) => setTransactions(prev => [newTx, ...prev]);
-  const addActivityLog = (newLog) => setActivityLogs(prev => [newLog, ...prev]);
-  const addSecurityAlert = (newAlert) => setSecurityAlerts(prev => [newAlert, ...prev]);
+  const addTransaction = (newTx) => setTransactions(prev => [{ ...newTx, isManual: true }, ...prev]);
+  const addActivityLog = (newLog) => setActivityLogs(prev => [{ ...newLog, isManual: true, id: Math.random().toString() }, ...prev]);
+  const addSecurityAlert = (newAlert) => setSecurityAlerts(prev => [{ ...newAlert, isManual: true }, ...prev]);
   const removeSecurityAlert = (id) => setSecurityAlerts(prev => prev.filter(alert => alert.id !== id));
-  const restoreSecurityAlerts = () => fetchAllDataFromBackend();
+  const restoreSecurityAlerts = () => {
+    const mockBlacklist = {
+      id: 'AL-BL-' + Date.now(),
+      plate: '51F-888.88',
+      type: 'BIỂN SỐ ĐEN',
+      reason: 'Xe bị báo mất cắp, có yêu cầu giữ xe từ cơ quan chức năng.',
+      time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+      status: 'new',
+      isManual: true
+    };
+
+    const mockTheft = {
+      id: 'AL-TH-' + Date.now(),
+      plate: '30G-123.45',
+      type: 'NGHI NGỜ TRỘM CẮP',
+      reason: 'Phát hiện chấn động mạnh khi xe đang bật Khóa chống trộm.',
+      time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+      status: 'new',
+      isManual: true
+    };
+
+    setSecurityAlerts(prev => [mockBlacklist, mockTheft, ...prev]);
+    fetchAllDataFromBackend();
+  };
 
   const updateShiftStats = (amount, isCash = true) => {
     setShiftStats(prev => ({
@@ -192,6 +257,30 @@ export const GlobalProvider = ({ children }) => {
 
   const removeActiveVehicle = (plate) => {
     setActiveVehicles(prev => prev.filter(v => v.plate !== plate));
+    
+    // Temporarily hide this plate from subsequent API fetches for 15 seconds
+    setRecentlyProcessed(prev => [...prev, { plate, action: 'exit' }]);
+    setTimeout(() => {
+      setRecentlyProcessed(prev => prev.filter(p => p.plate !== plate));
+    }, 15000);
+
+    if (currentVehicle?.plate === plate) {
+      setCurrentVehicle(null);
+    }
+  };
+
+  const processEntryVehicle = (plate) => {
+    // Keep it in activeVehicles but clear its gate so it moves to "Trong bãi"
+    setActiveVehicles(prev => prev.map(v => 
+      v.plate === plate ? { ...v, gate: null, inTime: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) } : v
+    ));
+    
+    // Force API to keep its gate as null for 15s to give backend time to update
+    setRecentlyProcessed(prev => [...prev, { plate, action: 'entry' }]);
+    setTimeout(() => {
+      setRecentlyProcessed(prev => prev.filter(p => p.plate !== plate));
+    }, 15000);
+
     if (currentVehicle?.plate === plate) {
       setCurrentVehicle(null);
     }
@@ -204,6 +293,51 @@ export const GlobalProvider = ({ children }) => {
     });
   };
 
+  const INITIAL_GATES = [
+    { id: 'L-VÀO 1', type: 'TRỐNG', typeColor: 'bg-slate-100 text-slate-400', plate: '---', barrier: 'ĐÓNG', barrierColor: 'text-red-500', mode: 'Tự động', actions: ['lock', 'wrench'], vehicleId: null },
+    { id: 'L-VÀO 2', type: 'TRỐNG', typeColor: 'bg-slate-100 text-slate-400', plate: '---', barrier: 'ĐÓNG', barrierColor: 'text-red-500', mode: 'Tự động', actions: ['lock', 'wrench'], vehicleId: null },
+    { id: 'L-VÀO 3', type: 'TRỐNG', typeColor: 'bg-slate-100 text-slate-400', plate: '---', barrier: 'ĐÓNG', barrierColor: 'text-red-500', mode: 'Tự động', actions: ['lock', 'wrench'], vehicleId: null },
+    { id: 'L-RA 1', type: 'TRỐNG', typeColor: 'bg-slate-100 text-slate-400', plate: '---', barrier: 'ĐÓNG', barrierColor: 'text-red-500', mode: 'Tự động', actions: ['lock', 'wrench'], vehicleId: null },
+    { id: 'L-RA 2', type: 'TRỐNG', typeColor: 'bg-slate-100 text-slate-400', plate: '---', barrier: 'ĐÓNG', barrierColor: 'text-red-500', mode: 'Tự động', actions: ['lock', 'wrench'], vehicleId: null },
+    { id: 'L-RA 3', type: 'TRỐNG', typeColor: 'bg-slate-100 text-slate-400', plate: '---', barrier: 'ĐÓNG', barrierColor: 'text-red-500', mode: 'Tự động', actions: ['lock', 'wrench'], vehicleId: null }
+  ];
+  
+  const [gates, setGates] = useState(INITIAL_GATES);
+  const [gateLogs, setGateLogs] = useState([]); 
+
+  useEffect(() => {
+    setGates(prevGates => {
+      let newGates = prevGates.map(g => {
+        if (g.mode === 'Bảo trì') return g;
+        return { ...g, type: 'TRỐNG', typeColor: 'bg-slate-100 text-slate-400', plate: '---', barrier: 'ĐÓNG', barrierColor: 'text-red-500', mode: 'Tự động', actions: ['lock', 'wrench'], vehicleId: null };
+      });
+      
+      if (activeVehicles && activeVehicles.length > 0) {
+        activeVehicles.filter(v => v.gate).forEach(v => {
+          let gateId = v.gate.toUpperCase().replace(/CỔNG\s*[-]?\s*/g, 'L-');
+          let gateIndex = newGates.findIndex(g => g.id === gateId);
+          if (gateIndex === -1) {
+            newGates.push({ id: gateId, mode: 'Tự động' });
+            gateIndex = newGates.length - 1;
+          }
+          let g = newGates[gateIndex];
+          if (g.mode === 'Bảo trì') return;
+          
+          g.type = v.type.toUpperCase();
+          g.typeColor = v.type === 'VIP' ? 'bg-slate-800 text-white' : 'bg-blue-100 text-blue-700';
+          g.plate = v.plate;
+          
+          g.mode = v.status === 'Chờ thanh toán' ? 'Thủ công' : 'Tự động';
+          g.barrier = v.status === 'Chờ thanh toán' ? 'ĐANG CHỜ' : (v.status === 'Cảnh báo' || v.status === 'Lỗi thẻ' ? 'ĐÓNG' : 'MỞ');
+          g.barrierColor = g.barrier === 'MỞ' ? 'text-emerald-500' : (g.barrier === 'ĐÓNG' ? 'text-red-500' : 'text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded');
+          g.actions = g.mode === 'Thủ công' ? ["approve", "reject"] : ["lock", "wrench"];
+          g.vehicleId = v.id;
+        });
+      }
+      return newGates;
+    });
+  }, [activeVehicles]);
+
   return (
     <GlobalContext.Provider value={{        searchValue, setSearchValue, activeLocation, setActiveLocation, totalGates, setTotalGates,
         isEmergency, setIsEmergency,
@@ -214,7 +348,8 @@ export const GlobalProvider = ({ children }) => {
       shiftStats, updateShiftStats, setShiftStats,
       dailyVolume, setDailyVolume,
       activeVehicles, currentVehicle, setCurrentVehicle, removeActiveVehicle, addActiveVehicle,
-      fetchAllDataFromBackend
+      gates, setGates, gateLogs, setGateLogs,
+      fetchAllDataFromBackend, processEntryVehicle
     }}>
       {children}
     </GlobalContext.Provider>

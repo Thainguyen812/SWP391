@@ -3,6 +3,7 @@ package com.parking.controller;
 import com.parking.model.ParkingSession;
 import com.parking.repository.ParkingSessionRepository;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
 import java.util.*;
 
 @RestController

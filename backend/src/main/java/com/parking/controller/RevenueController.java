@@ -54,19 +54,31 @@ public class RevenueController {
     @GetMapping("/transactions")
     public Map<String, Object> getTransactions(@RequestParam(defaultValue = "1") int page) {
         List<Map<String, Object>> items = new ArrayList<>();
-        for (Transaction t : transactionRepo.findAll()) {
+        List<Transaction> transactions = transactionRepo.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "processedAt"));
+        for (Transaction t : transactions) {
             Map<String, Object> item = new HashMap<>();
             item.put("id", t.getId().toString().substring(0,8));
             item.put("time", t.getProcessedAt() != null ? t.getProcessedAt().toString() : "Hôm nay");
             
             // Fetch associated ParkingSession for plate and type
-            Optional<ParkingSession> session = sessionRepo.findById(t.getSessionId());
-            if (session.isPresent()) {
-                item.put("plate", session.get().getLicensePlate());
-                item.put("type", session.get().getIsVip() != null && session.get().getIsVip() ? "VIP" : "Vãng lai");
+            if (t.getSessionId() != null) {
+                Optional<ParkingSession> session = sessionRepo.findById(t.getSessionId());
+                if (session.isPresent()) {
+                    item.put("plate", session.get().getLicensePlate());
+                    item.put("type", session.get().getIsVip() != null && session.get().getIsVip() ? "VIP" : "Vãng lai");
+                    if (session.get().getCheckInTime() != null) {
+                        item.put("inTime", session.get().getCheckInTime().toString());
+                    }
+                    if (session.get().getCheckOutTime() != null) {
+                        item.put("outTime", session.get().getCheckOutTime().toString());
+                    }
+                } else {
+                    item.put("plate", "---");
+                    item.put("type", "Phương tiện");
+                }
             } else {
                 item.put("plate", "---");
-                item.put("type", "Phương tiện");
+                item.put("type", "Khách vãng lai");
             }
             
             item.put("amount", t.getTotalAmount() != null ? t.getTotalAmount().toString() + "đ" : "0đ");
@@ -78,6 +90,47 @@ public class RevenueController {
         response.put("total", items.size());
         response.put("items", items);
         return response;
+    }
+
+    @PostMapping("/transactions/mock")
+    public Map<String, Object> mockTransaction(@RequestBody Map<String, Object> payload) {
+        Transaction t = new Transaction();
+        t.setPaymentMethod(Transaction.PaymentMethod.CASH);
+        t.setPaymentStatus(Transaction.PaymentStatus.SUCCESS);
+        t.setProcessedAt(java.time.Instant.now());
+        t.setIsMobileCheckout(false);
+        try {
+            if (payload.get("amount") != null) {
+                t.setTotalAmount(new java.math.BigDecimal(payload.get("amount").toString().replace(",", "").replace(".", "")));
+            }
+            if (payload.get("plate") != null) {
+                String plate = payload.get("plate").toString();
+                // Find session and check it out
+                Optional<ParkingSession> activeSession = sessionRepo.findByLicensePlateAndSessionStatus(plate, ParkingSession.SessionStatus.ACTIVE);
+                if (activeSession.isPresent()) {
+                    ParkingSession s = activeSession.get();
+                    s.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
+                    s.setCheckOutTime(java.time.Instant.now());
+                    sessionRepo.save(s);
+                    t.setSessionId(s.getId());
+                } else {
+                    // Create dummy session so transaction has a valid session_id
+                    ParkingSession dummy = new ParkingSession();
+                    dummy.setId(java.util.UUID.randomUUID());
+                    dummy.setLicensePlate(plate);
+                    dummy.setCheckInTime(java.time.Instant.now().minusSeconds(3600));
+                    dummy.setCheckOutTime(java.time.Instant.now());
+                    dummy.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
+                    sessionRepo.save(dummy);
+                    t.setSessionId(dummy.getId());
+                }
+            }
+            t.setId(java.util.UUID.randomUUID());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        transactionRepo.save(t);
+        return Map.of("success", true);
     }
 
     @GetMapping("/shift-stats")

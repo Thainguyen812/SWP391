@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,7 +25,7 @@ public class VehicleController {
             map.put("plate", v.getLicensePlate());
             map.put("name", v.getBrand() != null ? v.getBrand() : "Xe của tôi");
             map.put("type", v.getVehicleSize());
-            map.put("isLocked", false);
+            map.put("isLocked", v.isLocked());
             mapped.add(map);
         }
         return java.util.Map.of("success", true, "data", mapped);
@@ -57,8 +58,16 @@ public class VehicleController {
     @PostMapping("/lock")
     public ResponseEntity<?> lockVehicle(@RequestBody VehicleLockRequest request) {
         boolean isLocked = request.getIsLocked() != null && request.getIsLocked();
-        String msg = isLocked ? "Kich hoat radar khoa banh thanh cong cho xe " + request.getPlate() + "!" 
-                              : "Da mo khoa an ninh cho xe " + request.getPlate() + ". Xe co the xuat bai!";
+        
+        Optional<Vehicle> optVehicle = repo.findByLicensePlate(request.getPlate());
+        if (optVehicle.isPresent()) {
+            Vehicle v = optVehicle.get();
+            v.setLocked(isLocked);
+            repo.save(v);
+        }
+
+        String msg = isLocked ? "Kích hoạt radar khóa bánh thành công cho xe " + request.getPlate() + "!" 
+                              : "Đã mở khóa an ninh cho xe " + request.getPlate() + ". Xe có thể xuất bãi!";
         return ResponseEntity.ok(java.util.Map.of("success", true, "message", msg));
     }
 

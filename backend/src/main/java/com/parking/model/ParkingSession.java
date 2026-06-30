@@ -57,6 +57,9 @@ public class ParkingSession {
     @Column(name = "override_reason")
     private String overrideReason;
 
+    @Column(name = "qr_fallback_used", nullable = false)
+    private Boolean qrFallbackUsed = false;
+
     @Column(name = "mobile_checkout_staff_id")
     private UUID mobileCheckoutStaffId;
 
@@ -69,7 +72,6 @@ public class ParkingSession {
     @Column(name = "mobile_checkout_photo")
     private String mobileCheckoutPhoto;
 
-    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "lost_card_proof_photos")
     private String lostCardProofPhotos;
 
@@ -117,6 +119,8 @@ public class ParkingSession {
     public void setIsSuspicious(Boolean isSuspicious) { this.isSuspicious = isSuspicious; }
     public String getSuspiciousReason() { return suspiciousReason; }
     public void setSuspiciousReason(String suspiciousReason) { this.suspiciousReason = suspiciousReason; }
+    public Boolean getQrFallbackUsed() { return qrFallbackUsed; }
+    public void setQrFallbackUsed(Boolean qrFallbackUsed) { this.qrFallbackUsed = qrFallbackUsed; }
     public UUID getOverrideByStaff() { return overrideByStaff; }
     public void setOverrideByStaff(UUID overrideByStaff) { this.overrideByStaff = overrideByStaff; }
     public String getOverrideReason() { return overrideReason; }
