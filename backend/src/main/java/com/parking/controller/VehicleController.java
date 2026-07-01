@@ -11,20 +11,33 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.parking.dto.VehicleRegistrationRequest;
 import com.parking.model.User;
 import com.parking.repository.UserRepository;
+
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import java.security.Principal;
+import java.time.Instant;
+import jakarta.validation.Valid;
+
 
 @RestController
 @RequestMapping("/api/vehicles")
 public class VehicleController {
-    private final VehicleRepository repo;
-    private final UserRepository userRepo;
 
-    public VehicleController(VehicleRepository repo, UserRepository userRepo){ 
-        this.repo = repo; 
-        this.userRepo = userRepo;
-    }
+
+private final VehicleRepository repo;
+private final UserRepository userRepo;
+
+public VehicleController(
+        VehicleRepository repo,
+        UserRepository userRepo) {
+
+this.repo = repo;
+this.userRepo = userRepo;
+}
 
     @GetMapping
     public java.util.Map<String, Object> all(Principal principal){ 
@@ -60,105 +73,129 @@ public class VehicleController {
         return v.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+
+
+    //ĐĂNG KÝ XE MỚI 
     @PostMapping
-    public Vehicle create(@RequestBody Vehicle vehicle) {
-        if (vehicle.getCreatedAt() == null) {
-            vehicle.setCreatedAt(java.time.Instant.now());
-        }
-        if (vehicle.getUpdatedAt() == null) {
-            vehicle.setUpdatedAt(java.time.Instant.now());
-        }
-        return repo.save(vehicle);
-    }
+    public Vehicle create(@Valid @RequestBody VehicleRegistrationRequest request) {
+    
+        // KTRA XEM BIỂN SỐ XE NÀY ĐÃ DC ĐĂNG KÝ CHƯA 
+        Authentication authentication =
+            SecurityContextHolder.getContext().getAuthentication();
 
-    @PutMapping("/{id}")
-    public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody Vehicle vehicle, Principal principal) { // SỬA THÀNH UUID
-        if (principal == null) {
-            return ResponseEntity.status(401).body(java.util.Map.of("success", false, "message", "Unauthorized"));
-        }
+    String username = authentication.getName();
 
-        String username = principal.getName();
-        Optional<User> uOpt = userRepo.findByUsername(username);
-        if (uOpt.isEmpty()) {
-            return ResponseEntity.status(401).body(java.util.Map.of("success", false, "message", "User not found"));
-        }
-        User currentUser = uOpt.get();
+    User owner = userRepo
+            .findByUsername(username)
+            .orElseThrow(() ->
+                    new RuntimeException("User không tồn tại"));
 
-        Optional<Vehicle> existingOpt = repo.findById(id);
-        if (existingOpt.isEmpty() && vehicle.getLicensePlate() != null) {
-            existingOpt = repo.findByLicensePlate(vehicle.getLicensePlate());
-        }
+    if (repo.findByLicensePlate(request.getLicensePlate()).isPresent()) {
+        throw new RuntimeException("Biển số xe đã được đăng ký.");
+}                
+    Vehicle vehicle = new Vehicle();
 
-        if (existingOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
+    vehicle.setId(UUID.randomUUID());
 
-        Vehicle existing = existingOpt.get();
+    vehicle.setOwnerId(owner.getId());
 
-        // Chốt chặn kiểm tra quyền sở hữu xe: chỉ cho phép chủ sở hữu chỉnh sửa (ADMIN/MANAGER có quyền quản lý toàn cục)
-        if (currentUser.getRole() != User.Role.ADMIN && currentUser.getRole() != User.Role.MANAGER 
-                && !existing.getOwnerId().equals(currentUser.getId())) {
-            return ResponseEntity.status(403).body(java.util.Map.of(
-                "success", false, 
-                "message", "Bạn không có quyền chỉnh sửa phương tiện này!"
-            ));
-        }
+    vehicle.setLicensePlate(request.getLicensePlate());
 
-        vehicle.setId(existing.getId());
+    vehicle.setVehicleSize(request.getVehicleSize());
 
-        // Bảo toàn các trường không được gửi hoặc null bằng cách lấy từ existing
-        if (vehicle.getOwnerId() == null) {
-            vehicle.setOwnerId(existing.getOwnerId());
-        }
-        if (vehicle.getLicensePlate() == null) {
-            vehicle.setLicensePlate(existing.getLicensePlate());
-        }
-        if (vehicle.getVehicleSize() == null) {
-            vehicle.setVehicleSize(existing.getVehicleSize());
-        }
-        if (vehicle.getColor() == null) {
-            vehicle.setColor(existing.getColor());
-        }
-        if (vehicle.getColorRgb() == null) {
-            vehicle.setColorRgb(existing.getColorRgb());
-        }
-        if (vehicle.getBodyShape() == null) {
-            vehicle.setBodyShape(existing.getBodyShape());
-        }
-        if (vehicle.getBrand() == null) {
-            vehicle.setBrand(existing.getBrand());
-        }
-        if (vehicle.getRegistrationDocUrl() == null) {
-            vehicle.setRegistrationDocUrl(existing.getRegistrationDocUrl());
-        }
-        if (vehicle.getRegistrationPhotoUrl() == null) {
-            vehicle.setRegistrationPhotoUrl(existing.getRegistrationPhotoUrl());
-        }
-        if (vehicle.getFuelType() == null) {
-            vehicle.setFuelType(existing.getFuelType());
-        }
+    vehicle.setColor(request.getColor());
+
+    vehicle.setColorRgb(request.getColorRgb());
+
+    vehicle.setBodyShape(request.getBodyShape());
+
+    vehicle.setBrand(request.getBrand());
+
+    vehicle.setFuelType(request.getFuelType());
+
+    vehicle.setViolationCount(0);
+
+    vehicle.setActive(true);
+
+    vehicle.setCreatedAt(Instant.now());
+
+    vehicle.setUpdatedAt(Instant.now());
+
+    return repo.save(vehicle);
+}
+
+//SỬA THÔNG TIN XE 
+    @PutMapping("/{id}") // chỉ sửa dc những thông tin của vehicle bên post
+    public ResponseEntity<Vehicle> update(
+        @PathVariable UUID id,
+        @Valid @RequestBody VehicleRegistrationRequest request) {
+
+    return repo.findById(id).map(existing -> {
+    // ktra xem có đúng tk đăng nhập đang sửa xe của họ ko , ko thì ko cho
+        Authentication authentication =
+        SecurityContextHolder.getContext().getAuthentication();
+
+    String username = authentication.getName();
+
+    User currentUser = userRepo
+        .findByUsername(username)
+        .orElseThrow(() ->
+                new RuntimeException("User không tồn tại."));
+
+        if (!existing.getOwnerId().equals(currentUser.getId())) {
+    throw new RuntimeException("Bạn không có quyền sửa xe này.");
+}        
+    
+        // Kiểm tra biển số xe đã tồn tại chưa
+    Optional<Vehicle> duplicate =
+        repo.findByLicensePlate(request.getLicensePlate());
+
+    if (duplicate.isPresent()
+        && !duplicate.get().getId().equals(existing.getId())) {
+
+    throw new RuntimeException("Biển số xe đã tồn tại.");
+    }    
+        existing.setLicensePlate(request.getLicensePlate());
+        existing.setVehicleSize(request.getVehicleSize());
+        existing.setColor(request.getColor());
+        existing.setColorRgb(request.getColorRgb());
+        existing.setBodyShape(request.getBodyShape());
+        existing.setBrand(request.getBrand());
+        existing.setFuelType(request.getFuelType());
+
+        existing.setUpdatedAt(Instant.now());
+
+        return ResponseEntity.ok(repo.save(existing));
+
+    }).orElseGet(() -> ResponseEntity.notFound().build());
+}
+//LẤY THÔNG TIN TÀI KHOẢN ĐANG ĐĂNG NHẬP
+@DeleteMapping("/{id}")
+public ResponseEntity<?> delete(@PathVariable UUID id){
+    return repo.findById(id).map(vehicle -> {
+
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        String username = authentication.getName();
+
+User currentUser = userRepo
+        .findByUsername(username)
+        .orElseThrow(() ->
+                new RuntimeException("User không tồn tại."));
         
-        // Giữ nguyên các trường hệ thống/bảo mật
-        vehicle.setViolationCount(existing.getViolationCount());
-        vehicle.setActive(existing.isActive());
-        vehicle.setLocked(existing.isLocked());
-
-        if (vehicle.getCreatedAt() == null) {
-            vehicle.setCreatedAt(existing.getCreatedAt() != null ? existing.getCreatedAt() : java.time.Instant.now());
+        // KIỂM TRA NGƯỜI ĐĂNG NHẬP CÓ PHẢI CHỦ XE KHÔNG
+        if (!vehicle.getOwnerId().equals(currentUser.getId())) {
+            throw new RuntimeException("Bạn không có quyền xóa xe này.");
         }
-        vehicle.setUpdatedAt(java.time.Instant.now());
 
-        return ResponseEntity.ok(repo.save(vehicle));
-    }
+        repo.delete(vehicle);
 
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('MANAGER')")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) { // SỬA THÀNH UUID
-        if (!repo.existsById(id))
-            return ResponseEntity.notFound().build();
-        repo.deleteById(id);
+
         return ResponseEntity.noContent().build();
-    }
+
+    }).orElseGet(() -> ResponseEntity.notFound().build());
+}
 
     @PostMapping("/lock")
     public ResponseEntity<?> lockVehicle(@RequestBody VehicleLockRequest request) {

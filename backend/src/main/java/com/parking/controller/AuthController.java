@@ -15,11 +15,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
 
+import com.parking.dto.RefreshTokenRequest;
 import com.parking.model.User;
 import com.parking.repository.UserRepository;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.Authentication;
 
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -88,8 +89,9 @@ public class AuthController {
 
     // 3. API REFRESH TOKEN
     @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(@RequestBody Map<String, String> requestBody) {
-        String clientRefreshToken = requestBody.get("refreshToken");
+   public ResponseEntity<?> refresh(@RequestBody RefreshTokenRequest request) {
+
+    String clientRefreshToken = request.getRefreshToken();
 
         if (clientRefreshToken == null || clientRefreshToken.isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
