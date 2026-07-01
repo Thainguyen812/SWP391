@@ -2,13 +2,16 @@ package com.parking.controller;
 
 import com.parking.model.ParkingSession;
 import com.parking.model.Zone;
+import com.parking.model.Transaction;
 import com.parking.repository.ParkingSessionRepository;
 import com.parking.repository.UserRepository;
 import com.parking.repository.ZoneRepository;
+import com.parking.repository.TransactionRepository;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.math.BigDecimal;
 import java.util.*;
 
 @RestController
@@ -18,11 +21,13 @@ public class DashboardController {
     private final ParkingSessionRepository sessionRepo;
     private final ZoneRepository zoneRepo;
     private final UserRepository userRepo;
+    private final TransactionRepository transactionRepo;
 
-    public DashboardController(ParkingSessionRepository sessionRepo, ZoneRepository zoneRepo, UserRepository userRepo) {
+    public DashboardController(ParkingSessionRepository sessionRepo, ZoneRepository zoneRepo, UserRepository userRepo, TransactionRepository transactionRepo) {
         this.sessionRepo = sessionRepo;
         this.zoneRepo = zoneRepo;
         this.userRepo = userRepo;
+        this.transactionRepo = transactionRepo;
     }
 
     @GetMapping("/summary")
@@ -44,8 +49,11 @@ public class DashboardController {
         String occupancyTrend = (occupancyRateVal >= 80 && occupancyRateVal <= 90) ? "Tối ưu: 80-90%" : 
                                (occupancyRateVal > 90 ? "Cảnh báo quá tải" : "Đang trống nhiều");
 
+        BigDecimal rawRevenue = transactionRepo.sumTotalRevenueByStatus(Transaction.PaymentStatus.SUCCESS);
+        double millionVnd = rawRevenue == null ? 0.0 : rawRevenue.doubleValue() / 1_000_000.0;
+
         Map<String, Object> totalRevenue = new HashMap<>();
-        totalRevenue.put("value", "45.2"); // Tạm thời hardcode do bảng Session chưa lưu amount
+        totalRevenue.put("value", String.format(Locale.US, "%.1f", millionVnd));
         totalRevenue.put("unit", "Tr");
         totalRevenue.put("trend", "+12% so với hôm qua");
         totalRevenue.put("isPositive", true);
