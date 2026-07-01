@@ -3,6 +3,7 @@ package com.parking.controller;
 import com.parking.model.Vehicle;
 import com.parking.repository.VehicleRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -54,36 +55,25 @@ public class VehicleController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Vehicle> get(@PathVariable UUID id){ // SỬA THÀNH UUID
+    public ResponseEntity<Vehicle> get(@PathVariable UUID id) { // SỬA THÀNH UUID
         Optional<Vehicle> v = repo.findById(id);
         return v.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public Vehicle create(@RequestBody Vehicle vehicle){ 
+    public Vehicle create(@RequestBody Vehicle vehicle) {
         if (vehicle.getCreatedAt() == null) {
             vehicle.setCreatedAt(java.time.Instant.now());
         }
         if (vehicle.getUpdatedAt() == null) {
             vehicle.setUpdatedAt(java.time.Instant.now());
         }
-        return repo.save(vehicle); 
+        return repo.save(vehicle);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Vehicle> update(@PathVariable String id, @RequestBody Vehicle vehicle){
-        UUID uuid = null;
-        try {
-            uuid = UUID.fromString(id);
-        } catch (IllegalArgumentException e) {
-            // ID is not a valid UUID (e.g. mock ID "veh-1")
-        }
-
-        Optional<Vehicle> existingOpt = Optional.empty();
-        if (uuid != null) {
-            existingOpt = repo.findById(uuid);
-        }
-        
+    public ResponseEntity<Vehicle> update(@PathVariable UUID id, @RequestBody Vehicle vehicle) { // SỬA THÀNH UUID
+        Optional<Vehicle> existingOpt = repo.findById(id);
         if (existingOpt.isEmpty() && vehicle.getLicensePlate() != null) {
             existingOpt = repo.findByLicensePlate(vehicle.getLicensePlate());
         }
@@ -99,8 +89,10 @@ public class VehicleController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id){ // SỬA THÀNH UUID
-        if (!repo.existsById(id)) return ResponseEntity.notFound().build();
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<Void> delete(@PathVariable UUID id) { // SỬA THÀNH UUID
+        if (!repo.existsById(id))
+            return ResponseEntity.notFound().build();
         repo.deleteById(id);
         return ResponseEntity.noContent().build();
     }
@@ -108,7 +100,7 @@ public class VehicleController {
     @PostMapping("/lock")
     public ResponseEntity<?> lockVehicle(@RequestBody VehicleLockRequest request) {
         boolean isLocked = request.getIsLocked() != null && request.getIsLocked();
-        
+
         Optional<Vehicle> optVehicle = repo.findByLicensePlate(request.getPlate());
         if (optVehicle.isPresent()) {
             Vehicle v = optVehicle.get();
@@ -116,18 +108,30 @@ public class VehicleController {
             repo.save(v);
         }
 
-        String msg = isLocked ? "Kích hoạt radar khóa bánh thành công cho xe " + request.getPlate() + "!" 
-                              : "Đã mở khóa an ninh cho xe " + request.getPlate() + ". Xe có thể xuất bãi!";
+        String msg = isLocked ? "Kích hoạt radar khóa bánh thành công cho xe " + request.getPlate() + "!"
+                : "Đã mở khóa an ninh cho xe " + request.getPlate() + ". Xe có thể xuất bãi!";
         return ResponseEntity.ok(java.util.Map.of("success", true, "message", msg));
     }
 
     public static class VehicleLockRequest {
         private String plate;
         private Boolean isLocked;
-        public String getPlate() { return plate; }
-        public void setPlate(String plate) { this.plate = plate; }
-        public Boolean getIsLocked() { return isLocked; }
-        public void setIsLocked(Boolean isLocked) { this.isLocked = isLocked; }
+
+        public String getPlate() {
+            return plate;
+        }
+
+        public void setPlate(String plate) {
+            this.plate = plate;
+        }
+
+        public Boolean getIsLocked() {
+            return isLocked;
+        }
+
+        public void setIsLocked(Boolean isLocked) {
+            this.isLocked = isLocked;
+        }
     }
 }
 // Trigger VS Code Build

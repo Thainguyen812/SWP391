@@ -362,6 +362,22 @@ public class ParkingServiceImpl implements ParkingService {
     public CheckInResponse visitorCheckIn(VisitorCheckInRequest request) {
         String plate = request.getPlate();
         ParkingSession sessionToUpdate = null;
+        // Chốt chặn kiểm tra nếu xe là VIP đang hoạt động thì không được cấp thẻ tạm vãng lai
+        Optional<Vehicle> vehicleOpt = vehicleRepository.findByLicensePlate(plate);
+        if (vehicleOpt.isPresent()) {
+            Vehicle vehicle = vehicleOpt.get();
+            Optional<VipSubscription> vipOpt = vipSubscriptionRepository.findByVehicleIdAndStatus(
+                    vehicle.getId(), VipSubscription.Status.ACTIVE);
+            if (vipOpt.isPresent()) {
+                VipSubscription vip = vipOpt.get();
+                java.time.LocalDate today = java.time.LocalDate.now();
+                if (!today.isBefore(vip.getStartDate()) && !today.isAfter(vip.getEndDate())) {
+                    throw new com.parking.exception.ApiExceptions.BadRequestException(
+                        "Phương tiện này đã đăng ký gói VIP đang hoạt động! Vui lòng đi vào làn tự động (AI/QR) hoặc gia hạn."
+                    );
+                }
+            }
+        }
 
         Optional<ParkingSession> existing = parkingSessionRepository.findByLicensePlateAndSessionStatus(
                 plate,

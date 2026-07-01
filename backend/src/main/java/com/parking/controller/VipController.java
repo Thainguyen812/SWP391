@@ -41,12 +41,13 @@ public class VipController {
     }
 
     @PutMapping("/{id}/reject")
+    @PreAuthorize("hasRole('MANAGER')") // Chỉ quản lý được từ chối
     public VipSubscription reject(@PathVariable UUID id) {
         return vipService.reject(id);
     }
 
     @PostMapping("/register")
-    @PreAuthorize("hasRole('DRIVER')") // Chỉ tài xế VIP được đăng ký
+    @PreAuthorize("hasAnyRole('DRIVER', 'STAFF', 'MANAGER')")
     public VipSubscription register(@RequestBody VipRegistrationRequest request) {
         return vipService.register(request);
     }
