@@ -84,7 +84,7 @@ export const AuthPage = () => {
   const [agreeTerms, setAgreeTerms] = useState(false);
 
   // Sign In values
-  const [signPhone, setSignPhone] = useState('');
+  const [signEmail, setSignEmail] = useState('');
   const [signPass, setSignPass] = useState('');
 
   // Password visibility
@@ -114,6 +114,12 @@ export const AuthPage = () => {
   const [forgotOtpTimer, setForgotOtpTimer] = useState(0);
   const [forgotOtp, setForgotOtp] = useState('');
 
+  // Login OTP verification states
+  const [loginOtpRequired, setLoginOtpRequired] = useState(false);
+  const [loginOtp, setLoginOtp] = useState('');
+  const [maskedEmail, setMaskedEmail] = useState('');
+  const [loginOtpTimer, setLoginOtpTimer] = useState(0);
+
   // Handle countdown trigger for simulated SMS OTP
   useEffect(() => {
     let interval;
@@ -134,6 +140,16 @@ export const AuthPage = () => {
     }
     return () => clearInterval(interval);
   }, [forgotOtpTimer]);
+
+  useEffect(() => {
+    let interval;
+    if (loginOtpTimer > 0) {
+      interval = setInterval(() => {
+        setLoginOtpTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [loginOtpTimer]);
 
   // Utility toast dispatcher
   const showNotification = (text: string, type = "info") => {
@@ -199,12 +215,6 @@ export const AuthPage = () => {
       newErrors.phone = 'Số điện thoại không đúng định dạng (Ví dụ: 0901234567)';
     }
 
-    if (!otpSent) {
-      newErrors.otp = 'Chưa nhận OTP';
-    } else if (!otp) {
-      newErrors.otp = 'Vui lòng nhập mã xác thực OTP';
-    }
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email) {
       newErrors.email = 'Vui lòng nhập địa chỉ email';
@@ -255,7 +265,7 @@ export const AuthPage = () => {
         name.trim(), // fullName
         email.trim(),
         phoneClean, // phone
-        otp.trim() // otp
+        "" // otp (removed/skipped)
       );
 
       setIsSubmitting(false);
@@ -344,34 +354,85 @@ export const AuthPage = () => {
       showNotification(result.message || 'Khôi phục mật khẩu thất bại.', 'error');
     }
   };
+  const maskEmail = (emailStr: string) => {
+    if (!emailStr) return '';
+    const parts = emailStr.split('@');
+    if (parts.length !== 2) return emailStr;
+    const namePart = parts[0];
+    const domainPart = parts[1];
+    if (namePart.length <= 2) {
+      return namePart + '***@' + domainPart;
+    }
+    return namePart.substring(0, 2) + '***' + namePart.substring(namePart.length - 1) + '@' + domainPart;
+  };
+
+  const handleCancelLoginOtp = () => {
+    setLoginOtpRequired(false);
+    setLoginOtp('');
+    setMaskedEmail('');
+    setLoginOtpTimer(0);
+  };
+
+  const handleResendLoginOtp = async (e) => {
+    e.preventDefault();
+    if (loginOtpTimer > 0) return;
+    
+    setIsSubmitting(true);
+    const result = await authService.login(signEmail.trim(), signPass, null);
+    setIsSubmitting(false);
+    
+    if (result.success && result.requiresOtp) {
+      setLoginOtpTimer(60);
+      showNotification(result.message || 'Mã OTP mới đã được gửi về email của bạn!', 'success');
+    } else {
+      showNotification(result.message || 'Không thể gửi lại mã OTP. Vui lòng thử lại!', 'error');
+    }
+  };
+
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    if (!signPhone) {
-      showNotification('Vui lòng điền số điện thoại', 'error');
+    if (!signEmail) {
+      showNotification('Vui lòng điền địa chỉ email', 'error');
       return;
     }
     if (!signPass) {
       showNotification('Vui lòng điền mật khẩu', 'error');
       return;
     }
+    if (loginOtpRequired && !loginOtp) {
+      showNotification('Vui lòng điền mã OTP để xác nhận đăng nhập', 'error');
+      return;
+    }
 
     setIsSubmitting(true);
-    const result = await authService.login(signPhone.trim(), signPass);
+    const result = await authService.login(
+      signEmail.trim(), 
+      signPass, 
+      loginOtpRequired ? loginOtp.trim() : null
+    );
     setIsSubmitting(false);
 
     if (result.success) {
-      showNotification('Đăng nhập thành công!', 'success');
-      
-      const user = result.user;
-      setTimeout(() => {
-        if (user && user.role === 'DRIVER') {
-          navigate('/driver');
-        } else if (user && user.role === 'STAFF') {
-          navigate('/staff-dashboard');
-        } else {
-          navigate('/admin');
-        }
-      }, 500);
+      if (result.requiresOtp) {
+        // Backend yêu cầu xác thực OTP gửi qua email
+        setLoginOtpRequired(true);
+        setMaskedEmail(maskEmail(result.email));
+        setLoginOtpTimer(60);
+        showNotification(result.message || 'Mã OTP đã được gửi về email của bạn!', 'success');
+      } else {
+        showNotification('Đăng nhập thành công!', 'success');
+        
+        const user = result.user;
+        setTimeout(() => {
+          if (user && user.role === 'DRIVER') {
+            navigate('/driver');
+          } else if (user && user.role === 'STAFF') {
+            navigate('/staff-dashboard');
+          } else {
+            navigate('/admin');
+          }
+        }, 500);
+      }
     } else {
       showNotification(result.message || 'Đăng nhập thất bại', 'error');
     }
@@ -390,6 +451,11 @@ export const AuthPage = () => {
     setOtpTimer(0);
     setErrors({});
     setIsRegistered(false);
+    setLoginOtpRequired(false);
+    setLoginOtp('');
+    setMaskedEmail('');
+    setSignEmail('');
+    setSignPass('');
   };
 
   
@@ -709,70 +775,18 @@ export const AuthPage = () => {
                   disabled={isSubmitting}
                 />
 
-                {/* 2. Email field + Get OTP side-by-side Button */}
-                <div className="w-full">
-                  <label htmlFor="reg-email" className="block text-[11px] font-bold tracking-wider text-slate-700 uppercase mb-1.5">
-                    Địa chỉ email
-                  </label>
-                  <div className="flex gap-2 items-start">
-                    <div className="relative rounded-md shadow-xs flex-1">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Mail className="w-4 h-4" />
-                      </div>
-                      <input
-                        id="reg-email"
-                        type="email"
-                        placeholder="name@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={isSubmitting || otpSent}
-                        className={`
-                          block w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 
-                          text-[14px] text-slate-800 placeholder-slate-400/80 outline-hidden transition-all duration-200
-                          focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50
-                          disabled:bg-slate-50 disabled:text-slate-400
-                          ${errors.email ? 'border-red-300 focus:border-red-500' : ''}
-                        `}
-                      />
-                    </div>
-                    
-                    <button
-                      type="button"
-                      onClick={handleRequestOtp}
-                      disabled={isSubmitting || otpTimer > 0}
-                      className={`
-                        h-[43px] px-4 rounded-lg font-medium text-[13px] tracking-wide shrink-0 transition-all shadow-sm flex items-center justify-center cursor-pointer
-                        ${otpTimer > 0 
-                          ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                          : 'bg-[#2563eb] text-white hover:bg-[#1d4ed8] active:scale-95'
-                        }
-                      `}
-                    >
-                      {otpTimer > 0 ? `Gửi lại (${otpTimer}s)` : 'Nhận mã OTP'}
-                    </button>
-                  </div>
-                  {errors.email && (
-                    <span className="block text-xs text-red-500 mt-1">{errors.email}</span>
-                  )}
-                </div>
-
-                {/* 3. Conditionally shown (or interactive OTP entry form based on sent state) */}
-                {otpSent && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    className="overflow-hidden"
-                  >
-                    <OtpInput 
-                      value={otp} 
-                      onChange={setOtp} 
-                      disabled={isSubmitting} 
-                    />
-                    {errors.otp && (
-                      <span className="block text-xs text-red-500 mt-1 px-1">{errors.otp}</span>
-                    )}
-                  </motion.div>
-                )}
+                {/* 2. Email field */}
+                <InputField
+                  id="reg-email"
+                  label="Địa chỉ email"
+                  placeholder="name@example.com"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  icon={<Mail className="w-4 h-4" />}
+                  error={errors.email}
+                  disabled={isSubmitting}
+                />
 
                 {/* 4. Phone number input (normal field) */}
                 <InputField
@@ -861,7 +875,7 @@ export const AuthPage = () => {
                     <span 
                       onClick={() => {
                         setIsSignUp(false);
-                        setErrors({});
+                        handleReset();
                       }}
                       className="text-blue-600 font-semibold hover:underline cursor-pointer ml-1"
                     >
@@ -891,44 +905,82 @@ export const AuthPage = () => {
                   </p>
                 </div>
 
-                <InputField
-                  id="sign-phone"
-                  label="Số điện thoại"
-                  placeholder="Nhập số điện thoại"
-                  type="tel"
-                  value={signPhone}
-                  onChange={(e) => setSignPhone(e.target.value)}
-                  icon={<Smartphone className="w-4 h-4" />}
-                  disabled={isSubmitting}
-                />
+                {loginOtpRequired ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-slate-600 bg-blue-50 border border-blue-200 p-3 rounded-lg leading-relaxed">
+                      Mã OTP đã được gửi tới email của bạn (<strong>{maskedEmail}</strong>). Vui lòng nhập mã OTP để đăng nhập.
+                    </p>
+                    <OtpInput 
+                      value={loginOtp} 
+                      onChange={setLoginOtp} 
+                      disabled={isSubmitting} 
+                    />
+                    
+                    <div className="flex items-center justify-between text-xs pt-1">
+                      <button
+                        type="button"
+                        onClick={handleCancelLoginOtp}
+                        className="text-slate-500 hover:text-slate-800 hover:underline font-semibold cursor-pointer"
+                      >
+                        Quay lại nhập email & mật khẩu
+                      </button>
+                      
+                      <button
+                        type="button"
+                        disabled={loginOtpTimer > 0 || isSubmitting}
+                        onClick={handleResendLoginOtp}
+                        className={`font-semibold cursor-pointer select-none transition-colors ${
+                          loginOtpTimer > 0 
+                            ? 'text-slate-400 cursor-not-allowed' 
+                            : 'text-blue-600 hover:text-blue-800 hover:underline'
+                        }`}
+                      >
+                        {loginOtpTimer > 0 ? `Gửi lại mã (${loginOtpTimer}s)` : 'Gửi lại mã OTP'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <InputField
+                      id="sign-email"
+                      label="Địa chỉ Email"
+                      placeholder="Nhập địa chỉ email của bạn"
+                      type="email"
+                      value={signEmail}
+                      onChange={(e) => setSignEmail(e.target.value)}
+                      icon={<Mail className="w-4 h-4" />}
+                      disabled={isSubmitting}
+                    />
 
-                <InputField
-                  id="sign-pass"
-                  label="Mật khẩu"
-                  placeholder="••••••••"
-                  type={showSignPass ? "text" : "password"}
-                  value={signPass}
-                  onChange={(e) => setSignPass(e.target.value)}
-                  icon={<Lock className="w-4 h-4" />}
-                  rightIcon={showSignPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  onRightIconClick={() => setShowSignPass(!showSignPass)}
-                  disabled={isSubmitting}
-                />
+                    <InputField
+                      id="sign-pass"
+                      label="Mật khẩu"
+                      placeholder="••••••••"
+                      type={showSignPass ? "text" : "password"}
+                      value={signPass}
+                      onChange={(e) => setSignPass(e.target.value)}
+                      icon={<Lock className="w-4 h-4" />}
+                      rightIcon={showSignPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      onRightIconClick={() => setShowSignPass(!showSignPass)}
+                      disabled={isSubmitting}
+                    />
 
-                <div className="flex items-center justify-between text-[13px]">
-                  <label className="flex items-center gap-2 text-slate-600 cursor-pointer">
-                    <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                    Ghi nhớ đăng nhập
-                  </label>
-                  <span 
-                    onClick={() => {
-                      setIsForgotPassword(true);
-                    }}
-                    className="text-blue-600 hover:underline cursor-pointer font-medium"
-                  >
-                    Quên mật khẩu?
-                  </span>
-                </div>
+                    <div className="flex items-center justify-between text-[13px]">
+                      <label className="flex items-center gap-2 text-slate-600 cursor-pointer">
+                        <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                        Ghi nhớ đăng nhập
+                      </label>
+                      <span 
+                        onClick={() => {
+                          setIsForgotPassword(true);
+                        }}
+                        className="text-blue-600 hover:underline cursor-pointer font-medium"
+                      >
+                        Quên mật khẩu?
+                      </span>
+                    </div>
+                  </>
+                )}
 
                 <button
                   type="submit"
@@ -937,6 +989,8 @@ export const AuthPage = () => {
                 >
                   {isSubmitting ? (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : loginOtpRequired ? (
+                    'Xác nhận đăng nhập'
                   ) : (
                     'Đăng nhập tài khoản'
                   )}
@@ -948,7 +1002,7 @@ export const AuthPage = () => {
                     <span 
                       onClick={() => {
                         setIsSignUp(true);
-                        setErrors({});
+                        handleReset();
                       }}
                       className="text-blue-600 font-semibold hover:underline cursor-pointer ml-1"
                     >

@@ -34,8 +34,112 @@ export function DriverVipReg() {
     billingTimeFilter, setBillingTimeFilter, billingTypeFilter, setBillingTypeFilter,
     searchSupportQuery, setSearchSupportQuery, expandedFaq, setExpandedFaq,
     ticketTopic, setTicketTopic, ticketMessage, setTicketMessage,
-    ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout
+    ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout,
+    handleStartVnpay
   } = ctx;
+
+  const VEHICLE_PRICING = {
+    'Ô tô gầm thấp 4-5 chỗ': {
+      day: 50000,
+      month: 1000000,
+      quarter: 2700000,
+      halfYear: 5000000,
+      year: 9000000
+    },
+    'Xe 7 chỗ': {
+      day: 70000,
+      month: 1400000,
+      quarter: 3800000,
+      halfYear: 7000000,
+      year: 12500000
+    },
+    'Xe 9 chỗ': {
+      day: 70000,
+      month: 1400000,
+      quarter: 3800000,
+      halfYear: 7000000,
+      year: 12500000
+    },
+    'Xe 16 chỗ': {
+      day: 100000,
+      month: 2000000,
+      quarter: 5400000,
+      halfYear: 10000000,
+      year: 18000000
+    }
+  };
+
+  // Dynamically compute pricing based on selected vehicle
+  const currentVeh = vehicles.find((v: any) => v.plate === selectedVehicleForVIP);
+  const currentVehType = currentVeh ? currentVeh.type : 'Ô tô gầm thấp 4-5 chỗ';
+  
+  // Resolve prices based on vehicle type
+  const pricingTier = (VEHICLE_PRICING as any)[currentVehType] || VEHICLE_PRICING['Ô tô gầm thấp 4-5 chỗ'];
+
+  const packages = [
+    { 
+      id: 'pkg-1', 
+      label: 'Vé Ngày', 
+      price: pricingTier.day, 
+      desc: 'Giá trị trong 24 giờ kể từ thời điểm đăng ký.', 
+      badge: 'RA VÀO NHIỀU LẦN', 
+      features: [] 
+    },
+    { 
+      id: 'pkg-2', 
+      label: 'Thẻ Tháng VIP', 
+      price: pricingTier.month, 
+      desc: 'Giải pháp tối ưu cho cư dân và nhân viên văn phòng.', 
+      badge: 'PHỔ BIẾN', 
+      features: [
+        'Chỗ đỗ xe cố định (Tầng B1)',
+        'Rửa xe miễn phí 1 lần/tháng',
+        'Hỗ trợ kỹ thuật 24/7 tức thì'
+      ] 
+    },
+    { 
+      id: 'pkg-3', 
+      label: 'Thẻ 3 Tháng VIP', 
+      price: pricingTier.quarter, 
+      desc: 'Tiết kiệm 10% so với gia hạn từng tháng đơn lẻ.', 
+      badge: 'TIẾT KIỆM', 
+      features: [
+        'Quyền lợi tương đương Thẻ Tháng VIP',
+        'Tiết kiệm chi phí hơn'
+      ] 
+    },
+    { 
+      id: 'pkg-4', 
+      label: 'Thẻ 6 Tháng VIP', 
+      price: pricingTier.halfYear, 
+      desc: 'Thời hạn nửa năm tiện lợi, giá ưu đãi lớn.', 
+      badge: 'ƯU ĐÃI', 
+      features: [
+        'Quyền lợi tương đương Thẻ Tháng VIP',
+        'Không lo trễ hạn thanh toán định kỳ'
+      ] 
+    },
+    { 
+      id: 'pkg-5', 
+      label: 'Thẻ 1 Năm VIP', 
+      price: pricingTier.year, 
+      desc: 'Giải pháp tối thượng, tiết kiệm đến 25%.', 
+      badge: 'VIP CLUB', 
+      features: [
+        'Quyền lợi tương đương Thẻ Tháng VIP',
+        'Miễn phí 12 lần rửa xe/năm',
+        'Tặng bộ quà tặng thành viên UrbanPark'
+      ] 
+    }
+  ];
+
+  // Sync selected price automatically when vehicle type or package label changes
+  useEffect(() => {
+    const activePkg = packages.find(p => p.label === selectedPackLabel);
+    if (activePkg) {
+      setSelectedPackPrice(activePkg.price);
+    }
+  }, [selectedVehicleForVIP, selectedPackLabel, vehicles]);
 
   return (
     <>
@@ -145,28 +249,7 @@ export function DriverVipReg() {
                         </strong>
 
                         <div className="space-y-3.5">
-                          {[
-                            { 
-                              id: 'pkg-1', 
-                              label: 'Vé Ngày', 
-                              price: 50000, 
-                              desc: 'Giá trị trong 24 giờ kể từ thời điểm đăng ký.', 
-                              badge: 'RA VÀO NHIỀU LẦN', 
-                              features: [] 
-                            },
-                            { 
-                              id: 'pkg-2', 
-                              label: 'Thẻ Tháng VIP', 
-                              price: 1000000, 
-                              desc: 'Giải pháp tối ưu cho cư dân và nhân viên văn phòng.', 
-                              badge: 'PHỔ BIẾN', 
-                              features: [
-                                'Chỗ đỗ xe cố định (Tầng B1)',
-                                'Rửa xe miễn phí 1 lần/tháng',
-                                'Hỗ trợ kỹ thuật 24/7 tức thì'
-                              ] 
-                            }
-                          ].map(pkg => {
+                          {packages.map(pkg => {
                             const isSelected = selectedPackLabel === pkg.label;
                             return (
                               <div
@@ -244,7 +327,25 @@ export function DriverVipReg() {
                           </div>
                           <div className="flex justify-between">
                             <span>Thời hạn:</span>
-                            <strong className="text-slate-800">01/11 - 30/11</strong>
+                            <strong className="text-slate-800">
+                              {(() => {
+                                const start = new Date();
+                                const end = new Date();
+                                if (selectedPackLabel.includes('3 Tháng')) {
+                                  end.setMonth(end.getMonth() + 3);
+                                } else if (selectedPackLabel.includes('6 Tháng')) {
+                                  end.setMonth(end.getMonth() + 6);
+                                } else if (selectedPackLabel.includes('1 Năm')) {
+                                  end.setFullYear(end.getFullYear() + 1);
+                                } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
+                                  end.setMonth(end.getMonth() + 1);
+                                } else {
+                                  end.setDate(end.getDate() + 1);
+                                }
+                                const fmt = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+                                return `${fmt(start)} - ${fmt(end)}`;
+                              })()}
+                            </strong>
                           </div>
                         </div>
 

@@ -55,7 +55,7 @@ public class SecurityController {
         return Map.of("success", true, "message", "Cập nhật chính sách thành công");
     }
 
-    @GetMapping("/stats")
+    @GetMapping({"/stats", "/rbac-stats"})
     public Map<String, Object> getSecurityStats() {
         Map<String, Object> result = new HashMap<>();
         result.put("adminCount", 2);

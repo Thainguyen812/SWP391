@@ -3,6 +3,7 @@ package com.parking.service;
 import com.parking.dto.LoginRequest;
 import com.parking.dto.LoginResponse;
 import com.parking.dto.RegisterRequest;
+import com.parking.dto.ResetPasswordRequest;
 import com.parking.model.RefreshToken;
 import com.parking.model.User;
 import com.parking.repository.RefreshTokenRepository;
@@ -22,13 +23,17 @@ public class AuthService implements org.springframework.security.core.userdetail
     private final RefreshTokenRepository refreshRepo;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
+    private final OtpService otpService;
+    private final EmailService emailService;
 
     public AuthService(UserRepository userRepo, RefreshTokenRepository refreshRepo, PasswordEncoder passwordEncoder,
-            JwtUtils jwtUtils) {
+            JwtUtils jwtUtils, OtpService otpService, EmailService emailService) {
         this.userRepo = userRepo;
         this.refreshRepo = refreshRepo;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtils = jwtUtils;
+        this.otpService = otpService;
+        this.emailService = emailService;
     }
 
     @Override
@@ -47,12 +52,35 @@ public class AuthService implements org.springframework.security.core.userdetail
                 .build();
     }
 
+    private LoginResponse generateLoginResponse(User u) {
+        String access = jwtUtils.generateJwtToken(u.getUsername(), java.util.List.of("ROLE_" + u.getRole().name()));
+
+        UUID refreshUuid = UUID.randomUUID();
+        RefreshToken rt = new RefreshToken();
+        rt.setId(UUID.randomUUID());
+        rt.setUserId(u.getId());
+        rt.setToken(refreshUuid);
+        rt.setExpiresAt(java.time.Instant.now().plusSeconds(7 * 24 * 3600));
+
+        refreshRepo.save(rt);
+
+        return new LoginResponse(access, refreshUuid.toString(), u);
+    }
+
     public LoginResponse login(LoginRequest req) {
         try {
-            // 1. Kiểm tra username tồn tại dưới DB
-            Optional<User> uOpt = userRepo.findByUsername(req.getUsername());
+            // 1. Kiểm tra Username hoặc Email tồn tại dưới DB
+            String loginIdentifier = req.getUsername().trim();
+            Optional<User> uOpt = Optional.empty();
+            if (loginIdentifier.contains("@")) {
+                uOpt = userRepo.findByEmail(loginIdentifier.toLowerCase());
+            }
             if (uOpt.isEmpty()) {
-                throw new RuntimeException("❌ LỖI: Không tìm thấy Username '" + req.getUsername() + "' dưới Database!");
+                uOpt = userRepo.findByUsername(loginIdentifier);
+            }
+
+            if (uOpt.isEmpty()) {
+                throw new RuntimeException("❌ LỖI: Không tìm thấy tài khoản với Username hoặc Email '" + loginIdentifier + "' dưới Database!");
             }
 
             User u = uOpt.get();
@@ -66,21 +94,26 @@ public class AuthService implements org.springframework.security.core.userdetail
             if (u.getRole() == null) {
                 throw new RuntimeException("❌ LỖI: User này tồn tại nhưng cột 'role' dưới Database đang bị rỗng (NULL)!");
             }
-            String access = jwtUtils.generateJwtToken(u.getUsername(), java.util.List.of("ROLE_" + u.getRole().name()));
 
-            // 4. Tạo cấu trúc Refresh Token
-            UUID refreshUuid = UUID.randomUUID();
-            RefreshToken rt = new RefreshToken();
-            rt.setId(UUID.randomUUID());
-            rt.setUserId(u.getId());
-            rt.setToken(refreshUuid);
-            rt.setExpiresAt(java.time.Instant.now().plusSeconds(7 * 24 * 3600));
+            // 4. Kiểm tra OTP
+            if (req.getOtp() == null || req.getOtp().trim().isEmpty()) {
+                if (u.getEmail() == null || u.getEmail().trim().isEmpty()) {
+                    throw new RuntimeException("❌ LỖI: Tài khoản chưa cấu hình email nhận mã OTP!");
+                }
+                String otp = otpService.generateOtp(u.getEmail());
+                emailService.sendOtpEmail(u.getEmail(), otp);
+                
+                return new LoginResponse(true, u.getEmail(), "Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra!");
+            }
 
-            // 5. Lưu Refresh Token vào Database
-            refreshRepo.save(rt);
+            // 5. Xác thực OTP
+            boolean isOtpValid = otpService.verifyOtp(u.getEmail(), req.getOtp());
+            if (!isOtpValid) {
+                throw new RuntimeException("❌ LỖI: Mã OTP không chính xác hoặc đã hết hạn!");
+            }
 
-            // Truyền u vào constructor LoginResponse để Frontend nhận được thông tin User
-            return new LoginResponse(access, refreshUuid.toString(), u);
+            // 6. OTP hợp lệ, sinh response đăng nhập thành công
+            return generateLoginResponse(u);
 
         } catch (Exception e) {
             System.err.println("=================================================");
@@ -111,14 +144,27 @@ public class AuthService implements org.springframework.security.core.userdetail
             u.setCreatedAt(Instant.now());
             userRepo.save(u);
 
-            // Tự động đăng nhập luôn sau khi đăng ký thành công
-            LoginRequest lr = new LoginRequest();
-            lr.setUsername(req.getUsername());
-            lr.setPassword(req.getPassword());
-            return login(lr);
+            // Tự động đăng nhập luôn sau khi đăng ký thành công (bỏ qua OTP)
+            return generateLoginResponse(u);
         } catch (Exception e) {
-            throw new RuntimeException("Register failed: " + e.getMessage(), e);
+            throw new RuntimeException(e.getMessage(), e);
         }
+    }
+
+    public void resetPassword(ResetPasswordRequest req) {
+        // 1. Tìm user bằng email
+        User u = userRepo.findByEmail(req.getEmail().trim().toLowerCase())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản với email này!"));
+
+        // 2. Xác thực mã OTP
+        boolean isOtpValid = otpService.verifyOtp(req.getEmail(), req.getOtp());
+        if (!isOtpValid) {
+            throw new RuntimeException("Mã OTP không hợp lệ hoặc đã hết hạn!");
+        }
+
+        // 3. Cập nhật mật khẩu mới
+        u.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
+        userRepo.save(u);
     }
 
     public String refresh(String refreshToken) {

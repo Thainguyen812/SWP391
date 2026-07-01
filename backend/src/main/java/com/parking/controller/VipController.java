@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/vip")
+@RequestMapping({"/api/v1/vip", "/api/vip"})
 public class VipController {
 
     private final VipService vipService;
