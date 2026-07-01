@@ -20,4 +20,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     BigDecimal calculateParkingFee(@Param("vehicleSize") String vehicleSize,
             @Param("checkIn") Instant checkIn,
             @Param("checkOut") Instant checkOut);
+
+    @Query("SELECT COALESCE(SUM(t.totalAmount), 0) FROM Transaction t WHERE t.paymentStatus = :status")
+    BigDecimal sumTotalRevenueByStatus(@Param("status") Transaction.PaymentStatus status);
 }

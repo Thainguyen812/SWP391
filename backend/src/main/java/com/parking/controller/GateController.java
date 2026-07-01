@@ -1,4 +1,4 @@
-﻿package com.parking.controller;
+package com.parking.controller;
 
 import com.parking.model.Vehicle;
 import com.parking.model.ParkingSession;
