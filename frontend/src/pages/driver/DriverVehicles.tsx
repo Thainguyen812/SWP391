@@ -34,8 +34,30 @@ export function DriverVehicles() {
     billingTimeFilter, setBillingTimeFilter, billingTypeFilter, setBillingTypeFilter,
     searchSupportQuery, setSearchSupportQuery, expandedFaq, setExpandedFaq,
     ticketTopic, setTicketTopic, ticketMessage, setTicketMessage,
-    ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout
+    ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout,
+    editVehicleModalOpen, setEditVehicleModalOpen,
+    editingVehicleId, setEditingVehicleId,
+    editPlate, setEditPlate,
+    editName, setEditName,
+    editType, setEditType
   } = ctx;
+
+  // Let's find toggleVehicleLock from parent
+  const toggleVehicleLock = ctx.toggleVehicleLock || ((id: string, plate: string) => {
+    setVehicles((prev: any[]) => prev.map(v => {
+      if (v.id === id) {
+        const nextState = !v.isLocked;
+        triggerToast(
+          nextState 
+            ? `🔒 Đã kích hoạt kẹp phanh & khóa radar chống trộm cho xe ${plate}!`
+            : `🔓 Đã mở khóa an ninh bảo vệ xe ${plate}.`, 
+          nextState ? 'success' : 'info'
+        );
+        return { ...v, isLocked: nextState };
+      }
+      return v;
+    }));
+  });
 
   return (
     <>
@@ -165,10 +187,16 @@ export function DriverVehicles() {
                             </button>
 
                             <button 
-                              onClick={() => triggerToast(`Thẻ xe của phương tiện ${v.plate} được cấp mới đầy đủ!`, 'info')}
+                              onClick={() => {
+                                setEditingVehicleId(v.id);
+                                setEditPlate(v.plate);
+                                setEditName(v.name);
+                                setEditType(v.type);
+                                setEditVehicleModalOpen(true);
+                              }}
                               className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs rounded-xl cursor-pointer transition-all"
                             >
-                              Chi tiết
+                              Sửa
                             </button>
                           </div>
 

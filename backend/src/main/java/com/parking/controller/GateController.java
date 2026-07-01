@@ -5,23 +5,34 @@ import com.parking.model.ParkingSession;
 import com.parking.repository.VehicleRepository;
 import com.parking.repository.ParkingSessionRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import com.parking.repository.VipSubscriptionRepository;
+import com.parking.service.ParkingService;
+import com.parking.model.Transaction;
+
 @RestController
 @RequestMapping("/api/gate")
 @CrossOrigin(origins = "*", maxAge = 3600)
+@PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
 public class GateController {
 
     private final VehicleRepository vehicleRepo;
     private final ParkingSessionRepository sessionRepo;
-    private final com.parking.service.ParkingService parkingService;
+    private final VipSubscriptionRepository vipSubscriptionRepository;
+    private final ParkingService parkingService;
 
-    public GateController(VehicleRepository vehicleRepo, ParkingSessionRepository sessionRepo, com.parking.service.ParkingService parkingService) {
+    public GateController(VehicleRepository vehicleRepo, 
+                          ParkingSessionRepository sessionRepo,
+                          VipSubscriptionRepository vipSubscriptionRepository,
+                          ParkingService parkingService) {
         this.vehicleRepo = vehicleRepo;
         this.sessionRepo = sessionRepo;
+        this.vipSubscriptionRepository = vipSubscriptionRepository;
         this.parkingService = parkingService;
     }
 
@@ -35,7 +46,7 @@ public class GateController {
     @PostMapping("/scan")
     public ResponseEntity<?> scanGate(@RequestBody GateScanRequest request) {
         Map<String, Object> response = new HashMap<>();
-        
+
         // Anti-theft logic
         if (request.plate != null && !request.plate.isEmpty()) {
             Optional<Vehicle> optVehicle = vehicleRepo.findByLicensePlate(request.plate);
@@ -51,72 +62,117 @@ public class GateController {
             }
         }
 
-        // QR Fallback logic: check for active session
-        if (request.plate != null && !request.plate.isEmpty()) {
-            Optional<ParkingSession> optSession = sessionRepo.findByLicensePlateAndSessionStatus(request.plate, ParkingSession.SessionStatus.ACTIVE);
-            if (optSession.isPresent()) {
-                ParkingSession session = optSession.get();
-                if (Boolean.TRUE.equals(session.getQrFallbackUsed())) {
-                    if (request.qrToken == null || request.qrToken.isEmpty()) {
-                        response.put("success", false);
-                        response.put("error", "QR_FALLBACK_REQUIRED");
-                        Map<String, Object> vehicleData = new HashMap<>();
-                        vehicleData.put("plate", request.plate);
-                        Map<String, Object> dataMap = new HashMap<>();
-                        dataMap.put("vehicle", vehicleData);
-                        response.put("data", dataMap);
-                        return ResponseEntity.ok(response);
-                    }
+        try {
+            // Determine Direction (Entrance vs Exit)
+            boolean isEntrance = true;
+            if (request.gate != null) {
+                String gateLower = request.gate.toLowerCase();
+                if (gateLower.contains("ra") || gateLower.endsWith("3")) {
+                    isEntrance = false;
                 }
             }
-        }
 
-        // Thực hiện gọi Check-in thực tế
-        try {
-            if (request.cardCode != null && !request.cardCode.isEmpty()) {
-                // Có thẻ -> Khách vãng lai Check-in
-                com.parking.dto.VisitorCheckInRequest visitorReq = new com.parking.dto.VisitorCheckInRequest();
-                visitorReq.setPlate(request.plate);
-                visitorReq.setCard_code(request.cardCode);
-                visitorReq.setVehicle_type("CAR"); // Default for now
-                visitorReq.setGate(request.gate);
-                com.parking.dto.CheckInResponse checkInResponse = parkingService.visitorCheckIn(visitorReq);
-                
-                response.put("success", true);
-                response.put("message", "Check-in khách vãng lai thành công");
-                response.put("data", checkInResponse);
-                return ResponseEntity.ok(response);
-                
-            } else if (request.plate != null && !request.plate.isEmpty()) {
-                // Chỉ có biển số -> AI Camera Check-in cho xe VIP
-                com.parking.dto.AiCheckInRequest aiReq = new com.parking.dto.AiCheckInRequest();
-                aiReq.setPlate(request.plate);
-                aiReq.setVehicle_type("CAR");
-                aiReq.setConfidence_score(99.0);
-                aiReq.setCamera_id(request.gate);
-                com.parking.dto.CheckInResponse checkInResponse = parkingService.aiCheckIn(aiReq);
-                
-                response.put("success", true);
-                response.put("message", "Check-in AI thành công");
-                response.put("data", checkInResponse);
-                return ResponseEntity.ok(response);
+            if (isEntrance) {
+                // Entrance Gate Logic
+                boolean isVip = false;
+                Optional<Vehicle> optVehicle = Optional.empty();
+                if (request.plate != null && !request.plate.trim().isEmpty()) {
+                    optVehicle = vehicleRepo.findByLicensePlate(request.plate.trim());
+                    if (optVehicle.isPresent()) {
+                        Vehicle vehicle = optVehicle.get();
+                        Optional<com.parking.model.VipSubscription> vipSub = vipSubscriptionRepository
+                                .findByVehicleIdAndStatus(vehicle.getId(), com.parking.model.VipSubscription.Status.ACTIVE);
+                        if (vipSub.isPresent()) {
+                            isVip = true;
+                        }
+                    }
+                }
+
+                if (isVip) {
+                    // Case A: VIP Check-in
+                    com.parking.dto.AiCheckInRequest aiReq = new com.parking.dto.AiCheckInRequest();
+                    aiReq.setPlate(request.plate.trim());
+                    aiReq.setConfidence_score(95.0);
+                    aiReq.setCamera_id(request.gate);
+                    aiReq.setImage_url("https://camera-storage.com/live/gate_scan.jpg");
+                    aiReq.setVehicle_type(optVehicle.isPresent() ? optVehicle.get().getVehicleSize() : "SEDAN_HATCHBACK");
+
+                    com.parking.dto.CheckInResponse checkInResponse = parkingService.aiCheckIn(aiReq);
+
+                    response.put("success", true);
+                    response.put("message", "VIP Check-in thành công tại " + request.gate);
+                    
+                    Map<String, Object> vehicleData = new HashMap<>();
+                    vehicleData.put("plate", request.plate);
+                    Map<String, Object> dataMap = new HashMap<>();
+                    dataMap.put("vehicle", vehicleData);
+                    dataMap.put("sessionId", checkInResponse.getSession_id());
+                    response.put("data", dataMap);
+                } else {
+                    // Case B: Visitor Check-in
+                    if (request.cardCode == null || request.cardCode.trim().isEmpty()) {
+                        throw new IllegalArgumentException("Yêu cầu mã thẻ cho khách vãng lai");
+                    }
+                    com.parking.dto.VisitorCheckInRequest visitorReq = new com.parking.dto.VisitorCheckInRequest();
+                    String plateStr = (request.plate != null && !request.plate.trim().isEmpty()) ? request.plate.trim() : "UNKNOWN_PLATE";
+                    visitorReq.setPlate(plateStr);
+                    visitorReq.setCard_code(request.cardCode.trim());
+                    visitorReq.setImage_url("https://camera-storage.com/live/gate_scan.jpg");
+                    visitorReq.setVehicle_type(optVehicle.isPresent() ? optVehicle.get().getVehicleSize() : "SEDAN_HATCHBACK");
+
+                    com.parking.dto.CheckInResponse checkInResponse = parkingService.visitorCheckIn(visitorReq);
+
+                    response.put("success", true);
+                    response.put("message", "Visitor Check-in thành công tại " + request.gate);
+
+                    Map<String, Object> vehicleData = new HashMap<>();
+                    vehicleData.put("plate", plateStr);
+                    Map<String, Object> dataMap = new HashMap<>();
+                    dataMap.put("vehicle", vehicleData);
+                    dataMap.put("sessionId", checkInResponse.getSession_id());
+                    response.put("data", dataMap);
+                }
+            } else {
+                // Exit Gate Logic
+                if (request.qrToken != null && !request.qrToken.trim().isEmpty()) {
+                    // Case A: VIP QR Exit
+                    parkingService.verifyExitQr(request.plate != null ? request.plate.trim() : "", request.qrToken.trim());
+                    response.put("success", true);
+                    response.put("message", "VIP QR Exit thành công tại " + request.gate);
+
+                    Map<String, Object> vehicleData = new HashMap<>();
+                    vehicleData.put("plate", request.plate);
+                    Map<String, Object> dataMap = new HashMap<>();
+                    dataMap.put("vehicle", vehicleData);
+                    response.put("data", dataMap);
+                } else if (request.cardCode != null && !request.cardCode.trim().isEmpty()) {
+                    // Case B: Visitor Checkout
+                    Transaction transaction = parkingService.checkoutCardByCode(request.cardCode.trim());
+                    response.put("success", true);
+                    response.put("message", "Visitor Checkout thành công tại " + request.gate);
+
+                    Map<String, Object> vehicleData = new HashMap<>();
+                    vehicleData.put("plate", request.plate);
+                    Map<String, Object> dataMap = new HashMap<>();
+                    dataMap.put("vehicle", vehicleData);
+                    
+                    Map<String, Object> transData = new HashMap<>();
+                    transData.put("id", transaction.getId());
+                    transData.put("feeAmount", transaction.getTotalAmount());
+                    dataMap.put("transaction", transData);
+                    
+                    response.put("data", dataMap);
+                } else {
+                    throw new IllegalArgumentException("Yêu cầu mã QR VIP hoặc mã thẻ vãng lai để xuất bãi");
+                }
             }
+
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);
-            response.put("error", e.getMessage());
-            return ResponseEntity.ok(response);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         }
-
-        response.put("success", true);
-        response.put("message", "Quét " + (request.plate != null && !request.plate.isEmpty() ? request.plate : "thẻ/QR") + " thành công tại " + request.gate);
-        
-        Map<String, Object> vehicleData = new HashMap<>();
-        vehicleData.put("plate", request.plate);
-        Map<String, Object> dataMap = new HashMap<>();
-        dataMap.put("vehicle", vehicleData);
-        response.put("data", dataMap);
-        
-        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/clear")
@@ -126,4 +182,3 @@ public class GateController {
         return ResponseEntity.ok(response);
     }
 }
-

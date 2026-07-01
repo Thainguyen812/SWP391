@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/vip")
+@RequestMapping({"/api/v1/vip", "/api/vip"})
 public class VipController {
 
     private final VipService vipService;
@@ -41,12 +41,13 @@ public class VipController {
     }
 
     @PutMapping("/{id}/reject")
+    @PreAuthorize("hasRole('MANAGER')") // Chỉ quản lý được từ chối
     public VipSubscription reject(@PathVariable UUID id) {
         return vipService.reject(id);
     }
 
     @PostMapping("/register")
-    @PreAuthorize("hasRole('DRIVER')") // Chỉ tài xế VIP được đăng ký
+    @PreAuthorize("hasAnyRole('DRIVER', 'STAFF', 'MANAGER')")
     public VipSubscription register(@RequestBody VipRegistrationRequest request) {
         return vipService.register(request);
     }

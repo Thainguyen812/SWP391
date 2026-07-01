@@ -45,6 +45,22 @@ public class VipServiceImpl implements VipService {
                 vip.setUpdatedAt(
                                 java.time.Instant.now());
 
+                // Cập nhật ngày gia hạn bắt đầu và kết thúc dựa trên thời gian thực lúc duyệt
+                java.time.LocalDate startDate = java.time.LocalDate.now();
+                vip.setStartDate(startDate);
+                String type = vip.getSubscriptionType() != null ? vip.getSubscriptionType().toUpperCase() : "MONTHLY";
+                if ("MONTHLY".equals(type)) {
+                        vip.setEndDate(startDate.plusMonths(1));
+                } else if ("QUARTERLY".equals(type) || "QUATERLY".equals(type)) {
+                        vip.setEndDate(startDate.plusMonths(3));
+                } else if ("HALF_YEARLY".equals(type) || "6_MONTHS".equals(type) || "6_MONTH".equals(type)) {
+                        vip.setEndDate(startDate.plusMonths(6));
+                } else if ("YEARLY".equals(type) || "YEAR".equals(type)) {
+                        vip.setEndDate(startDate.plusYears(1));
+                } else {
+                        vip.setEndDate(startDate.plusMonths(1));
+                }
+
                 return repo.save(vip);
         }
 
@@ -61,7 +77,7 @@ public class VipServiceImpl implements VipService {
         public VipSubscription register(
                         VipRegistrationRequest request) {
 
-                vehicleRepository.findById(
+                com.parking.model.Vehicle vehicle = vehicleRepository.findById(
                                 request.getVehicleId())
                                 .orElseThrow(() -> new RuntimeException("Không tìm thấy xe"));
 
@@ -75,21 +91,61 @@ public class VipServiceImpl implements VipService {
                 java.time.LocalDate startDate = java.time.LocalDate.now();
                 vip.setStartDate(startDate);
 
-                // Tính toán endDate dựa vào subscriptionType
+                // Tính toán endDate và feeAmount dựa vào subscriptionType và vehicleSize
+                String size = vehicle.getVehicleSize() != null ? vehicle.getVehicleSize().toUpperCase() : "SEDAN_HATCHBACK";
                 String type = request.getSubscriptionType() != null ? request.getSubscriptionType().toUpperCase() : "MONTHLY";
-                if ("MONTHLY".equals(type)) {
-                        vip.setEndDate(startDate.plusMonths(1));
-                        vip.setFeeAmount(new java.math.BigDecimal("1200000"));
-                } else if ("QUARTERLY".equals(type) || "QUATERLY".equals(type)) {
-                        vip.setEndDate(startDate.plusMonths(3));
-                        vip.setFeeAmount(new java.math.BigDecimal("3500000"));
-                } else if ("YEARLY".equals(type) || "YEAR".equals(type)) {
-                        vip.setEndDate(startDate.plusYears(1));
-                        vip.setFeeAmount(new java.math.BigDecimal("12000000"));
-                } else {
-                        vip.setEndDate(startDate.plusMonths(1));
-                        vip.setFeeAmount(java.math.BigDecimal.ZERO);
+
+                long fee = 0;
+                if ("SUV_CUV_MPV".equals(size)) {
+                        if ("MONTHLY".equals(type)) {
+                                vip.setEndDate(startDate.plusMonths(1));
+                                fee = 1400000;
+                        } else if ("QUARTERLY".equals(type) || "QUATERLY".equals(type)) {
+                                vip.setEndDate(startDate.plusMonths(3));
+                                fee = 3800000;
+                        } else if ("HALF_YEARLY".equals(type) || "6_MONTHS".equals(type) || "6_MONTH".equals(type)) {
+                                vip.setEndDate(startDate.plusMonths(6));
+                                fee = 7000000;
+                        } else if ("YEARLY".equals(type) || "YEAR".equals(type)) {
+                                vip.setEndDate(startDate.plusYears(1));
+                                fee = 12500000;
+                        } else {
+                                vip.setEndDate(startDate.plusMonths(1));
+                        }
+                } else if ("LARGE_VAN_MINIBUS".equals(size)) {
+                        if ("MONTHLY".equals(type)) {
+                                vip.setEndDate(startDate.plusMonths(1));
+                                fee = 2000000;
+                        } else if ("QUARTERLY".equals(type) || "QUATERLY".equals(type)) {
+                                vip.setEndDate(startDate.plusMonths(3));
+                                fee = 5400000;
+                        } else if ("HALF_YEARLY".equals(type) || "6_MONTHS".equals(type) || "6_MONTH".equals(type)) {
+                                vip.setEndDate(startDate.plusMonths(6));
+                                fee = 10000000;
+                        } else if ("YEARLY".equals(type) || "YEAR".equals(type)) {
+                                vip.setEndDate(startDate.plusYears(1));
+                                fee = 18000000;
+                        } else {
+                                vip.setEndDate(startDate.plusMonths(1));
+                        }
+                } else { // SEDAN_HATCHBACK or other
+                        if ("MONTHLY".equals(type)) {
+                                vip.setEndDate(startDate.plusMonths(1));
+                                fee = 1000000;
+                        } else if ("QUARTERLY".equals(type) || "QUATERLY".equals(type)) {
+                                vip.setEndDate(startDate.plusMonths(3));
+                                fee = 2700000;
+                        } else if ("HALF_YEARLY".equals(type) || "6_MONTHS".equals(type) || "6_MONTH".equals(type)) {
+                                vip.setEndDate(startDate.plusMonths(6));
+                                fee = 5000000;
+                        } else if ("YEARLY".equals(type) || "YEAR".equals(type)) {
+                                vip.setEndDate(startDate.plusYears(1));
+                                fee = 9000000;
+                        } else {
+                                vip.setEndDate(startDate.plusMonths(1));
+                        }
                 }
+                vip.setFeeAmount(new java.math.BigDecimal(fee));
 
                 vip.setPaymentMethod("BANK_TRANSFER");
                 vip.setPaymentStatus("PENDING");

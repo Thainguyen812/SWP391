@@ -15,7 +15,9 @@ services:
     restart: unless-stopped
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      network: host
     container_name: parking_backend
     ports:
       - "8080:8080"
@@ -23,12 +25,29 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/parking_db
       - SPRING_DATASOURCE_USERNAME=parking_user
       - SPRING_DATASOURCE_PASSWORD=ParkingDB@2024!
+      - MAIL_HOST=${MAIL_HOST:-maildev}
+      - MAIL_PORT=${MAIL_PORT:-1025}
+      - MAIL_USERNAME=${MAIL_USERNAME:-}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-}
+      - MAIL_SMTP_AUTH=${MAIL_SMTP_AUTH:-false}
+      - MAIL_SMTP_STARTTLS=${MAIL_SMTP_STARTTLS:-false}
     depends_on:
       - postgres
+      - maildev
+    restart: unless-stopped
+
+  maildev:
+    image: maildev/maildev
+    container_name: parking_maildev
+    ports:
+      - "1080:1080"
+      - "1025:1025"
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      network: host
     container_name: parking_frontend
     ports:
       - "80:80"

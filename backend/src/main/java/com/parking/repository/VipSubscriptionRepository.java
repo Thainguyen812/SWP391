@@ -11,4 +11,6 @@ public interface VipSubscriptionRepository extends JpaRepository<VipSubscription
 
     List<VipSubscription> findByStatus( // đăng ký vip
             VipSubscription.Status status);
+
+    long countByStatus(VipSubscription.Status status);
 }
