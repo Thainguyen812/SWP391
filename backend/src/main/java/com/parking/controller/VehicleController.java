@@ -72,20 +72,83 @@ public class VehicleController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Vehicle> update(@PathVariable UUID id, @RequestBody Vehicle vehicle) { // SỬA THÀNH UUID
+    public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody Vehicle vehicle, Principal principal) { // SỬA THÀNH UUID
+        if (principal == null) {
+            return ResponseEntity.status(401).body(java.util.Map.of("success", false, "message", "Unauthorized"));
+        }
+
+        String username = principal.getName();
+        Optional<User> uOpt = userRepo.findByUsername(username);
+        if (uOpt.isEmpty()) {
+            return ResponseEntity.status(401).body(java.util.Map.of("success", false, "message", "User not found"));
+        }
+        User currentUser = uOpt.get();
+
         Optional<Vehicle> existingOpt = repo.findById(id);
         if (existingOpt.isEmpty() && vehicle.getLicensePlate() != null) {
             existingOpt = repo.findByLicensePlate(vehicle.getLicensePlate());
         }
 
-        return existingOpt.map(existing -> {
-            vehicle.setId(existing.getId());
-            if (vehicle.getCreatedAt() == null) {
-                vehicle.setCreatedAt(existing.getCreatedAt() != null ? existing.getCreatedAt() : java.time.Instant.now());
-            }
-            vehicle.setUpdatedAt(java.time.Instant.now());
-            return ResponseEntity.ok(repo.save(vehicle));
-        }).orElseGet(() -> ResponseEntity.notFound().build());
+        if (existingOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Vehicle existing = existingOpt.get();
+
+        // Chốt chặn kiểm tra quyền sở hữu xe: chỉ cho phép chủ sở hữu chỉnh sửa (ADMIN/MANAGER có quyền quản lý toàn cục)
+        if (currentUser.getRole() != User.Role.ADMIN && currentUser.getRole() != User.Role.MANAGER 
+                && !existing.getOwnerId().equals(currentUser.getId())) {
+            return ResponseEntity.status(403).body(java.util.Map.of(
+                "success", false, 
+                "message", "Bạn không có quyền chỉnh sửa phương tiện này!"
+            ));
+        }
+
+        vehicle.setId(existing.getId());
+
+        // Bảo toàn các trường không được gửi hoặc null bằng cách lấy từ existing
+        if (vehicle.getOwnerId() == null) {
+            vehicle.setOwnerId(existing.getOwnerId());
+        }
+        if (vehicle.getLicensePlate() == null) {
+            vehicle.setLicensePlate(existing.getLicensePlate());
+        }
+        if (vehicle.getVehicleSize() == null) {
+            vehicle.setVehicleSize(existing.getVehicleSize());
+        }
+        if (vehicle.getColor() == null) {
+            vehicle.setColor(existing.getColor());
+        }
+        if (vehicle.getColorRgb() == null) {
+            vehicle.setColorRgb(existing.getColorRgb());
+        }
+        if (vehicle.getBodyShape() == null) {
+            vehicle.setBodyShape(existing.getBodyShape());
+        }
+        if (vehicle.getBrand() == null) {
+            vehicle.setBrand(existing.getBrand());
+        }
+        if (vehicle.getRegistrationDocUrl() == null) {
+            vehicle.setRegistrationDocUrl(existing.getRegistrationDocUrl());
+        }
+        if (vehicle.getRegistrationPhotoUrl() == null) {
+            vehicle.setRegistrationPhotoUrl(existing.getRegistrationPhotoUrl());
+        }
+        if (vehicle.getFuelType() == null) {
+            vehicle.setFuelType(existing.getFuelType());
+        }
+        
+        // Giữ nguyên các trường hệ thống/bảo mật
+        vehicle.setViolationCount(existing.getViolationCount());
+        vehicle.setActive(existing.isActive());
+        vehicle.setLocked(existing.isLocked());
+
+        if (vehicle.getCreatedAt() == null) {
+            vehicle.setCreatedAt(existing.getCreatedAt() != null ? existing.getCreatedAt() : java.time.Instant.now());
+        }
+        vehicle.setUpdatedAt(java.time.Instant.now());
+
+        return ResponseEntity.ok(repo.save(vehicle));
     }
 
     @DeleteMapping("/{id}")
