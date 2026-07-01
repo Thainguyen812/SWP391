@@ -19,8 +19,10 @@ public class CustomerController {
     public Map<String, Object> getCustomerStats() {
         long vipCount = userRepo.findAll().stream().filter(u -> "VIP".equals(u.getRole().name())).count();
         Map<String, Object> result = new HashMap<>();
-        result.put("activeMonthly", vipCount);
-        result.put("activeBlacklist", 0);
+        result.put("total", vipCount); // Using vipCount for total for now
+        result.put("monthly", vipCount);
+        result.put("vip", vipCount);
+        result.put("expired", 0);
         return result;
     }
 

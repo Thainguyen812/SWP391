@@ -21,7 +21,8 @@ public class DriverController {
     private final ParkingSessionRepository sessionRepo;
     private final ParkingService parkingService;
 
-    public DriverController(VipQrIdentifierRepository qrRepo, ParkingSessionRepository sessionRepo, ParkingService parkingService) {
+    public DriverController(VipQrIdentifierRepository qrRepo, ParkingSessionRepository sessionRepo,
+            ParkingService parkingService) {
         this.qrRepo = qrRepo;
         this.sessionRepo = sessionRepo;
         this.parkingService = parkingService;
@@ -43,13 +44,14 @@ public class DriverController {
         return ResponseEntity.status(201).body(qr);
     }
 
+    // 2. Khóa xe chống trộm: Tài xế VIP tự khóa xe họ, hoặc MANAGER hỗ trợ khóa từ
+    // xa qua tổng đài
     @PutMapping("/vehicle/lock")
-    @PreAuthorize("hasRole('DRIVER')")
+    @PreAuthorize("hasAnyRole('DRIVER', 'MANAGER')")
     public ResponseEntity<?> lockVehicle(@RequestBody LockVehicleRequest req) {
         List<ParkingSession> activeSessions = sessionRepo.findByVehicleIdAndSessionStatusIn(
                 req.getVehicleId(),
-                List.of(ParkingSession.SessionStatus.ACTIVE, ParkingSession.SessionStatus.PASSED_CONFIRMED)
-        );
+                List.of(ParkingSession.SessionStatus.ACTIVE, ParkingSession.SessionStatus.PASSED_CONFIRMED));
 
         if (activeSessions.isEmpty()) {
             return ResponseEntity.status(404).body("Không tìm thấy phiên gửi xe hoạt động cho phương tiện này!");
@@ -63,6 +65,7 @@ public class DriverController {
         return ResponseEntity.ok("Cập nhật trạng thái khóa chống trộm thành công!");
     }
 
+    // 3. Xem trạng thái xe: Chỉ tài xế VIP kiểm tra tình trạng xe của mình
     @GetMapping("/vehicle/{vehicleId}/status")
     @PreAuthorize("hasRole('DRIVER')")
     public ResponseEntity<java.util.Map<String, Object>> getVehicleStatus(@PathVariable UUID vehicleId) {
@@ -74,19 +77,41 @@ public class DriverController {
         private UUID vehicleId;
         private String purpose;
 
-        public UUID getVehicleId() { return vehicleId; }
-        public void setVehicleId(UUID vehicleId) { this.vehicleId = vehicleId; }
-        public String getPurpose() { return purpose; }
-        public void setPurpose(String purpose) { this.purpose = purpose; }
+        public UUID getVehicleId() {
+            return vehicleId;
+        }
+
+        public void setVehicleId(UUID vehicleId) {
+            this.vehicleId = vehicleId;
+        }
+
+        public String getPurpose() {
+            return purpose;
+        }
+
+        public void setPurpose(String purpose) {
+            this.purpose = purpose;
+        }
     }
 
     public static class LockVehicleRequest {
         private UUID vehicleId;
         private Boolean lockStatus;
 
-        public UUID getVehicleId() { return vehicleId; }
-        public void setVehicleId(UUID vehicleId) { this.vehicleId = vehicleId; }
-        public Boolean getLockStatus() { return lockStatus; }
-        public void setLockStatus(Boolean lockStatus) { this.lockStatus = lockStatus; }
+        public UUID getVehicleId() {
+            return vehicleId;
+        }
+
+        public void setVehicleId(UUID vehicleId) {
+            this.vehicleId = vehicleId;
+        }
+
+        public Boolean getLockStatus() {
+            return lockStatus;
+        }
+
+        public void setLockStatus(Boolean lockStatus) {
+            this.lockStatus = lockStatus;
+        }
     }
 }

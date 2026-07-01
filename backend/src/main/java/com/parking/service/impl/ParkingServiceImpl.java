@@ -361,7 +361,7 @@ public class ParkingServiceImpl implements ParkingService {
     @Transactional
     public CheckInResponse visitorCheckIn(VisitorCheckInRequest request) {
         String plate = request.getPlate();
-
+        ParkingSession sessionToUpdate = null;
         // Chốt chặn kiểm tra nếu xe là VIP đang hoạt động thì không được cấp thẻ tạm vãng lai
         Optional<Vehicle> vehicleOpt = vehicleRepository.findByLicensePlate(plate);
         if (vehicleOpt.isPresent()) {
@@ -379,17 +379,21 @@ public class ParkingServiceImpl implements ParkingService {
             }
         }
 
-        Optional<ParkingSession> existing = parkingSessionRepository.findByLicensePlateAndSessionStatus( // kiểm tra xe
-                                                                                                         // có phiên gửi
-                                                                                                         // xe chưa
+        Optional<ParkingSession> existing = parkingSessionRepository.findByLicensePlateAndSessionStatus(
                 plate,
                 ParkingSession.SessionStatus.ACTIVE);
 
         if (existing.isPresent()) {
-            throw new ApiExceptions.ConflictException("Xe này đang có phiên gửi xe ACTIVE");
+            ParkingSession session = existing.get();
+            if (Boolean.TRUE.equals(session.getIsSuspicious()) && session.getEntryGate() != null) {
+                // Suspicious session stuck at entry gate, we will assign a new card and allow it in
+                sessionToUpdate = session;
+            } else {
+                throw new ApiExceptions.ConflictException("Xe này đang có phiên gửi xe ACTIVE");
+            }
         }
 
-        Card card = cardRepository.findByCardCode(request.getCard_code()) // tìm thẻ để sử dung
+        Card card = cardRepository.findByCardCode(request.getCard_code()) // tìm thẻ để sử dụng
                 .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thẻ tạm này"));
 
         if (card.getStatus() != Card.CardStatus.AVAILABLE) {
@@ -415,7 +419,9 @@ public class ParkingServiceImpl implements ParkingService {
             throw new ApiExceptions.BadRequestException("Không còn zone phù hợp cho loại xe này");
         }
 
-        zoneRepository.increaseOccupied(chosen.getId()); // trừ số lượng slot còn trống
+        if (sessionToUpdate == null) {
+            zoneRepository.increaseOccupied(chosen.getId()); // trừ số lượng slot còn trống
+        }
 
         Vehicle vehicle = vehicleRepository // chưa có thì tạo và lưu vehicle
                 .findByLicensePlate(plate)
@@ -444,19 +450,28 @@ public class ParkingServiceImpl implements ParkingService {
                     return vehicleRepository.save(newVehicle);
                 });
 
-        // Tao parking session
-        ParkingSession session = new ParkingSession();
-        session.setId(UUID.randomUUID());
-        session.setLicensePlate(plate);
+        ParkingSession session = sessionToUpdate != null ? sessionToUpdate : new ParkingSession();
+        if (sessionToUpdate == null) {
+            session.setId(UUID.randomUUID());
+            session.setLicensePlate(plate);
+            session.setVehicleId(vehicle.getId());
+            session.setCheckInTime(Instant.now());
+            session.setCreatedAt(Instant.now());
+            session.setAssignedZoneId(chosen.getId());
+            session.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
+            session.setIsVip(false);
+            session.setMobileCheckoutPhoto(request.getImage_url());
+        }
+
         session.setCardId(card.getId());
-        session.setVehicleId(vehicle.getId());
-        session.setCheckInTime(Instant.now());
-        session.setCreatedAt(Instant.now());
         session.setUpdatedAt(Instant.now());
-        session.setAssignedZoneId(chosen.getId());
-        session.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
-        session.setIsVip(false);
-        session.setMobileCheckoutPhoto(request.getImage_url());
+        
+        // Clear suspicious status and entry gate if it was an error session
+        if (sessionToUpdate != null) {
+            session.setIsSuspicious(false);
+            session.setSuspiciousReason(null);
+            session.setEntryGate(null); // Clear entry gate to let it inside
+        }
 
         // Find first available slot in the chosen zone
         final Zone finalZone = chosen;

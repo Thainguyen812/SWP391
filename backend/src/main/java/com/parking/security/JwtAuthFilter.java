@@ -51,9 +51,13 @@ public class JwtAuthFilter extends OncePerRequestFilter { // Đảm bảo chạy
                 // 4. Chuyển đổi danh sách String quyền hạn sang cấu trúc GrantedAuthority của
                 // Spring Security
                 List<SimpleGrantedAuthority> authorities = roles != null ? roles.stream()
-                        .map(SimpleGrantedAuthority::new)
+                        .map(role -> {
+                            // Nếu chuỗi chưa có tiền tố ROLE_ thì tự động thêm vào cho đúng chuẩn Spring
+                            // Security
+                            String formattedRole = role.startsWith("ROLE_") ? role : "ROLE_" + role.toUpperCase();
+                            return new SimpleGrantedAuthority(formattedRole);
+                        })
                         .toList() : List.of();
-
                 // 5. Tạo "thẻ thông hành" UsernamePasswordAuthenticationToken tích hợp sẵn
                 // thông tin
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
