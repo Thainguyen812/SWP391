@@ -48,6 +48,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+//tính tiền
+import com.parking.model.PricingRule;
+import com.parking.repository.PricingRuleRepository;
+
 @Service
 public class ParkingServiceImpl implements ParkingService {
 
@@ -65,6 +69,8 @@ public class ParkingServiceImpl implements ParkingService {
     private final ParkingSlotRepository slotRepository;
     private final UserRepository userRepository;
 
+    private final PricingRuleRepository pricingRuleRepository;
+
     public ParkingServiceImpl(BlacklistRepository blacklistRepository,
             ParkingSessionRepository parkingSessionRepository,
             ZoneRepository zoneRepository,
@@ -76,7 +82,8 @@ public class ParkingServiceImpl implements ParkingService {
             TransactionRepository transactionRepository, // task 5
             CardRepository cardRepository,
             ParkingSlotRepository slotRepository,
-            UserRepository userRepository) { // task 5
+            UserRepository userRepository,
+            PricingRuleRepository pricingRuleRepository) { // task 5
         this.blacklistRepository = blacklistRepository;
         this.parkingSessionRepository = parkingSessionRepository;
         this.zoneRepository = zoneRepository;
@@ -89,6 +96,7 @@ public class ParkingServiceImpl implements ParkingService {
         this.cardRepository = cardRepository; // task 5
         this.slotRepository = slotRepository;
         this.userRepository = userRepository;
+        this.pricingRuleRepository = pricingRuleRepository;
     }
 
     @Override
@@ -144,11 +152,11 @@ public class ParkingServiceImpl implements ParkingService {
             }
         }
 
-        // Chốt chặn: Nếu không phải là xe VIP hoạt động, cấm tạo session tự động tại làn AI
+        // Chốt chặn: Nếu không phải là xe VIP hoạt động, cấm tạo session tự động tại
+        // làn AI
         if (!isVip) {
             throw new com.parking.exception.ApiExceptions.ForbiddenException(
-                "Phương tiện không có gói VIP hoạt động. Vui lòng di chuyển sang làn thường để quẹt thẻ tạm."
-            );
+                    "Phương tiện không có gói VIP hoạt động. Vui lòng di chuyển sang làn thường để quẹt thẻ tạm.");
         }
 
         // Create session
@@ -362,7 +370,8 @@ public class ParkingServiceImpl implements ParkingService {
     public CheckInResponse visitorCheckIn(VisitorCheckInRequest request) {
         String plate = request.getPlate();
         ParkingSession sessionToUpdate = null;
-        // Chốt chặn kiểm tra nếu xe là VIP đang hoạt động thì không được cấp thẻ tạm vãng lai
+        // Chốt chặn kiểm tra nếu xe là VIP đang hoạt động thì không được cấp thẻ tạm
+        // vãng lai
         Optional<Vehicle> vehicleOpt = vehicleRepository.findByLicensePlate(plate);
         if (vehicleOpt.isPresent()) {
             Vehicle vehicle = vehicleOpt.get();
@@ -373,8 +382,7 @@ public class ParkingServiceImpl implements ParkingService {
                 java.time.LocalDate today = java.time.LocalDate.now();
                 if (!today.isBefore(vip.getStartDate()) && !today.isAfter(vip.getEndDate())) {
                     throw new com.parking.exception.ApiExceptions.BadRequestException(
-                        "Phương tiện này đã đăng ký gói VIP đang hoạt động! Vui lòng đi vào làn tự động (AI/QR) hoặc gia hạn."
-                    );
+                            "Phương tiện này đã đăng ký gói VIP đang hoạt động! Vui lòng đi vào làn tự động (AI/QR) hoặc gia hạn.");
                 }
             }
         }
@@ -386,7 +394,8 @@ public class ParkingServiceImpl implements ParkingService {
         if (existing.isPresent()) {
             ParkingSession session = existing.get();
             if (Boolean.TRUE.equals(session.getIsSuspicious()) && session.getEntryGate() != null) {
-                // Suspicious session stuck at entry gate, we will assign a new card and allow it in
+                // Suspicious session stuck at entry gate, we will assign a new card and allow
+                // it in
                 sessionToUpdate = session;
             } else {
                 throw new ApiExceptions.ConflictException("Xe này đang có phiên gửi xe ACTIVE");
@@ -465,7 +474,7 @@ public class ParkingServiceImpl implements ParkingService {
 
         session.setCardId(card.getId());
         session.setUpdatedAt(Instant.now());
-        
+
         // Clear suspicious status and entry gate if it was an error session
         if (sessionToUpdate != null) {
             session.setIsSuspicious(false);
@@ -509,7 +518,8 @@ public class ParkingServiceImpl implements ParkingService {
                         cardId,
                         java.util.List.of(
                                 ParkingSession.SessionStatus.ACTIVE,
-                                ParkingSession.SessionStatus.PASSED_CONFIRMED))
+                                ParkingSession.SessionStatus.PASSED_CONFIRMED,
+                                ParkingSession.SessionStatus.LOST_CARD))
                 .stream()
                 .findFirst()
                 .orElseThrow(
@@ -582,10 +592,23 @@ public class ParkingServiceImpl implements ParkingService {
         Transaction transaction = new Transaction();
         transaction.setId(UUID.randomUUID());
         transaction.setSessionId(session.getId());
+        BigDecimal lostCardPenalty = BigDecimal.ZERO;
+
+        if (session.getSessionStatus() == ParkingSession.SessionStatus.LOST_CARD) {
+
+            PricingRule pricingRule = pricingRuleRepository
+                    .findFirstByVehicleSizeAndIsActiveTrueOrderByEffectiveFromDesc(
+                            vehicle.getVehicleSize())
+                    .orElseThrow(() -> new ApiExceptions.NotFoundException(
+                            "Không tìm thấy cấu hình bảng giá"));
+
+            lostCardPenalty = pricingRule.getLostCardPenalty();
+        }
+
         transaction.setParkingFee(parkingFee);
-        transaction.setLostCardPenalty(BigDecimal.ZERO);
+        transaction.setLostCardPenalty(lostCardPenalty);
         transaction.setViolationPenalty(BigDecimal.ZERO);
-        transaction.setTotalAmount(parkingFee);
+        transaction.setTotalAmount(parkingFee.add(lostCardPenalty));
         transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
         transaction.setPaymentStatus(Transaction.PaymentStatus.PENDING);
         transaction.setIsMobileCheckout(false);
@@ -810,7 +833,8 @@ public class ParkingServiceImpl implements ParkingService {
                         cardId,
                         java.util.List.of(
                                 ParkingSession.SessionStatus.ACTIVE,
-                                ParkingSession.SessionStatus.PASSED_CONFIRMED))
+                                ParkingSession.SessionStatus.PASSED_CONFIRMED,
+                                ParkingSession.SessionStatus.LOST_CARD))
                 .stream()
                 .findFirst()
                 .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy phiên gửi xe hợp lệ"));
@@ -959,11 +983,12 @@ public class ParkingServiceImpl implements ParkingService {
             subscription.setRejectionReason(rejectionReason);
         } else {
             subscription.setRejectionReason(null);
-            
+
             // Cập nhật ngày gia hạn bắt đầu và kết thúc dựa trên thời gian thực lúc duyệt
             java.time.LocalDate startDate = java.time.LocalDate.now();
             subscription.setStartDate(startDate);
-            String type = subscription.getSubscriptionType() != null ? subscription.getSubscriptionType().toUpperCase() : "MONTHLY";
+            String type = subscription.getSubscriptionType() != null ? subscription.getSubscriptionType().toUpperCase()
+                    : "MONTHLY";
             if ("MONTHLY".equals(type)) {
                 subscription.setEndDate(startDate.plusMonths(1));
             } else if ("QUARTERLY".equals(type) || "QUATERLY".equals(type)) {
