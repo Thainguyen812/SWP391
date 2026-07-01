@@ -43,7 +43,7 @@ public class PersonnelServiceImpl implements PersonnelService {
 
         // 1. Mã hóa mật khẩu
         String encryptedPassword = passwordEncoder.encode(request.getPassword());
-        user.setPassword(encryptedPassword);
+        user.setPasswordHash(encryptedPassword);
 
         // 2. Ép kiểu String thành Enum tương ứng của hệ thống bạn (STAFF hoặc MANAGER)
         // Lưu ý: Nếu tên Enum của bạn khác (ví dụ: UserRole.STAFF), bạn thay chữ User.Role tương ứng nhé
