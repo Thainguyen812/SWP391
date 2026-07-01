@@ -34,8 +34,23 @@ public class VipController {
         return vipService.getPending();
     }
 
+<<<<<<< Updated upstream
+=======
+    @PutMapping("/{id}/approve")
+    @PreAuthorize("hasRole('MANAGER')") // Chỉ quản lý được duyệt
+    public VipSubscription approve(@PathVariable UUID id) {
+        return vipService.approve(id);
+    }
+
+    @PutMapping("/{id}/reject")
+    @PreAuthorize("hasRole('MANAGER')") // Chỉ quản lý được từ chối
+    public VipSubscription reject(@PathVariable UUID id) {
+        return vipService.reject(id);
+    }
+
+>>>>>>> Stashed changes
     @PostMapping("/register")
-    @PreAuthorize("hasRole('DRIVER')") // Chỉ tài xế VIP được đăng ký
+    @PreAuthorize("hasAnyRole('DRIVER', 'STAFF', 'MANAGER')")
     public VipSubscription register(@RequestBody VipRegistrationRequest request) {
         return vipService.register(request);
     }

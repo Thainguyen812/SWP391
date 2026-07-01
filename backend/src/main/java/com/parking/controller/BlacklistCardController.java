@@ -4,7 +4,12 @@ import com.parking.dto.BlacklistCardRequest;
 import com.parking.model.BlacklistEntry;
 import com.parking.model.ParkingSession;
 import com.parking.service.BlacklistCardService;
+<<<<<<< Updated upstream
 import org.springframework.security.core.Authentication; // Nhớ import thư viện này
+=======
+
+import org.springframework.security.access.prepost.PreAuthorize;
+>>>>>>> Stashed changes
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,6 +17,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/blacklisted-cards")
+@PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
 public class BlacklistCardController {
 
     private final BlacklistCardService blacklistCardService;
