@@ -1,4 +1,4 @@
-﻿package com.parking.controller;
+package com.parking.controller;
 
 import org.springframework.web.bind.annotation.*;
 import java.util.*;

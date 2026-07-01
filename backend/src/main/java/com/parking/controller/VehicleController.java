@@ -4,29 +4,49 @@ import com.parking.model.Vehicle;
 import com.parking.repository.VehicleRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import jakarta.validation.Valid;
+import com.parking.dto.VehicleRegistrationRequest;
+import com.parking.model.User;
+import com.parking.repository.UserRepository;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/vehicles")
 public class VehicleController {
-    private final VehicleRepository repo;
+
+    @Autowired
+    private VehicleRepository repo;
+
+    @Autowired
+    private UserRepository userRepo;
     public VehicleController(VehicleRepository repo){ this.repo = repo; }
 
     @GetMapping
-    public java.util.Map<String, Object> all(){ 
+    public java.util.Map<String, Object> all() { 
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        Optional<User> ownerOpt = userRepo.findByUsername(username);
         List<Map<String, Object>> mapped = new java.util.ArrayList<>();
-        for (Vehicle v : repo.findAll()) {
-            Map<String, Object> map = new java.util.HashMap<>();
-            map.put("id", v.getId());
-            map.put("plate", v.getLicensePlate());
-            map.put("name", v.getBrand() != null ? v.getBrand() : "Xe của tôi");
-            map.put("type", v.getVehicleSize());
-            map.put("isLocked", v.isLocked());
-            mapped.add(map);
+        
+        if (ownerOpt.isPresent()) {
+            for (Vehicle v : repo.findByOwnerId(ownerOpt.get().getId())) {
+                Map<String, Object> map = new java.util.HashMap<>();
+                map.put("id", v.getId());
+                map.put("plate", v.getLicensePlate());
+                map.put("name", v.getBrand() != null ? v.getBrand() : "Xe của tôi");
+                map.put("type", v.getVehicleSize());
+                map.put("isLocked", v.isLocked());
+                mapped.add(map);
+            }
         }
         return java.util.Map.of("success", true, "data", mapped);
     }
@@ -38,7 +58,35 @@ public class VehicleController {
     }
 
     @PostMapping
-    public Vehicle create(@RequestBody Vehicle vehicle){ return repo.save(vehicle); }
+    public Vehicle create(@Valid @RequestBody VehicleRegistrationRequest request) {
+        // 1. Đọc thông tin từ Spring Security (giải mã token JWT của tài xế đang đăng nhập)
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        // 2. Tìm User tương ứng dưới DB
+        User owner = userRepo.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User không tồn tại"));
+        // 3. Kiểm tra trùng biển số
+        if (repo.findByLicensePlate(request.getLicensePlate()).isPresent()) {
+            throw new RuntimeException("Biển số xe đã được đăng ký.");
+        }                
+        Vehicle vehicle = new Vehicle();
+        vehicle.setId(UUID.randomUUID());
+        
+        // 4. TỰ ĐỘNG GÁN CHỦ XE LÀ NGƯỜI ĐANG ĐĂNG NHẬP 
+        vehicle.setOwnerId(owner.getId()); // <=== ĐÃ XỬ LÝ Ở ĐÂY!
+        vehicle.setLicensePlate(request.getLicensePlate());
+        vehicle.setVehicleSize(request.getVehicleSize());
+        vehicle.setColor(request.getColor());
+        vehicle.setColorRgb(request.getColorRgb());
+        vehicle.setBodyShape(request.getBodyShape());
+        vehicle.setBrand(request.getBrand());
+        vehicle.setFuelType(request.getFuelType());
+        vehicle.setViolationCount(0);
+        vehicle.setActive(true);
+        vehicle.setCreatedAt(Instant.now());
+        vehicle.setUpdatedAt(Instant.now());
+        return repo.save(vehicle);
+    }
 
     @PutMapping("/{id}")
     public ResponseEntity<Vehicle> update(@PathVariable UUID id, @RequestBody Vehicle vehicle){ // SỬA THÀNH UUID

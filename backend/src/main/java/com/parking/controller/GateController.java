@@ -1,4 +1,4 @@
-﻿package com.parking.controller;
+package com.parking.controller;
 
 import com.parking.model.Vehicle;
 import com.parking.model.ParkingSession;
@@ -17,10 +17,12 @@ public class GateController {
 
     private final VehicleRepository vehicleRepo;
     private final ParkingSessionRepository sessionRepo;
+    private final com.parking.service.ParkingService parkingService;
 
-    public GateController(VehicleRepository vehicleRepo, ParkingSessionRepository sessionRepo) {
+    public GateController(VehicleRepository vehicleRepo, ParkingSessionRepository sessionRepo, com.parking.service.ParkingService parkingService) {
         this.vehicleRepo = vehicleRepo;
         this.sessionRepo = sessionRepo;
+        this.parkingService = parkingService;
     }
 
     public static class GateScanRequest {
@@ -66,9 +68,43 @@ public class GateController {
                         return ResponseEntity.ok(response);
                     }
                 }
-            } else if (request.qrToken != null && !request.qrToken.isEmpty()) {
-                // Mock logic for dashboard check-in: If qrToken is present and no session exists, we assume it's a QR Check-in
             }
+        }
+
+        // Thực hiện gọi Check-in thực tế
+        try {
+            if (request.cardCode != null && !request.cardCode.isEmpty()) {
+                // Có thẻ -> Khách vãng lai Check-in
+                com.parking.dto.VisitorCheckInRequest visitorReq = new com.parking.dto.VisitorCheckInRequest();
+                visitorReq.setPlate(request.plate);
+                visitorReq.setCard_code(request.cardCode);
+                visitorReq.setVehicle_type("CAR"); // Default for now
+                visitorReq.setGate(request.gate);
+                com.parking.dto.CheckInResponse checkInResponse = parkingService.visitorCheckIn(visitorReq);
+                
+                response.put("success", true);
+                response.put("message", "Check-in khách vãng lai thành công");
+                response.put("data", checkInResponse);
+                return ResponseEntity.ok(response);
+                
+            } else if (request.plate != null && !request.plate.isEmpty()) {
+                // Chỉ có biển số -> AI Camera Check-in cho xe VIP
+                com.parking.dto.AiCheckInRequest aiReq = new com.parking.dto.AiCheckInRequest();
+                aiReq.setPlate(request.plate);
+                aiReq.setVehicle_type("CAR");
+                aiReq.setConfidence_score(99.0);
+                aiReq.setCamera_id(request.gate);
+                com.parking.dto.CheckInResponse checkInResponse = parkingService.aiCheckIn(aiReq);
+                
+                response.put("success", true);
+                response.put("message", "Check-in AI thành công");
+                response.put("data", checkInResponse);
+                return ResponseEntity.ok(response);
+            }
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.ok(response);
         }
 
         response.put("success", true);

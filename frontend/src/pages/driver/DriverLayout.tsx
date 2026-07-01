@@ -396,27 +396,57 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   };
 
   // Add Vehicle helper
-  const handleAddVehicle = (e: React.FormEvent) => {
+  const handleAddVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPlate.trim()) {
       triggerToast('Vui lòng điền biển số xe!', 'error');
       return;
     }
-    const modelItem: UserVehicle = {
-      id: `veh-${Date.now()}`,
-      plate: newPlate.toUpperCase(),
-      name: newName.trim() || 'Phương tiện mới',
-      type: newType,
-      regDate: new Date().toLocaleDateString('vi-VN'),
-      isActive: true,
-      image: '',
-      isLocked: false
-    };
-    setVehicles(prev => [...prev, modelItem]);
-    setNewPlate('');
-    setNewName('');
-    setAddVehicleModalOpen(false);
-    triggerToast(`Đăng ký thêm phương tiện ${modelItem.plate} thành công!`, 'success');
+    
+    if (isOffline) {
+      triggerToast('Không thể đăng ký xe khi đang ngoại tuyến.', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/vehicles', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          licensePlate: newPlate.toUpperCase(),
+          brand: newName.trim() || 'Phương tiện mới',
+          vehicleSize: newType
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Biển số xe đã được đăng ký hoặc có lỗi xảy ra!');
+      }
+
+      const savedVehicle = await response.json();
+      
+      const modelItem: UserVehicle = {
+        id: savedVehicle.id,
+        plate: savedVehicle.licensePlate,
+        name: savedVehicle.brand || 'Phương tiện mới',
+        type: savedVehicle.vehicleSize || newType,
+        regDate: new Date(savedVehicle.createdAt || Date.now()).toLocaleDateString('vi-VN'),
+        isActive: true,
+        image: savedVehicle.image || '',
+        isLocked: savedVehicle.locked || false
+      };
+      
+      setVehicles(prev => [...prev, modelItem]);
+      setNewPlate('');
+      setNewName('');
+      setAddVehicleModalOpen(false);
+      triggerToast(`Đăng ký thêm phương tiện ${modelItem.plate} thành công!`, 'success');
+    } catch (error: any) {
+      triggerToast(error.message || 'Đăng ký xe thất bại', 'error');
+    }
   };
 
   // Lock/Unlock Anti-theft vehicle

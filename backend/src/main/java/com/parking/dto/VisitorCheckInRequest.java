@@ -5,6 +5,7 @@ public class VisitorCheckInRequest {
     private String vehicle_type;
     private String card_code;
     private String image_url;
+    private String gate;
 
     public String getPlate() {
         return plate;
@@ -36,5 +37,13 @@ public class VisitorCheckInRequest {
 
     public void setImage_url(String image_url) {
         this.image_url = image_url;
+    }
+
+    public String getGate() {
+        return gate;
+    }
+
+    public void setGate(String gate) {
+        this.gate = gate;
     }
 }

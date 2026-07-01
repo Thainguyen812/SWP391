@@ -159,6 +159,7 @@ public class ParkingServiceImpl implements ParkingService {
         ps.setAssignedZoneId(chosen.getId());
         ps.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
         ps.setIsVip(isVip);
+        ps.setEntryGate(request.getCamera_id());
         // store image url if provided
         ps.setMobileCheckoutPhoto(request.getImage_url());
 
@@ -166,18 +167,19 @@ public class ParkingServiceImpl implements ParkingService {
             ps.setVehicleId(vehicleOpt.get().getId());
         }
 
-        // Find first available slot in the chosen zone
-        final Zone finalZone = chosen;
-        ParkingSlot assignedSlot = slotRepository.findAll().stream()
-                .filter(s -> s.getZoneId().equals(finalZone.getId()) && "AVAILABLE".equals(s.getSlotStatus()))
-                .findFirst()
-                .orElse(null);
+        // Cải thiện thuật toán tìm Slot trống trực tiếp từ Database
+        ParkingSlot assignedSlot = slotRepository.findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", request.getVehicle_type())
+                .orElse(slotRepository.findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", "NORMAL").orElse(null));
+                
         if (assignedSlot != null) {
             assignedSlot.setSlotStatus("OCCUPIED");
             assignedSlot.setLastUpdated(Instant.now());
             slotRepository.save(assignedSlot);
             ps.setParkedSlotId(assignedSlot.getId());
             ps.setSlotPhotoUrl("https://mock-sensor-camera.com/slots/" + assignedSlot.getId() + ".jpg");
+        } else {
+            // Ném lỗi nếu hết slot thực tế dù Zone đếm còn trống (tránh lệch data)
+            throw new ApiExceptions.BadRequestException("Khu vực này hiện đã hết vị trí đỗ xe thực tế.");
         }
 
         parkingSessionRepository.save(ps);
@@ -457,18 +459,19 @@ public class ParkingServiceImpl implements ParkingService {
             session.setEntryGate(null); // Clear entry gate to let it inside
         }
 
-        // Find first available slot in the chosen zone
-        final Zone finalZone = chosen;
-        ParkingSlot assignedSlot = slotRepository.findAll().stream()
-                .filter(s -> s.getZoneId().equals(finalZone.getId()) && "AVAILABLE".equals(s.getSlotStatus()))
-                .findFirst()
-                .orElse(null);
+        // Cải thiện thuật toán tìm Slot trống trực tiếp từ Database
+        ParkingSlot assignedSlot = slotRepository.findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", request.getVehicle_type())
+                .orElse(slotRepository.findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", "NORMAL").orElse(null));
+                
         if (assignedSlot != null) {
             assignedSlot.setSlotStatus("OCCUPIED");
             assignedSlot.setLastUpdated(Instant.now());
             slotRepository.save(assignedSlot);
             session.setParkedSlotId(assignedSlot.getId());
             session.setSlotPhotoUrl("https://mock-sensor-camera.com/slots/" + assignedSlot.getId() + ".jpg");
+        } else {
+            // Ném lỗi nếu hết slot thực tế dù Zone đếm còn trống (tránh lệch data)
+            throw new ApiExceptions.BadRequestException("Khu vực này hiện đã hết vị trí đỗ xe thực tế.");
         }
 
         parkingSessionRepository.save(session); // save vào database

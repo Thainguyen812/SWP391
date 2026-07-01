@@ -235,7 +235,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   const [gatePlate, setGatePlate] = useState('');
   const [gateCardCode, setGateCardCode] = useState('');
   const [gateQrToken, setGateQrToken] = useState('');
-  const [gateActiveName, setGateActiveName] = useState('Bốt Gác Cổng Chính 1');
+  const [gateActiveName, setGateActiveName] = useState('Cổng vào 1');
   const [liveScanLogs, setLiveScanLogs] = useState<any[]>([]);
   const [isSecurityLockTriggered, setIsSecurityLockTriggered] = useState(false);
   const [securityViolatorPlate, setSecurityViolatorPlate] = useState('');
@@ -379,6 +379,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   // Check-in and out interactive modal managers
   const [selectedSlotForCheckIn, setSelectedSlotForCheckIn] = useState<any | null>(null);
   const [checkInPlate, setCheckInPlate] = useState('');
+  const [checkInCardCode, setCheckInCardCode] = useState('');
   const [checkInVehicleType, setCheckInVehicleType] = useState<'Sedan' | 'SUV' | 'Hatchback' | 'Sang trọng'>('Sedan');
   const [checkInIsVip, setCheckInIsVip] = useState(false);
 
@@ -460,9 +461,9 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
   useEffect(() => {
     if (activeFacility === 'cs2') {
-      setGateActiveName('Bốt Gác Landmark 1');
+      setGateActiveName('Cổng vào 3');
     } else {
-      setGateActiveName('Bốt Gác Cổng Trực 1');
+      setGateActiveName('Cổng vào 1');
     }
   }, [activeFacility]);
 
@@ -632,7 +633,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   const [mockLprPlateInput, setMockLprPlateInput] = useState('');
   const [mockLprType, setMockLprType] = useState<'OTO' | 'XEMAY' | 'VIP'>('OTO');
 
-  const executeLprCheckIn = (customPlate?: string) => {
+  const executeLprCheckIn = async (customPlate?: string) => {
     let chosenPlate = (customPlate || mockLprPlateInput).trim().toUpperCase();
     if (!chosenPlate) {
       // Generate realistic Vietnamese random license plate
@@ -643,184 +644,97 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
       chosenPlate = `${firstNum}${alpha}-${sub}.${end}`;
     }
 
-    // Is it blacklisted?
-    const isBad = blacklist.find(b => b.plate.replace(/\s+/g, '') === chosenPlate.replace(/\s+/g, ''));
-    if (isBad) {
-      triggerToast(`⚠️ CẢNH BÁO AN NINH! Xe trong danh sách đen phát hiện tại cổng: ${chosenPlate}. Lý do: ${isBad.reason}`, 'error');
-      // Append red system alert
-      const newNotice: SystemNotice = {
-        id: `NTC-${Date.now()}`,
-        type: 'ERROR',
-        title: `Phát hiện xe đen: ${chosenPlate}`,
-        desc: `Cảnh báo tức thì tại barriers! Lý do: ${isBad.reason}`,
-        time: 'Vừa xong'
-      };
-      setNotices([newNotice, ...notices]);
-      // Play sound
+    try {
+      await parkingService.aiCheckIn({
+        plate: chosenPlate,
+        cameraId: 'CAM-IN-01' // Mock camera ID
+      });
+      triggerToast(`Đã nhận diện & mở barie cho xe ${chosenPlate} bằng API AI!`, 'success');
+      
       const newLog = {
         id: `LOG-${Date.now()}`,
         time: new Date().toLocaleTimeString(),
-        type: 'ERROR',
-        message: `🚨 BÁO ĐỘNG ĐỎ: Xe trong danh sách kiểm soát [${chosenPlate}] tìm cách check-in.`
+        type: 'SUCCESS',
+        message: `API AI Check-in thành công xe [${chosenPlate}].`
       };
       setLogs([newLog, ...logs]);
-      return;
+      setNotificationsCount(prev => prev + 1);
+      setMockLprPlateInput('');
+      
+    } catch (error: any) {
+      const errMsg = error?.response?.data?.message || `Lỗi AI Check-in xe [${chosenPlate}]`;
+      triggerToast(errMsg, 'error');
+      const newNotice: SystemNotice = {
+        id: `NTC-${Date.now()}`,
+        type: 'ERROR',
+        title: `Phát hiện xe lỗi: ${chosenPlate}`,
+        desc: errMsg,
+        time: 'Vừa xong'
+      };
+      setNotices([newNotice, ...notices]);
     }
-
-    // Generate random slot
-    const slotIdx = Math.floor(1 + Math.random() * 30);
-    const zones = ['Khu A (Tầng 1)', 'Khu B (Tầng 2)', 'Khu C (Hầm B1)'] as const;
-    const randomZone = zones[mockLprType === 'OTO' ? 0 : mockLprType === 'VIP' ? 1 : 2];
-    const generatedSlot = `${randomZone.includes('Hầm') ? 'C' : randomZone.includes('Tầng 2') ? 'B' : 'A'}${slotIdx.toString().padStart(2, '0')}`;
-
-    // Add vehicular entry 
-    const newVehicle: ParkedVehicle = {
-      plate: chosenPlate,
-      type: mockLprType,
-      zone: randomZone,
-      slot: generatedSlot,
-      entryTime: currentTime,
-      ownerName: mockLprType === 'VIP' ? 'Khách hàng VIP' : 'Khách vãng lai',
-      phone: '090*******'
-    };
-
-    setVehicles([newVehicle, ...vehicles]);
-    triggerToast(`Đã nhận diện & mở barie cho xe ${chosenPlate} vào vị trí đỗ [${generatedSlot}] thành công!`, 'success');
-
-    // Add log entry
-    const newLog = {
-      id: `LOG-${Date.now()}`,
-      time: new Date().toLocaleTimeString(),
-      type: 'SUCCESS',
-      message: `Cổng Vào 01 nhận diện [${chosenPlate}] (${mockLprType === 'VIP' ? 'Vé VIP' : 'Vé Thường'}). Cấp vị trí: ${generatedSlot}.`
-    };
-    setLogs([newLog, ...logs]);
-    
-    // Increment notifications count
-    setNotificationsCount(prev => prev + 1);
-
-    setMockLprPlateInput('');
   };
 
-  const executeLprCheckOut = (plateToRelease: string) => {
-    const isVIP = vehicles.find(v => v.plate === plateToRelease)?.type === 'VIP';
-    const releaseCost = isVIP ? '0 VNĐ (Thẻ VIP)' : '10,000 VNĐ';
-
-    setVehicles(vehicles.filter(v => v.plate !== plateToRelease));
-    
-    // Add transaction log
-    const nextTxId = `TXN-${Math.floor(100 + Math.random() * 900)}`;
-    const newTx = {
-      id: nextTxId,
-      plate: plateToRelease,
-      type: isVIP ? 'Vé VIP' : 'Vé Ngày',
-      gate: 'Cổng Ra 01',
-      time: new Date().toLocaleTimeString().substring(0, 5) + ' Hôm nay',
-      cost: releaseCost,
-      originalCost: isVIP ? '0 VNĐ' : '10,000 VNĐ',
-      paymentMethod: isVIP ? 'Thẻ từ Auto' : 'VNPAY',
-      invoiceNo: `VAT-${Math.floor(100000 + Math.random() * 900000)}`,
-      status: 'THÀNH CÔNG',
-      note: ''
-    };
-
-    setTransactions([newTx, ...transactions]);
-    triggerToast(`Đã xuất bến thành công cho xe ${plateToRelease}! Hóa đơn ${releaseCost}.`, 'success');
-
-    // Logging
-    const newLog = {
-      id: `LOG-${Date.now()}`,
-      time: new Date().toLocaleTimeString(),
-      type: 'SUCCESS',
-      message: `Xe [${plateToRelease}] check-out khỏi bãi qua Cổng Ra 01. Giao dịch: ${releaseCost}.`
-    };
-    setLogs([newLog, ...logs]);
+  const executeLprCheckOut = async (plateToRelease: string) => {
+    try {
+      await parkingService.checkoutByCode('TEMP_' + plateToRelease);
+      triggerToast(`Đã gọi API Check-out LPR thành công cho xe ${plateToRelease}!`, 'success');
+      setVehicles(vehicles.filter(v => v.plate !== plateToRelease));
+    } catch (error: any) {
+      triggerToast(error?.response?.data?.message || `Lỗi gọi API Checkout cho xe ${plateToRelease}`, 'error');
+    }
   };
 
-  const handleManualCheckIn = () => {
+  const handleManualCheckIn = async () => {
     if (!checkInPlate.trim()) {
       triggerToast('Vui lòng nhập biển số xe hợp lệ!', 'error');
       return;
     }
-    const updatedSlots = blueprintSlots.map(s => {
-      if (s.id === selectedSlotForCheckIn.id) {
-        return {
-          ...s,
-          status: checkInIsVip ? 'XE VIP' : 'ĐÃ ĐỖ',
-          vehicleType: checkInVehicleType,
-          plate: checkInPlate.trim().toUpperCase(),
-          entryTime: new Date().toLocaleTimeString().substring(0, 5)
-        };
-      }
-      return s;
-    });
-    setBlueprintSlots(updatedSlots);
-    
-    // Add live activity movement
-    const newActivity = {
-      id: `act-${Date.now()}`,
-      plate: checkInPlate.trim().toUpperCase(),
-      type: checkInVehicleType,
-      gate: 'Cổng Vào 1',
-      time: new Date().toLocaleTimeString().substring(0, 8),
-      action: 'Vào',
-      vip: checkInIsVip
-    };
-    setRecentActivities([newActivity, ...recentActivities]);
-
-    // Sync to vehicles list
-    const newVehicle: ParkedVehicle = {
-      plate: checkInPlate.trim().toUpperCase(),
-      type: checkInIsVip ? 'VIP' : checkInVehicleType === 'Sang trọng' ? 'VIP' : 'OTO',
-      zone: (monitoringFloor === 'Tầng hầm B1' ? 'Khu C (Hầm B1)' : 'Khu A (Tầng 1)') as any,
-      slot: selectedSlotForCheckIn.label,
-      entryTime: new Date().toLocaleTimeString().substring(0, 5),
-      ownerName: checkInIsVip ? 'Khách hàng VIP' : 'Khách vãng lai',
-      phone: '090*******'
-    };
-    setVehicles([newVehicle, ...vehicles]);
-
-    triggerToast(`Đã đỗ xe ${checkInPlate.toUpperCase()} thành công tại ô ${selectedSlotForCheckIn.label}!`, 'success');
-    setSelectedSlotForCheckIn(null);
-    setCheckInPlate('');
+    if (!checkInCardCode.trim()) {
+      triggerToast('Vui lòng nhập mã thẻ (VD: 000001)!', 'error');
+      return;
+    }
+    try {
+      await parkingService.visitorCheckIn({
+        plate: checkInPlate.trim().toUpperCase(),
+        vehicle_type: checkInVehicleType,
+        card_code: checkInCardCode.trim(),
+        image_url: 'https://example.com/fake-lpr.jpg' // Fake image
+      });
+      triggerToast(`Đã gọi API Check-in xe ${checkInPlate.toUpperCase()} thành công!`, 'success');
+      setSelectedSlotForCheckIn(null);
+      setCheckInPlate('');
+      setCheckInCardCode('');
+    } catch (error: any) {
+      triggerToast(error?.response?.data?.message || 'Lỗi khi gọi API Check-in', 'error');
+    }
   };
 
-  const handleManualCheckOut = (slotId: string, label: string) => {
+  const handleManualCheckOut = async (slotId: string, label: string) => {
     const targetSlot = blueprintSlots.find(s => s.id === slotId);
     if (!targetSlot || (targetSlot.status !== 'ĐÃ ĐỖ' && targetSlot.status !== 'XE VIP')) return;
 
     const releasedPlate = targetSlot.plate;
-    const isVip = targetSlot.status === 'XE VIP';
     
-    const updatedSlots = blueprintSlots.map(s => {
-      if (s.id === slotId) {
-        return {
-          id: s.id,
-          label: s.label,
-          status: 'CÒN'
-        };
-      }
-      return s;
-    });
-    setBlueprintSlots(updatedSlots);
-
-    // Add live activity movement
-    const newActivity = {
-      id: `act-${Date.now()}`,
-      plate: releasedPlate,
-      type: targetSlot.vehicleType || 'Sedan',
-      gate: 'Cổng Ra 1',
-      time: new Date().toLocaleTimeString().substring(0, 8),
-      action: 'Ra',
-      vip: isVip
-    };
-    setRecentActivities([newActivity, ...recentActivities]);
-
-    // Sync with regular vehicles state
-    setVehicles(vehicles.filter(v => v.plate !== releasedPlate));
-
-    triggerToast(`Đã xuất bến cho xe ${releasedPlate} từ ô đỗ ${label}! Phí thanh toán: ${isVip ? '0 VNĐ (VIP)' : '10.000 VNĐ'}`, 'success');
-    setSelectedSlotDetails(null);
+    try {
+      // Dùng biển số làm cardCode tạm thời để khớp với Backend Check-in trước đó
+      await parkingService.checkoutByCode('TEMP_' + releasedPlate);
+      
+      triggerToast(`Đã xuất bến cho xe ${releasedPlate} từ ô đỗ ${label}!`, 'success');
+      
+      // Xóa xe khỏi giao diện
+      const updatedSlots = blueprintSlots.map(s => {
+        if (s.id === slotId) {
+          return { ...s, id: s.id, label: s.label, status: 'CÒN' };
+        }
+        return s;
+      });
+      setBlueprintSlots(updatedSlots);
+      setVehicles(vehicles.filter(v => v.plate !== releasedPlate));
+      setSelectedSlotDetails(null);
+    } catch (error: any) {
+      triggerToast(error?.response?.data?.message || `Lỗi API Check-out xe [${releasedPlate}]`, 'error');
+    }
   };
 
   const handleManualActionNotice = (noticeId: string) => {
@@ -1393,16 +1307,16 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                               >
                                 {(activeFacility === 'all' || activeFacility === 'cs1') && (
                                   <>
-                                    <option value="Bốt Gác Cổng Trực 1">CS1 - Bốt Gác Cổng Vào chính B1 (HQ)</option>
-                                    <option value="Bốt Gác Cổng Trực 2">CS1 - Bốt Gác Cổng Vào phụ G2</option>
-                                    <option value="Bốt Gác Cổng Trực 3">CS1 - Bốt Gác Cổng Ra chính v1</option>
+                                    <option value="Cổng vào 1">CS1 - Bốt Gác Cổng Vào chính B1 (HQ)</option>
+                                    <option value="Cổng vào 2">CS1 - Bốt Gác Cổng Vào phụ G2</option>
+                                    <option value="Cổng ra 1">CS1 - Bốt Gác Cổng Ra chính v1</option>
                                   </>
                                 )}
                                 {(activeFacility === 'all' || activeFacility === 'cs2') && (
                                   <>
-                                    <option value="Bốt Gác Landmark 1">CS2 - Bốt Gác Landmark Cổng Vào A1</option>
-                                    <option value="Bốt Gác Landmark 2">CS2 - Bốt Gác Landmark Cổng Vào B2</option>
-                                    <option value="Bốt Gác Landmark 3">CS2 - Bốt Gác Landmark Cổng Ra chính</option>
+                                    <option value="Cổng vào 3">CS2 - Bốt Gác Landmark Cổng Vào A1</option>
+                                    <option value="Cổng ra 2">CS2 - Bốt Gác Landmark Cổng Ra B2</option>
+                                    <option value="Cổng ra 3">CS2 - Bốt Gác Landmark Cổng Ra chính</option>
                                   </>
                                 )}
                               </select>
@@ -2192,6 +2106,16 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                                     placeholder="Ví dụ: 30A-999.88"
                                     value={checkInPlate}
                                     onChange={(e) => setCheckInPlate(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-205 dark:border-slate-850 rounded-xl font-mono text-xs uppercase font-extrabold focus:border-blue-500 outline-none"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Mã thẻ (000001-000050)</label>
+                                  <input 
+                                    type="text"
+                                    placeholder="Ví dụ: 000001"
+                                    value={checkInCardCode}
+                                    onChange={(e) => setCheckInCardCode(e.target.value)}
                                     className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-205 dark:border-slate-850 rounded-xl font-mono text-xs uppercase font-extrabold focus:border-blue-500 outline-none"
                                   />
                                 </div>
