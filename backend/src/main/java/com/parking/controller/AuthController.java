@@ -15,17 +15,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
 
-<<<<<<< HEAD
+import com.parking.dto.RefreshTokenRequest;
 import com.parking.model.User;
 import com.parking.repository.UserRepository;
-import org.springframework.security.core.context.SecurityContextHolder;
+
 import org.springframework.security.core.Authentication;
-
-=======
-import com.parking.dto.RefreshTokenRequest;
-
-import java.util.List;
->>>>>>> f7742fb (Chuẩn hóa request của API refresh token)
+import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.Map;
 import java.util.HashMap;
 
