@@ -13,6 +13,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import com.parking.model.User;
+import com.parking.model.Vehicle;
+import com.parking.repository.UserRepository;
+import com.parking.repository.VehicleRepository;
+import org.springframework.security.core.Authentication;
+import java.util.Optional;
+
 @RestController
 @RequestMapping("/api/v1/driver")
 public class DriverController {
@@ -20,12 +27,21 @@ public class DriverController {
     private final VipQrIdentifierRepository qrRepo;
     private final ParkingSessionRepository sessionRepo;
     private final ParkingService parkingService;
+    private final VehicleRepository vehicleRepository;
+    private final UserRepository userRepository;
 
-    public DriverController(VipQrIdentifierRepository qrRepo, ParkingSessionRepository sessionRepo,
-            ParkingService parkingService) {
+    public DriverController(
+            VipQrIdentifierRepository qrRepo,
+            ParkingSessionRepository sessionRepo,
+            ParkingService parkingService,
+            VehicleRepository vehicleRepository,
+            UserRepository userRepository) {
+
         this.qrRepo = qrRepo;
         this.sessionRepo = sessionRepo;
         this.parkingService = parkingService;
+        this.vehicleRepository = vehicleRepository;
+        this.userRepository = userRepository;
     }
 
     @PostMapping("/qr/generate")
@@ -114,4 +130,20 @@ public class DriverController {
             this.lockStatus = lockStatus;
         }
     }
+
+    //API lấy danh sách xe của chính chủ
+    @GetMapping("/vehicles")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ResponseEntity<List<Vehicle>> getMyVehicles(Authentication authentication) {
+
+        String username = authentication.getName();
+
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+
+        List<Vehicle> vehicles = vehicleRepository.findByOwnerId(currentUser.getId());
+
+        return ResponseEntity.ok(vehicles);
+    }
+
 }
