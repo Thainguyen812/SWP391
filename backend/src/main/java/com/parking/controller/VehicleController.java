@@ -13,7 +13,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/vehicles")
-@PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
 public class VehicleController {
     private final VehicleRepository repo;
 

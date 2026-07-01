@@ -66,7 +66,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/blacklisted-cards/**").hasAnyRole("STAFF", "MANAGER")
                         .requestMatchers("/api/tickets/**").hasAnyRole("STAFF", "MANAGER")
                         .requestMatchers("/api/shifts/**", "/api/personnel/**").hasAnyRole("STAFF", "MANAGER")
-                        .requestMatchers("/api/parking/monitoring/**").hasAnyRole("STAFF", "MANAGER")
+                        .requestMatchers("/api/monitoring/**").hasAnyRole("STAFF", "MANAGER")
                         .requestMatchers("/api/camera/**").hasAnyRole("STAFF", "MANAGER")
                         .requestMatchers("/api/sessions/daily-volume").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers("/api/sessions/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
