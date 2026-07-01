@@ -128,9 +128,10 @@ public class ParkingController {
         return ResponseEntity.ok(parkingService.findCarByDigits(digits));
     }
 
-    // 8. Bản đồ bãi xe: Loại bỏ quyền ADMIN, chỉ dành cho Staff và Manager vận hành
+    // 8. Bản đồ bãi xe: chỉ dành cho Staff và Manager vận hành,Thêm ADMIN để cấp kỹ
+    // thuật cao nhất
     @GetMapping("/monitoring/map")
-    @PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('STAFF', 'MANAGER', 'ADMIN')")
     public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getMonitoringMap() {
         return ResponseEntity.ok(parkingService.getMonitoringMap());
     }

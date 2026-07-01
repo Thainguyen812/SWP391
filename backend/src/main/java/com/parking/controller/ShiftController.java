@@ -3,6 +3,7 @@ package com.parking.controller;
 import com.parking.model.ShiftHistory;
 import com.parking.repository.ShiftHistoryRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -10,6 +11,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/shifts")
+@PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
 public class ShiftController {
 
     private final ShiftHistoryRepository shiftRepo;
