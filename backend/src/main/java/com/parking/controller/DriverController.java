@@ -47,7 +47,7 @@ public class DriverController {
     // 2. Khóa xe chống trộm: Tài xế VIP tự khóa xe họ, hoặc MANAGER hỗ trợ khóa từ
     // xa qua tổng đài
     @PutMapping("/vehicle/lock")
-    @PreAuthorize("hasAnyRole('DRIVER', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('DRIVER', 'STAFF', 'MANAGER')")
     public ResponseEntity<?> lockVehicle(@RequestBody LockVehicleRequest req) {
         List<ParkingSession> activeSessions = sessionRepo.findByVehicleIdAndSessionStatusIn(
                 req.getVehicleId(),
@@ -67,7 +67,7 @@ public class DriverController {
 
     // 3. Xem trạng thái xe: Chỉ tài xế VIP kiểm tra tình trạng xe của mình
     @GetMapping("/vehicle/{vehicleId}/status")
-    @PreAuthorize("hasRole('DRIVER')")
+    @PreAuthorize("hasAnyRole('DRIVER', 'STAFF', 'MANAGER')")
     public ResponseEntity<java.util.Map<String, Object>> getVehicleStatus(@PathVariable UUID vehicleId) {
         return ResponseEntity.ok(parkingService.getVehicleStatus(vehicleId));
     }

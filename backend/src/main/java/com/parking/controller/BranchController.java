@@ -2,13 +2,15 @@ package com.parking.controller;
 
 import com.parking.model.Branch;
 import com.parking.repository.BranchRepository;
+
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
 @RequestMapping("/api/branches")
 public class BranchController {
-    
+
     private final BranchRepository branchRepo;
 
     public BranchController(BranchRepository branchRepo) {
@@ -16,6 +18,7 @@ public class BranchController {
     }
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public List<Map<String, Object>> getBranches() {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Branch b : branchRepo.findAll()) {
@@ -32,6 +35,7 @@ public class BranchController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> createBranch(@RequestBody Map<String, Object> branchData) {
         Branch b = new Branch();
         b.setId(UUID.randomUUID());

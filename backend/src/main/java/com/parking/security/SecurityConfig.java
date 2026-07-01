@@ -2,6 +2,7 @@ package com.parking.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -47,14 +48,16 @@ public class SecurityConfig {
                         .permitAll()
 
                         // 2. Phân vùng API chỉ dành riêng cho ADMIN
-                        .requestMatchers("/api/users/**").hasRole("ADMIN")
+                        .requestMatchers("/api/users/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/security/**").hasRole("ADMIN")
 
                         // 3. Phân vùng API dành cho Quản lý (MANAGER) và Nhân viên (STAFF)
                         .requestMatchers("/api/logs/**").hasAnyRole("ADMIN", "MANAGER", "STAFF")
 
                         // 3. Phân vùng API dành cho Quản lý (MANAGER)
-                        .requestMatchers("/api/revenue/shift-stats", "/api/revenue/transactions", "/api/revenue/transactions/**").hasAnyRole("MANAGER", "STAFF")
+                        .requestMatchers("/api/revenue/shift-stats", "/api/revenue/transactions",
+                                "/api/revenue/transactions/**")
+                        .hasAnyRole("MANAGER", "STAFF")
                         .requestMatchers("/api/revenue/**").hasRole("MANAGER")
                         .requestMatchers("/api/dashboard/**").hasRole("MANAGER")
                         .requestMatchers("/api/settings/**").hasRole("MANAGER")
@@ -63,8 +66,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/blacklisted-cards/**").hasAnyRole("STAFF", "MANAGER")
                         .requestMatchers("/api/tickets/**").hasAnyRole("STAFF", "MANAGER")
                         .requestMatchers("/api/shifts/**", "/api/personnel/**").hasAnyRole("STAFF", "MANAGER")
-                        .requestMatchers("/api/monitoring/**").hasAnyRole("STAFF", "MANAGER")
+                        .requestMatchers("/api/parking/monitoring/**").hasAnyRole("STAFF", "MANAGER")
                         .requestMatchers("/api/camera/**").hasAnyRole("STAFF", "MANAGER")
+                        .requestMatchers("/api/sessions/daily-volume").hasAnyRole("MANAGER", "ADMIN")
+                        .requestMatchers("/api/sessions/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
+                        .requestMatchers("/api/gate/**").hasAnyRole("STAFF", "MANAGER")
+                        .requestMatchers(HttpMethod.GET, "/api/branches").authenticated() // Đăng nhập là xem được
+                        .requestMatchers(HttpMethod.POST, "/api/branches").hasRole("ADMIN") // Chỉ Admin được tạo
 
                         // 5. Toàn bộ các API còn lại (bao gồm /api/v1/parking/** và /api/vehicles/**)
                         // Sẽ được kiểm soát chi tiết bằng @PreAuthorize tại Controller
