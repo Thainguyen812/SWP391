@@ -34,7 +34,8 @@ export function DriverHome() {
     billingTimeFilter, setBillingTimeFilter, billingTypeFilter, setBillingTypeFilter,
     searchSupportQuery, setSearchSupportQuery, expandedFaq, setExpandedFaq,
     ticketTopic, setTicketTopic, ticketMessage, setTicketMessage,
-    ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout
+    ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout,
+    triggerSecurityTest
   } = ctx;
 
   return (
