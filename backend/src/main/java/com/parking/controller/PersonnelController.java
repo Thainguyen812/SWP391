@@ -39,7 +39,7 @@ public class PersonnelController {
 
         try {
             User savedUser = personnelService.createPersonnel(request);
-            savedUser.setPassword("[PROTECTED]"); // Giấu mật khẩu đã mã hóa trước khi trả về client
+            savedUser.setPasswordHash("[PROTECTED]"); // Giấu mật khẩu đã mã hóa trước khi trả về client
             return ResponseEntity.status(HttpStatus.CREATED).body(savedUser);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
