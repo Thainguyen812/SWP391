@@ -74,7 +74,6 @@ public class ParkingSession {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "lost_card_proof_photos")
-    @JdbcTypeCode(SqlTypes.JSON)
     private String lostCardProofPhotos;
 
     @Column(name = "slot_photo_url")

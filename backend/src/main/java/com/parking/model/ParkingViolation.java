@@ -1,18 +1,14 @@
 package com.parking.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "parking_violations")
-@Data
 public class ParkingViolation {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -60,4 +56,40 @@ public class ParkingViolation {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    // Manual Getters & Setters
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
+    public UUID getSessionId() { return sessionId; }
+    public void setSessionId(UUID sessionId) { this.sessionId = sessionId; }
+
+    public String getViolationType() { return violationType; }
+    public void setViolationType(String violationType) { this.violationType = violationType; }
+
+    public String getPhotoUrls() { return photoUrls; }
+    public void setPhotoUrls(String photoUrls) { this.photoUrls = photoUrls; }
+
+    public UUID getDetectedBy() { return detectedBy; }
+    public void setDetectedBy(UUID detectedBy) { this.detectedBy = detectedBy; }
+
+    public Instant getDetectedAt() { return detectedAt; }
+    public void setDetectedAt(Instant detectedAt) { this.detectedAt = detectedAt; }
+
+    public boolean isFirstViolation() { return isFirstViolation; }
+    public void setFirstViolation(boolean firstViolation) { isFirstViolation = firstViolation; }
+
+    public boolean isPenaltyApplied() { return penaltyApplied; }
+    public void setPenaltyApplied(boolean penaltyApplied) { this.penaltyApplied = penaltyApplied; }
+
+    public BigDecimal getPenaltyAmount() { return penaltyAmount; }
+    public void setPenaltyAmount(BigDecimal penaltyAmount) { this.penaltyAmount = penaltyAmount; }
+
+    public UUID getSlotId() { return slotId; }
+    public void setSlotId(UUID slotId) { this.slotId = slotId; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 }
