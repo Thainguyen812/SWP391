@@ -340,10 +340,30 @@ export const GlobalProvider = ({ children }) => {
           g.typeColor = v.type === 'VIP' ? 'bg-slate-800 text-white' : 'bg-blue-100 text-blue-700';
           g.plate = v.plate;
           
-          g.mode = v.status === 'Chờ thanh toán' ? 'Thủ công' : 'Tự động';
-          g.barrier = v.status === 'Chờ thanh toán' ? 'ĐANG CHỜ' : (v.status === 'Cảnh báo' || v.status === 'Lỗi thẻ' ? 'ĐÓNG' : 'MỞ');
-          g.barrierColor = g.barrier === 'MỞ' ? 'text-emerald-500' : (g.barrier === 'ĐÓNG' ? 'text-red-500' : 'text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded');
-          g.actions = g.mode === 'Thủ công' ? ["approve", "reject"] : ["lock", "wrench"];
+          const isEntryGate = gateId.includes('VÀO');
+          const isExitGate = gateId.includes('RA');
+          if (isEntryGate) {
+            // Entry gate: vehicle waits for staff approval
+            g.mode = 'Thủ công';
+            g.barrier = 'ĐANG CHỜ';
+            g.barrierColor = 'text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded';
+            g.actions = ["approve", "reject"];
+          } else if (v.status === 'Chờ thanh toán') {
+            g.mode = 'Thủ công';
+            g.barrier = 'ĐANG CHỜ';
+            g.barrierColor = 'text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded';
+            g.actions = ["approve", "reject"];
+          } else if (v.status === 'Cảnh báo' || v.status === 'Lỗi thẻ') {
+            g.mode = 'Tự động';
+            g.barrier = 'ĐÓNG';
+            g.barrierColor = 'text-red-500';
+            g.actions = ["lock", "wrench"];
+          } else {
+            g.mode = 'Tự động';
+            g.barrier = 'MỞ';
+            g.barrierColor = 'text-emerald-500';
+            g.actions = ["lock", "wrench"];
+          }
           g.vehicleId = v.id;
         });
       }

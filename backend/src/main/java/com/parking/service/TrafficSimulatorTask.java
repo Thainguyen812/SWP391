@@ -26,12 +26,15 @@ public class TrafficSimulatorTask {
     private final TransactionRepository transactionRepo;
     private final ZoneRepository zoneRepo;
     private final SecurityAlertRepository alertRepo;
+    private final PendingGateVehicleService pendingGateVehicleService;
 
-    public TrafficSimulatorTask(ParkingSessionRepository sessionRepo, TransactionRepository transactionRepo, ZoneRepository zoneRepo, SecurityAlertRepository alertRepo) {
+    public TrafficSimulatorTask(ParkingSessionRepository sessionRepo, TransactionRepository transactionRepo, ZoneRepository zoneRepo,
+            SecurityAlertRepository alertRepo, PendingGateVehicleService pendingGateVehicleService) {
         this.sessionRepo = sessionRepo;
         this.transactionRepo = transactionRepo;
         this.zoneRepo = zoneRepo;
         this.alertRepo = alertRepo;
+        this.pendingGateVehicleService = pendingGateVehicleService;
     }
 
     private final List<String> IN_GATES = Arrays.asList("CỔNG VÀO 1", "CỔNG VÀO 2", "CỔNG VÀO 3");
@@ -42,9 +45,7 @@ public class TrafficSimulatorTask {
         try {
             // Logic Check-in: Clear entry gates that have been occupied for > 90s
             Instant threshold = Instant.now().minus(90, ChronoUnit.SECONDS);
-            List<ParkingSession> processingIns = sessionRepo.findAll().stream()
-                .filter(s -> s.getSessionStatus() == ParkingSession.SessionStatus.ACTIVE && s.getEntryGate() != null)
-                .collect(Collectors.toList());
+            List<PendingGateVehicleService.PendingEntry> processingIns = pendingGateVehicleService.findAll();
 
             // AUTOMATIC CHECK-IN COMMENTED OUT - wait for manual staff approval
             /*
@@ -92,7 +93,13 @@ public class TrafficSimulatorTask {
 
             // Randomly check in a new vehicle to an EMPTY entry gate
             if (Math.random() > 0.5) {
-                List<String> occupiedInGates = processingIns.stream().map(ParkingSession::getEntryGate).collect(Collectors.toList());
+                List<String> occupiedInGates = processingIns.stream()
+                    .map(PendingGateVehicleService.PendingEntry::getEntryGate)
+                    .collect(Collectors.toList());
+                occupiedInGates.addAll(sessionRepo.findAll().stream()
+                    .filter(s -> s.getSessionStatus() == ParkingSession.SessionStatus.ACTIVE && s.getEntryGate() != null)
+                    .map(ParkingSession::getEntryGate)
+                    .collect(Collectors.toList()));
                 List<String> emptyInGates = IN_GATES.stream().filter(g -> !occupiedInGates.contains(g)).collect(Collectors.toList());
                 
                 if (!emptyInGates.isEmpty()) {
@@ -128,7 +135,16 @@ public class TrafficSimulatorTask {
                         alert.setIsResolved(false);
                         alertRepo.save(alert);
                     }
-                    sessionRepo.save(session);
+                    pendingGateVehicleService.add(new PendingGateVehicleService.PendingEntry(
+                        session.getId(),
+                        session.getLicensePlate(),
+                        session.getEntryGate(),
+                        Boolean.TRUE.equals(session.getIsVip()),
+                        Boolean.TRUE.equals(session.getIsSuspicious()),
+                        session.getSuspiciousReason(),
+                        "SEDAN_HATCHBACK",
+                        session.getCheckInTime()
+                    ));
                 }
             } // Added missing closing brace here
 

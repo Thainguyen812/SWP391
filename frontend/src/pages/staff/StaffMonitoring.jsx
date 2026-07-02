@@ -15,7 +15,7 @@ export const StaffMonitoring = () => {
   const { activeVehicles, securityAlerts, removeSecurityAlert, totalGates } = useGlobalContext();
   
   const totalCapacity = 500;
-  const vehiclesInLot = activeVehicles ? activeVehicles.length : 0;
+  const vehiclesInLot = activeVehicles ? activeVehicles.filter(v => !v.gate).length : 0;
   const availableSpots = Math.max(0, totalCapacity - vehiclesInLot);
   const occupancyRate = ((vehiclesInLot / totalCapacity) * 100).toFixed(1);
   const alertsCount = securityAlerts ? securityAlerts.length : 0;

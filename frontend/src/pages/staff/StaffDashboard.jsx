@@ -67,7 +67,7 @@ export const StaffDashboard = () => {
         setLoadingLogs(true);
         const data = await logService.getParkingSessions();
         if (data && Array.isArray(data)) {
-          const mappedLogs = data.map((session, index) => {
+          const mappedLogs = data.filter(session => !session.isPending).map((session, index) => {
             const isCheckIn = !session.checkOutTime;
             
             // Map vehicle details from backend DTO

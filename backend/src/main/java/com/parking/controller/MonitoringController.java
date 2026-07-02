@@ -38,10 +38,10 @@ public class MonitoringController {
         int totalCapacity = zones.stream().mapToInt(Zone::getTotalSlots).sum();
         
         // Đếm số xe đang đỗ (ACTIVE)
-        long currentlyParked = sessionRepo.countBySessionStatus(ParkingSession.SessionStatus.ACTIVE);
+        long currentlyParked = sessionRepo.countBySessionStatusAndEntryGateIsNull(ParkingSession.SessionStatus.ACTIVE);
         
         // Đếm xe VIP đang đỗ
-        long vipVehicles = sessionRepo.countBySessionStatusAndIsVipTrue(ParkingSession.SessionStatus.ACTIVE);
+        long vipVehicles = sessionRepo.countBySessionStatusAndIsVipTrueAndEntryGateIsNull(ParkingSession.SessionStatus.ACTIVE);
         
         // Tỷ lệ và chỗ trống
         int parkedPercentage = totalCapacity == 0 ? 0 : (int) ((double) currentlyParked / totalCapacity * 100);
