@@ -156,32 +156,33 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       const response = await fetch('/api/vehicles', {
         headers: { 'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}` }
       });
-      const data = await response.json();
-      if (data.success && Array.isArray(data.data)) {
-        const mapped: UserVehicle[] = data.data.map((v: any, index: number) => {
-          const existingLocal = vehicles.find(lv => lv.plate === v.plate);
-          return {
-            id: v.id || `veh-${v.plate}`,
-            plate: v.plate,
-            name: v.name,
-            type: v.bodyShape ? v.bodyShape :
-                  v.type === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
-                  v.type === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
-                  'Ô tô gầm thấp 4-5 chỗ',
-            regDate: '12/10/2023',
-            isActive: true,
-            image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
-            isLocked: existingLocal ? existingLocal.isLocked : (v.isLocked || false),
-            activeSubscription: existingLocal ? existingLocal.activeSubscription : undefined,
-            subscriptionExpiry: existingLocal ? existingLocal.subscriptionExpiry : undefined
-          };
+           if (data.success && Array.isArray(data.data)) {
+        setVehicles(prevVehicles => {
+          const mapped: UserVehicle[] = data.data.map((v: any, index: number) => {
+            const existingLocal = prevVehicles.find(lv => lv.plate === v.plate);
+            return {
+              id: v.id || `veh-${v.plate}`,
+              plate: v.plate,
+              name: v.name,
+              type: v.bodyShape ? v.bodyShape :
+                    v.type === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
+                    v.type === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
+                    'Ô tô gầm thấp 4-5 chỗ',
+              regDate: '12/10/2023',
+              isActive: true,
+              image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
+              isLocked: v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false),
+              activeSubscription: existingLocal ? existingLocal.activeSubscription : undefined,
+              subscriptionExpiry: existingLocal ? existingLocal.subscriptionExpiry : undefined
+            };
+          });
+
+          if (mapped.length > 0 && (!selectedVehId || !mapped.some(mv => mv.id === selectedVehId))) {
+            setTimeout(() => setSelectedVehId(mapped[0].id), 0);
+          }
+
+          return mapped;
         });
-        setVehicles(mapped);
-        
-        // Auto-initialize first selection if needed
-        if (mapped.length > 0 && (!selectedVehId || !mapped.some(mv => mv.id === selectedVehId))) {
-          setSelectedVehId(mapped[0].id);
-        }
       }
     } catch (e) {
       console.warn("Backend not yet connected or starting:", e);

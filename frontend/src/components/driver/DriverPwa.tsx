@@ -211,43 +211,47 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       const data = await response.json();
       const vehicleList = Array.isArray(data) ? data : (data && data.success && Array.isArray(data.data) ? data.data : null);
       if (vehicleList) {
-        const mapped: UserVehicle[] = vehicleList.map((v: any, index: number) => {
-          const sizeType = v.vehicleSize || v.type || 'SEDAN_HATCHBACK';
-          const sizeLabel = v.bodyShape ? v.bodyShape :
-                            sizeType === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
-                            sizeType === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
-                            sizeType === 'EV_CAR' ? 'Xe điện' :
-                            'Ô tô gầm thấp 4-5 chỗ';
-          
-          let regDate = '30/06/2026';
-          if (v.createdAt) {
-            try {
-              const d = new Date(v.createdAt);
-              regDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-            } catch (err) {}
+        setVehicles(prevVehicles => {
+          const mapped: UserVehicle[] = vehicleList.map((v: any, index: number) => {
+            const sizeType = v.vehicleSize || v.type || 'SEDAN_HATCHBACK';
+            const sizeLabel = v.bodyShape ? v.bodyShape :
+                              sizeType === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
+                              sizeType === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
+                              sizeType === 'EV_CAR' ? 'Xe điện' :
+                              'Ô tô gầm thấp 4-5 chỗ';
+            
+            let regDate = '30/06/2026';
+            if (v.createdAt) {
+              try {
+                const d = new Date(v.createdAt);
+                regDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+              } catch (err) {}
+            }
+            
+            // Tìm xe cục bộ hiện tại bằng cách dùng prevVehicles thay vì state vehicles bị dính closure
+            const existingLocal = prevVehicles.find(lv => lv.plate === (v.licensePlate || v.plate));
+            
+            return {
+              id: v.id || `veh-${v.licensePlate || v.plate}`,
+              plate: v.licensePlate || v.plate,
+              name: v.brand || v.name || 'Phương tiện',
+              type: sizeLabel,
+              regDate: regDate,
+              isActive: v.isActive !== false && v.active !== false,
+              image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
+              isLocked: v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false),
+              activeSubscription: existingLocal ? existingLocal.activeSubscription : undefined,
+              subscriptionExpiry: existingLocal ? existingLocal.subscriptionExpiry : undefined
+            };
+          });
+
+          // Cập nhật selectedVehId bên ngoài nhưng dựa trên mapped list
+          if (mapped.length > 0 && (!selectedVehId || !mapped.some(mv => mv.id === selectedVehId))) {
+            setTimeout(() => setSelectedVehId(mapped[0].id), 0);
           }
-          
-          // Tìm xe cục bộ hiện tại để giữ lại thông tin đăng ký gói cước và trạng thái khoá
-          const existingLocal = vehicles.find(lv => lv.plate === (v.licensePlate || v.plate));
-          
-          return {
-            id: v.id || `veh-${v.licensePlate || v.plate}`,
-            plate: v.licensePlate || v.plate,
-            name: v.brand || v.name || 'Phương tiện',
-            type: sizeLabel,
-            regDate: regDate,
-            isActive: v.isActive !== false && v.active !== false,
-            image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
-            isLocked: existingLocal ? existingLocal.isLocked : (v.isLocked || false),
-            activeSubscription: existingLocal ? existingLocal.activeSubscription : undefined,
-            subscriptionExpiry: existingLocal ? existingLocal.subscriptionExpiry : undefined
-          };
+
+          return mapped;
         });
-        setVehicles(mapped);
-        
-        if (mapped.length > 0 && (!selectedVehId || !mapped.some(mv => mv.id === selectedVehId))) {
-          setSelectedVehId(mapped[0].id);
-        }
       }
     } catch (e) {
       console.warn("Backend not yet connected or starting:", e);
