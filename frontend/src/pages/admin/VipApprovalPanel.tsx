@@ -38,6 +38,19 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING' | 'ACTIVE' | 'REJECTED'>('PENDING');
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        setUserRole(u.role);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
 
   // Sync state with localstorage
   const loadSubscriptions = () => {
@@ -341,22 +354,28 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
 
                 {/* Decision controls */}
                 {(sub.status === 'PENDING' || sub.status === 'PENDING_APPROVAL') ? (
-                  <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-                    <button
-                      onClick={() => handleAction(sub.id, 'REJECTED')}
-                      className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 hover:text-rose-700 text-rose-600 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-98 cursor-pointer flex items-center gap-1"
-                    >
-                      <X className="w-4 h-4" />
-                      Không duyệt (Reject)
-                    </button>
-                    <button
-                      onClick={() => handleAction(sub.id, 'ACTIVE')}
-                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-98 cursor-pointer flex items-center gap-1"
-                    >
-                      <Check className="w-4 h-4" />
-                      Phê duyệt kích hoạt (Approve)
-                    </button>
-                  </div>
+                  userRole === 'MANAGER' ? (
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        onClick={() => handleAction(sub.id, 'REJECTED')}
+                        className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 hover:text-rose-700 text-rose-600 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-98 cursor-pointer flex items-center gap-1"
+                      >
+                        <X className="w-4 h-4" />
+                        Không duyệt (Reject)
+                      </button>
+                      <button
+                        onClick={() => handleAction(sub.id, 'ACTIVE')}
+                        className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-98 cursor-pointer flex items-center gap-1"
+                      >
+                        <Check className="w-4 h-4" />
+                        Phê duyệt kích hoạt (Approve)
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 font-medium italic">
+                      Chỉ Quản lý (Manager) mới có quyền phê duyệt hồ sơ VIP.
+                    </div>
+                  )
                 ) : (
                   <div className="flex justify-between items-center pt-4 border-t border-slate-100 dark:border-slate-800 text-xs font-mono">
                     <div className="flex items-center gap-1.5">
@@ -367,12 +386,14 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
                     </div>
                     
                     {/* Reset decision capability */}
-                    <button 
-                      onClick={() => handleAction(sub.id, sub.status === 'ACTIVE' ? 'REJECTED' : 'ACTIVE')}
-                      className="text-[10px] text-blue-500 hover:underline cursor-pointer font-bold"
-                    >
-                      Sửa đổi quyết định
-                    </button>
+                    {userRole === 'MANAGER' ? (
+                      <button 
+                        onClick={() => handleAction(sub.id, sub.status === 'ACTIVE' ? 'REJECTED' : 'ACTIVE')}
+                        className="text-[10px] text-blue-500 hover:underline cursor-pointer font-bold"
+                      >
+                        Sửa đổi quyết định
+                      </button>
+                    ) : null}
                   </div>
                 )}
 

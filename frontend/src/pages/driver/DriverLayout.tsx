@@ -231,6 +231,27 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
         setVehicles(prevVehicles => {
+          const mapped = data.data.map((v: any, index: number) => {
+            const sizeType = v.type || 'SEDAN_HATCHBACK';
+            let sizeLabel = 'Ô tô gầm thấp 4-5 chỗ';
+            if (v.bodyShape === 'SEDAN') {
+              sizeLabel = 'Ô tô gầm thấp 4-5 chỗ';
+            } else if (v.bodyShape === 'SUV') {
+              sizeLabel = 'Xe 7 chỗ';
+            } else if (v.bodyShape === 'VAN') {
+              sizeLabel = 'Xe 9 chỗ';
+            } else if (v.bodyShape === 'MINIBUS') {
+              sizeLabel = 'Xe 16 chỗ';
+            } else if (v.bodyShape && ['Ô tô gầm thấp 4-5 chỗ', 'Xe 7 chỗ', 'Xe 9 chỗ', 'Xe 16 chỗ'].includes(v.bodyShape)) {
+              sizeLabel = v.bodyShape;
+            } else {
+              sizeLabel = sizeType === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
+                          sizeType === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
+                          'Ô tô gầm thấp 4-5 chỗ';
+            }
+
+            const existingLocal = prevVehicles.find(lv => lv.plate === v.plate);
+
             // Lookup latest subscription status from localStorage
             const savedSubs = localStorage.getItem('urbanpark_vip_subscriptions');
             let activeSub = undefined;
@@ -255,14 +276,11 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               id: v.id || `veh-${v.plate}`,
               plate: v.plate,
               name: v.name,
-              type: v.bodyShape ? v.bodyShape :
-                    v.type === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
-                    v.type === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
-                    'Ô tô gầm thấp 4-5 chỗ',
+              type: sizeLabel,
               regDate: '12/10/2023',
               isActive: true,
               image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
-              isLocked: v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false),
+              isLocked: activeSub ? (v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false)) : false,
               activeSubscription: activeSub,
               subscriptionExpiry: expiry,
               subscriptionStatus: subStatus
@@ -512,6 +530,34 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       triggerToast('Vui lòng điền biển số xe!', 'error');
       return;
     }
+    const plateRegex = /^[0-9]{2}[A-Z]{1,2}[-]?([0-9]{4,5}|[0-9]{3}\.[0-9]{2})$/i;
+    if (!plateRegex.test(newPlate.trim())) {
+      triggerToast('Biển số xe không đúng định dạng (Ví dụ: 30G-123.45 hoặc 30A-99999)!', 'error');
+      return;
+    }
+
+    const brandInput = newName.trim();
+    if (!brandInput) {
+      triggerToast('Vui lòng điền tên hãng xe / model!', 'error');
+      return;
+    }
+    const unsignedRegex = /^[a-zA-Z0-9\s-]+$/;
+    if (!unsignedRegex.test(brandInput)) {
+      triggerToast('Tên xe không được phép chứa dấu tiếng Việt hoặc ký tự đặc biệt!', 'error');
+      return;
+    }
+    const validBrands = [
+      'TOYOTA', 'HONDA', 'VINFAST', 'MAZDA', 'MERCEDES', 'BMW', 'HYUNDAI', 'KIA', 'FORD', 
+      'AUDI', 'LEXUS', 'PORSCHE', 'MITSUBISHI', 'CHEVROLET', 'NISSAN', 'SUZUKI', 'PEUGEOT', 
+      'VOLVO', 'LAND ROVER', 'JAGUAR', 'TESLA', 'VOLKSWAGEN', 'SUBARU', 'MG', 'BYD', 'JEEP', 
+      'ROLLS ROYCE', 'BENTLEY', 'MINI', 'FIAT', 'FERRARI', 'LAMBORGHINI', 'ASTON MARTIN', 'MASERATI'
+    ];
+    const upperInput = brandInput.toUpperCase();
+    const hasValidBrand = validBrands.some(brand => upperInput.includes(brand));
+    if (!hasValidBrand) {
+      triggerToast('Hãng xe/Dòng xe không tồn tại trên thị trường hoặc không hợp lệ!', 'error');
+      return;
+    }
 
     let ownerId = null;
     try {
@@ -530,6 +576,15 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       sizeType = 'LARGE_VAN_MINIBUS';
     }
 
+    let bodyShapeDb = 'SEDAN';
+    if (newType === 'Xe 7 chỗ') {
+      bodyShapeDb = 'SUV';
+    } else if (newType === 'Xe 9 chỗ') {
+      bodyShapeDb = 'VAN';
+    } else if (newType === 'Xe 16 chỗ') {
+      bodyShapeDb = 'MINIBUS';
+    }
+
     const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
       const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
@@ -543,7 +598,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       brand: newName.trim() || 'Phương tiện mới',
       color: 'WHITE',
       colorRgb: '#FFFFFF',
-      bodyShape: newType,
+      bodyShape: bodyShapeDb,
       isActive: true,
       fuelType: 'GASOLINE'
     };
@@ -621,6 +676,34 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       triggerToast('Vui lòng điền biển số xe!', 'error');
       return;
     }
+    const plateRegex = /^[0-9]{2}[A-Z]{1,2}[-]?([0-9]{4,5}|[0-9]{3}\.[0-9]{2})$/i;
+    if (!plateRegex.test(editPlate.trim())) {
+      triggerToast('Biển số xe không đúng định dạng (Ví dụ: 30G-123.45 hoặc 30A-99999)!', 'error');
+      return;
+    }
+
+    const brandInput = editName.trim();
+    if (!brandInput) {
+      triggerToast('Vui lòng điền tên hãng xe / model!', 'error');
+      return;
+    }
+    const unsignedRegex = /^[a-zA-Z0-9\s-]+$/;
+    if (!unsignedRegex.test(brandInput)) {
+      triggerToast('Tên xe không được phép chứa dấu tiếng Việt hoặc ký tự đặc biệt!', 'error');
+      return;
+    }
+    const validBrands = [
+      'TOYOTA', 'HONDA', 'VINFAST', 'MAZDA', 'MERCEDES', 'BMW', 'HYUNDAI', 'KIA', 'FORD', 
+      'AUDI', 'LEXUS', 'PORSCHE', 'MITSUBISHI', 'CHEVROLET', 'NISSAN', 'SUZUKI', 'PEUGEOT', 
+      'VOLVO', 'LAND ROVER', 'JAGUAR', 'TESLA', 'VOLKSWAGEN', 'SUBARU', 'MG', 'BYD', 'JEEP', 
+      'ROLLS ROYCE', 'BENTLEY', 'MINI', 'FIAT', 'FERRARI', 'LAMBORGHINI', 'ASTON MARTIN', 'MASERATI'
+    ];
+    const upperInput = brandInput.toUpperCase();
+    const hasValidBrand = validBrands.some(brand => upperInput.includes(brand));
+    if (!hasValidBrand) {
+      triggerToast('Hãng xe/Dòng xe không tồn tại trên thị trường hoặc không hợp lệ!', 'error');
+      return;
+    }
 
     let ownerId = null;
     try {
@@ -639,6 +722,15 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       sizeType = 'LARGE_VAN_MINIBUS';
     }
 
+    let bodyShapeDb = 'SEDAN';
+    if (editType === 'Xe 7 chỗ') {
+      bodyShapeDb = 'SUV';
+    } else if (editType === 'Xe 9 chỗ') {
+      bodyShapeDb = 'VAN';
+    } else if (editType === 'Xe 16 chỗ') {
+      bodyShapeDb = 'MINIBUS';
+    }
+
     const payload = {
       id: editingVehicleId,
       ownerId: ownerId,
@@ -647,7 +739,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       brand: editName.trim() || 'Phương tiện',
       color: 'WHITE',
       colorRgb: '#FFFFFF',
-      bodyShape: editType,
+      bodyShape: bodyShapeDb,
       isActive: true,
       fuelType: 'GASOLINE'
     };
