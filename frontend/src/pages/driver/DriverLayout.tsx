@@ -543,7 +543,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       brand: newName.trim() || 'Phương tiện mới',
       color: 'WHITE',
       colorRgb: '#FFFFFF',
-      bodyShape: newType,
+      bodyShape: sizeType,
       isActive: true,
       fuelType: 'GASOLINE'
     };

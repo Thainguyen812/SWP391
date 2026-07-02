@@ -651,7 +651,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       brand: newName.trim() || 'Phương tiện mới',
       color: 'WHITE',
       colorRgb: '#FFFFFF',
-      bodyShape: newType,
+      bodyShape: sizeType,
       isActive: true,
       fuelType: 'GASOLINE'
     };

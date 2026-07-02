@@ -108,7 +108,11 @@ this.userRepo = userRepo;
 
     vehicle.setColorRgb(request.getColorRgb());
 
-    vehicle.setBodyShape(request.getBodyShape());
+    String safeBodyShape = request.getBodyShape();
+    if (safeBodyShape == null || safeBodyShape.trim().isEmpty() || safeBodyShape.contains(" ")) {
+        safeBodyShape = request.getVehicleSize() != null ? request.getVehicleSize() : "SEDAN_HATCHBACK";
+    }
+    vehicle.setBodyShape(safeBodyShape);
 
     vehicle.setBrand(request.getBrand());
 
