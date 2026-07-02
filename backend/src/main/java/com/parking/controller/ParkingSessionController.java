@@ -41,7 +41,13 @@ public class ParkingSessionController {
         if (session.getLicensePlate() != null) {
             vehicle = vehicleRepo.findByLicensePlate(session.getLicensePlate()).orElse(null);
         }
-        return new ParkingSessionDto(session, vehicle);
+        ParkingSessionDto dto = new ParkingSessionDto(session, vehicle);
+        if (session.getAssignedZoneId() != null) {
+            zoneRepo.findById(session.getAssignedZoneId()).ifPresent(z -> {
+                dto.setAssignedZoneCode(z.getCode());
+            });
+        }
+        return dto;
     }
 
     @GetMapping
@@ -61,12 +67,22 @@ public class ParkingSessionController {
                     .forEach(v -> vehicleMap.put(v.getLicensePlate(), v));
         }
 
+        java.util.Map<UUID, Zone> zoneMap = new java.util.HashMap<>();
+        zoneRepo.findAll().forEach(z -> zoneMap.put(z.getId(), z));
+
         return sessions.stream().map(session -> {
             Vehicle vehicle = null;
             if (session.getLicensePlate() != null) {
                 vehicle = vehicleMap.get(session.getLicensePlate());
             }
-            return new ParkingSessionDto(session, vehicle);
+            ParkingSessionDto dto = new ParkingSessionDto(session, vehicle);
+            if (session.getAssignedZoneId() != null) {
+                Zone z = zoneMap.get(session.getAssignedZoneId());
+                if (z != null) {
+                    dto.setAssignedZoneCode(z.getCode());
+                }
+            }
+            return dto;
         }).collect(Collectors.toList());
     }
 

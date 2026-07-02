@@ -9,6 +9,7 @@ public class ParkingSessionDto {
     private UUID id;
     private String licensePlate;
     private UUID assignedZoneId;
+    private String assignedZoneCode;
     private UUID cardId;
     private Instant checkInTime;
     private Instant checkOutTime;
@@ -48,6 +49,8 @@ public class ParkingSessionDto {
     public UUID getId() { return id; }
     public String getLicensePlate() { return licensePlate; }
     public UUID getAssignedZoneId() { return assignedZoneId; }
+    public String getAssignedZoneCode() { return assignedZoneCode; }
+    public void setAssignedZoneCode(String assignedZoneCode) { this.assignedZoneCode = assignedZoneCode; }
     public UUID getCardId() { return cardId; }
     public Instant getCheckInTime() { return checkInTime; }
     public Instant getCheckOutTime() { return checkOutTime; }
