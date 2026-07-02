@@ -13,7 +13,7 @@ import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffMobilePOS = () => {
   const navigate = useNavigate();
-  const { activeVehicles, currentUser } = useGlobalContext();
+  const { activeVehicles, currentUser, getVehicleFines, clearVehicleFines } = useGlobalContext();
   const [plate, setPlate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [vehicle, setVehicle] = useState(null);
@@ -53,13 +53,18 @@ export const StaffMobilePOS = () => {
         setVehicle(found);
         
         // Nếu là vé tháng/VIP
+        let baseFee = 0;
         if (found.type === 'VIP' || found.type === 'Vé tháng') {
-          setFee(0);
+          baseFee = 0;
           setPaymentMethod('card'); // VIP bắt buộc QR động (card)
         } else {
-          setFee(calculateFee(found.inTime));
+          baseFee = calculateFee(found.inTime);
           setPaymentMethod('cash');
         }
+        
+        // Cộng dồn tiền phạt
+        const accumulatedFines = getVehicleFines(found.plate).reduce((sum, fine) => sum + fine.amount, 0);
+        setFee(baseFee + accumulatedFines);
       } else {
         notification.error({ message: 'Không tìm thấy xe', description: 'Xe không có trong bãi hoặc đã ra khỏi bãi.' });
         setVehicle(null);
@@ -89,6 +94,7 @@ export const StaffMobilePOS = () => {
         message: 'Thanh toán thành công', 
         description: `Xe ${vehicle.plate} đã thanh toán và có thể ra thẳng qua cổng.` 
       });
+      if (vehicle?.plate) clearVehicleFines(vehicle.plate);
       
     } catch (error) {
       const errorMsg = error.response?.data?.message || error.message || 'Đã có lỗi xảy ra.';
@@ -135,10 +141,22 @@ export const StaffMobilePOS = () => {
               </p>
               
               <div className="bg-white w-full rounded-xl p-4 shadow-sm border border-slate-100 mb-8 text-left">
-                <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                  <span className="text-slate-500 text-sm">Số tiền thu:</span>
-                  <span className="font-bold text-slate-800">{fee.toLocaleString()} đ</span>
-                </div>
+                  <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                    <span className="text-slate-500 text-sm">Phí gửi xe:</span>
+                    <span className="font-bold text-slate-800">
+                      {vehicle.type === 'VIP' || vehicle.type === 'Vé tháng' ? '0 đ' : `${calculateFee(vehicle.inTime).toLocaleString()} đ`}
+                    </span>
+                  </div>
+                  {getVehicleFines(vehicle.plate).length > 0 && (
+                    <div className="flex justify-between items-center py-2 border-b border-slate-100 text-red-600">
+                      <span className="text-red-500 text-sm">Phạt vi phạm ({getVehicleFines(vehicle.plate).length} lỗi):</span>
+                      <span className="font-bold">+{getVehicleFines(vehicle.plate).reduce((sum, fine) => sum + fine.amount, 0).toLocaleString()} đ</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center py-2 border-b border-slate-100 bg-red-50 px-2 rounded-t mt-2">
+                    <span className="text-red-700 font-bold">Tổng tiền thu:</span>
+                    <span className="font-black text-red-600 text-lg">{fee.toLocaleString()} đ</span>
+                  </div>
                 <div className="flex justify-between items-center py-2 border-b border-slate-100">
                   <span className="text-slate-500 text-sm">Phương thức:</span>
                   <span className="font-bold text-slate-800">

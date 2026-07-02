@@ -20,7 +20,7 @@ import { parkingService } from '../../services/parkingService';
 export const StaffPayment = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { transactions, fetchAllDataFromBackend, addTransaction, updateShiftStats, shiftStats, addActivityLog, currentVehicle, activeVehicles, removeActiveVehicle, isEmergency, currentUser } = useGlobalContext();
+  const { transactions, fetchAllDataFromBackend, addTransaction, updateShiftStats, shiftStats, addActivityLog, currentVehicle, activeVehicles, removeActiveVehicle, isEmergency, currentUser, getVehicleFines, clearVehicleFines } = useGlobalContext();
   
   const totalSlots = 400; // Static capacity for now until API provides it
   const activeCount = activeVehicles ? activeVehicles.length : 0;
@@ -100,6 +100,9 @@ export const StaffPayment = () => {
     let amount;
     let evPenalty = backendTxn?.violationPenalty || (lpr && lpr.includes('EV') ? 500000 : 0);
     
+    // Calculate accumulated fines
+    const accumulatedFines = lpr ? getVehicleFines(lpr).reduce((sum, fine) => sum + fine.amount, 0) : 0;
+    
     if (isLostCard) {
       amount = calculateVisitorFee(lostCardData?.duration) + penaltyAmount + evPenalty;
     } else if (isVip) {
@@ -107,6 +110,8 @@ export const StaffPayment = () => {
     } else {
       amount = calculateVisitorFee(vehicleToPay?.duration) + evPenalty;
     }
+    
+    amount += accumulatedFines;
     
     setTotalAmount(prev => {
       if (prev !== amount) {
@@ -232,6 +237,7 @@ export const StaffPayment = () => {
         });
 
         removeActiveVehicle(lpr);
+        if (lpr) clearVehicleFines(lpr);
 
         setHasVehicle(false);
         setBackendTxn(null);
@@ -386,6 +392,7 @@ export const StaffPayment = () => {
                     <div className="text-2xl font-black text-red-600">{totalAmount.toLocaleString()} <span className="text-sm font-bold">VND</span></div>
                     {isLostCard && <div className="text-[10px] text-red-500 mt-1">Đã bao gồm 200k tiền phạt thẻ</div>}
                     {(backendTxn?.violationPenalty > 0 || (lpr && lpr.includes('EV'))) && <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">⚠️ Bị phạt Đỗ sai vị trí EV (+500k)</div>}
+                    {lpr && getVehicleFines(lpr).length > 0 && <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">⚠️ Đã bao gồm phạt cộng dồn (+{getVehicleFines(lpr).reduce((sum, f) => sum + f.amount, 0).toLocaleString()}đ)</div>}
                   </div>
                 </div>
 

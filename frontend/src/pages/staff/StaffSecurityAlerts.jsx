@@ -12,7 +12,7 @@ import { notification, Modal, Input } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffSecurityAlerts = () => {
-  const { securityAlerts, removeSecurityAlert, restoreSecurityAlerts } = useGlobalContext();
+  const { securityAlerts, removeSecurityAlert, restoreSecurityAlerts, addVehicleFine } = useGlobalContext();
   
   const [resolvingAlerts, setResolvingAlerts] = useState({});
   const [isFineModalVisible, setIsFineModalVisible] = useState(false);
@@ -279,14 +279,18 @@ export const StaffSecurityAlerts = () => {
         open={isFineModalVisible}
         onCancel={() => setIsFineModalVisible(false)}
         onOk={() => {
-          notification.success({ message: `Đã thu phạt ${fineAmount.toLocaleString()}đ và gỡ phong tỏa`, placement: 'topRight' });
+          notification.success({ message: `Đã ghi nhận phạt ${fineAmount.toLocaleString()}đ vào hệ thống và gỡ phong tỏa`, placement: 'topRight' });
           if (currentFineAlertId) {
+            const alert = securityAlerts.find(a => a.id === currentFineAlertId);
+            if (alert) {
+              addVehicleFine({ plate: alert.plate, amount: parseInt(fineAmount) || 0, reason: fineNote });
+            }
             removeSecurityAlert(currentFineAlertId);
             setResolvingAlerts(prev => { const n = {...prev}; delete n[currentFineAlertId]; return n; });
           }
           setIsFineModalVisible(false);
         }}
-        okText="Thu tiền & Hoàn tất"
+        okText="Ghi nhận & Hoàn tất"
         cancelText="Hủy"
         okButtonProps={{ className: 'bg-blue-600' }}
       >
