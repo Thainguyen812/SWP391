@@ -23,14 +23,7 @@ import { StaffLostCard } from './pages/staff/StaffLostCard';
 import { StaffSettings } from './pages/staff/StaffSettings';
 import { StaffSupport } from './pages/staff/StaffSupport';
 import StaffLayout from './components/layout/StaffLayout';
-import { DriverLayout } from './pages/driver/DriverLayout';
-import { DriverDashboardPanel } from './pages/driver/DriverDashboardPanel';
-import { DriverHome } from './pages/driver/DriverHome';
-import { DriverVehicles } from './pages/driver/DriverVehicles';
-import { DriverVipReg } from './pages/driver/DriverVipReg';
-import { DriverBilling } from './pages/driver/DriverBilling';
-import { DriverSettings } from './pages/driver/DriverSettings';
-import { DriverSupport } from './pages/driver/DriverSupport';
+import { DriverPwa } from './components/driver/DriverPwa';
 
 import { Dashboard as LegacyDashboard } from './pages/admin/AdminDashboard';
 import { GlobalProvider } from './context/GlobalContext';
@@ -107,7 +100,7 @@ const DriverAppWrapper = () => {
   const navigate = useNavigate();
   
   return (
-    <DriverLayout 
+    <DriverPwa 
       user={{ 
         phone: user.phone || user.username, 
         name: user.fullName, 
@@ -200,16 +193,7 @@ function App() {
         <Route path="/staff-support" element={<StaffProtectedPage><StaffSupport /></StaffProtectedPage>} />
 
         {/* Nhóm Khách hàng (Driver) */}
-        <Route path="/driver" element={<DriverPage><DriverAppWrapper /></DriverPage>}>
-          <Route index element={<Navigate to="home" replace />} />
-          <Route path="panel" element={<DriverDashboardPanel />} />
-          <Route path="home" element={<DriverHome />} />
-          <Route path="vehicles" element={<DriverVehicles />} />
-          <Route path="vip" element={<DriverVipReg />} />
-          <Route path="billing" element={<DriverBilling />} />
-          <Route path="settings" element={<DriverSettings />} />
-          <Route path="support" element={<DriverSupport />} />
-        </Route>
+        <Route path="/driver" element={<DriverPage><DriverAppWrapper /></DriverPage>} />
 
         {/* Catch-all */}
         <Route path="*" element={

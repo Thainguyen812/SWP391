@@ -1043,7 +1043,8 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               editPlate, setEditPlate,
               editName, setEditName,
               editType, setEditType,
-              handleEditVehicle
+              handleEditVehicle,
+              triggerSecurityTest
             }} />
 
             </AnimatePresence>
