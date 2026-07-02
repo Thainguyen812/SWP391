@@ -21,6 +21,9 @@ public interface ParkingService {
     Transaction checkoutCard(UUID cardId); //task 5 check out vãn lai
     Transaction checkoutCardByCode(String cardCode);
 
+    FloorEntryVerificationResponse verifyFloorExit( // confirm đã ra khỏi bốt phân tầng cho cả 2 loại khách hàng
+        FloorEntryVerificationRequest request);
+
     Transaction congestionCheckout( // check out lưu động vãn lai 
     CongestionCheckoutRequest request
     );
@@ -35,4 +38,5 @@ public interface ParkingService {
     java.util.Map<String, Object> getVehicleStatus(UUID vehicleId);
     void approveVipSubscription(UUID id, String status, String rejectionReason, UUID managerId);
     FloorEntryVerificationResponse verifyFloorEntry(FloorEntryVerificationRequest request);
+
 }
