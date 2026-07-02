@@ -83,8 +83,12 @@ public class AuthController {
 
     // 2. API ĐĂNG KÝ
     @PostMapping("/register")
-    public ResponseEntity<LoginResponse> register(@RequestBody RegisterRequest req) {
-        return ResponseEntity.status(201).body(authService.register(req));
+    public ResponseEntity<?> register(@RequestBody RegisterRequest req) {
+        try {
+            return ResponseEntity.status(201).body(authService.register(req));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(java.util.Collections.singletonMap("message", e.getMessage()));
+        }
     }
 
     // 3. API REFRESH TOKEN
