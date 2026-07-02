@@ -137,6 +137,76 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   const [qrDirection, setQrDirection] = useState<'VÀO' | 'RA'>('VÀO');
   const [isTogglingLock, setIsTogglingLock] = useState<string | null>(null);
 
+  const [activeQrToken, setActiveQrToken] = useState<string>('');
+  const [qrExpiryTime, setQrExpiryTime] = useState<number | null>(null);
+  const [isGeneratingQr, setIsGeneratingQr] = useState<boolean>(false);
+  const [countdownSec, setCountdownSec] = useState<number>(300);
+
+  const generateQrToken = async (vehicleId: string, direction: 'VÀO' | 'RA') => {
+    if (isOffline) return;
+    if (!vehicleId || vehicleId.startsWith('veh-')) {
+      const activeVeh = vehicles.find(v => v.id === vehicleId) || vehicles[0];
+      const plateStr = activeVeh ? activeVeh.plate : '34G56789';
+      setActiveQrToken(`MOCK_${plateStr}|${direction}|${Date.now()}`);
+      setQrExpiryTime(Date.now() + 300000);
+      return;
+    }
+    setIsGeneratingQr(true);
+    try {
+      const response = await fetch('/api/v1/driver/qr/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          vehicleId: vehicleId,
+          purpose: direction === 'VÀO' ? 'CHECK_IN' : 'CHECK_OUT'
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.qrToken) {
+          setActiveQrToken(data.qrToken);
+          if (data.expiredAt) {
+            setQrExpiryTime(new Date(data.expiredAt).getTime());
+          } else {
+            setQrExpiryTime(Date.now() + 300000);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error generating QR Token:", e);
+    } finally {
+      setIsGeneratingQr(false);
+    }
+  };
+
+  // Tự động generate/refresh token khi thay đổi
+  useEffect(() => {
+    const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+    if (activeVeh) {
+      generateQrToken(activeVeh.id, qrDirection);
+    }
+  }, [selectedVehId, qrDirection, vehicles.length]);
+
+  // Bộ đếm countdown và tự động làm mới
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (qrExpiryTime) {
+        const diff = Math.max(0, Math.round((qrExpiryTime - Date.now()) / 1000));
+        setCountdownSec(diff);
+        if (diff <= 5 && !isGeneratingQr) {
+          const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+          if (activeVeh) {
+            generateQrToken(activeVeh.id, qrDirection);
+          }
+        }
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [qrExpiryTime, selectedVehId, qrDirection, isGeneratingQr, vehicles]);
+
   const [vehicles, setVehicles] = useState<UserVehicle[]>(() => {
     const saved = localStorage.getItem(`urbanpark_user_vehicles_${user?.username || 'default'}`);
     if (saved) {
@@ -1063,7 +1133,12 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               editName, setEditName,
               editType, setEditType,
               handleEditVehicle,
-              triggerSecurityTest
+              triggerSecurityTest,
+              activeQrToken,
+              qrExpiryTime,
+              isGeneratingQr,
+              countdownSec,
+              generateQrToken
             }} />
 
             </AnimatePresence>
