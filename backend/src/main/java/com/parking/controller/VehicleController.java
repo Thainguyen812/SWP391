@@ -142,9 +142,9 @@ this.userRepo = userRepo;
         .orElseThrow(() ->
                 new RuntimeException("User không tồn tại."));
 
-        if (!existing.getOwnerId().equals(currentUser.getId())) {
-    throw new RuntimeException("Bạn không có quyền sửa xe này.");
-}        
+        if (currentUser.getRole() == User.Role.DRIVER && !existing.getOwnerId().equals(currentUser.getId())) {
+            throw new RuntimeException("Bạn không có quyền sửa xe này.");
+        }        
     
         // Kiểm tra biển số xe đã tồn tại chưa
     Optional<Vehicle> duplicate =
@@ -184,8 +184,8 @@ User currentUser = userRepo
         .orElseThrow(() ->
                 new RuntimeException("User không tồn tại."));
         
-        // KIỂM TRA NGƯỜI ĐĂNG NHẬP CÓ PHẢI CHỦ XE KHÔNG
-        if (!vehicle.getOwnerId().equals(currentUser.getId())) {
+        // KIỂM TRA NGƯỜI ĐĂNG NHẬP CÓ PHẢI CHỦ XE KHÔNG (CHỈ GIỚI HẠN DRIVER)
+        if (currentUser.getRole() == User.Role.DRIVER && !vehicle.getOwnerId().equals(currentUser.getId())) {
             throw new RuntimeException("Bạn không có quyền xóa xe này.");
         }
 
