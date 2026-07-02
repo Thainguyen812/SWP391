@@ -1103,10 +1103,6 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         Giao diện tương tác và bảo mật tức thời kết nối trực tiếp đến Backend Cloud UrbanPark.
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full border border-emerald-200 text-xs font-black">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      MÔI TRƯỜNG API THẬT (LIVE REST CLIENT)
-                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
