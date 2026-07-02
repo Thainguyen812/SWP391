@@ -61,6 +61,7 @@ this.userRepo = userRepo;
             map.put("plate", v.getLicensePlate());
             map.put("name", v.getBrand() != null ? v.getBrand() : "Xe của tôi");
             map.put("type", v.getVehicleSize());
+            map.put("bodyShape", v.getBodyShape());
             map.put("isLocked", v.isLocked());
             mapped.add(map);
         }

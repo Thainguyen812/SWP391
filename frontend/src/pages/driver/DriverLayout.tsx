@@ -164,7 +164,8 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
             id: v.id || `veh-${v.plate}`,
             plate: v.plate,
             name: v.name,
-            type: v.type === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
+            type: v.bodyShape ? v.bodyShape :
+                  v.type === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
                   v.type === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
                   'Ô tô gầm thấp 4-5 chỗ',
             regDate: '12/10/2023',
@@ -449,7 +450,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       brand: newName.trim() || 'Phương tiện mới',
       color: 'WHITE',
       colorRgb: '#FFFFFF',
-      bodyShape: 'SEDAN',
+      bodyShape: newType,
       isActive: true,
       fuelType: 'GASOLINE'
     };
@@ -484,7 +485,14 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       });
 
       if (!response.ok) {
-        throw new Error('Thêm xe thất bại. Biển số xe có thể đã tồn tại!');
+        let errMsg = 'Thêm xe thất bại. Biển số xe có thể đã tồn tại!';
+        try {
+          const errData = await response.json();
+          if (errData && errData.message) {
+            errMsg = errData.message;
+          }
+        } catch (e) {}
+        throw new Error(errMsg);
       }
 
       const savedVehicle = await response.json();
@@ -546,7 +554,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       brand: editName.trim() || 'Phương tiện',
       color: 'WHITE',
       colorRgb: '#FFFFFF',
-      bodyShape: 'SEDAN',
+      bodyShape: editType,
       isActive: true,
       fuelType: 'GASOLINE'
     };
@@ -595,7 +603,14 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         setEditVehicleModalOpen(false);
         triggerToast('Cập nhật phương tiện thành công!', 'success');
       } else {
-        triggerToast('Không thể cập nhật phương tiện. Vui lòng thử lại!', 'error');
+        let errMsg = 'Không thể cập nhật phương tiện. Vui lòng thử lại!';
+        try {
+          const errData = await response.json();
+          if (errData && errData.message) {
+            errMsg = errData.message;
+          }
+        } catch (e) {}
+        triggerToast(errMsg, 'error');
       }
     } catch (err) {
       triggerToast('Lỗi kết nối API Backend!', 'error');
