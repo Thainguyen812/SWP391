@@ -68,7 +68,7 @@ export const StaffDashboard = () => {
         setLoadingLogs(true);
         const data = await logService.getParkingSessions();
         if (data && Array.isArray(data)) {
-          const mappedLogs = data.map((session, index) => {
+          const mappedLogs = data.filter(session => !session.isPending).map((session, index) => {
             const isCheckIn = !session.checkOutTime;
             
             // Map vehicle details from backend DTO
@@ -417,6 +417,17 @@ export const StaffDashboard = () => {
                 return <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded">HỢP LỆ</span>;
               };
 
+              const getFloorDisplayName = (v) => {
+                if (v.floorName) return v.floorName;
+                const code = v.assignedZoneCode || v.assignedZoneId || '';
+                const c = code.toUpperCase();
+                if (c === "F1") return "Tầng 1";
+                if (c === "F2") return "Tầng 2";
+                if (c === "B1") return "Tầng B1";
+                if (c === "G") return "Tầng G";
+                return code || "F1";
+              };
+
               return (
                 <div 
                   key={cam.id}
@@ -449,13 +460,35 @@ export const StaffDashboard = () => {
                     </div>
                   )}
 
+                  {/* Mini LED Board Widget */}
+                  {vehicle && (
+                    <div className={`absolute ${isSelected ? 'top-10' : 'top-2'} right-2 w-[155px] bg-slate-950/90 border border-slate-800 rounded px-1.5 py-0.5 shadow-md flex items-center overflow-hidden z-10`}>
+                      {vehicle.type === 'VIP' ? (
+                        <marquee scrollamount="4" className="font-mono text-[9px] font-bold text-amber-500 tracking-wider w-full" style={{ textShadow: '0 0 4px rgba(245, 158, 11, 0.6)' }}>
+                          WELCOME VIP {vehicle.plate} ➔ HƯỚNG ĐI: {getFloorDisplayName(vehicle).toUpperCase()}
+                        </marquee>
+                      ) : (
+                        <marquee scrollamount="4" className="font-mono text-[9px] font-bold text-emerald-400 tracking-wider w-full" style={{ textShadow: '0 0 4px rgba(52, 211, 153, 0.6)' }}>
+                          BIỂN SỐ: {vehicle.plate} ➔ HƯỚNG ĐI: {getFloorDisplayName(vehicle).toUpperCase()}
+                        </marquee>
+                      )}
+                    </div>
+                  )}
+
                   {vehicle ? (
                     <div className={`absolute bottom-0 left-0 w-full p-3 bg-gradient-to-t from-black/90 to-transparent transition-all ${isSelected ? 'from-blue-900/90' : ''}`}>
                       <div className="flex justify-between items-end">
                         <div>
-                          <div className={`text-xl font-bold tracking-widest drop-shadow-md ${isSelected ? 'text-blue-100' : 'text-white'}`}>{vehicle.plate}</div>
+                          <div className={`text-xl font-bold tracking-widest drop-shadow-md ${isSelected ? 'text-blue-100' : 'text-white'} flex items-center gap-1.5`}>
+                            {vehicle.plate}
+                            {vehicle.type === 'VIP' && (
+                              <span className="text-amber-400 bg-amber-500/20 border border-amber-500/40 text-[9px] font-black px-1.5 py-0.5 rounded shadow-[0_0_10px_rgba(245,158,11,0.4)] animate-pulse">
+                                VIP
+                              </span>
+                            )}
+                          </div>
                           <div className={`${vehicle.status === 'Hợp lệ' ? 'text-emerald-400' : 'text-red-400'} text-[10px] font-bold uppercase tracking-wider`}>
-                            {vehicle.type === 'Vé tháng' && vehicle.status === 'Lỗi thẻ' ? 'Khớp đặt chỗ: LỖI' : `Độ tin cậy: ${vehicle.confidence}`}
+                            {vehicle.type === 'VIP' ? 'Khách VIP' : 'Khách Vãng Lai'} • {vehicle.type === 'Vé tháng' && vehicle.status === 'Lỗi thẻ' ? 'Khớp đặt chỗ: LỖI' : `Độ tin cậy: ${vehicle.confidence}`}
                           </div>
                         </div>
                         {getStatusBadge(vehicle.type, vehicle.status)}
@@ -830,6 +863,7 @@ export const StaffDashboard = () => {
                 <tr className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                   <th className="p-3 border-b border-slate-200">Biển số</th>
                   <th className="p-3 border-b border-slate-200">Loại vé</th>
+                  <th className="p-3 border-b border-slate-200">Tầng đỗ</th>
                   <th className="p-3 border-b border-slate-200">Giờ vào</th>
                   <th className="p-3 border-b border-slate-200 text-right">Thao tác</th>
                 </tr>
@@ -843,6 +877,21 @@ export const StaffDashboard = () => {
                         <span className={`px-2 py-1 rounded text-[10px] font-bold ${v.type === 'VIP' ? 'bg-slate-800 text-white' : 'bg-blue-100 text-blue-700'}`}>
                           {v.type}
                         </span>
+                      </td>
+                      <td className="p-3">
+                        {v.assignedZoneCode ? (
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${
+                            v.assignedZoneCode.toUpperCase() === 'F1' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            v.assignedZoneCode.toUpperCase() === 'F2' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            v.assignedZoneCode.toUpperCase() === 'B1' ? 'bg-slate-100 text-slate-600 border-slate-200' :
+                            v.assignedZoneCode.toUpperCase() === 'G' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                            'bg-slate-50 text-slate-700'
+                          }`}>
+                            {v.floorName || v.assignedZoneCode} ({v.assignedZoneCode.toUpperCase()})
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 font-medium">Chưa gán</span>
+                        )}
                       </td>
                       <td className="p-3 text-slate-600 text-sm">{v.inTime}</td>
                       <td className="p-3 text-right">

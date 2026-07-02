@@ -81,7 +81,11 @@ export const RevenuePage = () => {
       ) : (
         <div className="flex flex-col gap-6 w-full pb-8">
           <RevenueSummaryCards summary={summary} />
-          <RevenueCharts charts={charts} />
+          <RevenueCharts 
+            barData={charts?.barData} 
+            pieData={charts?.pieData} 
+            totalVehicleRevenue={charts?.totalVehicleRevenue} 
+          />
           <RecentTransactions transactions={transactions} />
         </div>
       )}

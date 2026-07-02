@@ -23,6 +23,27 @@ export const StaffGateControl = () => {
   const [manualCardCode, setManualCardCode] = useState('');
   const [manualType, setManualType] = useState('Ô tô gầm thấp 4-5 chỗ');
   const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [lastCheckInResult, setLastCheckInResult] = useState(null);
+
+  const getFloorShortName = (code) => {
+    if (!code) return "Chưa gán";
+    const c = code.toUpperCase();
+    if (c === "F1") return "Tầng 1";
+    if (c === "F2") return "Tầng 2";
+    if (c === "B1") return "Tầng B1";
+    if (c === "G") return "Tầng G";
+    return c;
+  };
+
+  const getFloorFullName = (code) => {
+    if (!code) return "Chưa gán";
+    const c = code.toUpperCase();
+    if (c === "F1") return "Tầng 1 — Khu Xe Gia Đình 4-5 Chỗ (Sedan, Hatchback, EV)";
+    if (c === "F2") return "Tầng 2 — Khu Xe 7-9 Chỗ (SUV, CUV, MPV)";
+    if (c === "B1") return "Tầng B1 — Khu Xe Van & Xe Tải Nhỏ";
+    if (c === "G") return "Tầng G — Khu Xe Khách 12-16 Chỗ";
+    return `Tầng ${c}`;
+  };
 
   useEffect(() => {
     if (currentVehicle && currentVehicle.plate) {
@@ -104,6 +125,18 @@ export const StaffGateControl = () => {
       });
       addLog(`[GATE_SCAN] Success: ${response.data?.message}`, 'SUCCESS');
       
+      const isVip = response.data?.message?.toLowerCase().includes('vip') || false;
+      const zone = response.data?.data?.assignedZoneCode || 'F1';
+      setLastCheckInResult({
+        plate: manualPlate.trim().toUpperCase(),
+        type: isVip ? 'VIP' : 'Vãng lai',
+        vehicleType: mappedType,
+        assignedZoneCode: zone,
+        floorName: getFloorShortName(zone),
+        floorFullName: getFloorFullName(zone),
+        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      });
+
       if (fetchAllDataFromBackend) {
         fetchAllDataFromBackend();
       }
@@ -177,6 +210,17 @@ export const StaffGateControl = () => {
         image_url: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80'
       });
       
+      const zone = response.data?.assigned_zone_code || 'F1';
+      setLastCheckInResult({
+        plate: aiPlate.toUpperCase(),
+        type: 'VIP',
+        vehicleType: 'SEDAN_HATCHBACK',
+        assignedZoneCode: zone,
+        floorName: getFloorShortName(zone),
+        floorFullName: getFloorFullName(zone),
+        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      });
+
       notification.success({ message: 'AI Nhận diện Thành công', description: `Biển số ${aiPlate} hợp lệ.` });
       addLog(`[AI_LPR] Success: Plate ${aiPlate}, Conf: ${aiConfidence}%`, 'OK');
       setIsAiModalVisible(false);
@@ -715,6 +759,92 @@ export const StaffGateControl = () => {
         {/* Right Column: Cameras & Logs */}
         <div className="lg:col-span-4 flex flex-col gap-6">
           
+          {/* Virtual LED Board Widget */}
+          <div className="bg-slate-950 border-4 border-slate-800 rounded-xl p-4 shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex flex-col justify-center overflow-hidden relative">
+            <div className="absolute inset-0 bg-radial-gradient from-transparent to-black/40 pointer-events-none"></div>
+            <div className="flex justify-between items-center mb-2 border-b border-slate-800 pb-1">
+              <span className="text-[9px] font-mono font-bold text-slate-500 tracking-wider">LED BOARD SIMULATOR — LÀN VÀO</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping"></div>
+            </div>
+            <div className="bg-slate-950/80 rounded px-2 py-3 border border-slate-900 flex items-center justify-center min-h-[50px]">
+              {lastCheckInResult ? (
+                lastCheckInResult.type === 'VIP' ? (
+                  <marquee 
+                    className="font-mono text-sm sm:text-base font-extrabold tracking-widest text-amber-500" 
+                    style={{ textShadow: '0 0 8px rgba(245, 158, 11, 0.8)' }}
+                    scrollamount="6"
+                  >
+                    WELCOME VIP {lastCheckInResult.plate} ➔ HƯỚNG ĐI: {lastCheckInResult.floorName.toUpperCase()}
+                  </marquee>
+                ) : (
+                  <marquee 
+                    className="font-mono text-sm sm:text-base font-extrabold tracking-widest text-emerald-400" 
+                    style={{ textShadow: '0 0 8px rgba(52, 211, 153, 0.8)' }}
+                    scrollamount="6"
+                  >
+                    BIỂN SỐ: {lastCheckInResult.plate} ➔ XE {lastCheckInResult.vehicleType} ➔ HƯỚNG ĐI: {lastCheckInResult.floorName.toUpperCase()}
+                  </marquee>
+                )
+              ) : (
+                <span 
+                  className="font-mono text-xs text-orange-600/70 font-semibold tracking-wider uppercase animate-pulse"
+                  style={{ textShadow: '0 0 4px rgba(234, 88, 12, 0.3)' }}
+                >
+                  Hệ thống LED đang chờ phương tiện...
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* AI Info Card with Glassmorphism */}
+          {lastCheckInResult && (
+            <div className="backdrop-blur-md bg-white/80 border border-slate-100 p-4 rounded-xl shadow-sm transition-all duration-350 transform translate-y-0 opacity-100 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Trích xuất Camera AI</span>
+                <span className="text-[9px] font-mono text-slate-500">{lastCheckInResult.timestamp}</span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-medium">Biển số</span>
+                  <span className="font-mono text-lg font-bold text-slate-800 tracking-wider">{lastCheckInResult.plate}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-medium">Vé xe</span>
+                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-extrabold uppercase mt-0.5 ${
+                    lastCheckInResult.type === 'VIP' ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-blue-100 text-blue-800 border border-blue-200'
+                  }`}>
+                    {lastCheckInResult.type}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-medium">Nhận diện xe</span>
+                  <span className="text-xs font-bold text-slate-700">{lastCheckInResult.vehicleType}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-medium">Phân Tầng Đỗ</span>
+                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold mt-0.5 ${
+                    lastCheckInResult.assignedZoneCode === 'F1' ? 'bg-emerald-100 text-emerald-800' :
+                    lastCheckInResult.assignedZoneCode === 'F2' ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-800'
+                  }`}>
+                    {lastCheckInResult.floorName}
+                  </span>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 pt-2 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                <span className="flex items-center gap-1 text-emerald-600">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                  Đã phân tầng thành công
+                </span>
+                <span className="text-slate-400 font-normal">Zone: {lastCheckInResult.assignedZoneCode}</span>
+              </div>
+            </div>
+          )}
+          
           {/* Camera Monitor */}
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
             <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-white">
@@ -927,6 +1057,7 @@ export const StaffGateControl = () => {
                 <tr className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                   <th className="p-3 border-b border-slate-200">Biển số</th>
                   <th className="p-3 border-b border-slate-200">Loại vé</th>
+                  <th className="p-3 border-b border-slate-200">Tầng đỗ</th>
                   <th className="p-3 border-b border-slate-200">Giờ vào</th>
                   <th className="p-3 border-b border-slate-200 text-right">Thao tác</th>
                 </tr>
@@ -940,6 +1071,21 @@ export const StaffGateControl = () => {
                         <span className={`px-2 py-1 rounded text-[10px] font-bold ${v.type === 'VIP' ? 'bg-slate-800 text-white' : 'bg-blue-100 text-blue-700'}`}>
                           {v.type}
                         </span>
+                      </td>
+                      <td className="p-3">
+                        {v.assignedZoneCode ? (
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${
+                            v.assignedZoneCode.toUpperCase() === 'F1' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            v.assignedZoneCode.toUpperCase() === 'F2' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            v.assignedZoneCode.toUpperCase() === 'B1' ? 'bg-slate-100 text-slate-600 border-slate-200' :
+                            v.assignedZoneCode.toUpperCase() === 'G' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                            'bg-slate-50 text-slate-700'
+                          }`}>
+                            {v.floorName || v.assignedZoneCode} ({v.assignedZoneCode.toUpperCase()})
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 font-medium">Chưa gán</span>
+                        )}
                       </td>
                       <td className="p-3 text-slate-600 text-sm">{v.inTime}</td>
                       <td className="p-3 text-right">

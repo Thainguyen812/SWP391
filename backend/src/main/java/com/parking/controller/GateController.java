@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import com.parking.repository.VipSubscriptionRepository;
+import com.parking.repository.ZoneRepository;
 import com.parking.service.ParkingService;
 import com.parking.model.Transaction;
 
@@ -25,15 +26,18 @@ public class GateController {
     private final VehicleRepository vehicleRepo;
     private final ParkingSessionRepository sessionRepo;
     private final VipSubscriptionRepository vipSubscriptionRepository;
+    private final ZoneRepository zoneRepo;
     private final ParkingService parkingService;
 
     public GateController(VehicleRepository vehicleRepo, 
                           ParkingSessionRepository sessionRepo,
                           VipSubscriptionRepository vipSubscriptionRepository,
+                          ZoneRepository zoneRepo,
                           ParkingService parkingService) {
         this.vehicleRepo = vehicleRepo;
         this.sessionRepo = sessionRepo;
         this.vipSubscriptionRepository = vipSubscriptionRepository;
+        this.zoneRepo = zoneRepo;
         this.parkingService = parkingService;
     }
 
@@ -79,12 +83,19 @@ public class GateController {
                 boolean isVip = false;
                 Optional<Vehicle> optVehicle = Optional.empty();
                 if (request.plate != null && !request.plate.trim().isEmpty()) {
-                    optVehicle = vehicleRepo.findByLicensePlate(request.plate.trim());
+                    String plateStr = request.plate.trim();
+                    optVehicle = vehicleRepo.findByLicensePlate(plateStr);
                     if (optVehicle.isPresent()) {
                         Vehicle vehicle = optVehicle.get();
                         Optional<com.parking.model.VipSubscription> vipSub = vipSubscriptionRepository
                                 .findByVehicleIdAndStatus(vehicle.getId(), com.parking.model.VipSubscription.Status.ACTIVE);
                         if (vipSub.isPresent()) {
+                            isVip = true;
+                        }
+                    }
+                    if (!isVip) {
+                        Optional<ParkingSession> activeSessionOpt = sessionRepo.findByLicensePlateAndSessionStatus(plateStr, ParkingSession.SessionStatus.ACTIVE);
+                        if (activeSessionOpt.isPresent() && Boolean.TRUE.equals(activeSessionOpt.get().getIsVip())) {
                             isVip = true;
                         }
                     }
@@ -96,24 +107,53 @@ public class GateController {
 
                 if (isVip) {
                     // Case A: VIP Check-in
-                    com.parking.dto.AiCheckInRequest aiReq = new com.parking.dto.AiCheckInRequest();
-                    aiReq.setPlate(request.plate.trim());
-                    aiReq.setConfidence_score(95.0);
-                    aiReq.setCamera_id(request.gate);
-                    aiReq.setImage_url("https://camera-storage.com/live/gate_scan.jpg");
-                    aiReq.setVehicle_type(resolvedVehicleType);
+                    String plateStr = request.plate.trim();
+                    Optional<ParkingSession> existingVipSession = sessionRepo.findByLicensePlateAndSessionStatus(plateStr, ParkingSession.SessionStatus.ACTIVE);
 
-                    com.parking.dto.CheckInResponse checkInResponse = parkingService.aiCheckIn(aiReq);
+                    if (existingVipSession.isPresent() && existingVipSession.get().getEntryGate() != null) {
+                        // VIP already waiting at gate — approve directly (clear entry gate)
+                        ParkingSession session = existingVipSession.get();
+                        session.setIsVip(true);
+                        sessionRepo.save(session);
+                        com.parking.dto.CheckInResponse checkInResponse = parkingService.approveEntry(plateStr);
 
-                    response.put("success", true);
-                    response.put("message", "VIP Check-in thành công tại " + request.gate);
-                    
-                    Map<String, Object> vehicleData = new HashMap<>();
-                    vehicleData.put("plate", request.plate);
-                    Map<String, Object> dataMap = new HashMap<>();
-                    dataMap.put("vehicle", vehicleData);
-                    dataMap.put("sessionId", checkInResponse.getSession_id());
-                    response.put("data", dataMap);
+                        String zoneCode = "F1";
+                        if (session.getAssignedZoneId() != null) {
+                            Optional<com.parking.model.Zone> zoneOpt = zoneRepo.findById(session.getAssignedZoneId());
+                            if (zoneOpt.isPresent()) zoneCode = zoneOpt.get().getCode();
+                        }
+
+                        response.put("success", true);
+                        response.put("message", "VIP Check-in thành công tại " + request.gate);
+                        Map<String, Object> vehicleData = new HashMap<>();
+                        vehicleData.put("plate", plateStr);
+                        Map<String, Object> dataMap = new HashMap<>();
+                        dataMap.put("vehicle", vehicleData);
+                        dataMap.put("sessionId", checkInResponse.getSession_id());
+                        dataMap.put("assignedZoneCode", checkInResponse.getAssigned_zone_code() != null ? checkInResponse.getAssigned_zone_code() : zoneCode);
+                        response.put("data", dataMap);
+                    } else {
+                        // No existing session — create new VIP session via AI service
+                        com.parking.dto.AiCheckInRequest aiReq = new com.parking.dto.AiCheckInRequest();
+                        aiReq.setPlate(plateStr);
+                        aiReq.setConfidence_score(95.0);
+                        aiReq.setCamera_id(request.gate);
+                        aiReq.setImage_url("https://camera-storage.com/live/gate_scan.jpg");
+                        aiReq.setVehicle_type(resolvedVehicleType);
+
+                        parkingService.aiCheckIn(aiReq);
+                        com.parking.dto.CheckInResponse checkInResponse = parkingService.approveEntry(plateStr);
+
+                        response.put("success", true);
+                        response.put("message", "VIP Check-in thành công tại " + request.gate);
+                        Map<String, Object> vehicleData = new HashMap<>();
+                        vehicleData.put("plate", plateStr);
+                        Map<String, Object> dataMap = new HashMap<>();
+                        dataMap.put("vehicle", vehicleData);
+                        dataMap.put("sessionId", checkInResponse.getSession_id());
+                        dataMap.put("assignedZoneCode", checkInResponse.getAssigned_zone_code());
+                        response.put("data", dataMap);
+                    }
                 } else {
                     // Case B: Visitor Check-in
                     if (request.cardCode == null || request.cardCode.trim().isEmpty()) {
@@ -136,6 +176,7 @@ public class GateController {
                     Map<String, Object> dataMap = new HashMap<>();
                     dataMap.put("vehicle", vehicleData);
                     dataMap.put("sessionId", checkInResponse.getSession_id());
+                    dataMap.put("assignedZoneCode", checkInResponse.getAssigned_zone_code());
                     response.put("data", dataMap);
                 }
             } else {

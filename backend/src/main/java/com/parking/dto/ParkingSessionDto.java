@@ -9,6 +9,7 @@ public class ParkingSessionDto {
     private UUID id;
     private String licensePlate;
     private UUID assignedZoneId;
+    private String assignedZoneCode;
     private UUID cardId;
     private Instant checkInTime;
     private Instant checkOutTime;
@@ -17,6 +18,7 @@ public class ParkingSessionDto {
     private String exitGate;
     private Boolean isVip;
     private Boolean isSuspicious;
+    private Boolean isPending = false;
     private String suspiciousReason;
     
     // Additional fields for UI
@@ -36,6 +38,7 @@ public class ParkingSessionDto {
         this.exitGate = session.getExitGate();
         this.isVip = session.getIsVip();
         this.isSuspicious = session.getIsSuspicious();
+        this.isPending = false;
         this.suspiciousReason = session.getSuspiciousReason();
 
         if (vehicle != null) {
@@ -45,9 +48,24 @@ public class ParkingSessionDto {
         }
     }
 
+    public ParkingSessionDto(UUID id, String licensePlate, Instant checkInTime, String sessionStatus,
+            String entryGate, Boolean isVip, Boolean isSuspicious, String suspiciousReason) {
+        this.id = id;
+        this.licensePlate = licensePlate;
+        this.checkInTime = checkInTime;
+        this.sessionStatus = sessionStatus;
+        this.entryGate = entryGate;
+        this.isVip = isVip;
+        this.isSuspicious = isSuspicious;
+        this.isPending = true;
+        this.suspiciousReason = suspiciousReason;
+    }
+
     public UUID getId() { return id; }
     public String getLicensePlate() { return licensePlate; }
     public UUID getAssignedZoneId() { return assignedZoneId; }
+    public String getAssignedZoneCode() { return assignedZoneCode; }
+    public void setAssignedZoneCode(String assignedZoneCode) { this.assignedZoneCode = assignedZoneCode; }
     public UUID getCardId() { return cardId; }
     public Instant getCheckInTime() { return checkInTime; }
     public Instant getCheckOutTime() { return checkOutTime; }
@@ -56,6 +74,7 @@ public class ParkingSessionDto {
     public String getExitGate() { return exitGate; }
     public Boolean getIsVip() { return isVip; }
     public Boolean getIsSuspicious() { return isSuspicious; }
+    public Boolean getIsPending() { return isPending; }
     public String getSuspiciousReason() { return suspiciousReason; }
     public String getVehicleBrand() { return vehicleBrand; }
     public String getVehicleColor() { return vehicleColor; }

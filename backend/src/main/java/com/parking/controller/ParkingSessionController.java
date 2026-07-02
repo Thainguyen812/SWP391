@@ -8,6 +8,8 @@ import com.parking.repository.ParkingSessionRepository;
 import com.parking.repository.VehicleRepository;
 import com.parking.repository.TransactionRepository;
 import com.parking.repository.ZoneRepository;
+import com.parking.service.PendingGateVehicleService;
+import com.parking.service.ParkingService;
 import com.parking.dto.ParkingSessionDto;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,13 +29,18 @@ public class ParkingSessionController {
     private final VehicleRepository vehicleRepo;
     private final ZoneRepository zoneRepo;
     private final TransactionRepository transactionRepo;
+    private final ParkingService parkingService;
+    private final PendingGateVehicleService pendingGateVehicleService;
 
     public ParkingSessionController(ParkingSessionRepository repo, VehicleRepository vehicleRepo,
-            ZoneRepository zoneRepo, TransactionRepository transactionRepo) {
+            ZoneRepository zoneRepo, TransactionRepository transactionRepo, ParkingService parkingService,
+            PendingGateVehicleService pendingGateVehicleService) {
         this.repo = repo;
         this.vehicleRepo = vehicleRepo;
         this.zoneRepo = zoneRepo;
         this.transactionRepo = transactionRepo;
+        this.parkingService = parkingService;
+        this.pendingGateVehicleService = pendingGateVehicleService;
     }
 
     private ParkingSessionDto convertToDto(ParkingSession session) {
@@ -41,7 +48,13 @@ public class ParkingSessionController {
         if (session.getLicensePlate() != null) {
             vehicle = vehicleRepo.findByLicensePlate(session.getLicensePlate()).orElse(null);
         }
-        return new ParkingSessionDto(session, vehicle);
+        ParkingSessionDto dto = new ParkingSessionDto(session, vehicle);
+        if (session.getAssignedZoneId() != null) {
+            zoneRepo.findById(session.getAssignedZoneId()).ifPresent(z -> {
+                dto.setAssignedZoneCode(z.getCode());
+            });
+        }
+        return dto;
     }
 
     @GetMapping
@@ -61,13 +74,36 @@ public class ParkingSessionController {
                     .forEach(v -> vehicleMap.put(v.getLicensePlate(), v));
         }
 
-        return sessions.stream().map(session -> {
+        java.util.Map<UUID, Zone> zoneMap = new java.util.HashMap<>();
+        zoneRepo.findAll().forEach(z -> zoneMap.put(z.getId(), z));
+
+        List<ParkingSessionDto> result = sessions.stream().map(session -> {
             Vehicle vehicle = null;
             if (session.getLicensePlate() != null) {
                 vehicle = vehicleMap.get(session.getLicensePlate());
             }
-            return new ParkingSessionDto(session, vehicle);
+            ParkingSessionDto dto = new ParkingSessionDto(session, vehicle);
+            if (session.getAssignedZoneId() != null) {
+                Zone z = zoneMap.get(session.getAssignedZoneId());
+                if (z != null) {
+                    dto.setAssignedZoneCode(z.getCode());
+                }
+            }
+            return dto;
         }).collect(Collectors.toList());
+
+        pendingGateVehicleService.findAll().forEach(pending -> result.add(new ParkingSessionDto(
+                pending.getId(),
+                pending.getLicensePlate(),
+                pending.getDetectedAt(),
+                ParkingSession.SessionStatus.ACTIVE.name(),
+                pending.getEntryGate(),
+                pending.isVip(),
+                pending.isSuspicious(),
+                pending.getSuspiciousReason()
+        )));
+
+        return result;
     }
 
     @GetMapping("/{id}")
@@ -109,15 +145,17 @@ public class ParkingSessionController {
     @PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
     public ResponseEntity<?> approveEntry(@RequestBody java.util.Map<String, String> payload) {
         String plate = payload.get("plate");
-        Optional<ParkingSession> s = repo.findByLicensePlateAndSessionStatus(plate,
-                ParkingSession.SessionStatus.ACTIVE);
-        if (s.isPresent()) {
-            ParkingSession session = s.get();
-            session.setEntryGate(null); // Clear the entry gate, car goes inside
-            repo.save(session);
+        try {
+            Optional<PendingGateVehicleService.PendingEntry> pendingEntry = pendingGateVehicleService.removeByPlate(plate);
+            if (pendingEntry.isPresent()) {
+                parkingService.approvePendingEntry(pendingEntry.get());
+            } else {
+                parkingService.approveEntry(plate);
+            }
             return ResponseEntity.ok(java.util.Collections.singletonMap("success", true));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
-        return ResponseEntity.badRequest().body("Session not found");
     }
 
     // 7. Xem thống kê lưu lượng xe trong ngày (Chỉ dành cho Manager và Admin xem
