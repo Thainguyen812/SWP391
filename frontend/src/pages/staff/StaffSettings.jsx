@@ -8,7 +8,7 @@ import {
   LoadingOutlined,
   CheckOutlined
 } from '@ant-design/icons';
-import { Switch, Modal, notification, Spin } from 'antd'; // Using antd for components
+import { Switch, Modal, notification, Spin, InputNumber } from 'antd'; // Using antd for components
 import { useGlobalContext } from '../../context/GlobalContext';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
@@ -149,13 +149,23 @@ export const StaffSettings = () => {
               </div>
 
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 mt-4">TIỀN MẶT THỰC TẾ (TRONG KÉT)</div>
-              <input 
-                type="number" 
-                placeholder="Nhập số tiền mặt thực tế..."
-                value={declaredCash}
-                onChange={e => setDeclaredCash(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg py-2.5 px-3 text-sm text-slate-800 font-medium bg-slate-50 mb-6 focus:outline-none focus:border-blue-500"
-              />
+              <div className="mb-6">
+                <InputNumber
+                  className="w-full text-lg"
+                  size="large"
+                  placeholder="Nhập số tiền mặt thực tế..."
+                  value={declaredCash}
+                  onChange={value => setDeclaredCash(value)}
+                  formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                  addonAfter="VNĐ"
+                />
+                {(declaredCash !== '' && declaredCash !== null) && (
+                  <div className={`text-xs mt-2 font-medium ${parseFloat(declaredCash) - shiftStats.cash < 0 ? 'text-red-500' : (parseFloat(declaredCash) - shiftStats.cash > 0 ? 'text-green-600' : 'text-slate-500')}`}>
+                    Chênh lệch so với hệ thống: {(parseFloat(declaredCash) - shiftStats.cash) > 0 ? '+' : ''}{(parseFloat(declaredCash) - shiftStats.cash).toLocaleString()}đ
+                  </div>
+                )}
+              </div>
 
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">CHỌN CA TIẾP NHẬN</div>
               <select 
