@@ -169,7 +169,7 @@ export const StaffDashboard = () => {
             type: 'MỞ BARRIER',
             gate: currentVehicle ? currentVehicle.gate : 'Cổng Khẩn Cấp',
             action: 'Mở Thủ công',
-            time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            time: new Date().toISOString(),
             status: 'THÀNH CÔNG',
             typeColor: 'text-orange-600',
             statusColor: 'bg-emerald-100 text-emerald-700',
@@ -195,7 +195,7 @@ export const StaffDashboard = () => {
             type: 'ĐÓNG BARRIER',
             gate: currentVehicle ? currentVehicle.gate : 'Cổng Khẩn Cấp',
             action: 'Đóng Thủ công',
-            time: 'Vừa xong',
+            time: new Date().toISOString(),
             status: 'THÀNH CÔNG',
             typeColor: 'text-orange-600',
             statusColor: 'bg-emerald-100 text-emerald-700',
@@ -214,10 +214,10 @@ export const StaffDashboard = () => {
       return;
     }
     const isEntryGate = currentVehicle.gate?.toLowerCase().includes('vào');
-    const isCardError = currentVehicle.status === 'Lỗi thẻ';
+    const isManualEntryRequired = currentVehicle.type !== 'VIP' && currentVehicle.type !== 'Vé tháng';
     
     if (isEntryGate) {
-      if (isCardError) {
+      if (isManualEntryRequired) {
         notification.info({ message: 'Chuyển hướng', description: 'Đang mở màn hình nhập xe thủ công...' });
         navigate('/staff-gate-control', { state: { manualPlate: currentVehicle.plate } });
         return;
@@ -229,7 +229,7 @@ export const StaffDashboard = () => {
         type: 'VÀO BÃI',
         gate: currentVehicle.gate,
         action: 'Đã cấp vé',
-        time: new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit', second: '2-digit'}),
+        time: new Date().toISOString(),
         status: 'THÀNH CÔNG',
         typeColor: 'text-blue-600',
         statusColor: 'bg-emerald-100 text-emerald-700',
@@ -412,7 +412,7 @@ export const StaffDashboard = () => {
               
               // Helper to map status to color
               const getStatusBadge = (type, status) => {
-                if (type === 'VIP') return <span className="bg-slate-800 border border-slate-600 text-white text-[10px] font-bold px-2 py-1 rounded">VIP</span>;
+                if (type === 'VIP') return <span className="bg-black border border-amber-500 text-amber-400 text-[10px] font-bold px-2 py-1 rounded">VIP</span>;
                 if (status === 'Lỗi thẻ' || status === 'Chờ thanh toán') return <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase">{status}</span>;
                 return <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded">HỢP LỆ</span>;
               };
@@ -441,37 +441,40 @@ export const StaffDashboard = () => {
                     className={`w-full h-full object-cover ${vehicle ? 'opacity-80' : 'opacity-40 grayscale'}`} 
                   />
                   
-                  <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm">
-                    {cam.id}: {cam.name}
+                  {/* Top Badges (Camera Name + LED Board) */}
+                  <div className="absolute top-2 left-2 flex z-10 rounded shadow-md overflow-hidden max-w-[90%]">
+                    <div className="bg-slate-700/90 text-white text-[9px] font-bold px-2 py-1.5 backdrop-blur-sm uppercase whitespace-nowrap">
+                      {cam.id}: {cam.name}
+                    </div>
+                    {vehicle && (
+                      <div className="bg-slate-950/90 border-l border-slate-700 px-1.5 py-0.5 flex items-center overflow-hidden w-[150px]">
+                        {vehicle.type === 'VIP' ? (
+                          <marquee scrollamount="4" className="font-mono text-[10px] font-bold text-amber-400 tracking-wider w-full" style={{ textShadow: '0 0 4px rgba(245, 158, 11, 0.6)' }}>
+                            WELCOME VIP {vehicle.plate.replace('.SIM', '')} ➔ HƯỚNG ĐI: {getFloorDisplayName(vehicle).toUpperCase()}
+                          </marquee>
+                        ) : (
+                          <marquee scrollamount="4" className="font-mono text-[10px] font-bold text-emerald-400 tracking-wider w-full" style={{ textShadow: '0 0 4px rgba(52, 211, 153, 0.6)' }}>
+                            BIỂN SỐ: {vehicle.plate.replace('.SIM', '')} ➔ HƯỚNG ĐI: {getFloorDisplayName(vehicle).toUpperCase()}
+                          </marquee>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  
+
                   {/* Bounding Box Mock based on index to simulate variety */}
                   {vehicle && i === 0 && (
-                    <div className="absolute top-[40%] left-[30%] w-[40%] h-[20%] border-2 border-emerald-400 transition-all duration-300">
-                      <div className="absolute -top-6 left-0 bg-emerald-400 text-black text-[10px] font-bold px-1 py-0.5">NHẬN DIỆN BIỂN SỐ</div>
+                    <div className="absolute top-[35%] left-[25%] w-[50%] h-[25%] border border-emerald-400 transition-all duration-300 z-0">
+                      <div className="absolute -top-5 left-0 bg-emerald-400/90 backdrop-blur-sm text-black text-[9px] font-bold px-1.5 py-0.5 rounded-t-sm">
+                        NHẬN DIỆN BIỂN SỐ
+                      </div>
                     </div>
                   )}
-
+                  
                   {/* Selected Overlay */}
                   {isSelected && (
-                    <div className="absolute top-2 right-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg flex items-center gap-1 animate-pulse">
+                    <div className="absolute top-2 right-2 bg-blue-500 text-white text-[9px] font-bold px-2 py-1.5 rounded-full shadow-lg flex items-center gap-1 animate-pulse z-10 uppercase tracking-wider">
                       <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                       ĐANG CHỌN
-                    </div>
-                  )}
-
-                  {/* Mini LED Board Widget */}
-                  {vehicle && (
-                    <div className={`absolute ${isSelected ? 'top-10' : 'top-2'} right-2 w-[155px] bg-slate-950/90 border border-slate-800 rounded px-1.5 py-0.5 shadow-md flex items-center overflow-hidden z-10`}>
-                      {vehicle.type === 'VIP' ? (
-                        <marquee scrollamount="4" className="font-mono text-[9px] font-bold text-amber-500 tracking-wider w-full" style={{ textShadow: '0 0 4px rgba(245, 158, 11, 0.6)' }}>
-                          WELCOME VIP {vehicle.plate} ➔ HƯỚNG ĐI: {getFloorDisplayName(vehicle).toUpperCase()}
-                        </marquee>
-                      ) : (
-                        <marquee scrollamount="4" className="font-mono text-[9px] font-bold text-emerald-400 tracking-wider w-full" style={{ textShadow: '0 0 4px rgba(52, 211, 153, 0.6)' }}>
-                          BIỂN SỐ: {vehicle.plate} ➔ HƯỚNG ĐI: {getFloorDisplayName(vehicle).toUpperCase()}
-                        </marquee>
-                      )}
                     </div>
                   )}
 
@@ -479,13 +482,8 @@ export const StaffDashboard = () => {
                     <div className={`absolute bottom-0 left-0 w-full p-3 bg-gradient-to-t from-black/90 to-transparent transition-all ${isSelected ? 'from-blue-900/90' : ''}`}>
                       <div className="flex justify-between items-end">
                         <div>
-                          <div className={`text-xl font-bold tracking-widest drop-shadow-md ${isSelected ? 'text-blue-100' : 'text-white'} flex items-center gap-1.5`}>
+                          <div className={`text-2xl font-black tracking-widest drop-shadow-md ${isSelected ? 'text-blue-100' : 'text-white'} flex items-center gap-1.5 mb-1`}>
                             {vehicle.plate}
-                            {vehicle.type === 'VIP' && (
-                              <span className="text-amber-400 bg-amber-500/20 border border-amber-500/40 text-[9px] font-black px-1.5 py-0.5 rounded shadow-[0_0_10px_rgba(245,158,11,0.4)] animate-pulse">
-                                VIP
-                              </span>
-                            )}
                           </div>
                           <div className={`${vehicle.status === 'Hợp lệ' ? 'text-emerald-400' : 'text-red-400'} text-[10px] font-bold uppercase tracking-wider`}>
                             {vehicle.type === 'VIP' ? 'Khách VIP' : 'Khách Vãng Lai'} • {vehicle.type === 'Vé tháng' && vehicle.status === 'Lỗi thẻ' ? 'Khớp đặt chỗ: LỖI' : `Độ tin cậy: ${vehicle.confidence}`}
@@ -520,7 +518,7 @@ export const StaffDashboard = () => {
             
             <button onClick={handleCashCollection} className="bg-white border border-slate-200 hover:border-blue-500 hover:shadow-md transition-all rounded-xl p-5 flex flex-col items-center justify-center gap-3 h-32">
               {currentVehicle?.gate?.toLowerCase().includes('vào') ? (
-                currentVehicle.status === 'Lỗi thẻ' ? (
+                currentVehicle.type !== 'VIP' && currentVehicle.type !== 'Vé tháng' ? (
                   <>
                     <QrcodeOutlined className="text-blue-500 text-2xl" />
                     <span className="text-sm font-bold text-slate-700 text-center">Nhập thẻ<br/>Thủ công</span>
@@ -881,13 +879,14 @@ export const StaffDashboard = () => {
                       <td className="p-3">
                         {v.assignedZoneCode ? (
                           <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${
+                            v.assignedZoneCode.length > 10 ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
                             v.assignedZoneCode.toUpperCase() === 'F1' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                             v.assignedZoneCode.toUpperCase() === 'F2' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                             v.assignedZoneCode.toUpperCase() === 'B1' ? 'bg-slate-100 text-slate-600 border-slate-200' :
                             v.assignedZoneCode.toUpperCase() === 'G' ? 'bg-orange-50 text-orange-700 border-orange-200' :
                             'bg-slate-50 text-slate-700'
                           }`}>
-                            {v.floorName || v.assignedZoneCode} ({v.assignedZoneCode.toUpperCase()})
+                            {v.assignedZoneCode.length > 10 ? ((v.floorName && v.floorName.length < 10) ? v.floorName : 'Khu Vực Chung') : `${(v.floorName && v.floorName.length < 10) ? v.floorName : v.assignedZoneCode} (${v.assignedZoneCode.toUpperCase()})`}
                           </span>
                         ) : (
                           <span className="text-[10px] text-slate-400 font-medium">Chưa gán</span>

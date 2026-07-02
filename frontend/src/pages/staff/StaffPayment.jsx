@@ -70,7 +70,6 @@ export const StaffPayment = () => {
   }, [activeVehicles, lpr, currentVehicle]);
 
   const isVip = vehicleToPay?.type === 'VIP' || vehicleToPay?.type === 'Vé tháng' || backendTxn?.ticketType === 'VIP' || backendTxn?.ticketType === 'Vé tháng' || location.state?.isVip === true || location.state?.type === 'VIP' || location.state?.type === 'Vé tháng';
-  const isAtEntryGate = vehicleToPay?.gate?.toUpperCase().includes('VÀO');
 
   useEffect(() => {
     setIsPaid(false);
@@ -79,11 +78,11 @@ export const StaffPayment = () => {
   useEffect(() => {
     // Auto-select payment method if VIP
     if (isVip) {
-      setPaymentMethod('card');
-    } else if (paymentMethod === 'card' && !isVip) {
-      setPaymentMethod('cash'); // Reset to cash if it's not VIP
+      setPaymentMethod('QR VIP');
     }
+  }, [isVip]);
 
+  useEffect(() => {
     if (backendTxn) {
       setTotalAmount(prev => {
         if (prev !== backendTxn.totalAmount) {
@@ -172,7 +171,7 @@ export const StaffPayment = () => {
   };
 
   const handlePayment = () => {
-    if (isPaid || isCheckingOut || isAtEntryGate) return;
+    if (isPaid || isCheckingOut) return;
     if (isEmergency) {
       notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể thanh toán và mở cổng lúc này.' });
       return;
@@ -306,7 +305,6 @@ export const StaffPayment = () => {
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-bold text-slate-800 m-0 flex items-center gap-2">
                   {isLostCard ? <span className="text-red-600"><WarningFilled className="mr-2"/> Xử lý Sự cố Mất thẻ</span> : "Xử lý vé vãng lai"}
-                  {isAtEntryGate && <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded border border-red-200">Xe đang ở Cổng Vào</span>}
                 </h3>
                 <span className="bg-slate-100 text-slate-500 font-mono text-xs px-3 py-1 rounded">TICKET #{useMemo(() => {
                   if (!lpr) return 1000;
@@ -502,9 +500,9 @@ export const StaffPayment = () => {
                   </button>
                   <button 
                     onClick={handlePayment} 
-                    disabled={isPaid || isCheckingOut || isAtEntryGate}
+                    disabled={isPaid || isCheckingOut}
                     className={`flex-[2] text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md ${
-                      isPaid || isCheckingOut || isAtEntryGate ? 'bg-slate-400 cursor-not-allowed shadow-none' : 'bg-[#1677ff] hover:bg-blue-600 shadow-blue-500/20 cursor-pointer'
+                      isPaid || isCheckingOut ? 'bg-slate-400 cursor-not-allowed shadow-none' : 'bg-[#1677ff] hover:bg-blue-600 shadow-blue-500/20 cursor-pointer'
                     }`}
                   >
                     <CheckCircleFilled />
