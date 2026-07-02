@@ -1266,6 +1266,38 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             );
                           }
                           const isLocked = activeVeh.isLocked;
+                          const isVip = activeVeh.activeSubscription;
+                          if (!isVip) {
+                            return (
+                              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-150 flex flex-col items-center justify-center text-center space-y-4 relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-450 from-amber-400 to-yellow-500" />
+                                <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-600 shadow-lg shadow-amber-100 flex items-center justify-center relative z-10">
+                                  <Lock className="w-8 h-8" />
+                                </div>
+                                <div className="space-y-1">
+                                  <h4 className="text-sm font-black uppercase tracking-wider text-amber-800">
+                                    DÀNH RIÊNG CHO HỘI VIÊN VIP
+                                  </h4>
+                                  <span className="text-[10px] bg-slate-200/60 font-mono text-slate-500 px-2 py-1 rounded font-bold uppercase tracking-wider">
+                                    {activeVeh.plate}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-400 leading-relaxed font-semibold">
+                                  Tính năng khoá bánh bảo vệ radar và kẹp phanh hơi thông minh chống trộm từ xa chỉ áp dụng cho phương tiện có vé tháng VIP đang hoạt động.
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedVehicleForVIP(activeVeh.plate);
+                                    setActiveTab('vip_reg');
+                                  }}
+                                  className="w-full py-3.5 bg-amber-500 hover:bg-amber-650 hover:bg-amber-600 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer text-center"
+                                >
+                                  Đăng ký VIP ngay để kích hoạt
+                                </button>
+                              </div>
+                            );
+                          }
                           return (
                             <div className="p-6 bg-slate-50 rounded-2xl border border-slate-150 flex flex-col items-center justify-center text-center space-y-4 relative overflow-hidden">
                               <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${isLocked ? 'from-rose-500 to-red-600' : 'from-emerald-400 to-teal-500'}`} />
@@ -1912,28 +1944,41 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             </div>
                           </div>
 
-                          {/* Lock Trigger Controller */}
-                          <div className="flex items-center justify-between gap-3 pt-1">
-                            <button
-                              onClick={() => toggleVehicleLock(v.id, v.plate)}
-                              className={`flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] ${
-                                v.isLocked 
-                                  ? 'bg-rose-100 hover:bg-rose-200 text-rose-600' 
-                                  : 'bg-blue-50 hover:bg-blue-100 text-blue-600'
-                              }`}
-                            >
-                              {v.isLocked ? (
-                                <>
-                                  <Lock className="w-4 h-4 text-rose-500 animate-pulse" />
-                                  <span>Mở khoá an ninh</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Unlock className="w-4 h-4 text-blue-500" />
-                                  <span>Khoá an toàn xe</span>
-                                </>
-                              )}
-                            </button>
+                           {/* Lock Trigger Controller */}
+                           <div className="flex items-center justify-between gap-3 pt-1">
+                             {v.activeSubscription ? (
+                               <button
+                                 onClick={() => toggleVehicleLock(v.id, v.plate)}
+                                 className={`flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] ${
+                                   v.isLocked 
+                                     ? 'bg-rose-100 hover:bg-rose-200 text-rose-600' 
+                                     : 'bg-blue-50 hover:bg-blue-100 text-blue-600'
+                                 }`}
+                               >
+                                 {v.isLocked ? (
+                                   <>
+                                     <Lock className="w-4 h-4 text-rose-500 animate-pulse" />
+                                     <span>Mở khoá an ninh</span>
+                                   </>
+                                 ) : (
+                                   <>
+                                     <Unlock className="w-4 h-4 text-blue-500" />
+                                     <span>Khoá an toàn xe</span>
+                                   </>
+                                 )}
+                               </button>
+                             ) : (
+                               <button
+                                 onClick={() => {
+                                   setSelectedVehicleForVIP(v.plate);
+                                   setActiveTab('vip_reg');
+                                 }}
+                                 className="flex-1 py-2 bg-slate-105 bg-slate-100 hover:bg-amber-100 hover:text-amber-700 text-slate-400 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-all"
+                               >
+                                 <Lock className="w-3.5 h-3.5 text-slate-400" />
+                                 <span>Đăng ký VIP để khoá bánh</span>
+                               </button>
+                             )}
 
                             <button 
                               onClick={() => {
