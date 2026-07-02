@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext, useNavigate, Link } from 'react-router-dom';
+import { Modal } from 'antd';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, Car, Calendar, CreditCard, Settings, LogOut, HelpCircle, Bell, Search, 
@@ -34,8 +35,38 @@ export function DriverHome() {
     billingTimeFilter, setBillingTimeFilter, billingTypeFilter, setBillingTypeFilter,
     searchSupportQuery, setSearchSupportQuery, expandedFaq, setExpandedFaq,
     ticketTopic, setTicketTopic, ticketMessage, setTicketMessage,
-    ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout
+    ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout,
+    triggerSecurityTest
   } = ctx;
+
+  const handleFindCar = () => {
+    if (currentParked && currentParked.isParked) {
+      Modal.info({
+        title: 'Định vị phương tiện của bạn',
+        content: (
+          <div className="space-y-3 mt-3 text-left">
+            <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-3">
+              <MapPin className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">VỊ TRÍ ĐỖ XE</p>
+                <strong className="text-lg font-black text-slate-800">{currentParked.location}</strong>
+              </div>
+            </div>
+            <div className="text-xs text-slate-550 font-semibold space-y-1">
+              <p>• Biển số xe: <strong className="font-mono text-slate-700">{currentParked.plate}</strong></p>
+              <p>• Trạng thái: <span className="text-emerald-600 font-extrabold">{currentParked.status}</span></p>
+              <p className="mt-2 text-slate-400">Chỉ dẫn: Bạn có thể đi bộ qua Lối đi bộ Zone A, bấm thang máy lên Tầng 2 để nhận xe.</p>
+            </div>
+          </div>
+        ),
+        okText: 'Đóng',
+        centered: true,
+        maskClosable: true,
+      });
+    } else {
+      triggerToast('Hiện tại không có phương tiện nào của bạn đang đỗ trong bãi xe!', 'info');
+    }
+  };
 
   return (
     <>
@@ -159,9 +190,7 @@ export function DriverHome() {
                       <div className="grid grid-cols-2 gap-4 flex-1">
                         
                         <button 
-                          onClick={() => {
-                            triggerToast('Đã kích hoạt thiết bị đo lường định vị radar xe của bạn!', 'success');
-                          }}
+                          onClick={handleFindCar}
                           className="p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center gap-2 select-none group cursor-pointer active:scale-95 transition-all"
                         >
                           <div className="p-2.5 bg-blue-50 text-blue-600 rounded-full group-hover:scale-110 transition-transform">
@@ -233,145 +262,7 @@ export function DriverHome() {
                     </div>
                   </div>
 
-                  {/* ANTI-THEFT EXPERIMENT BOX */}
-                  <div id="user-pwa-antitheft-card" className="p-5 bg-yellow-500/5 hover:bg-yellow-500/10 border border-yellow-500/20 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="space-y-1 text-center sm:text-left">
-                      <div className="flex items-center gap-1.5 justify-center sm:justify-start">
-                        <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-                        <strong className="text-xs text-yellow-800 font-extrabold">HỘP THỬ NGHIỆM ĐỘT NHẬP AN NINH DRIVER</strong>
-                      </div>
-                      <p className="text-[11px] text-yellow-600/90 leading-relaxed font-semibold">
-                        Kích hoạt còi báo động nhân bốt gác để kiểm tra độ trễ phản hồi kẹp phanh gạt chặn barie tự động bảo vệ tài sản!
-                      </p>
-                    </div>
-                    <button 
-                      onClick={triggerSecurityTest}
-                      className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-extrabold text-[11px] rounded-lg tracking-wide uppercase cursor-pointer transition-all active:scale-95 shrink-0"
-                    >
-                      Báo động đột nhập
-                    </button>
-                  </div>
 
-                  {/* USER INTERACTIVE STATE CONTROL PANEL (GOOD & BAD CASES) */}
-                  <div id="user-testing-pnl" className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                      <Sliders className="w-4 h-4 text-blue-600" />
-                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">
-                        Bảng Thử Nghiệm Tình Huống Vận Hành (User Portal)
-                      </h3>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Positive Scenarios */}
-                      <div className="p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/10 space-y-2.5 text-left">
-                        <div className="flex items-center gap-1.5 text-emerald-700 font-black text-xs">
-                          <CheckCircle className="w-4 h-4" />
-                          <span>TRƯỜNG HỢP TỐT (SUCCESS RUNS)</span>
-                        </div>
-                        <p className="text-[10.5px] text-slate-500 leading-normal font-sans">
-                          Kiểm định các tiến trình tiêu chuẩn vận hành mượt mà của chủ xe.
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCurrentParked({
-                                plate: vehicles[0]?.plate || '30G-123.45',
-                                status: 'ĐANG ĐỖ',
-                                location: 'Khu A • Tầng 2',
-                                isParked: true
-                              });
-                              // Add ticket log
-                              const newTx: TransactionItem = {
-                                id: `TXN-${Math.floor(1000 + Math.random() * 9000)}`,
-                                date: 'Vừa xong',
-                                type: 'Xe ô tô vào bãi',
-                                plate: vehicles[0]?.plate || '30G-123.45',
-                                fee: '$2.00',
-                                isEntry: true,
-                                status: 'Thành công'
-                              };
-                              setTransactions(prev => [newTx, ...prev]);
-                              triggerToast('Giả lập: Xe ô tô tự động quét LPR vào bãi thành công!', 'success');
-                            }}
-                            className="p-1.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-[10px] rounded-lg transition-all text-center cursor-pointer"
-                          >
-                            Xe vào bãi (LPR Chuẩn)
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isOffline) {
-                                triggerToast('Lỗi: Không thể nạp ví ở chế độ Ngoại tuyến!', 'error');
-                                return;
-                              }
-                              setBalance(prev => prev + 50.0);
-                              const newTx: TransactionItem = {
-                                id: `TXN-${Math.floor(1000 + Math.random() * 9000)}`,
-                                date: 'Vừa xong',
-                                type: 'Nạp ví VNPAY',
-                                plate: '-',
-                                fee: '+$50.00',
-                                isEntry: true,
-                                status: 'Thành công'
-                              };
-                              setTransactions(prev => [newTx, ...prev]);
-                              triggerToast('Giả lập: Nạp thêm $50.00 vào số dư ví thành công!', 'success');
-                            }}
-                            className="p-1.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-[10px] rounded-lg transition-all text-center cursor-pointer"
-                          >
-                            Nạp ví VNPAY $50
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Negative/Abnormal Fault Scenarios */}
-                      <div className="p-4 bg-rose-500/5 rounded-xl border border-rose-500/10 space-y-2.5 text-left">
-                        <div className="flex items-center gap-1.5 text-rose-700 font-bold text-xs">
-                          <AlertTriangle className="w-4 h-4" />
-                          <span>TRƯỜNG HỢP XẤU (ABNORMAL/FAULT RUNS)</span>
-                        </div>
-                        <p className="text-[10.5px] text-slate-500 leading-normal font-sans">
-                          Sự cố giả định liên quan đến ví cạn kiệt, hoặc mất kết nối bốt kiểm soát.
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setBalance(0.15);
-                              triggerToast('Giả lập: Đã hạ ví về mức cực thấp ($0.15)!', 'error');
-                            }}
-                            className="p-1.5 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-[10px] rounded-lg transition-all text-center cursor-pointer"
-                          >
-                            Hạ số dư ví về $0.15
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsOffline(!isOffline);
-                              triggerToast(
-                                !isOffline 
-                                  ? '⚠️ Đã tắt mạng! Bốt gác đang hoạt động Ngoại tuyến.' 
-                                  : '🟢 Khôi phục mạng Internet bốt gác hoạt động Online!', 
-                                !isOffline ? 'error' : 'success'
-                              );
-                            }}
-                            className={`p-1.5 py-2 text-white font-extrabold text-[10px] rounded-lg transition-all text-center cursor-pointer ${
-                              isOffline ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
-                            }`}
-                          >
-                            {isOffline ? 'Kết nối Internet lại' : 'Tắt mạng (Mất kết nối)'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-[10.5px] text-slate-500 leading-snug p-3 bg-slate-50 border border-slate-150 rounded-xl text-left">
-                      💡 <strong>Hướng dẫn kiểm thử nhanh:</strong> Click <strong>"Hạ số dư ví về $0.15"</strong>, rồi sang tab <strong>"Đăng ký hàng tháng"</strong> hoặc dùng Ví để thanh toán. Bạn sẽ kích hoạt ngay kịch bản lỗi thanh toán do cạn số dư! Click <strong>"Tắt mạng"</strong> để kích hoạt chế độ cứu nạn khẩn cấp ngoại tuyến.
-                    </div>
-                  </div>
 
                 </motion.div>
 

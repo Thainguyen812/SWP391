@@ -240,6 +240,26 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   const [isSecurityLockTriggered, setIsSecurityLockTriggered] = useState(false);
   const [securityViolatorPlate, setSecurityViolatorPlate] = useState('');
   const [isProcessingGateScan, setIsProcessingGateScan] = useState(false);
+  const [securityCountdown, setSecurityCountdown] = useState(30);
+
+  useEffect(() => {
+    let timer: any = null;
+    if (isSecurityLockTriggered) {
+      setSecurityCountdown(30);
+      timer = setInterval(() => {
+        setSecurityCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isSecurityLockTriggered]);
 
   const fetchGateScanLogs = async () => {
     try {
@@ -1240,19 +1260,60 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                           <span className="text-[9px] font-black uppercase text-slate-500 block">Quy trình xử lý sự cố cổng trực:</span>
                           <span className="text-[11px] text-slate-300 block">✓ 1. Bảo an trực tiếp xuất bốt áp sát kiểm tra chủ xe</span>
                           <span className="text-[11px] text-slate-300 block">✓ 2. Xác thực thẻ định danh / Căn cước công dân khớp vé tháng</span>
-                          <span className="text-[11px] text-slate-300 block">✓ 3. Yêu cầu chủ xe mở khóa trên Driver App hoặc ấn tắt chuông cưỡng chế</span>
+                          <span className="text-[11px] text-slate-300 block">✓ 3. Yêu cầu chủ xe mở khóa trên Driver App hoặc chờ 30 giây để Staff ghi đè</span>
                         </div>
+
+                        {securityCountdown > 0 ? (
+                          <div className="p-4 bg-slate-950/60 rounded-xl border border-amber-500/20 text-center space-y-1">
+                            <p className="text-xs font-black text-amber-400 uppercase animate-pulse">
+                              ⏱️ Đang đợi tài xế tắt khóa trên App ({securityCountdown}s)...
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              Hệ thống đã tự động gửi Push Notification nhắc nhở tài xế tắt khóa xe trên điện thoại.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-slate-950/60 rounded-xl border border-red-500/20 text-center space-y-1">
+                            <p className="text-xs font-black text-red-400 uppercase">
+                              🚨 Quá 30 giây tài xế chưa tắt khóa!
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              Bảo vệ có quyền Override khẩn cấp cưỡng chế mở Barie (Quyết định sẽ được ghi vào Audit Log).
+                            </p>
+                          </div>
+                        )}
 
                         <button
                           type="button"
                           onClick={() => {
+                            // Record Audit Log (Step 5 of Flow 6)
+                            try {
+                              const savedLogs = JSON.parse(localStorage.getItem('urbanpark_audit_logs') || '[]');
+                              const newLog = {
+                                id: `AUDIT-${Date.now()}`,
+                                timestamp: new Date().toLocaleString('vi-VN'),
+                                actor: 'Bảo vệ Trực Cổng (Staff)',
+                                action: 'OVERRIDE KHẨN CẤP',
+                                target: `Xe ${securityViolatorPlate || '30F-999.78'}`,
+                                details: `Cưỡng chế mở barie và tắt còi báo động khẩn cấp cho xe bị khóa chống trộm do ${
+                                  securityCountdown > 0 ? "Staff xử lý trực tiếp" : "tài xế quá 30 giây không phản hồi"
+                                }.`
+                              };
+                              savedLogs.push(newLog);
+                              localStorage.setItem('urbanpark_audit_logs', JSON.stringify(savedLogs));
+                              window.dispatchEvent(new Event('storage'));
+                            } catch (err) {
+                              console.error("Error writing audit log:", err);
+                            }
+
                             setIsSecurityLockTriggered(false);
                             setSecurityViolatorPlate('');
-                            triggerToast("🔓 Đã xác nhận tắt chuông cảnh báo cổng trực cưỡng chế và thông barie thành công.", "info");
+                            triggerToast("🔓 Đã xác nhận tắt chuông cảnh báo cổng trực cưỡng chế và thông barie thành công. Ghi nhận Audit Log.", "info");
                           }}
-                          className="w-full py-4 bg-gradient-to-r from-red-600 to-rose-650 hover:from-red-700 hover:to-rose-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg active:scale-95 cursor-pointer"
+                          className="w-full py-4 bg-gradient-to-r from-red-650 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                         >
-                          Tắt Còi & Giải Trừ Cảnh Báo (Mở Khóa Khẩn Cấp)
+                          <Unlock className="w-4 h-4 text-white" />
+                          <span>Tắt Còi & Override Khẩn Cấp (Ghi Audit Log)</span>
                         </button>
                       </motion.div>
                     </div>
@@ -1294,6 +1355,17 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                           <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
                             <span className="text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 block">VẬN HÀNH</span>
                             <h3 className="text-sm font-black text-slate-850 dark:text-slate-200 uppercase tracking-wide">Nhập thông tin biển số / Mã thẻ</h3>
+                          </div>
+
+                          {/* Virtual Gate LED Board (Flow 6) */}
+                          <div className="bg-black text-[#ff3b30] font-mono p-4 rounded-2xl border border-slate-800 shadow-inner flex flex-col items-center justify-center text-center space-y-1.5 relative overflow-hidden select-none mb-2">
+                            <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-red-600 via-rose-500 to-red-650 opacity-40 animate-pulse" />
+                            <span className="text-[8px] text-slate-500 uppercase tracking-widest block font-sans">BẢNG LED ĐIỆN TỬ CỔNG TRỰC (IoT LED Display)</span>
+                            <strong className="text-[13px] font-black tracking-widest uppercase block animate-pulse">
+                              {isSecurityLockTriggered 
+                                ? "🚨 XE BỊ KHÓA — VUI LÒNG T T KHÓA TRÊN APP" 
+                                : "CHÀO MỪNG BẠN ĐẾN VỚI URBANPARK"}
+                            </strong>
                           </div>
 
                           <form onSubmit={handlePerformGateScan} className="space-y-4">

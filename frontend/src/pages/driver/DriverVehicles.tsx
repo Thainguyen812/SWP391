@@ -132,8 +132,18 @@ export function DriverVehicles() {
                             <div>
                               <strong className="text-xl font-black text-slate-850 font-mono tracking-wide">{v.plate}</strong>
                               <span className="text-xs text-slate-400 font-bold block mt-0.5">{v.name}</span>
+                              {v.subscriptionStatus === 'PENDING_APPROVAL' && (
+                                <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 text-[9px] font-black text-amber-700 bg-amber-50 rounded-md uppercase tracking-wider border border-amber-200/50">
+                                  ⌛ Đang chờ duyệt VIP
+                                </span>
+                              )}
+                              {v.subscriptionStatus === 'REJECTED' && (
+                                <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 text-[9px] font-black text-rose-700 bg-rose-50 rounded-md uppercase tracking-wider border border-rose-200/50">
+                                  ❌ Bị từ chối (Hoàn tiền)
+                                </span>
+                              )}
                               {v.activeSubscription && (
-                                <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 text-[9px] font-black text-emerald-700 bg-emerald-50 rounded-md uppercase tracking-wider">
+                                <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 text-[9px] font-black text-emerald-700 bg-emerald-50 rounded-md uppercase tracking-wider border border-emerald-200/50">
                                   ✨ {v.activeSubscription}
                                 </span>
                               )}
@@ -163,28 +173,49 @@ export function DriverVehicles() {
                             </div>
                           </div>
 
-                          {/* Lock Trigger Controller */}
-                          <div className="flex items-center justify-between gap-3 pt-1">
-                            <button
-                              onClick={() => toggleVehicleLock(v.id, v.plate)}
-                              className={`flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] ${
-                                v.isLocked 
-                                  ? 'bg-rose-100 hover:bg-rose-200 text-rose-600' 
-                                  : 'bg-blue-50 hover:bg-blue-100 text-blue-600'
-                              }`}
-                            >
-                              {v.isLocked ? (
-                                <>
-                                  <Lock className="w-4 h-4 text-rose-500 animate-pulse" />
-                                  <span>Mở khoá an ninh</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Unlock className="w-4 h-4 text-blue-500" />
-                                  <span>Khoá an toàn xe</span>
-                                </>
-                              )}
-                            </button>
+                           {/* Lock Trigger Controller */}
+                           <div className="flex items-center justify-between gap-3 pt-1">
+                             {v.activeSubscription ? (
+                               <button
+                                 onClick={() => toggleVehicleLock(v.id, v.plate)}
+                                 className={`flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] ${
+                                   v.isLocked 
+                                     ? 'bg-rose-100 hover:bg-rose-200 text-rose-600' 
+                                     : 'bg-blue-50 hover:bg-blue-100 text-blue-600'
+                                 }`}
+                               >
+                                 {v.isLocked ? (
+                                   <>
+                                     <Lock className="w-4 h-4 text-rose-500 animate-pulse" />
+                                     <span>Mở khoá an ninh</span>
+                                   </>
+                                 ) : (
+                                   <>
+                                     <Unlock className="w-4 h-4 text-blue-500" />
+                                     <span>Khoá an toàn xe</span>
+                                   </>
+                                 )}
+                               </button>
+                             ) : v.subscriptionStatus === 'PENDING_APPROVAL' ? (
+                               <button
+                                 disabled
+                                 className="flex-1 py-2 bg-slate-50 text-slate-400 border border-slate-200/50 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-not-allowed"
+                               >
+                                 <Clock className="w-3.5 h-3.5 text-slate-400 animate-spin" />
+                                 <span>Đang chờ duyệt VIP...</span>
+                               </button>
+                             ) : (
+                               <button
+                                 onClick={() => {
+                                   setSelectedVehicleForVIP(v.plate);
+                                   setActiveTab('vip_reg');
+                                 }}
+                                 className="flex-1 py-2 bg-slate-100 hover:bg-amber-100 hover:text-amber-700 text-slate-400 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-all"
+                               >
+                                 <Lock className="w-3.5 h-3.5 text-slate-400" />
+                                 <span>Đăng ký VIP để khoá bánh</span>
+                               </button>
+                             )}
 
                             <button 
                               onClick={() => {

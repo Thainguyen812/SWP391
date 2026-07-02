@@ -38,6 +38,19 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING' | 'ACTIVE' | 'REJECTED'>('PENDING');
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        setUserRole(u.role);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
 
   // Sync state with localstorage
   const loadSubscriptions = () => {
@@ -84,6 +97,9 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
   }, []);
 
   const handleAction = (id: string, nextStatus: 'ACTIVE' | 'REJECTED') => {
+    let targetSub = subscriptions.find(s => s.id === id);
+    if (!targetSub) return;
+
     const updated = subscriptions.map(sub => {
       if (sub.id === id) {
         return {
@@ -97,14 +113,59 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
 
     setSubscriptions(updated);
     localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updated));
+
+    // Update ALL driver vehicle lists in localStorage
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('urbanpark_user_vehicles')) {
+        try {
+          const vehs = JSON.parse(localStorage.getItem(key) || '[]');
+          if (Array.isArray(vehs)) {
+            const updatedVehs = vehs.map((v: any) => {
+              if (v.plate === targetSub.vehicle_plate) {
+                return {
+                  ...v,
+                  activeSubscription: nextStatus === 'ACTIVE' ? targetSub.type : undefined,
+                  subscriptionExpiry: nextStatus === 'ACTIVE' ? targetSub.endDate : undefined,
+                  subscriptionStatus: nextStatus
+                };
+              }
+              return v;
+            });
+            localStorage.setItem(key, JSON.stringify(updatedVehs));
+          }
+        } catch (e) {
+          console.error("Error synchronizing vehicle status:", e);
+        }
+      }
+    }
+
+    // Record Audit Log (Step 4 of Flow 5)
+    try {
+      const savedLogs = JSON.parse(localStorage.getItem('urbanpark_audit_logs') || '[]');
+      const newLog = {
+        id: `AUDIT-${Date.now()}`,
+        timestamp: new Date().toLocaleString('vi-VN'),
+        actor: 'Bùi Phương (Manager)',
+        action: nextStatus === 'ACTIVE' ? 'PHÊ DUYỆT VIP' : 'TỪ CHỐI VIP',
+        target: `Xe ${targetSub.vehicle_plate} (Hồ sơ: ${id})`,
+        details: nextStatus === 'ACTIVE' 
+          ? `Kích hoạt gói ${targetSub.type} cho xe ${targetSub.vehicle_plate}.`
+          : `Từ chối cấp VIP và thực hiện hoàn tiền cho gói ${targetSub.type} của xe ${targetSub.vehicle_plate}.`
+      };
+      savedLogs.push(newLog);
+      localStorage.setItem('urbanpark_audit_logs', JSON.stringify(savedLogs));
+    } catch (err) {
+      console.error("Error writing audit log:", err);
+    }
     
     // Also dispatch a storage event manually so other components in same window know
     window.dispatchEvent(new Event('storage'));
 
     if (nextStatus === 'ACTIVE') {
-      triggerToast(`Đã chính thức KÍCH HOẠT & PHÊ DUYỆT hồ sơ tuyển chọn VIP mang mã ${id}!`, 'success');
+      triggerToast(`Đã chính thức KÍCH HOẠT & PHÊ DUYỆT hồ sơ tuyển chọn VIP mang mã ${id}! Ghi nhận Audit Log.`, 'success');
     } else {
-      triggerToast(`Đã ĐÓNG BÁO TỪ CHỐI hồ sơ ${id}. Tài xế sẽ nhận cảnh báo để cập nhật!`, 'info');
+      triggerToast(`Đã ĐÓNG BÁO TỪ CHỐI hồ sơ ${id} và hoàn tiền. Tài xế sẽ nhận cảnh báo để cập nhật!`, 'info');
     }
   };
 
@@ -245,6 +306,13 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
                   </div>
                 </div>
 
+                {(sub as any).explanation && (
+                  <div className="mt-3 p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-2xl text-xs text-amber-800 dark:text-amber-300 font-semibold leading-relaxed">
+                    <span className="font-black uppercase text-[10px] tracking-wider text-amber-700 dark:text-amber-400 block mb-1">⚠️ GIẢI TRÌNH KHÁC BIỆT BIỂN SỐ CỦA TÀI XẾ:</span>
+                    "{ (sub as any).explanation }"
+                  </div>
+                )}
+
                 {/* Document photos review list */}
                 <div className="py-5 space-y-3">
                   <span className="text-[10px] font-mono font-bold uppercase text-slate-400 tracking-wider flex items-center gap-2">
@@ -286,22 +354,28 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
 
                 {/* Decision controls */}
                 {(sub.status === 'PENDING' || sub.status === 'PENDING_APPROVAL') ? (
-                  <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-                    <button
-                      onClick={() => handleAction(sub.id, 'REJECTED')}
-                      className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 hover:text-rose-700 text-rose-600 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-98 cursor-pointer flex items-center gap-1"
-                    >
-                      <X className="w-4 h-4" />
-                      Không duyệt (Reject)
-                    </button>
-                    <button
-                      onClick={() => handleAction(sub.id, 'ACTIVE')}
-                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-98 cursor-pointer flex items-center gap-1"
-                    >
-                      <Check className="w-4 h-4" />
-                      Phê duyệt kích hoạt (Approve)
-                    </button>
-                  </div>
+                  userRole === 'MANAGER' ? (
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        onClick={() => handleAction(sub.id, 'REJECTED')}
+                        className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 hover:text-rose-700 text-rose-600 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-98 cursor-pointer flex items-center gap-1"
+                      >
+                        <X className="w-4 h-4" />
+                        Không duyệt (Reject)
+                      </button>
+                      <button
+                        onClick={() => handleAction(sub.id, 'ACTIVE')}
+                        className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-98 cursor-pointer flex items-center gap-1"
+                      >
+                        <Check className="w-4 h-4" />
+                        Phê duyệt kích hoạt (Approve)
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 font-medium italic">
+                      Chỉ Quản lý (Manager) mới có quyền phê duyệt hồ sơ VIP.
+                    </div>
+                  )
                 ) : (
                   <div className="flex justify-between items-center pt-4 border-t border-slate-100 dark:border-slate-800 text-xs font-mono">
                     <div className="flex items-center gap-1.5">
@@ -312,12 +386,14 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
                     </div>
                     
                     {/* Reset decision capability */}
-                    <button 
-                      onClick={() => handleAction(sub.id, sub.status === 'ACTIVE' ? 'REJECTED' : 'ACTIVE')}
-                      className="text-[10px] text-blue-500 hover:underline cursor-pointer font-bold"
-                    >
-                      Sửa đổi quyết định
-                    </button>
+                    {userRole === 'MANAGER' ? (
+                      <button 
+                        onClick={() => handleAction(sub.id, sub.status === 'ACTIVE' ? 'REJECTED' : 'ACTIVE')}
+                        className="text-[10px] text-blue-500 hover:underline cursor-pointer font-bold"
+                      >
+                        Sửa đổi quyết định
+                      </button>
+                    ) : null}
                   </div>
                 )}
 

@@ -53,8 +53,8 @@ export const StaffGateControl = () => {
       notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể check-in lúc này.' });
       return;
     }
-    if (!manualPlate || !manualCardCode) {
-      notification.error({ message: 'Lỗi', description: 'Vui lòng nhập đầy đủ biển số xe và mã thẻ!' });
+    if (!manualPlate) {
+      notification.error({ message: 'Lỗi', description: 'Vui lòng nhập biển số xe!' });
       return;
     }
     if (isManualPlateDuplicate) {
@@ -86,32 +86,28 @@ export const StaffGateControl = () => {
     
     setIsCheckingIn(true);
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
-      // Map local Vietnamese labels to backend allowed_sizes
       let mappedType = 'SEDAN_HATCHBACK';
-      if (manualType === 'Ô tô gầm thấp 4-5 chỗ') mappedType = 'SEDAN_HATCHBACK';
-      if (manualType === 'Xe 7 chỗ') mappedType = 'SUV_CUV_MPV';
-      if (manualType === 'Xe 9 chỗ') mappedType = 'LARGE_VAN_MINIBUS';
-      if (manualType === 'Xe 16 chỗ') mappedType = 'LARGE_VAN_MINIBUS';
+      if (manualType && manualType.includes('7')) mappedType = 'SUV_CUV_MPV';
+      if (manualType && (manualType.includes('9') || manualType.includes('16'))) mappedType = 'LARGE_VAN_MINIBUS';
 
-      // Using apiClient so the Bearer token is automatically attached!
-      const response = await apiClient.post(`/v1/parking/check-in/visitor`, {
-        plate: manualPlate.toUpperCase(),
-        vehicle_type: mappedType,
-        card_code: manualCardCode,
-        image_url: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80'
+      // Gọi API /api/gate/scan thông minh (Tự nhận diện VIP hoặc cấp thẻ vãng lai)
+      const response = await apiClient.post(`/gate/scan`, {
+        plate: manualPlate.trim().toUpperCase(),
+        cardCode: manualCardCode ? manualCardCode.trim() : '',
+        gate: 'Bốt Gác Cổng Trực 1',
+        vehicleType: mappedType
       });
-      notification.success({ message: 'Thành công', description: `Đã check-in cho xe ${manualPlate} với thẻ ${manualCardCode}` });
-      addLog(`[MANUAL_CHECKIN] Success: Plate ${manualPlate}, Type: ${manualType}, Card: ${manualCardCode}`, 'SUCCESS');
       
-      // Fetch latest data from backend to sync globally!
+      notification.success({ 
+        message: 'Thành công', 
+        description: response.data?.message || `Đã check-in thành công cho xe ${manualPlate}` 
+      });
+      addLog(`[GATE_SCAN] Success: ${response.data?.message}`, 'SUCCESS');
+      
       if (fetchAllDataFromBackend) {
         fetchAllDataFromBackend();
       }
-      
-      // Tăng biến đếm tổng lượt lên 1
       setDailyVolume(prev => prev + 1);
-
       setManualPlate('');
       setManualCardCode('');
     } catch (err) {

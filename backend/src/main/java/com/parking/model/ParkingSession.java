@@ -73,7 +73,7 @@ public class ParkingSession {
     private String mobileCheckoutPhoto;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "lost_card_proof_photos")
+    @Column(name = "lost_card_proof_photos", columnDefinition = "jsonb")
     private String lostCardProofPhotos;
 
     @Column(name = "slot_photo_url")

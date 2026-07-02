@@ -30,13 +30,11 @@ export const customerService = {
     return filtered;
   },
 
-  // Duyệt đăng ký VIP cho khách hàng qua backend
+  // Duyệt/Từ chối đăng ký VIP cho khách hàng qua backend
   approveVipSubscription: async (id, isApproved = true) => {
     if (isApproved) {
-      // Gọi API duyệt VIP của BE
       return apiClient.post(`/vip/${id}/approve`);
     } else {
-      // Gọi API từ chối VIP của BE kèm lý do mặc định (hoặc truyền lý do từ UI)
       return apiClient.post(`/vip/${id}/reject`, { reason: "Không đủ điều kiện phê duyệt" });
     }
   }

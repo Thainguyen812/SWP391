@@ -34,17 +34,7 @@ public class VipController {
         return vipService.getPending();
     }
 
-    @PutMapping("/{id}/approve")
-    @PreAuthorize("hasRole('MANAGER')") // Chỉ quản lý được duyệt
-    public VipSubscription approve(@PathVariable UUID id) {
-        return vipService.approve(id);
-    }
 
-    @PutMapping("/{id}/reject")
-    @PreAuthorize("hasRole('MANAGER')") // Chỉ quản lý được từ chối
-    public VipSubscription reject(@PathVariable UUID id) {
-        return vipService.reject(id);
-    }
 
     @PostMapping("/register")
     @PreAuthorize("hasAnyRole('DRIVER', 'STAFF', 'MANAGER')")
@@ -53,7 +43,7 @@ public class VipController {
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<?> approveVip(@PathVariable UUID id, Principal principal) {
         String username = principal.getName();
         User manager = userRepository.findByUsername(username)
@@ -65,7 +55,7 @@ public class VipController {
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<?> rejectVip(@PathVariable UUID id, @RequestBody RejectRequest req, Principal principal) {
         String username = principal.getName();
         User manager = userRepository.findByUsername(username)

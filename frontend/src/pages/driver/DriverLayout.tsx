@@ -149,6 +149,78 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     return [];
   });
 
+  const [activeQrToken, setActiveQrToken] = useState<string>('');
+  const [qrExpiryTime, setQrExpiryTime] = useState<number | null>(null);
+  const [isGeneratingQr, setIsGeneratingQr] = useState<boolean>(false);
+  const [countdownSec, setCountdownSec] = useState<number>(300);
+
+  const generateQrToken = async (vehicleId: string, direction: 'VÀO' | 'RA') => {
+    if (isOffline) return;
+    if (!vehicleId || vehicleId.startsWith('veh-')) {
+      const activeVeh = vehicles.find(v => v.id === vehicleId) || vehicles[0];
+      const plateStr = activeVeh ? activeVeh.plate : '34G56789';
+      setActiveQrToken(`MOCK_${plateStr}|${direction}|${Date.now()}`);
+      setQrExpiryTime(Date.now() + 300000);
+      return;
+    }
+    setIsGeneratingQr(true);
+    try {
+      const response = await fetch('/api/v1/driver/qr/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          vehicleId: vehicleId,
+          purpose: direction === 'VÀO' ? 'CHECK_IN' : 'CHECK_OUT'
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.qrToken) {
+          setActiveQrToken(data.qrToken);
+          if (data.expiredAt) {
+            setQrExpiryTime(new Date(data.expiredAt).getTime());
+          } else {
+            setQrExpiryTime(Date.now() + 300000);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error generating QR Token:", e);
+    } finally {
+      setIsGeneratingQr(false);
+    }
+  };
+
+  // Tự động generate/refresh token khi thay đổi
+  useEffect(() => {
+    const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+    if (activeVeh) {
+      generateQrToken(activeVeh.id, qrDirection);
+    }
+  }, [selectedVehId, qrDirection, vehicles.length]);
+
+  // Bộ đếm countdown và tự động làm mới
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (qrExpiryTime) {
+        const diff = Math.max(0, Math.round((qrExpiryTime - Date.now()) / 1000));
+        setCountdownSec(diff);
+        if (diff <= 5 && !isGeneratingQr) {
+          const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+          if (activeVeh) {
+            generateQrToken(activeVeh.id, qrDirection);
+          }
+        }
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [qrExpiryTime, selectedVehId, qrDirection, isGeneratingQr, vehicles]);
+
+
+
   // Background synchronize with live backend
   const fetchVehiclesFromApi = async () => {
     if (isOffline) return; // Skip API calls when offline
@@ -158,29 +230,69 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       });
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
-        const mapped: UserVehicle[] = data.data.map((v: any, index: number) => {
-          const existingLocal = vehicles.find(lv => lv.plate === v.plate);
-          return {
-            id: v.id || `veh-${v.plate}`,
-            plate: v.plate,
-            name: v.name,
-            type: v.type === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
-                  v.type === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
-                  'Ô tô gầm thấp 4-5 chỗ',
-            regDate: '12/10/2023',
-            isActive: true,
-            image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
-            isLocked: existingLocal ? existingLocal.isLocked : (v.isLocked || false),
-            activeSubscription: existingLocal ? existingLocal.activeSubscription : undefined,
-            subscriptionExpiry: existingLocal ? existingLocal.subscriptionExpiry : undefined
-          };
+        setVehicles(prevVehicles => {
+          const mapped = data.data.map((v: any, index: number) => {
+            const sizeType = v.type || 'SEDAN_HATCHBACK';
+            let sizeLabel = 'Ô tô gầm thấp 4-5 chỗ';
+            if (v.bodyShape === 'SEDAN') {
+              sizeLabel = 'Ô tô gầm thấp 4-5 chỗ';
+            } else if (v.bodyShape === 'SUV') {
+              sizeLabel = 'Xe 7 chỗ';
+            } else if (v.bodyShape === 'VAN') {
+              sizeLabel = 'Xe 9 chỗ';
+            } else if (v.bodyShape === 'MINIBUS') {
+              sizeLabel = 'Xe 16 chỗ';
+            } else if (v.bodyShape && ['Ô tô gầm thấp 4-5 chỗ', 'Xe 7 chỗ', 'Xe 9 chỗ', 'Xe 16 chỗ'].includes(v.bodyShape)) {
+              sizeLabel = v.bodyShape;
+            } else {
+              sizeLabel = sizeType === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
+                          sizeType === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
+                          'Ô tô gầm thấp 4-5 chỗ';
+            }
+
+            const existingLocal = prevVehicles.find(lv => lv.plate === v.plate);
+
+            // Lookup latest subscription status from localStorage
+            const savedSubs = localStorage.getItem('urbanpark_vip_subscriptions');
+            let activeSub = undefined;
+            let expiry = undefined;
+            let subStatus = undefined;
+            if (savedSubs) {
+              try {
+                const subs = JSON.parse(savedSubs);
+                const matched = subs.filter((s: any) => s.vehicle_plate === v.plate);
+                if (matched.length > 0) {
+                  const latest = matched[matched.length - 1];
+                  subStatus = latest.status;
+                  if (latest.status === 'ACTIVE') {
+                    activeSub = latest.type;
+                    expiry = latest.endDate;
+                  }
+                }
+              } catch (err) {}
+            }
+
+            return {
+              id: v.id || `veh-${v.plate}`,
+              plate: v.plate,
+              name: v.name,
+              type: sizeLabel,
+              regDate: '12/10/2023',
+              isActive: true,
+              image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
+              isLocked: activeSub ? (v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false)) : false,
+              activeSubscription: activeSub,
+              subscriptionExpiry: expiry,
+              subscriptionStatus: subStatus
+            };
+          });
+
+          if (mapped.length > 0 && (!selectedVehId || !mapped.some(mv => mv.id === selectedVehId))) {
+            setTimeout(() => setSelectedVehId(mapped[0].id), 0);
+          }
+
+          return mapped;
         });
-        setVehicles(mapped);
-        
-        // Auto-initialize first selection if needed
-        if (mapped.length > 0 && (!selectedVehId || !mapped.some(mv => mv.id === selectedVehId))) {
-          setSelectedVehId(mapped[0].id);
-        }
       }
     } catch (e) {
       console.warn("Backend not yet connected or starting:", e);
@@ -267,6 +379,9 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   // Profile Edit
   const [profileName, setProfileName] = useState(user.name);
   const [profilePhone, setProfilePhone] = useState(user.phone);
+  const [isPhoneVerified, setIsPhoneVerified] = useState(() => {
+    return localStorage.getItem('urbanpark_phone_verified') === 'true';
+  });
   const [profileEmail, setProfileEmail] = useState('nguyen.van@urbanpark.com');
   const [profileAddress, setProfileAddress] = useState('123 Đường Lê Lợi, Quận 1, TP.HCM');
   
@@ -415,6 +530,34 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       triggerToast('Vui lòng điền biển số xe!', 'error');
       return;
     }
+    const plateRegex = /^[0-9]{2}[A-Z]{1,2}[-]?([0-9]{4,5}|[0-9]{3}\.[0-9]{2})$/i;
+    if (!plateRegex.test(newPlate.trim())) {
+      triggerToast('Biển số xe không đúng định dạng (Ví dụ: 30G-123.45 hoặc 30A-99999)!', 'error');
+      return;
+    }
+
+    const brandInput = newName.trim();
+    if (!brandInput) {
+      triggerToast('Vui lòng điền tên hãng xe / model!', 'error');
+      return;
+    }
+    const unsignedRegex = /^[a-zA-Z0-9\s-]+$/;
+    if (!unsignedRegex.test(brandInput)) {
+      triggerToast('Tên xe không được phép chứa dấu tiếng Việt hoặc ký tự đặc biệt!', 'error');
+      return;
+    }
+    const validBrands = [
+      'TOYOTA', 'HONDA', 'VINFAST', 'MAZDA', 'MERCEDES', 'BMW', 'HYUNDAI', 'KIA', 'FORD', 
+      'AUDI', 'LEXUS', 'PORSCHE', 'MITSUBISHI', 'CHEVROLET', 'NISSAN', 'SUZUKI', 'PEUGEOT', 
+      'VOLVO', 'LAND ROVER', 'JAGUAR', 'TESLA', 'VOLKSWAGEN', 'SUBARU', 'MG', 'BYD', 'JEEP', 
+      'ROLLS ROYCE', 'BENTLEY', 'MINI', 'FIAT', 'FERRARI', 'LAMBORGHINI', 'ASTON MARTIN', 'MASERATI'
+    ];
+    const upperInput = brandInput.toUpperCase();
+    const hasValidBrand = validBrands.some(brand => upperInput.includes(brand));
+    if (!hasValidBrand) {
+      triggerToast('Hãng xe/Dòng xe không tồn tại trên thị trường hoặc không hợp lệ!', 'error');
+      return;
+    }
 
     let ownerId = null;
     try {
@@ -433,6 +576,15 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       sizeType = 'LARGE_VAN_MINIBUS';
     }
 
+    let bodyShapeDb = 'SEDAN';
+    if (newType === 'Xe 7 chỗ') {
+      bodyShapeDb = 'SUV';
+    } else if (newType === 'Xe 9 chỗ') {
+      bodyShapeDb = 'VAN';
+    } else if (newType === 'Xe 16 chỗ') {
+      bodyShapeDb = 'MINIBUS';
+    }
+
     const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
       const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
@@ -446,7 +598,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       brand: newName.trim() || 'Phương tiện mới',
       color: 'WHITE',
       colorRgb: '#FFFFFF',
-      bodyShape: 'SEDAN',
+      bodyShape: bodyShapeDb,
       isActive: true,
       fuelType: 'GASOLINE'
     };
@@ -481,7 +633,14 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       });
 
       if (!response.ok) {
-        throw new Error('Thêm xe thất bại. Biển số xe có thể đã tồn tại!');
+        let errMsg = 'Thêm xe thất bại. Biển số xe có thể đã tồn tại!';
+        try {
+          const errData = await response.json();
+          if (errData && errData.message) {
+            errMsg = errData.message;
+          }
+        } catch (e) {}
+        throw new Error(errMsg);
       }
 
       const savedVehicle = await response.json();
@@ -517,6 +676,34 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       triggerToast('Vui lòng điền biển số xe!', 'error');
       return;
     }
+    const plateRegex = /^[0-9]{2}[A-Z]{1,2}[-]?([0-9]{4,5}|[0-9]{3}\.[0-9]{2})$/i;
+    if (!plateRegex.test(editPlate.trim())) {
+      triggerToast('Biển số xe không đúng định dạng (Ví dụ: 30G-123.45 hoặc 30A-99999)!', 'error');
+      return;
+    }
+
+    const brandInput = editName.trim();
+    if (!brandInput) {
+      triggerToast('Vui lòng điền tên hãng xe / model!', 'error');
+      return;
+    }
+    const unsignedRegex = /^[a-zA-Z0-9\s-]+$/;
+    if (!unsignedRegex.test(brandInput)) {
+      triggerToast('Tên xe không được phép chứa dấu tiếng Việt hoặc ký tự đặc biệt!', 'error');
+      return;
+    }
+    const validBrands = [
+      'TOYOTA', 'HONDA', 'VINFAST', 'MAZDA', 'MERCEDES', 'BMW', 'HYUNDAI', 'KIA', 'FORD', 
+      'AUDI', 'LEXUS', 'PORSCHE', 'MITSUBISHI', 'CHEVROLET', 'NISSAN', 'SUZUKI', 'PEUGEOT', 
+      'VOLVO', 'LAND ROVER', 'JAGUAR', 'TESLA', 'VOLKSWAGEN', 'SUBARU', 'MG', 'BYD', 'JEEP', 
+      'ROLLS ROYCE', 'BENTLEY', 'MINI', 'FIAT', 'FERRARI', 'LAMBORGHINI', 'ASTON MARTIN', 'MASERATI'
+    ];
+    const upperInput = brandInput.toUpperCase();
+    const hasValidBrand = validBrands.some(brand => upperInput.includes(brand));
+    if (!hasValidBrand) {
+      triggerToast('Hãng xe/Dòng xe không tồn tại trên thị trường hoặc không hợp lệ!', 'error');
+      return;
+    }
 
     let ownerId = null;
     try {
@@ -535,6 +722,15 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       sizeType = 'LARGE_VAN_MINIBUS';
     }
 
+    let bodyShapeDb = 'SEDAN';
+    if (editType === 'Xe 7 chỗ') {
+      bodyShapeDb = 'SUV';
+    } else if (editType === 'Xe 9 chỗ') {
+      bodyShapeDb = 'VAN';
+    } else if (editType === 'Xe 16 chỗ') {
+      bodyShapeDb = 'MINIBUS';
+    }
+
     const payload = {
       id: editingVehicleId,
       ownerId: ownerId,
@@ -543,7 +739,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       brand: editName.trim() || 'Phương tiện',
       color: 'WHITE',
       colorRgb: '#FFFFFF',
-      bodyShape: 'SEDAN',
+      bodyShape: bodyShapeDb,
       isActive: true,
       fuelType: 'GASOLINE'
     };
@@ -592,7 +788,14 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         setEditVehicleModalOpen(false);
         triggerToast('Cập nhật phương tiện thành công!', 'success');
       } else {
-        triggerToast('Không thể cập nhật phương tiện. Vui lòng thử lại!', 'error');
+        let errMsg = 'Không thể cập nhật phương tiện. Vui lòng thử lại!';
+        try {
+          const errData = await response.json();
+          if (errData && errData.message) {
+            errMsg = errData.message;
+          }
+        } catch (e) {}
+        triggerToast(errMsg, 'error');
       }
     } catch (err) {
       triggerToast('Lỗi kết nối API Backend!', 'error');
@@ -645,6 +848,21 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     }
   };
 
+  const parseExpiryDate = (dateStr: string) => {
+    if (!dateStr) return new Date();
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      const parsed = new Date(year, month, day);
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+    return new Date();
+  };
+
   // Checkout VIP flow
   const handleStartVnpay = () => {
     if (isOffline) {
@@ -670,33 +888,51 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       };
       setTransactions(prev => [newTx, ...prev]);
       
-      // Update vehicle subscription status in local state
-      setVehicles(prev => prev.map(v => {
-        if (v.plate === selectedVehicleForVIP) {
-          const expiryDate = new Date();
-          if (selectedPackLabel.includes('3 Tháng')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 3);
-          } else if (selectedPackLabel.includes('6 Tháng')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 6);
-          } else if (selectedPackLabel.includes('1 Năm')) {
-            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-          } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 1);
-          } else {
-            expiryDate.setDate(expiryDate.getDate() + 1);
-          }
-          const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
-          return {
-            ...v,
-            activeSubscription: selectedPackLabel,
-            subscriptionExpiry: expiryString
-          };
+      // Calculate expiry date by checking if they already have an active subscription
+      const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
+      let expiryDate = new Date();
+      if (targetVeh && targetVeh.activeSubscription && targetVeh.subscriptionExpiry) {
+        const parsedExpiry = parseExpiryDate(targetVeh.subscriptionExpiry);
+        if (parsedExpiry.getTime() > Date.now()) {
+          expiryDate = parsedExpiry;
         }
-        return v;
-      }));
+      }
+
+      if (selectedPackLabel.includes('3 Tháng')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 3);
+      } else if (selectedPackLabel.includes('6 Tháng')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 6);
+      } else if (selectedPackLabel.includes('1 Năm')) {
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 1);
+      } else {
+        expiryDate.setDate(expiryDate.getDate() + 1);
+      }
+      const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
+
+      // Create subscription in localStorage with PENDING_APPROVAL status
+      const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+      const newSub = {
+        id: `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
+        vehicle_plate: selectedVehicleForVIP,
+        type: selectedPackLabel,
+        startDate: new Date().toLocaleDateString('vi-VN'),
+        endDate: expiryString,
+        status: 'PENDING_APPROVAL',
+        document_photos: (window as any).lastUploadedPhotos || {
+          registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+          identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+          frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+        },
+        explanation: (window as any).lastUploadedPhotos?.explanation || ''
+      };
+      savedSubs.push(newSub);
+      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(savedSubs));
+      window.dispatchEvent(new Event('storage'));
 
       setRegStep(3); // success step!
-      triggerToast(`Đăng kí thành công bằng Ví UrbanPark cho xe ${selectedVehicleForVIP}!`, 'success');
+      triggerToast(`✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe ${selectedVehicleForVIP}.`, 'success');
     } else {
       setVnpayStep('info');
       setVnpayModalOpen(true);
@@ -757,32 +993,50 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       };
       setTransactions(prev => [newTx, ...prev]);
       
-      // Update vehicle subscription status in local state
-      setVehicles(prev => prev.map(v => {
-        if (v.plate === selectedVehicleForVIP) {
-          const expiryDate = new Date();
-          if (selectedPackLabel.includes('3 Tháng')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 3);
-          } else if (selectedPackLabel.includes('6 Tháng')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 6);
-          } else if (selectedPackLabel.includes('1 Năm')) {
-            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-          } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 1);
-          } else {
-            expiryDate.setDate(expiryDate.getDate() + 1);
-          }
-          const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
-          return {
-            ...v,
-            activeSubscription: selectedPackLabel,
-            subscriptionExpiry: expiryString
-          };
+      // Calculate expiry date by checking if they already have an active subscription
+      const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
+      let expiryDate = new Date();
+      if (targetVeh && targetVeh.activeSubscription && targetVeh.subscriptionExpiry) {
+        const parsedExpiry = parseExpiryDate(targetVeh.subscriptionExpiry);
+        if (parsedExpiry.getTime() > Date.now()) {
+          expiryDate = parsedExpiry;
         }
-        return v;
-      }));
+      }
 
-      triggerToast(`Đăng kí thành viên thành công cho xe ${selectedVehicleForVIP}!`, 'success');
+      if (selectedPackLabel.includes('3 Tháng')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 3);
+      } else if (selectedPackLabel.includes('6 Tháng')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 6);
+      } else if (selectedPackLabel.includes('1 Năm')) {
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 1);
+      } else {
+        expiryDate.setDate(expiryDate.getDate() + 1);
+      }
+      const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
+
+      // Create subscription in localStorage with PENDING_APPROVAL status
+      const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+      const newSub = {
+        id: `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
+        vehicle_plate: selectedVehicleForVIP,
+        type: selectedPackLabel,
+        startDate: new Date().toLocaleDateString('vi-VN'),
+        endDate: expiryString,
+        status: 'PENDING_APPROVAL',
+        document_photos: (window as any).lastUploadedPhotos || {
+          registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+          identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+          frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+        },
+        explanation: (window as any).lastUploadedPhotos?.explanation || ''
+      };
+      savedSubs.push(newSub);
+      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(savedSubs));
+      window.dispatchEvent(new Event('storage'));
+
+      triggerToast(`✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe ${selectedVehicleForVIP}.`, 'success');
     }
   };
 
@@ -1030,7 +1284,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               vnpayOtp, setVnpayOtp, vnpayModalOpen, setVnpayModalOpen,
               vnpayStep, setVnpayStep, isSirenMuted, setIsSirenMuted,
               isAlertOverlayShown, setIsAlertOverlayShown, profileName, setProfileName,
-              profilePhone, setProfilePhone, profileEmail, setProfileEmail,
+              profilePhone, setProfilePhone, isPhoneVerified, setIsPhoneVerified, profileEmail, setProfileEmail,
               profileAddress, setProfileAddress, is2faEnabled, setIs2faEnabled,
               emailNotifyGate, setEmailNotifyGate, smsNotifyGate, setSmsNotifyGate,
               emailNotifyReceipt, setEmailNotifyReceipt, smsNotifyReceipt, setSmsNotifyReceipt,
@@ -1043,7 +1297,13 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               editPlate, setEditPlate,
               editName, setEditName,
               editType, setEditType,
-              handleEditVehicle
+              handleEditVehicle,
+              triggerSecurityTest,
+              activeQrToken,
+              qrExpiryTime,
+              isGeneratingQr,
+              countdownSec,
+              generateQrToken
             }} />
 
             </AnimatePresence>

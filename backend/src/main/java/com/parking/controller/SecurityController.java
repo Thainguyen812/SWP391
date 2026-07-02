@@ -9,6 +9,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
+import java.time.LocalDateTime;
+
 @RestController
 @RequestMapping("/api/security")
 @PreAuthorize("hasRole('ADMIN')") // Khóa chặt đồng bộ tuyệt đối với SecurityConfig
@@ -55,7 +57,7 @@ public class SecurityController {
         return Map.of("success", true, "message", "Cập nhật chính sách thành công");
     }
 
-    @GetMapping({"/stats", "/rbac-stats"})
+    @GetMapping({ "/stats", "/rbac-stats" })
     public Map<String, Object> getSecurityStats() {
         Map<String, Object> result = new HashMap<>();
         result.put("adminCount", 2);
@@ -74,6 +76,7 @@ public class SecurityController {
                         "192.168.1.10"));
     }
 
+    //hiện cảnh bảo trên hệ thống
     @GetMapping("/alerts")
     public List<Map<String, Object>> getSecurityAlerts() {
         List<SecurityAlert> alerts = alertRepo.findByIsResolvedFalseOrderByCreatedAtDesc();
@@ -94,5 +97,27 @@ public class SecurityController {
             result.add(map);
         }
         return result;
+    }
+    // cập nhật trạng thái đã xử lý cho các cảnh báo 
+    @PutMapping("/alerts/{id}/resolve")
+    public Map<String, Object> resolveSecurityAlert(@PathVariable UUID id) {
+
+        SecurityAlert alert = alertRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy cảnh báo an ninh"));
+
+        if (Boolean.TRUE.equals(alert.getIsResolved())) {
+            return Map.of(
+                    "success", false,
+                    "message", "Cảnh báo đã được xử lý trước đó");
+        }
+
+        alert.setIsResolved(true);
+        alert.setResolvedAt(LocalDateTime.now());
+
+        alertRepo.save(alert);
+
+        return Map.of(
+                "success", true,
+                "message", "Đã xử lý cảnh báo an ninh thành công");
     }
 }
