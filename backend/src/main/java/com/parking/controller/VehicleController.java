@@ -15,6 +15,7 @@ import com.parking.dto.VehicleRegistrationRequest;
 import com.parking.model.User;
 import com.parking.repository.UserRepository;
 import com.parking.repository.VipSubscriptionRepository;
+import com.parking.model.VipSubscription;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -163,7 +164,33 @@ this.vipSubscriptionRepository = vipSubscriptionRepository;
 
     vehicle.setUpdatedAt(Instant.now());
 
-    return repo.save(vehicle);
+    Vehicle saved = repo.save(vehicle);
+
+    // Auto-create pending VIP subscription to submit documents for manager approval
+    VipSubscription vip = new VipSubscription();
+    vip.setId(UUID.randomUUID());
+    vip.setVehicleId(saved.getId());
+    vip.setSubscriptionType("MONTHLY");
+    vip.setStatus(VipSubscription.Status.PENDING_APPROVAL);
+    vip.setStartDate(java.time.LocalDate.now());
+    vip.setEndDate(java.time.LocalDate.now().plusMonths(1));
+    vip.setFeeAmount(java.math.BigDecimal.ZERO);
+    vip.setPaymentMethod("FREE_DUYET_XE");
+    vip.setPaymentStatus("PAID");
+
+    String regDoc = saved.getRegistrationDocUrl() != null ? saved.getRegistrationDocUrl() : "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80";
+    String regPhoto = saved.getRegistrationPhotoUrl() != null ? saved.getRegistrationPhotoUrl() : "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80";
+    vip.setDocumentPhotos(String.format(
+        "{\"registrationPaper\":\"%s\",\"identityCard\":\"%s\",\"frontPhoto\":\"%s\"}",
+        regDoc,
+        regPhoto,
+        "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80"
+    ));
+    vip.setCreatedAt(Instant.now());
+    vip.setUpdatedAt(Instant.now());
+    vipSubscriptionRepository.save(vip);
+
+    return saved;
 }
 
 //SỬA THÔNG TIN XE 
