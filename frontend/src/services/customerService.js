@@ -6,18 +6,10 @@ export const customerService = {
     return apiClient.get('/customers/stats');
   },
 
-  // Lấy danh sách khách hàng thật từ danh sách users của backend
+  // Lấy danh sách khách hàng từ backend
   getCustomers: async (filter = 'all') => {
-    const response = await apiClient.get('/users');
-    const realData = response.data.map(u => ({
-      id: u.id,
-      name: u.fullName || u.username,
-      phone: u.phone || "N/A",
-      plate: "N/A", // Trường biển số xe chưa được tích hợp trực tiếp trong model User
-      type: u.role === "VIP" ? "VIP" : "Tháng",
-      status: u.status,
-      expireDate: "N/A"
-    }));
+    const response = await apiClient.get('/customers');
+    const realData = response.data;
     
     let filtered = realData;
     if (filter === 'month') {

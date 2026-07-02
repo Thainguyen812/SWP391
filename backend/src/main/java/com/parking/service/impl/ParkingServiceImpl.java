@@ -1242,7 +1242,7 @@ public class ParkingServiceImpl implements ParkingService {
         AuditLog audit = new AuditLog();
         audit.setId(UUID.randomUUID());
         audit.setUserId(managerId);
-        audit.setActionType("VIP_APPROVAL");
+        audit.setActionType(newStatus == VipSubscription.Status.ACTIVE ? "APPROVE_VIP" : "REJECT_VIP");
         audit.setEntityType("VipSubscription");
         audit.setEntityId(subscription.getId());
         audit.setOldValue("{\"status\":\"" + oldStatusStr + "\"}");

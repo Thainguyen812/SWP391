@@ -34,6 +34,12 @@ public class VipController {
         return vipService.getPending();
     }
 
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('MANAGER')")
+    public List<VipSubscription> getAll() {
+        return vipService.getAll();
+    }
+
 
 
     @PostMapping("/register")

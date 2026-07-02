@@ -71,6 +71,32 @@ this.vipSubscriptionRepository = vipSubscriptionRepository;
             map.put("isActive", v.isActive());
             map.put("registrationDocUrl", v.getRegistrationDocUrl());
             map.put("registrationPhotoUrl", v.getRegistrationPhotoUrl());
+            map.put("createdAt", v.getCreatedAt() != null ? v.getCreatedAt().toString() : null);
+            
+            // Add VIP subscription details
+            List<com.parking.model.VipSubscription> subs = vipSubscriptionRepository.findByVehicleIdOrderByCreatedAtDesc(v.getId());
+            if (subs != null && !subs.isEmpty()) {
+                com.parking.model.VipSubscription latestSub = subs.get(0);
+                map.put("subscriptionId", latestSub.getId().toString());
+                map.put("subscriptionStatus", latestSub.getStatus().name());
+                
+                String typeStr = "Thẻ Tháng VIP";
+                if ("QUARTERLY".equals(latestSub.getSubscriptionType())) {
+                    typeStr = "Thẻ 3 Tháng VIP";
+                } else if ("HALF_YEARLY".equals(latestSub.getSubscriptionType())) {
+                    typeStr = "Thẻ 6 Tháng VIP";
+                } else if ("YEARLY".equals(latestSub.getSubscriptionType())) {
+                    typeStr = "Thẻ Năm VIP";
+                }
+                map.put("subscriptionType", typeStr);
+                map.put("subscriptionExpiry", latestSub.getEndDate() != null ? latestSub.getEndDate().toString() : null);
+            } else {
+                map.put("subscriptionId", null);
+                map.put("subscriptionStatus", null);
+                map.put("subscriptionType", null);
+                map.put("subscriptionExpiry", null);
+            }
+            
             mapped.add(map);
         }
         return java.util.Map.of("success", true, "data", mapped);
@@ -179,7 +205,7 @@ this.vipSubscriptionRepository = vipSubscriptionRepository;
     vip.setStartDate(java.time.LocalDate.now());
     vip.setEndDate(java.time.LocalDate.now().plusMonths(1));
     vip.setFeeAmount(java.math.BigDecimal.ZERO);
-    vip.setPaymentMethod("FREE_DUYET_XE");
+    vip.setPaymentMethod("BANK_TRANSFER");
     vip.setPaymentStatus("PAID");
 
     String regDoc = saved.getRegistrationDocUrl() != null ? saved.getRegistrationDocUrl() : "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80";
