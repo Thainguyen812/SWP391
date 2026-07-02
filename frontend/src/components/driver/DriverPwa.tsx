@@ -303,6 +303,26 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
             // Tìm xe cục bộ hiện tại bằng cách dùng prevVehicles thay vì state vehicles bị dính closure
             const existingLocal = prevVehicles.find(lv => lv.plate === (v.licensePlate || v.plate));
             
+            // Lookup latest subscription status from localStorage
+            const savedSubs = localStorage.getItem('urbanpark_vip_subscriptions');
+            let activeSub = undefined;
+            let expiry = undefined;
+            let subStatus = undefined;
+            if (savedSubs) {
+              try {
+                const subs = JSON.parse(savedSubs);
+                const matched = subs.filter((s: any) => s.vehicle_plate === (v.licensePlate || v.plate));
+                if (matched.length > 0) {
+                  const latest = matched[matched.length - 1];
+                  subStatus = latest.status;
+                  if (latest.status === 'ACTIVE') {
+                    activeSub = latest.type;
+                    expiry = latest.endDate;
+                  }
+                }
+              } catch (err) {}
+            }
+
             return {
               id: v.id || `veh-${v.licensePlate || v.plate}`,
               plate: v.licensePlate || v.plate,
@@ -312,8 +332,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
               isActive: v.isActive !== false && v.active !== false,
               image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
               isLocked: v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false),
-              activeSubscription: existingLocal ? existingLocal.activeSubscription : undefined,
-              subscriptionExpiry: existingLocal ? existingLocal.subscriptionExpiry : undefined
+              activeSubscription: activeSub,
+              subscriptionExpiry: expiry,
+              subscriptionStatus: subStatus
             };
           });
 

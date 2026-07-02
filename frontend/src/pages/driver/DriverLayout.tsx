@@ -231,8 +231,26 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
         setVehicles(prevVehicles => {
-          const mapped: UserVehicle[] = data.data.map((v: any, index: number) => {
-            const existingLocal = prevVehicles.find(lv => lv.plate === v.plate);
+            // Lookup latest subscription status from localStorage
+            const savedSubs = localStorage.getItem('urbanpark_vip_subscriptions');
+            let activeSub = undefined;
+            let expiry = undefined;
+            let subStatus = undefined;
+            if (savedSubs) {
+              try {
+                const subs = JSON.parse(savedSubs);
+                const matched = subs.filter((s: any) => s.vehicle_plate === v.plate);
+                if (matched.length > 0) {
+                  const latest = matched[matched.length - 1];
+                  subStatus = latest.status;
+                  if (latest.status === 'ACTIVE') {
+                    activeSub = latest.type;
+                    expiry = latest.endDate;
+                  }
+                }
+              } catch (err) {}
+            }
+
             return {
               id: v.id || `veh-${v.plate}`,
               plate: v.plate,
@@ -245,8 +263,9 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               isActive: true,
               image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
               isLocked: v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false),
-              activeSubscription: existingLocal ? existingLocal.activeSubscription : undefined,
-              subscriptionExpiry: existingLocal ? existingLocal.subscriptionExpiry : undefined
+              activeSubscription: activeSub,
+              subscriptionExpiry: expiry,
+              subscriptionStatus: subStatus
             };
           });
 
@@ -762,33 +781,43 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       };
       setTransactions(prev => [newTx, ...prev]);
       
-      // Update vehicle subscription status in local state
-      setVehicles(prev => prev.map(v => {
-        if (v.plate === selectedVehicleForVIP) {
-          const expiryDate = new Date();
-          if (selectedPackLabel.includes('3 Tháng')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 3);
-          } else if (selectedPackLabel.includes('6 Tháng')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 6);
-          } else if (selectedPackLabel.includes('1 Năm')) {
-            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-          } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 1);
-          } else {
-            expiryDate.setDate(expiryDate.getDate() + 1);
-          }
-          const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
-          return {
-            ...v,
-            activeSubscription: selectedPackLabel,
-            subscriptionExpiry: expiryString
-          };
-        }
-        return v;
-      }));
+      // Calculate expiry date
+      const expiryDate = new Date();
+      if (selectedPackLabel.includes('3 Tháng')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 3);
+      } else if (selectedPackLabel.includes('6 Tháng')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 6);
+      } else if (selectedPackLabel.includes('1 Năm')) {
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 1);
+      } else {
+        expiryDate.setDate(expiryDate.getDate() + 1);
+      }
+      const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
+
+      // Create subscription in localStorage with PENDING_APPROVAL status
+      const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+      const newSub = {
+        id: `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
+        vehicle_plate: selectedVehicleForVIP,
+        type: selectedPackLabel,
+        startDate: new Date().toLocaleDateString('vi-VN'),
+        endDate: expiryString,
+        status: 'PENDING_APPROVAL',
+        document_photos: (window as any).lastUploadedPhotos || {
+          registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+          identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+          frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+        },
+        explanation: (window as any).lastUploadedPhotos?.explanation || ''
+      };
+      savedSubs.push(newSub);
+      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(savedSubs));
+      window.dispatchEvent(new Event('storage'));
 
       setRegStep(3); // success step!
-      triggerToast(`Đăng kí thành công bằng Ví UrbanPark cho xe ${selectedVehicleForVIP}!`, 'success');
+      triggerToast(`✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe ${selectedVehicleForVIP}.`, 'success');
     } else {
       setVnpayStep('info');
       setVnpayModalOpen(true);
@@ -849,32 +878,42 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       };
       setTransactions(prev => [newTx, ...prev]);
       
-      // Update vehicle subscription status in local state
-      setVehicles(prev => prev.map(v => {
-        if (v.plate === selectedVehicleForVIP) {
-          const expiryDate = new Date();
-          if (selectedPackLabel.includes('3 Tháng')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 3);
-          } else if (selectedPackLabel.includes('6 Tháng')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 6);
-          } else if (selectedPackLabel.includes('1 Năm')) {
-            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-          } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 1);
-          } else {
-            expiryDate.setDate(expiryDate.getDate() + 1);
-          }
-          const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
-          return {
-            ...v,
-            activeSubscription: selectedPackLabel,
-            subscriptionExpiry: expiryString
-          };
-        }
-        return v;
-      }));
+      // Calculate expiry date
+      const expiryDate = new Date();
+      if (selectedPackLabel.includes('3 Tháng')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 3);
+      } else if (selectedPackLabel.includes('6 Tháng')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 6);
+      } else if (selectedPackLabel.includes('1 Năm')) {
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 1);
+      } else {
+        expiryDate.setDate(expiryDate.getDate() + 1);
+      }
+      const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
 
-      triggerToast(`Đăng kí thành viên thành công cho xe ${selectedVehicleForVIP}!`, 'success');
+      // Create subscription in localStorage with PENDING_APPROVAL status
+      const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+      const newSub = {
+        id: `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
+        vehicle_plate: selectedVehicleForVIP,
+        type: selectedPackLabel,
+        startDate: new Date().toLocaleDateString('vi-VN'),
+        endDate: expiryString,
+        status: 'PENDING_APPROVAL',
+        document_photos: (window as any).lastUploadedPhotos || {
+          registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+          identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+          frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+        },
+        explanation: (window as any).lastUploadedPhotos?.explanation || ''
+      };
+      savedSubs.push(newSub);
+      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(savedSubs));
+      window.dispatchEvent(new Event('storage'));
+
+      triggerToast(`✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe ${selectedVehicleForVIP}.`, 'success');
     }
   };
 
