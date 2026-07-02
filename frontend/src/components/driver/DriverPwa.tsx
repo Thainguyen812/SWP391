@@ -1003,8 +1003,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
       // Create subscription in localStorage with PENDING_APPROVAL status
       const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+      const tempId = `VIP-${Math.floor(1000 + Math.random() * 9000)}`;
       const newSub = {
-        id: `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: tempId,
         vehicle_plate: selectedVehicleForVIP,
         type: selectedPackLabel,
         startDate: new Date().toLocaleDateString('vi-VN'),
@@ -1020,6 +1021,41 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         })(),
         explanation: (window as any).lastUploadedPhotos?.explanation || ''
       };
+      // Call Backend API to register VIP subscription
+      if (targetVeh?.id) {
+        let subType = 'MONTHLY';
+        if (selectedPackLabel.includes('3 Tháng')) {
+          subType = 'QUARTERLY';
+        } else if (selectedPackLabel.includes('6 Tháng')) {
+          subType = 'HALF_YEARLY';
+        } else if (selectedPackLabel.includes('1 Năm')) {
+          subType = 'YEARLY';
+        }
+
+        fetch('/api/vip/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            vehicleId: targetVeh.id,
+            subscriptionType: subType
+          })
+        }).then(res => {
+          if (res.ok) {
+            return res.json();
+          }
+        }).then(data => {
+          if (data && data.id) {
+            const currentSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+            const updated = currentSubs.map((s: any) => s.id === tempId ? { ...s, id: data.id } : s);
+            localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updated));
+            window.dispatchEvent(new Event('storage'));
+          }
+        }).catch(err => console.warn("Backend VIP registration failed:", err));
+      }
+
       savedSubs.push(newSub);
       localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(savedSubs));
       window.dispatchEvent(new Event('storage'));
@@ -1110,8 +1146,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
       // Create subscription in localStorage with PENDING_APPROVAL status
       const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+      const tempId = `VIP-${Math.floor(1000 + Math.random() * 9000)}`;
       const newSub = {
-        id: `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: tempId,
         vehicle_plate: selectedVehicleForVIP,
         type: selectedPackLabel,
         startDate: new Date().toLocaleDateString('vi-VN'),
@@ -1127,6 +1164,41 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         })(),
         explanation: (window as any).lastUploadedPhotos?.explanation || ''
       };
+      // Call Backend API to register VIP subscription
+      if (targetVeh?.id) {
+        let subType = 'MONTHLY';
+        if (selectedPackLabel.includes('3 Tháng')) {
+          subType = 'QUARTERLY';
+        } else if (selectedPackLabel.includes('6 Tháng')) {
+          subType = 'HALF_YEARLY';
+        } else if (selectedPackLabel.includes('1 Năm')) {
+          subType = 'YEARLY';
+        }
+
+        fetch('/api/vip/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            vehicleId: targetVeh.id,
+            subscriptionType: subType
+          })
+        }).then(res => {
+          if (res.ok) {
+            return res.json();
+          }
+        }).then(data => {
+          if (data && data.id) {
+            const currentSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+            const updated = currentSubs.map((s: any) => s.id === tempId ? { ...s, id: data.id } : s);
+            localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updated));
+            window.dispatchEvent(new Event('storage'));
+          }
+        }).catch(err => console.warn("Backend VIP registration failed:", err));
+      }
+
       savedSubs.push(newSub);
       localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(savedSubs));
       window.dispatchEvent(new Event('storage'));
