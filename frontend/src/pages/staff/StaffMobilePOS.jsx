@@ -11,7 +11,7 @@ import { apiClient } from '../../api/apiClient';
 import dayjs from 'dayjs';
 import { useGlobalContext } from '../../context/GlobalContext';
 
-const StaffMobilePOS = () => {
+export const StaffMobilePOS = () => {
   const navigate = useNavigate();
   const { activeVehicles, currentUser } = useGlobalContext();
   const [plate, setPlate] = useState('');
@@ -327,4 +327,4 @@ const StaffMobilePOS = () => {
   );
 };
 
-export default StaffMobilePOS;
+
