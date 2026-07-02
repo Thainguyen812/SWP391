@@ -267,6 +267,9 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   // Profile Edit
   const [profileName, setProfileName] = useState(user.name);
   const [profilePhone, setProfilePhone] = useState(user.phone);
+  const [isPhoneVerified, setIsPhoneVerified] = useState(() => {
+    return localStorage.getItem('urbanpark_phone_verified') === 'true';
+  });
   const [profileEmail, setProfileEmail] = useState('nguyen.van@urbanpark.com');
   const [profileAddress, setProfileAddress] = useState('123 Đường Lê Lợi, Quận 1, TP.HCM');
   
@@ -1030,7 +1033,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               vnpayOtp, setVnpayOtp, vnpayModalOpen, setVnpayModalOpen,
               vnpayStep, setVnpayStep, isSirenMuted, setIsSirenMuted,
               isAlertOverlayShown, setIsAlertOverlayShown, profileName, setProfileName,
-              profilePhone, setProfilePhone, profileEmail, setProfileEmail,
+              profilePhone, setProfilePhone, isPhoneVerified, setIsPhoneVerified, profileEmail, setProfileEmail,
               profileAddress, setProfileAddress, is2faEnabled, setIs2faEnabled,
               emailNotifyGate, setEmailNotifyGate, smsNotifyGate, setSmsNotifyGate,
               emailNotifyReceipt, setEmailNotifyReceipt, smsNotifyReceipt, setSmsNotifyReceipt,

@@ -346,6 +346,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [profilePhone, setProfilePhone] = useState(() => {
     return localStorage.getItem('urbanpark_user_phone') || user.phone;
   });
+  const [isPhoneVerified, setIsPhoneVerified] = useState(() => {
+    return localStorage.getItem('urbanpark_phone_verified') === 'true';
+  });
   const [profileEmail, setProfileEmail] = useState(() => {
     return localStorage.getItem('urbanpark_user_email') || user.email || '';
   });
@@ -2451,12 +2454,30 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                               <input
                                 type="text"
                                 value={profilePhone}
-                                onChange={e => setProfilePhone(e.target.value)}
+                                onChange={e => {
+                                  setProfilePhone(e.target.value);
+                                  setIsPhoneVerified(false);
+                                  localStorage.setItem('urbanpark_phone_verified', 'false');
+                                }}
                                 className="w-full p-3 pr-24 border rounded-xl font-bold bg-slate-50 border-slate-200 focus:bg-white text-slate-800 focus:border-blue-500 outline-none transition-colors"
                               />
-                              <span className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-500/15">
-                                ✓ Đã xác thực
-                              </span>
+                              {isPhoneVerified ? (
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-500/15">
+                                  ✓ Đã xác thực
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsPhoneVerified(true);
+                                    localStorage.setItem('urbanpark_phone_verified', 'true');
+                                    triggerToast('Xác thực số điện thoại thành công!', 'success');
+                                  }}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[10px] font-extrabold text-amber-600 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-md border border-amber-500/15 transition-colors cursor-pointer"
+                                >
+                                  ⚠ Chưa xác thực
+                                </button>
+                              )}
                             </div>
                           </div>
 
