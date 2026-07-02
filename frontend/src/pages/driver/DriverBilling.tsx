@@ -37,6 +37,79 @@ export function DriverBilling() {
     ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout
   } = ctx;
 
+  const getBillingStats = () => {
+    let sumThisMonth = 0;
+    let sumLastMonth = 0;
+    
+    const now = new Date();
+    const currentMonth = now.getMonth(); // 0-11
+    const currentYear = now.getFullYear();
+    
+    // Last month calculations
+    let lastMonth = currentMonth - 1;
+    let lastMonthYear = currentYear;
+    if (lastMonth < 0) {
+      lastMonth = 11;
+      lastMonthYear = currentYear - 1;
+    }
+    
+    transactions.forEach(tx => {
+      if (tx.isEntry === false) {
+        // Parse date DD/MM/YYYY HH:mm:ss
+        const datePart = tx.date ? tx.date.split(' ')[0] : '';
+        const parts = datePart ? datePart.split('/') : [];
+        if (parts.length === 3) {
+          const dMonth = parseInt(parts[1], 10) - 1; // 0-11
+          const dYear = parseInt(parts[2], 10);
+          
+          const feeStr = tx.fee ? tx.fee.replace(/[-+$₫]/g, '').replace(/,/g, '').trim() : '';
+          const value = parseFloat(feeStr);
+          if (!isNaN(value)) {
+            const valVND = tx.fee && tx.fee.includes('$') ? value * 25000 : value;
+            
+            if (dMonth === currentMonth && dYear === currentYear) {
+              sumThisMonth += valVND;
+            } else if (dMonth === lastMonth && dYear === lastMonthYear) {
+              sumLastMonth += valVND;
+            }
+          }
+        }
+      }
+    });
+    
+    let percentText = "0% so với tháng trước";
+    let isDecrease = false;
+    let isIncrease = false;
+    
+    if (sumLastMonth === 0) {
+      if (sumThisMonth > 0) {
+        percentText = "+100% so với tháng trước";
+        isIncrease = true;
+      } else {
+        percentText = "Không thay đổi so với tháng trước";
+      }
+    } else {
+      const diff = ((sumThisMonth - sumLastMonth) / sumLastMonth) * 100;
+      const rounded = Math.round(diff);
+      if (rounded < 0) {
+        percentText = `${rounded}% so với tháng trước`;
+        isDecrease = true;
+      } else if (rounded > 0) {
+        percentText = `+${rounded}% so với tháng trước`;
+        isIncrease = true;
+      } else {
+        percentText = "0% so với tháng trước";
+      }
+    }
+    
+    return {
+      sumThisMonth,
+      percentText,
+      isDecrease,
+      isIncrease
+    };
+  };
+
   return (
     <>
                 <motion.div 
@@ -63,14 +136,31 @@ export function DriverBilling() {
                           SỐ TIỀN THANH TOÁN THÁNG NÀY
                         </span>
                         <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
-                          $128.50
+                          {(() => {
+                            const { sumThisMonth } = getBillingStats();
+                            return sumThisMonth.toLocaleString('vi-VN') + '₫';
+                          })()}
                         </div>
                       </div>
                       <div className="mt-3">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-extrabold text-emerald-600 bg-emerald-50 rounded-full">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          -12% so với tháng trước
-                        </span>
+                        {(() => {
+                          const { percentText, isDecrease, isIncrease } = getBillingStats();
+                          let textColor = "text-slate-600 bg-slate-50 border border-slate-100";
+                          let dotColor = "bg-slate-400";
+                          if (isDecrease) {
+                            textColor = "text-emerald-600 bg-emerald-50 border border-emerald-500/15";
+                            dotColor = "bg-emerald-500";
+                          } else if (isIncrease) {
+                            textColor = "text-red-600 bg-red-50 border border-red-500/15";
+                            dotColor = "bg-red-500";
+                          }
+                          return (
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-extrabold rounded-full ${textColor}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${dotColor} ${isDecrease || isIncrease ? 'animate-pulse' : ''}`} />
+                              {percentText}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
 
