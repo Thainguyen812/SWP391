@@ -143,4 +143,11 @@ public class ParkingController {
             @RequestBody FloorEntryVerificationRequest request) {
         return ResponseEntity.ok(parkingService.verifyFloorEntry(request));
     }
+
+    @PostMapping("/verify-floor-exit")
+    public FloorEntryVerificationResponse verifyFloorExit(
+            @RequestBody FloorEntryVerificationRequest request) {
+
+        return parkingService.verifyFloorExit(request);
+    }
 }
