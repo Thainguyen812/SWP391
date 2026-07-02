@@ -23,7 +23,7 @@ export const StaffPayment = () => {
   const { transactions, fetchAllDataFromBackend, addTransaction, updateShiftStats, shiftStats, addActivityLog, currentVehicle, activeVehicles, removeActiveVehicle, isEmergency, currentUser, getVehicleFines, clearVehicleFines } = useGlobalContext();
   
   const totalSlots = 400; // Static capacity for now until API provides it
-  const activeCount = activeVehicles ? activeVehicles.length : 0;
+  const activeCount = activeVehicles ? activeVehicles.filter(v => !v.gate).length : 0;
   const emptyCount = Math.max(0, totalSlots - activeCount);
   const occupancyPercent = totalSlots > 0 ? Math.round((activeCount / totalSlots) * 100) : 0;
   

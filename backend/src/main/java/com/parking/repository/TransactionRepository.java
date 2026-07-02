@@ -10,6 +10,8 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import java.util.List;
+
 // phần 1 / check out task 5
 
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
@@ -23,4 +25,15 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
 
     @Query("SELECT COALESCE(SUM(t.totalAmount), 0) FROM Transaction t WHERE t.paymentStatus = :status")
     BigDecimal sumTotalRevenueByStatus(@Param("status") Transaction.PaymentStatus status);
+
+    @Query(value = """
+            SELECT
+                DATE(processed_at) AS revenue_date,
+                SUM(total_amount) AS revenue
+            FROM transactions
+            WHERE payment_status = 'SUCCESS'
+            GROUP BY DATE(processed_at)
+            ORDER BY DATE(processed_at)
+            """, nativeQuery = true)
+    List<Object[]> getRevenueByDay();
 }

@@ -35,7 +35,7 @@ public class DashboardController {
         Map<String, Object> response = new HashMap<>();
 
         // Active sessions
-        long activeCount = sessionRepo.countBySessionStatus(ParkingSession.SessionStatus.ACTIVE);
+        long activeCount = sessionRepo.countBySessionStatusAndEntryGateIsNull(ParkingSession.SessionStatus.ACTIVE);
         
         // Suspicious sessions
         long suspiciousCount = sessionRepo.findByIsSuspiciousTrue().size();

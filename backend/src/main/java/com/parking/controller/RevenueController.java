@@ -7,6 +7,8 @@ import com.parking.repository.ParkingSessionRepository;
 
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
 import java.util.*;
 
 @RestController
@@ -42,17 +44,35 @@ public class RevenueController {
     @GetMapping("/charts")
     @PreAuthorize("hasRole('MANAGER')")
     public Map<String, Object> getCharts(@RequestParam(required = false) String month) {
-        List<Map<String, Object>> barData = Arrays.asList(
-                Map.of("date", "Hôm nay", "revenue", 50000),
-                Map.of("date", "Hôm qua", "revenue", 45000),
-                Map.of("date", "Hôm kia", "revenue", 60000));
+
+        // Lấy doanh thu theo ngày
+        List<Object[]> rows = transactionRepo.getRevenueByDay();
+
+        List<Map<String, Object>> barData = new ArrayList<>();
+
+        for (Object[] row : rows) {
+
+            Map<String, Object> item = new HashMap<>();
+
+            item.put("date", row[0].toString());
+            item.put("revenue", row[1]);
+
+            barData.add(item);
+        }
+
+        BigDecimal totalRevenue = transactionRepo.sumTotalRevenueByStatus(
+                Transaction.PaymentStatus.SUCCESS);
+
+        // Tạm giữ biểu đồ tròn
         List<Map<String, Object>> pieData = Arrays.asList(
                 Map.of("type", "Ô tô", "value", 60),
                 Map.of("type", "Xe máy", "value", 40));
+
+        // Tổng doanh thu thật
         Map<String, Object> response = new HashMap<>();
         response.put("barData", barData);
         response.put("pieData", pieData);
-        response.put("totalVehicleRevenue", "125K");
+        response.put("totalVehicleRevenue", totalRevenue);
         return response;
     }
 

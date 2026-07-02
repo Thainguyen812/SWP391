@@ -25,6 +25,9 @@ public class VehicleRegistrationRequest {
     @NotBlank(message = "Fuel type is required")
     private String fuelType;
 
+    private String registrationDocUrl;
+    private String registrationPhotoUrl;
+
     public String getLicensePlate() {
         return licensePlate;
     }
@@ -79,5 +82,21 @@ public class VehicleRegistrationRequest {
 
     public void setFuelType(String fuelType) {
         this.fuelType = fuelType;
+    }
+
+    public String getRegistrationDocUrl() {
+        return registrationDocUrl;
+    }
+
+    public void setRegistrationDocUrl(String registrationDocUrl) {
+        this.registrationDocUrl = registrationDocUrl;
+    }
+
+    public String getRegistrationPhotoUrl() {
+        return registrationPhotoUrl;
+    }
+
+    public void setRegistrationPhotoUrl(String registrationPhotoUrl) {
+        this.registrationPhotoUrl = registrationPhotoUrl;
     }
 }
