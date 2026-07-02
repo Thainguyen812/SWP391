@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext, useNavigate, Link } from 'react-router-dom';
+import { Modal } from 'antd';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, Car, Calendar, CreditCard, Settings, LogOut, HelpCircle, Bell, Search, 
@@ -37,6 +38,35 @@ export function DriverHome() {
     ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout,
     triggerSecurityTest
   } = ctx;
+
+  const handleFindCar = () => {
+    if (currentParked && currentParked.isParked) {
+      Modal.info({
+        title: 'Định vị phương tiện của bạn',
+        content: (
+          <div className="space-y-3 mt-3 text-left">
+            <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-3">
+              <MapPin className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">VỊ TRÍ ĐỖ XE</p>
+                <strong className="text-lg font-black text-slate-800">{currentParked.location}</strong>
+              </div>
+            </div>
+            <div className="text-xs text-slate-550 font-semibold space-y-1">
+              <p>• Biển số xe: <strong className="font-mono text-slate-700">{currentParked.plate}</strong></p>
+              <p>• Trạng thái: <span className="text-emerald-600 font-extrabold">{currentParked.status}</span></p>
+              <p className="mt-2 text-slate-400">Chỉ dẫn: Bạn có thể đi bộ qua Lối đi bộ Zone A, bấm thang máy lên Tầng 2 để nhận xe.</p>
+            </div>
+          </div>
+        ),
+        okText: 'Đóng',
+        centered: true,
+        maskClosable: true,
+      });
+    } else {
+      triggerToast('Hiện tại không có phương tiện nào của bạn đang đỗ trong bãi xe!', 'info');
+    }
+  };
 
   return (
     <>
@@ -160,9 +190,7 @@ export function DriverHome() {
                       <div className="grid grid-cols-2 gap-4 flex-1">
                         
                         <button 
-                          onClick={() => {
-                            triggerToast('Đã kích hoạt thiết bị đo lường định vị radar xe của bạn!', 'success');
-                          }}
+                          onClick={handleFindCar}
                           className="p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center gap-2 select-none group cursor-pointer active:scale-95 transition-all"
                         >
                           <div className="p-2.5 bg-blue-50 text-blue-600 rounded-full group-hover:scale-110 transition-transform">
