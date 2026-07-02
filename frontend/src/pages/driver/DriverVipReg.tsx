@@ -157,6 +157,44 @@ export function DriverVipReg() {
                     </p>
                   </div>
 
+                  {vehicles.length === 0 ? (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-white p-8 rounded-3xl border border-slate-200/60 shadow-lg text-center max-w-xl mx-auto space-y-6 mt-8"
+                    >
+                      <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto animate-bounce">
+                        <Car className="w-10 h-10" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-black text-slate-800">Chưa có phương tiện đăng ký</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed">
+                          Bạn cần thêm ít nhất một phương tiện vào tài khoản trước khi thực hiện mua vé tháng VIP hoặc đăng ký gói dịch vụ.
+                        </p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewType('Ô tô gầm thấp 4-5 chỗ');
+                            setAddVehicleModalOpen(true);
+                          }}
+                          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-2xl transition-all shadow-md cursor-pointer"
+                        >
+                          + Thêm xe mới ngay
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('vehicles')}
+                          className="px-6 py-3 border border-slate-200 hover:bg-slate-50 text-slate-655 font-extrabold text-xs uppercase tracking-wider rounded-2xl transition-all cursor-pointer"
+                        >
+                          Quản lý xe của tôi
+                        </button>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <>
+
                   {/* Progressive Horizontal steps */}
                   <div className="bg-white px-8 py-5 rounded-2xl border border-slate-200/60 flex items-center justify-between gap-6 overflow-x-auto">
                     {[
@@ -386,6 +424,8 @@ export function DriverVipReg() {
                     </div>
 
                   </div>
+                    </>
+                  )}
 
                 </motion.div>
 
