@@ -6,16 +6,16 @@ import java.util.UUID;
 
 public class VipRegistrationRequest {
 
-    private UUID vehicleId;
+    private String licensePlate;
     private String subscriptionType;
     private String documentPhotos;
 
-    public UUID getVehicleId() {
-        return vehicleId;
+    public String getLicensePlate() {
+        return licensePlate;
     }
 
-    public void setVehicleId(UUID vehicleId) {
-        this.vehicleId = vehicleId;
+    public void setLicensePlate(String licensePlate) {
+        this.licensePlate = licensePlate;
     }
 
     public String getSubscriptionType() {

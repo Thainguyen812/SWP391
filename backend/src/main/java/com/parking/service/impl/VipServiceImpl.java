@@ -69,14 +69,22 @@ public class VipServiceImpl implements VipService {
         public VipSubscription register(
                         VipRegistrationRequest request) {
 
-                com.parking.model.Vehicle vehicle = vehicleRepository.findById(
-                                request.getVehicleId())
-                                .orElseThrow(() -> new RuntimeException("Không tìm thấy xe"));
+                com.parking.model.Vehicle vehicle = vehicleRepository.findByLicensePlate(request.getLicensePlate())
+                        .orElseGet(() -> {
+                            // Auto create mock vehicle for demo if missing
+                            com.parking.model.Vehicle newV = new com.parking.model.Vehicle();
+                            newV.setId(UUID.randomUUID());
+                            newV.setLicensePlate(request.getLicensePlate());
+                            // Use a random owner for now
+                            newV.setOwnerId(UUID.randomUUID());
+                            newV.setVehicleSize("SEDAN_HATCHBACK");
+                            return vehicleRepository.save(newV);
+                        });
 
                 VipSubscription vip = new VipSubscription();
 
                 vip.setId(UUID.randomUUID());
-                vip.setVehicleId(request.getVehicleId());
+                vip.setVehicleId(vehicle.getId());
                 vip.setSubscriptionType(request.getSubscriptionType());
                 vip.setDocumentPhotos(request.getDocumentPhotos());
                 vip.setStatus(VipSubscription.Status.PENDING_APPROVAL);

@@ -1000,7 +1000,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
       try {
         await apiClient.post('/vip/register', {
-          vehicleId: targetVeh ? targetVeh.id : null,
+          licensePlate: targetVeh ? targetVeh.plate : null,
           subscriptionType: subType,
           documentPhotos: JSON.stringify(docPhotos)
         });
@@ -1110,7 +1110,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
       try {
         await apiClient.post('/vip/register', {
-          vehicleId: targetVeh ? targetVeh.id : null,
+          licensePlate: targetVeh ? targetVeh.plate : null,
           subscriptionType: subType,
           documentPhotos: JSON.stringify(docPhotos)
         });
