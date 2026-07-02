@@ -12,4 +12,6 @@ public interface CardRepository extends JpaRepository<Card, UUID> {
 
     Optional<Card> findByCardCode(String cardCode);
 
+    Optional<Card> findFirstByStatus(Card.CardStatus status);
+
 }
