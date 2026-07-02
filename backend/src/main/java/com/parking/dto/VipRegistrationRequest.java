@@ -7,8 +7,17 @@ import java.util.UUID;
 public class VipRegistrationRequest {
 
     private String licensePlate;
+    private UUID ownerId;
     private String subscriptionType;
     private String documentPhotos;
+
+    public UUID getOwnerId() {
+        return ownerId;
+    }
+
+    public void setOwnerId(UUID ownerId) {
+        this.ownerId = ownerId;
+    }
 
     public String getLicensePlate() {
         return licensePlate;

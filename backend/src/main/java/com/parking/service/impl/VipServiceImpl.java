@@ -75,8 +75,7 @@ public class VipServiceImpl implements VipService {
                             com.parking.model.Vehicle newV = new com.parking.model.Vehicle();
                             newV.setId(UUID.randomUUID());
                             newV.setLicensePlate(request.getLicensePlate());
-                            // Use a random owner for now
-                            newV.setOwnerId(UUID.randomUUID());
+                            newV.setOwnerId(request.getOwnerId() != null ? request.getOwnerId() : UUID.randomUUID());
                             newV.setVehicleSize("SEDAN_HATCHBACK");
                             return vehicleRepository.save(newV);
                         });

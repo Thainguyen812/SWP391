@@ -39,7 +39,13 @@ public class VipController {
 
     @PostMapping("/register")
     @PreAuthorize("hasAnyRole('DRIVER', 'STAFF', 'MANAGER')")
-    public VipSubscription register(@RequestBody VipRegistrationRequest request) {
+    public VipSubscription register(@RequestBody VipRegistrationRequest request, Principal principal) {
+        if (principal != null) {
+            User user = userRepository.findByUsername(principal.getName()).orElse(null);
+            if (user != null) {
+                request.setOwnerId(user.getId());
+            }
+        }
         return vipService.register(request);
     }
 
