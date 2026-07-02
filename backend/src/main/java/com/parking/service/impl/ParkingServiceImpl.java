@@ -1091,6 +1091,13 @@ public class ParkingServiceImpl implements ParkingService {
 
         vipSubscriptionRepository.save(subscription);
 
+        if (newStatus == VipSubscription.Status.ACTIVE) {
+            vehicleRepository.findById(subscription.getVehicleId()).ifPresent(vehicle -> {
+                vehicle.setActive(true);
+                vehicleRepository.save(vehicle);
+            });
+        }
+
         // Ghi nhận vào audit log
         AuditLog audit = new AuditLog();
         audit.setId(UUID.randomUUID());

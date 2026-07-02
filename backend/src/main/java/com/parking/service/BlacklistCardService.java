@@ -4,8 +4,10 @@ import com.parking.dto.BlacklistCardRequest;
 import com.parking.exception.ApiExceptions;
 import com.parking.model.BlacklistEntry; // Sử dụng Entity mới
 import com.parking.model.ParkingSession;
+import com.parking.model.Card;
 import com.parking.repository.BlacklistRepository; // Sử dụng Repository mới
 import com.parking.repository.ParkingSessionRepository;
+import com.parking.repository.CardRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,11 +20,14 @@ public class BlacklistCardService {
 
     private final BlacklistRepository blacklistedCardRepository;
     private final ParkingSessionRepository parkingSessionRepository;
+    private final CardRepository cardRepository;
 
     public BlacklistCardService(BlacklistRepository blacklistedCardRepository,
-            ParkingSessionRepository parkingSessionRepository) {
+            ParkingSessionRepository parkingSessionRepository,
+            CardRepository cardRepository) {
         this.blacklistedCardRepository = blacklistedCardRepository;
         this.parkingSessionRepository = parkingSessionRepository;
+        this.cardRepository = cardRepository;
     }
 
     public UUID getCardIdByActiveLicensePlate(String plate) {
@@ -77,10 +82,16 @@ public class BlacklistCardService {
         // Sửa hàm lỗi: Dùng setOverrideByStaff để ghi nhận ID nhân viên xử lý tại bốt
         session.setOverrideByStaff(request.getBlacklistedBy());
         if (request.getNotes() != null) {
-            session.setOverrideReason(request.getNotes()); // Lưu luôn lý do vào phiên xe
+        session.setOverrideReason(request.getNotes()); // Lưu luôn lý do vào phiên xe
         }
 
         parkingSessionRepository.save(session);
+        
+        // Cập nhật trạng thái thẻ thành LOST
+        Card card = cardRepository.findById(request.getCardId())
+                .orElseThrow(() -> new ApiExceptions.BadRequestException("Không tìm thấy thẻ xe!"));
+        card.setStatus(Card.CardStatus.LOST);
+        cardRepository.save(card);
 
         BlacklistEntry blacklistEntry = new BlacklistEntry();
         blacklistEntry.setId(UUID.randomUUID());

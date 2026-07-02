@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   FilterOutlined, 
   WarningFilled,
@@ -8,11 +8,17 @@ import {
   TeamOutlined,
   MoreOutlined
 } from '@ant-design/icons';
-import { notification, Modal } from 'antd';
+import { notification, Modal, Input } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffSecurityAlerts = () => {
-  const { securityAlerts, removeSecurityAlert, restoreSecurityAlerts } = useGlobalContext();
+  const { securityAlerts, removeSecurityAlert, restoreSecurityAlerts, addVehicleFine } = useGlobalContext();
+  
+  const [resolvingAlerts, setResolvingAlerts] = useState({});
+  const [isFineModalVisible, setIsFineModalVisible] = useState(false);
+  const [currentFineAlertId, setCurrentFineAlertId] = useState(null);
+  const [fineAmount, setFineAmount] = useState(200000);
+  const [fineNote, setFineNote] = useState('');
 
   const handleResolve = (type, id) => {
     Modal.confirm({
@@ -23,20 +29,21 @@ export const StaffSecurityAlerts = () => {
       onOk() {
         notification.success({ message: `Đã ghi nhận xử lý cảnh báo: ${type}`, placement: 'topRight' });
         removeSecurityAlert(id);
+        setResolvingAlerts(prev => { const n = {...prev}; delete n[id]; return n; });
       }
     });
   };
 
-  const handleSecurityDispatch = (id) => {
+  const handleCustomAction = (id, title, content, successMsg, btnClass = 'bg-blue-600') => {
     Modal.confirm({
-      title: 'Điều phối An ninh',
-      content: 'Gửi yêu cầu đội an ninh hỗ trợ tại hiện trường?',
-      okText: 'Gửi yêu cầu',
+      title: title,
+      content: content,
+      okText: 'Xác nhận',
       cancelText: 'Hủy',
-      okButtonProps: { className: 'bg-emerald-600' },
+      okButtonProps: { className: btnClass },
       onOk() {
-        notification.success({ message: 'Đã điều động lực lượng an ninh', placement: 'topRight' });
-        removeSecurityAlert(id);
+        notification.success({ message: successMsg, placement: 'topRight' });
+        setResolvingAlerts(prev => ({ ...prev, [id]: true }));
       }
     });
   };
@@ -46,7 +53,6 @@ export const StaffSecurityAlerts = () => {
       <div className="p-6 max-w-[1200px] mx-auto w-full text-center py-20 text-slate-500">
         <CheckCircleOutlined className="text-6xl text-emerald-400 mb-4" />
         <h2 className="text-2xl font-bold text-slate-700">Tất cả cảnh báo đã được xử lý</h2>
-        <button onClick={restoreSecurityAlerts} className="mt-4 text-blue-500 underline cursor-pointer">Khôi phục dữ liệu mẫu</button>
       </div>
     );
   }
@@ -129,7 +135,7 @@ export const StaffSecurityAlerts = () => {
                   <button onClick={() => handleResolve(alert.type, alert.id)} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-md shadow-red-500/20 cursor-pointer">
                     <CheckCircleOutlined /> Xác nhận
                   </button>
-                  <button onClick={() => handleSecurityDispatch(alert.id)} className="bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-700 font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer">
+                  <button onClick={() => handleCustomAction(alert.id, 'Điều phối An ninh', 'Gửi yêu cầu đội an ninh hỗ trợ tại hiện trường?', 'Đã điều động lực lượng an ninh', 'bg-emerald-600')} className="bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-700 font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer">
                     <SafetyCertificateOutlined /> An ninh
                   </button>
                 </div>
@@ -178,20 +184,143 @@ export const StaffSecurityAlerts = () => {
               </div>
             )}
 
-            <div className={`flex gap-2 mt-auto`}>
-              <button onClick={() => handleResolve(alert.type, alert.id)} className={`flex-1 ${alert.type.includes('TRỘM') ? 'bg-[#0f172a] hover:bg-slate-800 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'} font-bold py-2 rounded-lg text-sm transition-colors cursor-pointer flex items-center justify-center gap-2`}>
-                {alert.type.includes('TRỘM') ? <CheckCircleOutlined /> : null}
-                {alert.type.includes('TRỘM') ? 'Đã nhận' : 'Bỏ qua (Xác nhận)'}
-              </button>
-              <button onClick={() => handleSecurityDispatch(alert.id)} className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-4 rounded-lg flex items-center justify-center transition-colors cursor-pointer gap-2">
-                {alert.type.includes('TRỘM') ? <><TeamOutlined /> Đội tuần tra</> : <AudioOutlined />}
-              </button>
+            <div className={`flex mt-auto`}>
+              {resolvingAlerts[alert.id] ? (
+                <div className="w-full bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col mt-2">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">Hướng xử lý tiếp theo</div>
+                  <div className="flex gap-2">
+                    <button onClick={() => {
+                    setCurrentFineAlertId(alert.id);
+                    setFineAmount(200000);
+                    setFineNote('');
+                    setIsFineModalVisible(true);
+                  }} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-sm transition-colors cursor-pointer flex items-center justify-center gap-2">
+                      Lập biên bản
+                    </button>
+                    <button onClick={() => {
+                      notification.success({ message: 'Đã gỡ phong tỏa phương tiện', placement: 'topRight' });
+                      removeSecurityAlert(alert.id);
+                      setResolvingAlerts(prev => { const n = {...prev}; delete n[alert.id]; return n; });
+                    }} className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold px-3 rounded-lg flex items-center justify-center transition-colors cursor-pointer gap-2 text-sm">
+                      Gỡ phong tỏa
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2 w-full mt-2">
+              {alert.type.includes('TRỘM') ? (
+                <>
+                  <button onClick={() => handleResolve(alert.type, alert.id)} className="flex-1 bg-[#0f172a] hover:bg-slate-800 text-white font-bold py-2 rounded-lg text-sm transition-colors cursor-pointer flex items-center justify-center gap-2">
+                    <CheckCircleOutlined /> Đã nhận
+                  </button>
+                  <button onClick={() => handleCustomAction(alert.id, 'Điều phối An ninh', 'Gửi yêu cầu đội tuần tra đến ngay hiện trường?', 'Đã điều động lực lượng an ninh', 'bg-orange-600')} className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-4 rounded-lg flex items-center justify-center transition-colors cursor-pointer gap-2">
+                    <TeamOutlined /> Đội tuần tra
+                  </button>
+                </>
+              ) : alert.reason === 'Đỗ sai quy định' || alert.reason === 'Đỗ sai quy định / Lấn vạch' ? (
+                <>
+                  <button onClick={() => handleCustomAction(alert.id, 'Phát loa nhắc nhở', 'Phát cảnh báo đỗ sai quy định qua loa tại bãi?', 'Đã phát loa nhắc nhở', 'bg-blue-600')} className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold py-2 rounded-lg text-sm transition-colors cursor-pointer flex items-center justify-center gap-2">
+                    <AudioOutlined /> Nhắc nhở
+                  </button>
+                  <button onClick={() => handleCustomAction(alert.id, 'Khóa bánh xe', 'Yêu cầu an ninh khóa bánh xe này?', 'Đã yêu cầu khóa bánh', 'bg-red-600')} className="bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-700 font-bold px-4 rounded-lg flex items-center justify-center transition-colors cursor-pointer gap-2 text-sm">
+                    Khóa bánh
+                  </button>
+                </>
+              ) : alert.reason === 'Trốn vé' || alert.reason === 'Trốn vé / Vượt rào' ? (
+                <>
+                  <button onClick={() => handleCustomAction(alert.id, 'Khóa cổng tự động', 'Hệ thống sẽ khóa cổng và chặn xe này không cho xuất bãi?', 'Đã khóa cổng, chặn xe xuất bãi', 'bg-red-600')} className="flex-1 bg-white border border-red-200 hover:bg-red-50 text-red-600 font-bold py-2 rounded-lg text-sm transition-colors cursor-pointer flex items-center justify-center gap-2">
+                    Chặn xuất bãi
+                  </button>
+                  <button onClick={() => handleCustomAction(alert.id, 'Phạt tiền / Khóa thẻ', 'Tiến hành khóa thẻ và lập biên bản phạt tiền?', 'Đã yêu cầu xử phạt', 'bg-blue-600')} className="bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-700 font-bold px-4 rounded-lg flex items-center justify-center transition-colors cursor-pointer gap-2 text-sm">
+                    Khóa thẻ
+                  </button>
+                </>
+              ) : alert.reason === 'Gây rối trật tự' || alert.reason === 'Gây rối trật tự an ninh' ? (
+                <>
+                  <button onClick={() => handleCustomAction(alert.id, 'Báo Công an', 'Gọi ngay cho lực lượng Công an Phường gần nhất?', 'Đã báo cáo Công an', 'bg-red-600')} className="flex-1 bg-red-50 border border-red-200 hover:bg-red-100 text-red-600 font-bold py-2 rounded-lg text-sm transition-colors cursor-pointer flex items-center justify-center gap-2">
+                    Báo Công an
+                  </button>
+                  <button onClick={() => handleCustomAction(alert.id, 'Đội tuần tra', 'Điều phối đội tuần tra đến hiện trường?', 'Đã điều động lực lượng an ninh', 'bg-orange-600')} className="bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-700 font-bold px-4 rounded-lg flex items-center justify-center transition-colors cursor-pointer gap-2 text-sm">
+                    Đội tuần tra
+                  </button>
+                </>
+              ) : alert.reason === 'Tai nạn' || alert.reason === 'Gây tai nạn / Hư hỏng tài sản' ? (
+                <>
+                  <button onClick={() => handleCustomAction(alert.id, 'Gọi Cứu thương', 'Gọi cấp cứu 115 đến hiện trường?', 'Đã gọi cứu thương', 'bg-red-600')} className="flex-1 bg-white border border-red-200 hover:bg-red-50 text-red-600 font-bold py-2 rounded-lg text-sm transition-colors cursor-pointer flex items-center justify-center gap-2">
+                    Gọi Cứu thương
+                  </button>
+                  <button onClick={() => handleCustomAction(alert.id, 'Bảo vệ hiện trường', 'Cử đội an ninh đến phong tỏa và bảo vệ hiện trường?', 'Đã cử đội bảo vệ hiện trường', 'bg-blue-600')} className="bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-700 font-bold px-4 rounded-lg flex items-center justify-center transition-colors cursor-pointer gap-2 text-sm">
+                    Bảo vệ HT
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => handleResolve(alert.type, alert.id)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 rounded-lg text-sm transition-colors cursor-pointer flex items-center justify-center gap-2">
+                    Bỏ qua (Xác nhận)
+                  </button>
+                  <button onClick={() => handleCustomAction(alert.id, 'Điều phối An ninh', 'Gửi yêu cầu đội an ninh hỗ trợ tại hiện trường?', 'Đã điều động lực lượng an ninh', 'bg-emerald-600')} className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-4 rounded-lg flex items-center justify-center transition-colors cursor-pointer gap-2">
+                    <AudioOutlined />
+                  </button>
+                </>
+              )}
+                </div>
+              )}
             </div>
           </div>
           ))}
 
         </div>
       </div>
+      
+      {/* Fine Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-slate-800 uppercase tracking-wider font-bold">
+            <SafetyCertificateOutlined className="text-blue-600" /> Lập Biên bản & Xử phạt
+          </div>
+        }
+        open={isFineModalVisible}
+        onCancel={() => setIsFineModalVisible(false)}
+        onOk={() => {
+          notification.success({ message: `Đã ghi nhận phạt ${fineAmount.toLocaleString()}đ vào hệ thống và gỡ phong tỏa`, placement: 'topRight' });
+          if (currentFineAlertId) {
+            const alert = securityAlerts.find(a => a.id === currentFineAlertId);
+            if (alert) {
+              addVehicleFine({ plate: alert.plate, amount: parseInt(fineAmount) || 0, reason: fineNote });
+            }
+            removeSecurityAlert(currentFineAlertId);
+            setResolvingAlerts(prev => { const n = {...prev}; delete n[currentFineAlertId]; return n; });
+          }
+          setIsFineModalVisible(false);
+        }}
+        okText="Ghi nhận & Hoàn tất"
+        cancelText="Hủy"
+        okButtonProps={{ className: 'bg-blue-600' }}
+      >
+        <div className="py-4">
+          <div className="mb-4">
+            <label className="block text-sm font-bold text-slate-700 mb-2">Số tiền phạt (VNĐ)</label>
+            <Input 
+              type="number" 
+              value={fineAmount} 
+              onChange={e => setFineAmount(Number(e.target.value))}
+              size="large"
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-bold text-slate-700 mb-2">Ghi chú biên bản</label>
+            <Input.TextArea 
+              rows={3}
+              placeholder="Nhập chi tiết xử phạt..."
+              value={fineNote}
+              onChange={e => setFineNote(e.target.value)}
+            />
+          </div>
+          <div className="bg-blue-50 p-3 rounded text-sm text-blue-800 border border-blue-100">
+            Hệ thống sẽ tự động gỡ khóa an ninh cho phương tiện sau khi hoàn tất thu phạt.
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

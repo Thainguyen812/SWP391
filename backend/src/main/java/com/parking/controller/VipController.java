@@ -43,7 +43,7 @@ public class VipController {
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<?> approveVip(@PathVariable UUID id, Principal principal) {
         String username = principal.getName();
         User manager = userRepository.findByUsername(username)
@@ -55,7 +55,7 @@ public class VipController {
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<?> rejectVip(@PathVariable UUID id, @RequestBody RejectRequest req, Principal principal) {
         String username = principal.getName();
         User manager = userRepository.findByUsername(username)

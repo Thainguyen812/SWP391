@@ -34,7 +34,7 @@ public class Vehicle {
     private int violationCount = 0;
 
     @Column(name = "is_active", nullable = false)
-    private boolean isActive = true;
+    private boolean isActive = false;
 
     @Column(name = "fuel_type", nullable = false)
     private String fuelType = "GASOLINE";

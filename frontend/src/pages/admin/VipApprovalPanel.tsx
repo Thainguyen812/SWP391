@@ -38,37 +38,72 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING' | 'ACTIVE' | 'REJECTED'>('PENDING');
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        setUserRole(u.role);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
 
   // Sync state with localstorage
-  const loadSubscriptions = () => {
+  const loadSubscriptions = async () => {
+    let localSubs: VipSubscription[] = [];
     const saved = localStorage.getItem('urbanpark_vip_subscriptions');
     if (saved) {
       try {
-        setSubscriptions(JSON.parse(saved));
+        localSubs = JSON.parse(saved);
       } catch (err) {
         console.error("Failed to parse VIP subscriptions:", err);
       }
-    } else {
-      // Seed a few initial mock ones if empty, some in pending
-      const initialSubs: VipSubscription[] = [
-        {
-          id: 'VIP-9991',
-          vehicle_plate: '30F-999.78',
-          type: 'Cước Vàng Tháng Gold',
-          startDate: '13/06/2026',
-          endDate: '13/07/2026',
-          status: 'PENDING',
-          document_photos: {
-            registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-            identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-            frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
-          },
-          approved_by: null
-        }
-      ];
-      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(initialSubs));
-      setSubscriptions(initialSubs);
     }
+
+    try {
+      const response = await fetch('/api/vip/pending', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (response.ok) {
+        const backendPending = await response.json();
+        if (Array.isArray(backendPending)) {
+          const mappedPending = backendPending.map((bp: any) => {
+            let docPhotos = {
+              registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+              identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+              frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+            };
+            if (bp.documentPhotos) {
+              try {
+                docPhotos = JSON.parse(bp.documentPhotos);
+              } catch (e) {}
+            }
+            return {
+              id: bp.id,
+              vehicle_plate: bp.licensePlate || `XE-${bp.vehicleId}`,
+              type: bp.subscriptionType === 'YEARLY' ? 'Thẻ Năm VIP' : bp.subscriptionType === 'QUARTERLY' ? 'Thẻ 3 Tháng VIP' : 'Thẻ Tháng VIP',
+              startDate: bp.startDate ? new Date(bp.startDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+              endDate: bp.endDate ? new Date(bp.endDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+              status: bp.status === 'PENDING_APPROVAL' ? 'PENDING' : bp.status,
+              document_photos: docPhotos,
+              approved_by: bp.approvedBy ? 'Bùi Phương (Manager)' : null
+            };
+          });
+
+          // Merge: filter out pending ones from local since live is primary
+          const nonPendingLocal = localSubs.filter(s => s.status !== 'PENDING' && s.status !== 'PENDING_APPROVAL');
+          localSubs = [...mappedPending, ...nonPendingLocal];
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to fetch pending VIP list from backend API:", e);
+    }
+
+    setSubscriptions(localSubs);
   };
 
   useEffect(() => {
@@ -86,6 +121,19 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
   const handleAction = (id: string, nextStatus: 'ACTIVE' | 'REJECTED') => {
     let targetSub = subscriptions.find(s => s.id === id);
     if (!targetSub) return;
+
+    if (id.length === 36) {
+      const endpoint = nextStatus === 'ACTIVE' ? `/api/vip/${id}/approve` : `/api/vip/${id}/reject`;
+      const body = nextStatus === 'REJECTED' ? JSON.stringify({ reason: 'Không đủ điều kiện phê duyệt' }) : undefined;
+      fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: body
+      }).catch(err => console.warn("Backend action call failed:", err));
+    }
 
     const updated = subscriptions.map(sub => {
       if (sub.id === id) {
@@ -341,22 +389,28 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
 
                 {/* Decision controls */}
                 {(sub.status === 'PENDING' || sub.status === 'PENDING_APPROVAL') ? (
-                  <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-                    <button
-                      onClick={() => handleAction(sub.id, 'REJECTED')}
-                      className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 hover:text-rose-700 text-rose-600 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-98 cursor-pointer flex items-center gap-1"
-                    >
-                      <X className="w-4 h-4" />
-                      Không duyệt (Reject)
-                    </button>
-                    <button
-                      onClick={() => handleAction(sub.id, 'ACTIVE')}
-                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-98 cursor-pointer flex items-center gap-1"
-                    >
-                      <Check className="w-4 h-4" />
-                      Phê duyệt kích hoạt (Approve)
-                    </button>
-                  </div>
+                  userRole === 'MANAGER' ? (
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        onClick={() => handleAction(sub.id, 'REJECTED')}
+                        className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 hover:text-rose-700 text-rose-600 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-98 cursor-pointer flex items-center gap-1"
+                      >
+                        <X className="w-4 h-4" />
+                        Không duyệt (Reject)
+                      </button>
+                      <button
+                        onClick={() => handleAction(sub.id, 'ACTIVE')}
+                        className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-98 cursor-pointer flex items-center gap-1"
+                      >
+                        <Check className="w-4 h-4" />
+                        Phê duyệt kích hoạt (Approve)
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 font-medium italic">
+                      Chỉ Quản lý (Manager) mới có quyền phê duyệt hồ sơ VIP.
+                    </div>
+                  )
                 ) : (
                   <div className="flex justify-between items-center pt-4 border-t border-slate-100 dark:border-slate-800 text-xs font-mono">
                     <div className="flex items-center gap-1.5">
@@ -367,12 +421,14 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
                     </div>
                     
                     {/* Reset decision capability */}
-                    <button 
-                      onClick={() => handleAction(sub.id, sub.status === 'ACTIVE' ? 'REJECTED' : 'ACTIVE')}
-                      className="text-[10px] text-blue-500 hover:underline cursor-pointer font-bold"
-                    >
-                      Sửa đổi quyết định
-                    </button>
+                    {userRole === 'MANAGER' ? (
+                      <button 
+                        onClick={() => handleAction(sub.id, sub.status === 'ACTIVE' ? 'REJECTED' : 'ACTIVE')}
+                        className="text-[10px] text-blue-500 hover:underline cursor-pointer font-bold"
+                      >
+                        Sửa đổi quyết định
+                      </button>
+                    ) : null}
                   </div>
                 )}
 
