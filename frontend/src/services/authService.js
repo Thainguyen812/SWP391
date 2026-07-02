@@ -2,6 +2,17 @@ import { apiClient } from '../api/apiClient';
 
 const isMock = import.meta.env.VITE_USE_MOCK_API === 'true';
 
+const clearUserCache = () => {
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('urbanpark_')) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(key => localStorage.removeItem(key));
+};
+
 export const authService = {
   login: async (username, password, otp = null) => {
     if (isMock) {
@@ -43,9 +54,7 @@ export const authService = {
       localStorage.setItem('user', JSON.stringify(mockUser));
 
       // Xóa dữ liệu cache của người dùng cũ để tránh hiển thị chéo dữ liệu
-      localStorage.removeItem('urbanpark_user_vehicles');
-      localStorage.removeItem('urbanpark_user_balance');
-      localStorage.removeItem('urbanpark_user_transactions');
+      clearUserCache();
 
       return { success: true, user: mockUser };
     }
@@ -82,9 +91,7 @@ export const authService = {
         }
 
         // Xóa dữ liệu cache của người dùng cũ để tránh hiển thị chéo dữ liệu
-        localStorage.removeItem('urbanpark_user_vehicles');
-        localStorage.removeItem('urbanpark_user_balance');
-        localStorage.removeItem('urbanpark_user_transactions');
+        clearUserCache();
 
         return { success: true, user: user };
       } else {
@@ -110,9 +117,7 @@ export const authService = {
         role: "DRIVER" // Mặc định đăng ký từ Driver App là tài xế (DRIVER)
       });
       // Xóa dữ liệu cache của trình duyệt để đảm bảo tài khoản mới tạo 100% trống dữ liệu
-      localStorage.removeItem('urbanpark_user_vehicles');
-      localStorage.removeItem('urbanpark_user_balance');
-      localStorage.removeItem('urbanpark_user_transactions');
+      clearUserCache();
 
       return { success: true, data: response };
     } catch (error) {
@@ -162,13 +167,7 @@ export const authService = {
     localStorage.removeItem('user');
     
     // Xóa dữ liệu cache của tài xế để tránh hiển thị chéo giữa các tài khoản
-    localStorage.removeItem('urbanpark_user_vehicles');
-    localStorage.removeItem('urbanpark_user_balance');
-    localStorage.removeItem('urbanpark_user_transactions');
-    localStorage.removeItem('urbanpark_user_name');
-    localStorage.removeItem('urbanpark_user_phone');
-    localStorage.removeItem('urbanpark_user_email');
-    localStorage.removeItem('urbanpark_user_address');
+    clearUserCache();
     
     // Điều hướng về trang login
     window.location.href = '/login';
