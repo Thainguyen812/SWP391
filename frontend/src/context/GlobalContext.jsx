@@ -25,6 +25,7 @@ export const GlobalProvider = ({ children }) => {
   
   // Security Alerts & Stats (Initially Empty)
   const [securityAlerts, setSecurityAlerts] = useState([]);
+  const [vehicleFines, setVehicleFines] = useState([]); // Array of fines: { id, plate, amount, reason, date }
   const [shiftStats, setShiftStats] = useState({ revenue: 0, cash: 0, transfer: 0, transactions: 0 });
   const [dailyVolume, setDailyVolume] = useState(0);
 
@@ -220,6 +221,11 @@ export const GlobalProvider = ({ children }) => {
   const addActivityLog = (newLog) => setActivityLogs(prev => [{ ...newLog, isManual: true, id: Math.random().toString() }, ...prev]);
   const addSecurityAlert = (newAlert) => setSecurityAlerts(prev => [{ ...newAlert, isManual: true }, ...prev]);
   const removeSecurityAlert = (id) => setSecurityAlerts(prev => prev.filter(alert => alert.id !== id));
+  
+  const addVehicleFine = (fine) => setVehicleFines(prev => [...prev, { ...fine, id: Math.random().toString(), date: new Date().toISOString() }]);
+  const clearVehicleFines = (plate) => setVehicleFines(prev => prev.filter(f => f.plate !== plate));
+  const getVehicleFines = (plate) => vehicleFines.filter(f => f.plate === plate);
+
   const restoreSecurityAlerts = () => {
     const mockBlacklist = {
       id: 'AL-BL-' + Date.now(),
@@ -345,6 +351,7 @@ export const GlobalProvider = ({ children }) => {
       transactions, addTransaction,
       activityLogs, addActivityLog,
       securityAlerts, addSecurityAlert, removeSecurityAlert, restoreSecurityAlerts,
+      vehicleFines, addVehicleFine, clearVehicleFines, getVehicleFines,
       shiftStats, updateShiftStats, setShiftStats,
       dailyVolume, setDailyVolume,
       activeVehicles, currentVehicle, setCurrentVehicle, removeActiveVehicle, addActiveVehicle,
