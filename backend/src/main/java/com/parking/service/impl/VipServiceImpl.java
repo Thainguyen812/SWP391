@@ -6,9 +6,13 @@ import com.parking.repository.VehicleRepository;
 import com.parking.repository.SystemSettingRepository;
 import com.parking.repository.VipSubscriptionRepository;
 import com.parking.service.VipService;
+import com.parking.dto.VipSubscriptionResponseDTO;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -27,9 +31,36 @@ public class VipServiceImpl implements VipService {
         }
 
         @Override
-        public List<VipSubscription> getPending() {
-                return repo.findByStatus(
-                                VipSubscription.Status.PENDING_APPROVAL);
+        public List<VipSubscriptionResponseDTO> getPending() {
+                List<VipSubscription> pendingList = repo.findByStatus(VipSubscription.Status.PENDING_APPROVAL);
+                List<VipSubscriptionResponseDTO> responseList = new ArrayList<>();
+                ObjectMapper mapper = new ObjectMapper();
+
+                for (VipSubscription vip : pendingList) {
+                        VipSubscriptionResponseDTO dto = new VipSubscriptionResponseDTO();
+                        dto.setId(vip.getId().toString());
+                        dto.setType(vip.getSubscriptionType());
+                        dto.setStartDate(vip.getStartDate());
+                        dto.setEndDate(vip.getEndDate());
+                        dto.setStatus(vip.getStatus().name());
+                        dto.setApproved_by(vip.getApprovedBy() != null ? vip.getApprovedBy().toString() : null);
+
+                        if (vip.getDocumentPhotos() != null && !vip.getDocumentPhotos().isEmpty()) {
+                                try {
+                                        Map<String, Object> photos = mapper.readValue(vip.getDocumentPhotos(), Map.class);
+                                        dto.setDocument_photos(photos);
+                                } catch (Exception e) {
+                                        // Ignore parsing error
+                                }
+                        }
+
+                        vehicleRepository.findById(vip.getVehicleId()).ifPresent(vehicle -> {
+                                dto.setVehicle_plate(vehicle.getLicensePlate());
+                        });
+
+                        responseList.add(dto);
+                }
+                return responseList;
         }
 
 
@@ -47,6 +78,7 @@ public class VipServiceImpl implements VipService {
                 vip.setId(UUID.randomUUID());
                 vip.setVehicleId(request.getVehicleId());
                 vip.setSubscriptionType(request.getSubscriptionType());
+                vip.setDocumentPhotos(request.getDocumentPhotos());
                 vip.setStatus(VipSubscription.Status.PENDING_APPROVAL);
 
                 java.time.LocalDate startDate = java.time.LocalDate.now();

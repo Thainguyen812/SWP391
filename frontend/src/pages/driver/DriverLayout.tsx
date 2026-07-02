@@ -864,7 +864,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   };
 
   // Checkout VIP flow
-  const handleStartVnpay = () => {
+  const handleStartVnpay = async () => {
     if (isOffline) {
       triggerToast('Lỗi: Không thể đăng ký Thẻ Tháng VIP ở chế độ Ngoại tuyến!', 'error');
       return;
@@ -911,25 +911,31 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       }
       const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
 
-      // Create subscription in localStorage with PENDING_APPROVAL status
-      const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
-      const newSub = {
-        id: `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
-        vehicle_plate: selectedVehicleForVIP,
-        type: selectedPackLabel,
-        startDate: new Date().toLocaleDateString('vi-VN'),
-        endDate: expiryString,
-        status: 'PENDING_APPROVAL',
-        document_photos: (window as any).lastUploadedPhotos || {
-          registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-          identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-          frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
-        },
-        explanation: (window as any).lastUploadedPhotos?.explanation || ''
+      
+      let subType = 'MONTHLY';
+      if (selectedPackLabel.includes('Năm') || selectedPackLabel.includes('năm')) {
+        subType = 'YEARLY';
+      } else if (selectedPackLabel.includes('3 Tháng') || selectedPackLabel.includes('3 tháng') || selectedPackLabel.includes('Quý')) {
+        subType = 'QUARTERLY';
+      } else if (selectedPackLabel.includes('6 Tháng') || selectedPackLabel.includes('6 tháng') || selectedPackLabel.includes('Nửa')) {
+        subType = 'HALF_YEARLY';
+      }
+
+      const docPhotos = (window as any).lastUploadedPhotos || {
+        registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+        identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+        frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
       };
-      savedSubs.push(newSub);
-      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(savedSubs));
-      window.dispatchEvent(new Event('storage'));
+
+      try {
+        await apiClient.post('/vip/register', {
+          vehicleId: targetVeh ? targetVeh.id : null,
+          subscriptionType: subType,
+          documentPhotos: JSON.stringify(docPhotos)
+        });
+      } catch (err) {
+        console.error("Lỗi khi đăng ký VIP:", err);
+      }
 
       setRegStep(3); // success step!
       triggerToast(`✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe ${selectedVehicleForVIP}.`, 'success');
@@ -952,7 +958,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     setVnpayOtp('');
   };
 
-  const handleConfirmVnpayPayment = () => {
+  const handleConfirmVnpayPayment = async () => {
     if (isOffline) {
       triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
       return;
@@ -1016,25 +1022,31 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       }
       const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
 
-      // Create subscription in localStorage with PENDING_APPROVAL status
-      const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
-      const newSub = {
-        id: `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
-        vehicle_plate: selectedVehicleForVIP,
-        type: selectedPackLabel,
-        startDate: new Date().toLocaleDateString('vi-VN'),
-        endDate: expiryString,
-        status: 'PENDING_APPROVAL',
-        document_photos: (window as any).lastUploadedPhotos || {
-          registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-          identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-          frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
-        },
-        explanation: (window as any).lastUploadedPhotos?.explanation || ''
+      
+      let subType = 'MONTHLY';
+      if (selectedPackLabel.includes('Năm') || selectedPackLabel.includes('năm')) {
+        subType = 'YEARLY';
+      } else if (selectedPackLabel.includes('3 Tháng') || selectedPackLabel.includes('3 tháng') || selectedPackLabel.includes('Quý')) {
+        subType = 'QUARTERLY';
+      } else if (selectedPackLabel.includes('6 Tháng') || selectedPackLabel.includes('6 tháng') || selectedPackLabel.includes('Nửa')) {
+        subType = 'HALF_YEARLY';
+      }
+
+      const docPhotos = (window as any).lastUploadedPhotos || {
+        registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+        identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+        frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
       };
-      savedSubs.push(newSub);
-      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(savedSubs));
-      window.dispatchEvent(new Event('storage'));
+
+      try {
+        await apiClient.post('/vip/register', {
+          vehicleId: targetVeh ? targetVeh.id : null,
+          subscriptionType: subType,
+          documentPhotos: JSON.stringify(docPhotos)
+        });
+      } catch (err) {
+        console.error("Lỗi khi đăng ký VIP:", err);
+      }
 
       triggerToast(`✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe ${selectedVehicleForVIP}.`, 'success');
     }
