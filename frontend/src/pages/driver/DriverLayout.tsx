@@ -226,7 +226,8 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       const response = await fetch('/api/vehicles', {
         headers: { 'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}` }
       });
-           if (data.success && Array.isArray(data.data)) {
+      const data = await response.json();
+      if (data.success && Array.isArray(data.data)) {
         setVehicles(prevVehicles => {
           const mapped: UserVehicle[] = data.data.map((v: any, index: number) => {
             const existingLocal = prevVehicles.find(lv => lv.plate === v.plate);
