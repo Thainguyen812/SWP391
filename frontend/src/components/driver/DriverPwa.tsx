@@ -366,11 +366,70 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     }
   };
 
+  const getFloorNumber = (code: string) => {
+    if (!code) return "";
+    const c = code.toUpperCase();
+    if (c === "F1") return "1";
+    if (c === "F2") return "2";
+    if (c === "B1") return "B1";
+    if (c === "G") return "G";
+    return c;
+  };
+
+  const getFloorName = (code: string) => {
+    if (!code) return "Chưa gán";
+    const c = code.toUpperCase();
+    if (c === "F1") return "Tầng 1 — Khu Xe Gia Đình 4-5 Chỗ (Sedan, Hatchback, EV)";
+    if (c === "F2") return "Tầng 2 — Khu Xe 7-9 Chỗ (SUV, CUV, MPV)";
+    if (c === "B1") return "Tầng B1 — Khu Xe Van & Xe Tải Nhỏ";
+    if (c === "G") return "Tầng G — Khu Xe Khách 12-16 Chỗ";
+    return `Tầng ${c}`;
+  };
+
   useEffect(() => {
     fetchVehiclesFromApi();
     const timer = setInterval(fetchVehiclesFromApi, 3000);
     return () => clearInterval(timer);
   }, []);
+
+  // Dynamic active session check for currentParked vehicle from backend
+  useEffect(() => {
+    const fetchActiveSession = async () => {
+      const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+      if (!activeVeh) return;
+      try {
+        const response = await fetch(`/api/v1/parking/find-car?digits=${activeVeh.plate}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data) && data.length > 0) {
+            const session = data[0];
+            const zoneCode = session.zoneCode || 'F1';
+            setCurrentParked({
+              plate: activeVeh.plate,
+              status: 'ĐANG ĐỖ',
+              location: `Khu ${zoneCode} • Tầng ${getFloorNumber(zoneCode)}`,
+              isParked: true,
+              assignedZone: zoneCode
+            });
+          } else {
+            // Keep frontend simulation state if it was set via LPR simulator button
+            setCurrentParked(prev => {
+              if (prev && prev.plate === activeVeh.plate) {
+                return prev;
+              }
+              return null;
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch active session from backend:", err);
+      }
+    };
+
+    fetchActiveSession();
+    const timer = setInterval(fetchActiveSession, 4000);
+    return () => clearInterval(timer);
+  }, [selectedVehId, vehicles]);
 
   const [transactions, setTransactions] = useState<TransactionItem[]>(() => {
     const saved = localStorage.getItem('urbanpark_user_transactions');
@@ -385,12 +444,13 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     return [];
   });
 
-  // Current parked vehicle mock details
+  // Current parked vehicle details
   const [currentParked, setCurrentParked] = useState<{
     plate: string;
     status: string;
     location: string;
     isParked: boolean;
+    assignedZone?: string;
   } | null>(null);
 
   // Modal controls
@@ -1113,14 +1173,22 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
             <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-3">
               <MapPin className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
               <div>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">VỊ TRÍ ĐỖ XE</p>
-                <strong className="text-lg font-black text-slate-800">{currentParked.location}</strong>
+                <p className="text-xs text-slate-550 font-bold uppercase tracking-wider">VỊ TRÍ ĐỖ XE</p>
+                <strong className="text-lg font-black text-slate-800">
+                  {currentParked.assignedZone ? `Tầng ${getFloorNumber(currentParked.assignedZone)}` : currentParked.location}
+                </strong>
               </div>
             </div>
             <div className="text-xs text-slate-550 font-semibold space-y-1">
               <p>• Biển số xe: <strong className="font-mono text-slate-700">{currentParked.plate}</strong></p>
               <p>• Trạng thái: <span className="text-emerald-600 font-extrabold">{currentParked.status}</span></p>
-              <p className="mt-2 text-slate-400">Chỉ dẫn: Bạn có thể đi bộ qua Lối đi bộ Zone A, bấm thang máy lên Tầng 2 để nhận xe.</p>
+              {currentParked.assignedZone ? (
+                <p className="mt-2 text-blue-600 font-bold bg-blue-50/50 p-2.5 rounded-lg border border-blue-100/60 leading-relaxed">
+                  📍 Vị trí đỗ chỉ định: Tầng {getFloorNumber(currentParked.assignedZone)} - {getFloorName(currentParked.assignedZone)}
+                </p>
+              ) : (
+                <p className="mt-2 text-slate-400">Chỉ dẫn: Bạn có thể đi bộ qua Lối đi bộ Zone A, bấm thang máy lên Tầng 2 để nhận xe.</p>
+              )}
             </div>
           </div>
         ),
@@ -1753,8 +1821,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             <MapPin className="w-4.5 h-4.5" />
                           </div>
                           <div>
-                            <span className="text-[9px] font-extrabold text-slate-400 uppercase block tracking-wider">VỊ TRÍ ƯỚC TÍNH</span>
-                            <strong className="text-xs sm:text-sm font-extrabold text-slate-850 block">{currentParked?.location || 'Chưa ghi nhận'}</strong>
+                            <span className="text-[9px] font-extrabold text-slate-400 uppercase block tracking-wider">VỊ TRÍ CHỈ ĐỊNH</span>
+                            <strong className="text-xs sm:text-sm font-extrabold text-slate-850 block">
+                              {currentParked?.assignedZone ? `Tầng ${getFloorNumber(currentParked.assignedZone)}` : (currentParked?.location || 'Chưa ghi nhận')}
+                            </strong>
                           </div>
                         </div>
                       </div>

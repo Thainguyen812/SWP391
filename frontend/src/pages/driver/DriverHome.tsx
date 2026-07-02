@@ -39,6 +39,26 @@ export function DriverHome() {
     triggerSecurityTest
   } = ctx;
 
+  const getFloorNumber = (code: string) => {
+    if (!code) return "";
+    const c = code.toUpperCase();
+    if (c === "F1") return "1";
+    if (c === "F2") return "2";
+    if (c === "B1") return "B1";
+    if (c === "G") return "G";
+    return c;
+  };
+
+  const getFloorName = (code: string) => {
+    if (!code) return "Chưa gán";
+    const c = code.toUpperCase();
+    if (c === "F1") return "Tầng 1 — Khu Xe Gia Đình 4-5 Chỗ (Sedan, Hatchback, EV)";
+    if (c === "F2") return "Tầng 2 — Khu Xe 7-9 Chỗ (SUV, CUV, MPV)";
+    if (c === "B1") return "Tầng B1 — Khu Xe Van & Xe Tải Nhỏ";
+    if (c === "G") return "Tầng G — Khu Xe Khách 12-16 Chỗ";
+    return `Tầng ${c}`;
+  };
+
   const handleFindCar = () => {
     if (currentParked && currentParked.isParked) {
       Modal.info({
@@ -48,14 +68,22 @@ export function DriverHome() {
             <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-3">
               <MapPin className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
               <div>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">VỊ TRÍ ĐỖ XE</p>
-                <strong className="text-lg font-black text-slate-800">{currentParked.location}</strong>
+                <p className="text-xs text-slate-550 font-bold uppercase tracking-wider">VỊ TRÍ ĐỖ XE</p>
+                <strong className="text-lg font-black text-slate-800">
+                  {currentParked.assignedZone ? `Tầng ${getFloorNumber(currentParked.assignedZone)}` : currentParked.location}
+                </strong>
               </div>
             </div>
             <div className="text-xs text-slate-550 font-semibold space-y-1">
               <p>• Biển số xe: <strong className="font-mono text-slate-700">{currentParked.plate}</strong></p>
               <p>• Trạng thái: <span className="text-emerald-600 font-extrabold">{currentParked.status}</span></p>
-              <p className="mt-2 text-slate-400">Chỉ dẫn: Bạn có thể đi bộ qua Lối đi bộ Zone A, bấm thang máy lên Tầng 2 để nhận xe.</p>
+              {currentParked.assignedZone ? (
+                <p className="mt-2 text-blue-600 font-bold bg-blue-50/50 p-2.5 rounded-lg border border-blue-100/60 leading-relaxed">
+                  📍 Vị trí đỗ chỉ định: Tầng {getFloorNumber(currentParked.assignedZone)} - {getFloorName(currentParked.assignedZone)}
+                </p>
+              ) : (
+                <p className="mt-2 text-slate-400">Chỉ dẫn: Bạn có thể đi bộ qua Lối đi bộ Zone A, bấm thang máy lên Tầng 2 để nhận xe.</p>
+              )}
             </div>
           </div>
         ),
@@ -164,8 +192,10 @@ export function DriverHome() {
                             <MapPin className="w-4.5 h-4.5" />
                           </div>
                           <div>
-                            <span className="text-[9px] font-extrabold text-slate-400 uppercase block tracking-wider">VỊ TRÍ ƯỚC TÍNH</span>
-                            <strong className="text-xs sm:text-sm font-extrabold text-slate-850 block">{currentParked?.location || 'Chưa ghi nhận'}</strong>
+                            <span className="text-[9px] font-extrabold text-slate-400 uppercase block tracking-wider">VỊ TRÍ CHỈ ĐỊNH</span>
+                            <strong className="text-xs sm:text-sm font-extrabold text-slate-850 block">
+                              {currentParked?.assignedZone ? `Tầng ${getFloorNumber(currentParked.assignedZone)}` : (currentParked?.location || 'Chưa ghi nhận')}
+                            </strong>
                           </div>
                         </div>
                       </div>

@@ -117,6 +117,17 @@ export const GlobalProvider = ({ children }) => {
                 const charSum = (session.licensePlate || "A").split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
                 const uniqueImage = carImages[charSum % carImages.length];
 
+              const zoneCode = session.assignedZoneCode || session.assignedZoneId || "";
+              const mapZoneToFloor = (code) => {
+                if (!code) return "Chưa gán";
+                const c = code.toUpperCase();
+                if (c === "F1") return "Tầng 1";
+                if (c === "F2") return "Tầng 2";
+                if (c === "B1") return "Tầng B1";
+                if (c === "G") return "Tầng G";
+                return c;
+              };
+
               return {
                 id: session.id,
                 plate: session.licensePlate || "Không rõ",
@@ -129,7 +140,9 @@ export const GlobalProvider = ({ children }) => {
                 outTime: "--:--",
                 image: session.mobileCheckoutPhoto || uniqueImage,
                 model: session.vehicleModel || session.vehicleBrand || "Chưa xác định",
-                duration: durationStr
+                duration: durationStr,
+                assignedZoneCode: zoneCode,
+                floorName: mapZoneToFloor(zoneCode)
               };
             });
 

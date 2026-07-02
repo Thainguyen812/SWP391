@@ -113,6 +113,7 @@ public class GateController {
                     Map<String, Object> dataMap = new HashMap<>();
                     dataMap.put("vehicle", vehicleData);
                     dataMap.put("sessionId", checkInResponse.getSession_id());
+                    dataMap.put("assignedZoneCode", checkInResponse.getAssigned_zone_code());
                     response.put("data", dataMap);
                 } else {
                     // Case B: Visitor Check-in
@@ -136,6 +137,7 @@ public class GateController {
                     Map<String, Object> dataMap = new HashMap<>();
                     dataMap.put("vehicle", vehicleData);
                     dataMap.put("sessionId", checkInResponse.getSession_id());
+                    dataMap.put("assignedZoneCode", checkInResponse.getAssigned_zone_code());
                     response.put("data", dataMap);
                 }
             } else {

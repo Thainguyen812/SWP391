@@ -281,11 +281,69 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     }
   };
 
+  const getFloorNumber = (code: string) => {
+    if (!code) return "";
+    const c = code.toUpperCase();
+    if (c === "F1") return "1";
+    if (c === "F2") return "2";
+    if (c === "B1") return "B1";
+    if (c === "G") return "G";
+    return c;
+  };
+
+  const getFloorName = (code: string) => {
+    if (!code) return "Chưa gán";
+    const c = code.toUpperCase();
+    if (c === "F1") return "Tầng 1 — Khu Xe Gia Đình 4-5 Chỗ (Sedan, Hatchback, EV)";
+    if (c === "F2") return "Tầng 2 — Khu Xe 7-9 Chỗ (SUV, CUV, MPV)";
+    if (c === "B1") return "Tầng B1 — Khu Xe Van & Xe Tải Nhỏ";
+    if (c === "G") return "Tầng G — Khu Xe Khách 12-16 Chỗ";
+    return `Tầng ${c}`;
+  };
+
   useEffect(() => {
     fetchVehiclesFromApi();
     const timer = setInterval(fetchVehiclesFromApi, 3000);
     return () => clearInterval(timer);
   }, []);
+
+  // Dynamic active session check for currentParked vehicle from backend
+  useEffect(() => {
+    const fetchActiveSession = async () => {
+      const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+      if (!activeVeh) return;
+      try {
+        const response = await fetch(`/api/v1/parking/find-car?digits=${activeVeh.plate}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data) && data.length > 0) {
+            const session = data[0];
+            const zoneCode = session.zoneCode || 'F1';
+            setCurrentParked({
+              plate: activeVeh.plate,
+              status: 'ĐANG ĐỖ',
+              location: `Khu ${zoneCode} • Tầng ${getFloorNumber(zoneCode)}`,
+              isParked: true,
+              assignedZone: zoneCode
+            });
+          } else {
+            setCurrentParked(prev => {
+              if (prev && prev.plate === activeVeh.plate) {
+                return prev;
+              }
+              return null;
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch active session from backend:", err);
+      }
+    };
+
+    fetchActiveSession();
+    const timer = setInterval(fetchActiveSession, 4000);
+    return () => clearInterval(timer);
+  }, [selectedVehId, vehicles]);
 
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
 
@@ -317,12 +375,13 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     fetchTransactions();
   }, [user]);
 
-  // Current parked vehicle mock details
+  // Current parked vehicle details
   const [currentParked, setCurrentParked] = useState<{
     plate: string;
     status: string;
     location: string;
     isParked: boolean;
+    assignedZone?: string;
   } | null>(null);
 
   // Modal controls
