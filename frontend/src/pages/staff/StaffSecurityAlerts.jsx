@@ -18,6 +18,7 @@ export const StaffSecurityAlerts = () => {
   const [isFineModalVisible, setIsFineModalVisible] = useState(false);
   const [currentFineAlertId, setCurrentFineAlertId] = useState(null);
   const [fineAmount, setFineAmount] = useState(200000);
+  const [fineNote, setFineNote] = useState('');
 
   const handleResolve = (type, id) => {
     Modal.confirm({
@@ -189,9 +190,11 @@ export const StaffSecurityAlerts = () => {
                   <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">Hướng xử lý tiếp theo</div>
                   <div className="flex gap-2">
                     <button onClick={() => {
-                      setCurrentFineAlertId(alert.id);
-                      setIsFineModalVisible(true);
-                    }} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg text-sm transition-colors cursor-pointer flex items-center justify-center gap-1">
+                    setCurrentFineAlertId(alert.id);
+                    setFineAmount(200000);
+                    setFineNote('');
+                    setIsFineModalVisible(true);
+                  }} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-sm transition-colors cursor-pointer flex items-center justify-center gap-2">
                       Lập biên bản
                     </button>
                     <button onClick={() => {
@@ -309,6 +312,8 @@ export const StaffSecurityAlerts = () => {
             <Input.TextArea 
               rows={3}
               placeholder="Nhập chi tiết xử phạt..."
+              value={fineNote}
+              onChange={e => setFineNote(e.target.value)}
             />
           </div>
           <div className="bg-blue-50 p-3 rounded text-sm text-blue-800 border border-blue-100">
