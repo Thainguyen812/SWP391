@@ -36,7 +36,8 @@ import {
   AlertTriangle,
   KeyRound,
   Coins,
-  Sliders
+  Sliders,
+  Award
 } from 'lucide-react';
 
 interface DriverPwaProps {
@@ -180,6 +181,35 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     return new Date();
   };
 
+  const getRemainingDays = (expiryStr: string) => {
+    try {
+      const expiry = parseExpiryDate(expiryStr);
+      const diffTime = expiry.getTime() - Date.now();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays > 0 ? diffDays : 0;
+    } catch (e) {
+      return 0;
+    }
+  };
+
+  const getVipPrice = (sub: any) => {
+    if (!sub) return 0;
+    if (sub.price) return sub.price;
+    const targetVeh = vehicles.find(v => v.plate === sub.vehicle_plate);
+    const type = targetVeh ? targetVeh.type : 'Ô tô gầm thấp 4-5 chỗ';
+    const pricing = VEHICLE_PRICING[type] || VEHICLE_PRICING['Ô tô gầm thấp 4-5 chỗ'];
+    const subType = sub.type || '';
+    if (subType.includes('Năm') || subType.includes('1 năm') || subType.includes('YEARLY')) {
+      return pricing.year;
+    } else if (subType.includes('6 Tháng') || subType.includes('6 tháng') || subType.includes('HALF_YEARLY')) {
+      return pricing.month6;
+    } else if (subType.includes('3 Tháng') || subType.includes('3 tháng') || subType.includes('QUARTERLY')) {
+      return pricing.month3;
+    } else {
+      return pricing.month;
+    }
+  };
+
   // ----------------------------------------------------
   // --- CORE SYSTEM STATES & SEEDS ---
   // ----------------------------------------------------
@@ -187,7 +217,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [isOffline, setIsOffline] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'vnpay'>('wallet');
   const [balance, setBalance] = useState<number>(() => {
-    const saved = localStorage.getItem('urbanpark_user_balance');
+    const saved = localStorage.getItem(`urbanpark_user_balance_${user?.phone || 'default'}`);
     if (saved) {
       const parsed = parseFloat(saved);
       if (!isNaN(parsed)) {
@@ -205,7 +235,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [isTogglingLock, setIsTogglingLock] = useState<string | null>(null);
 
   const [vehicles, setVehicles] = useState<UserVehicle[]>(() => {
-    const saved = localStorage.getItem('urbanpark_user_vehicles');
+    const saved = localStorage.getItem(`urbanpark_user_vehicles_${user?.phone || 'default'}`);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -334,7 +364,52 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
             let activeSub = undefined;
             let expiry = undefined;
             let subStatus = undefined;
-            if (savedSubs) {
+
+            if (v.subscriptionStatus) {
+              subStatus = v.subscriptionStatus === 'PENDING_APPROVAL' ? 'PENDING' : v.subscriptionStatus;
+              if (v.subscriptionStatus === 'ACTIVE') {
+                activeSub = v.subscriptionType;
+                expiry = v.subscriptionExpiry ? new Date(v.subscriptionExpiry).toLocaleDateString('vi-VN') : undefined;
+              }
+
+              // Sync back to localStorage to keep other components/tabs in sync
+              try {
+                const subs = savedSubs ? JSON.parse(savedSubs) : [];
+                let changed = false;
+                let found = false;
+                const updatedSubs = subs.map((s: any) => {
+                  if (s.vehicle_plate === (v.licensePlate || v.plate)) {
+                    found = true;
+                    const newStatus = v.subscriptionStatus === 'PENDING_APPROVAL' ? 'PENDING' : v.subscriptionStatus;
+                    if (s.status !== newStatus) {
+                      changed = true;
+                      return { 
+                        ...s, 
+                        status: newStatus,
+                        endDate: v.subscriptionExpiry ? new Date(v.subscriptionExpiry).toLocaleDateString('vi-VN') : s.endDate
+                      };
+                    }
+                  }
+                  return s;
+                });
+
+                if (!found && v.subscriptionStatus) {
+                  changed = true;
+                  updatedSubs.push({
+                    id: v.subscriptionId || `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
+                    vehicle_plate: v.licensePlate || v.plate,
+                    type: v.subscriptionType || 'Thẻ Tháng VIP',
+                    startDate: new Date().toLocaleDateString('vi-VN'),
+                    endDate: v.subscriptionExpiry ? new Date(v.subscriptionExpiry).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+                    status: v.subscriptionStatus === 'PENDING_APPROVAL' ? 'PENDING' : v.subscriptionStatus
+                  });
+                }
+
+                if (changed) {
+                  localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updatedSubs));
+                }
+              } catch (err) {}
+            } else if (savedSubs) {
               try {
                 const subs = JSON.parse(savedSubs);
                 const matched = subs.filter((s: any) => s.vehicle_plate === (v.licensePlate || v.plate));
@@ -386,7 +461,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   }, []);
 
   const [transactions, setTransactions] = useState<TransactionItem[]>(() => {
-    const saved = localStorage.getItem('urbanpark_user_transactions');
+    const saved = localStorage.getItem(`urbanpark_user_transactions_${user?.phone || 'default'}`);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -455,6 +530,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   // Synchronize package price whenever selected vehicle, package label, or vehicles change
   useEffect(() => {
     if (!selectedVehicleForVIP) return;
+    if (selectedPackLabel.includes('Nạp tiền')) return;
+    
     const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
     const type = targetVeh ? targetVeh.type : 'Ô tô gầm thấp 4-5 chỗ';
     const pricing = VEHICLE_PRICING[type] || VEHICLE_PRICING['Ô tô gầm thấp 4-5 chỗ'];
@@ -474,19 +551,19 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
   // Profile Edit
   const [profileName, setProfileName] = useState(() => {
-    return localStorage.getItem('urbanpark_user_name') || user.name;
+    return localStorage.getItem(`urbanpark_user_name_${user?.phone || 'default'}`) || user.name;
   });
   const [profilePhone, setProfilePhone] = useState(() => {
-    return localStorage.getItem('urbanpark_user_phone') || user.phone;
+    return localStorage.getItem(`urbanpark_user_phone_${user?.phone || 'default'}`) || user.phone;
   });
   const [isPhoneVerified, setIsPhoneVerified] = useState(() => {
-    return localStorage.getItem('urbanpark_phone_verified') === 'true';
+    return localStorage.getItem(`urbanpark_phone_verified_${user?.phone || 'default'}`) === 'true';
   });
   const [profileEmail, setProfileEmail] = useState(() => {
-    return localStorage.getItem('urbanpark_user_email') || user.email || '';
+    return localStorage.getItem(`urbanpark_user_email_${user?.phone || 'default'}`) || user.email || '';
   });
   const [profileAddress, setProfileAddress] = useState(() => {
-    return localStorage.getItem('urbanpark_user_address') || '';
+    return localStorage.getItem(`urbanpark_user_address_${user?.phone || 'default'}`) || '';
   });
   
   // Extra settings states for absolute design fidelity
@@ -508,6 +585,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [ticketAttachedFiles, setTicketAttachedFiles] = useState<{name: string, size: string}[]>([]);
 
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [selectedSubForDetail, setSelectedSubForDetail] = useState<any | null>(null);
+  const [topupAmount, setTopupAmount] = useState<number>(500000);
 
   const triggerToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ text, type });
@@ -516,16 +595,16 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
   // Sync state to LocalStorage
   useEffect(() => {
-    localStorage.setItem('urbanpark_user_balance', balance.toString());
-  }, [balance]);
+    localStorage.setItem(`urbanpark_user_balance_${user?.phone || 'default'}`, balance.toString());
+  }, [balance, user?.phone]);
 
   useEffect(() => {
-    localStorage.setItem('urbanpark_user_vehicles', JSON.stringify(vehicles));
-  }, [vehicles]);
+    localStorage.setItem(`urbanpark_user_vehicles_${user?.phone || 'default'}`, JSON.stringify(vehicles));
+  }, [vehicles, user?.phone]);
 
   useEffect(() => {
-    localStorage.setItem('urbanpark_user_transactions', JSON.stringify(transactions));
-  }, [transactions]);
+    localStorage.setItem(`urbanpark_user_transactions_${user?.phone || 'default'}`, JSON.stringify(transactions));
+  }, [transactions, user?.phone]);
 
   // Auto-select first vehicle for VIP reg if none is selected or selection is invalid
   useEffect(() => {
@@ -1326,7 +1405,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-10 right-10 z-50 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 border ${
+            className={`fixed top-10 right-10 z-[9999] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 border ${
               toast.type === 'error' 
                 ? 'bg-rose-500 text-white border-rose-400' 
                 : toast.type === 'info' 
@@ -1335,6 +1414,152 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
             }`}
           >
             <span className="font-extrabold text-sm">{toast.text}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* VIP Subscription Detail Modal */}
+      <AnimatePresence>
+        {selectedSubForDetail && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-white rounded-[32px] w-full max-w-lg overflow-hidden border border-slate-200 shadow-2xl flex flex-col font-sans"
+            >
+              {/* Header */}
+              <div className="p-6 pb-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="space-y-1 text-left">
+                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block">
+                    Chi tiết đăng ký VIP
+                  </span>
+                  <h3 className="text-lg font-black text-slate-800 tracking-tight">
+                    Xe {selectedSubForDetail.vehicle_plate}
+                  </h3>
+                </div>
+                <button 
+                  onClick={() => setSelectedSubForDetail(null)}
+                  className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-5 text-left overflow-y-auto max-h-[70vh] leading-normal">
+                {/* Status Section */}
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Trạng thái</span>
+                    <strong className="text-sm font-black text-slate-700">
+                      {selectedSubForDetail.status === 'ACTIVE' ? 'Đã kích hoạt' : 
+                       selectedSubForDetail.status === 'REJECTED' ? 'Bị từ chối' : 'Chờ duyệt'}
+                    </strong>
+                  </div>
+                  <span className={`px-3 py-1 text-xs font-black rounded-lg uppercase tracking-wider ${
+                    selectedSubForDetail.status === 'ACTIVE' 
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-500/10' 
+                      : selectedSubForDetail.status === 'REJECTED'
+                      ? 'bg-rose-50 text-rose-700'
+                      : 'bg-amber-100/80 text-amber-700 animate-pulse'
+                  }`}>
+                    {selectedSubForDetail.status === 'ACTIVE' ? 'Hoạt động' : 
+                     selectedSubForDetail.status === 'REJECTED' ? 'Từ chối' : 'Chờ duyệt'}
+                  </span>
+                </div>
+
+                {/* Details list */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-slate-50/50 rounded-xl border border-slate-100/60">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Gói dịch vụ</span>
+                    <strong className="text-xs font-black text-slate-800 block mt-0.5">
+                      {selectedSubForDetail.type}
+                    </strong>
+                  </div>
+                  <div className="p-3 bg-slate-50/50 rounded-xl border border-slate-100/60">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Giá cước</span>
+                    <strong className="text-xs font-mono font-black text-slate-800 block mt-0.5">
+                      {getVipPrice(selectedSubForDetail).toLocaleString('vi-VN')}₫
+                    </strong>
+                  </div>
+                  <div className="p-3 bg-slate-50/50 rounded-xl border border-slate-100/60">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Ngày bắt đầu</span>
+                    <strong className="text-xs font-black text-slate-800 block mt-0.5">
+                      {selectedSubForDetail.startDate || 'N/A'}
+                    </strong>
+                  </div>
+                  <div className="p-3 bg-slate-50/50 rounded-xl border border-slate-100/60">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Hạn dùng</span>
+                    <strong className="text-xs font-black text-slate-800 block mt-0.5">
+                      {selectedSubForDetail.endDate || 'N/A'}
+                      {selectedSubForDetail.status === 'ACTIVE' && (
+                        <span className="text-[10px] ml-1.5 text-blue-600 font-bold">
+                          (Còn {getRemainingDays(selectedSubForDetail.endDate)} ngày)
+                        </span>
+                      )}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-50/50 rounded-xl border border-slate-100/60">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Hình thức thanh toán</span>
+                  <strong className="text-xs font-black text-slate-800 block mt-0.5">
+                    {selectedSubForDetail.paymentMethod || 'Ví điện tử'}
+                  </strong>
+                </div>
+
+                {/* Proof documents if any */}
+                {(selectedSubForDetail.regDoc || selectedSubForDetail.regPhoto) && (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                      Tài liệu minh chứng đính kèm
+                    </span>
+                    <div className="grid grid-cols-2 gap-3">
+                      {selectedSubForDetail.regDoc && (
+                        <div className="group relative h-28 bg-slate-100 rounded-xl overflow-hidden border border-slate-200/60">
+                          <img 
+                            src={selectedSubForDetail.regDoc} 
+                            alt="Cà vẹt xe" 
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                            <span className="text-[9px] text-white font-black uppercase">Ảnh cà vẹt</span>
+                          </div>
+                        </div>
+                      )}
+                      {selectedSubForDetail.regPhoto && (
+                        <div className="group relative h-28 bg-slate-100 rounded-xl overflow-hidden border border-slate-200/60">
+                          <img 
+                            src={selectedSubForDetail.regPhoto} 
+                            alt="Ảnh thực tế" 
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                            <span className="text-[9px] text-white font-black uppercase">Ảnh đầu xe</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
+                <button 
+                  onClick={() => setSelectedSubForDetail(null)}
+                  className="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -2138,7 +2363,12 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                               {v.activeSubscription ? (
                                 <>
                                   <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest block">HẠN SỬ DỤNG</span>
-                                  <strong className="text-xs font-black text-emerald-600 block mt-0.5">{v.subscriptionExpiry}</strong>
+                                  <strong className="text-xs font-black text-emerald-600 block mt-0.5">
+                                    {v.subscriptionExpiry}
+                                    <span className="text-[10px] ml-1.5 font-bold text-slate-500">
+                                      (Còn {getRemainingDays(v.subscriptionExpiry || '')} ngày)
+                                    </span>
+                                  </strong>
                                 </>
                               ) : (
                                 <>
@@ -2679,6 +2909,99 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                   </div>
 
+                  {/* VIP Subscriptions status and expiry card */}
+                  {(() => {
+                    const savedSubsStr = localStorage.getItem('urbanpark_vip_subscriptions');
+                    let mySubs: any[] = [];
+                    if (savedSubsStr) {
+                      try {
+                        mySubs = JSON.parse(savedSubsStr);
+                      } catch (e) {}
+                    }
+                    
+                    const activeOrPendingSubs = mySubs.filter((s: any) => 
+                      s.status === 'ACTIVE' || s.status === 'PENDING' || s.status === 'PENDING_APPROVAL'
+                    );
+                    
+                    if (activeOrPendingSubs.length === 0) return null;
+                    
+                    return (
+                      <div className="space-y-3">
+                        <strong className="text-xs font-black text-slate-800 uppercase tracking-widest block font-sans">
+                          Gói VIP đang sử dụng & Đang chờ duyệt
+                        </strong>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {activeOrPendingSubs.map((sub: any) => {
+                            const isPending = sub.status === 'PENDING' || sub.status === 'PENDING_APPROVAL';
+                            const remainingDays = isPending ? 0 : getRemainingDays(sub.endDate);
+                            
+                            return (
+                              <div 
+                                onClick={() => setSelectedSubForDetail(sub)}
+                                key={sub.id} 
+                                className={`p-4 rounded-[22px] border transition-all cursor-pointer hover:shadow-md ${
+                                  isPending 
+                                    ? 'bg-amber-50/50 border-amber-200/60 hover:border-amber-300' 
+                                    : 'bg-white border-slate-200/60 shadow-xs hover:border-slate-300'
+                                } flex items-start gap-3.5`}
+                              >
+                                <div className={`p-2.5 rounded-xl shrink-0 ${
+                                  isPending ? 'bg-amber-100 text-amber-600' : 'bg-blue-50 text-blue-600'
+                                }`}>
+                                  <Award className="w-5 h-5" />
+                                </div>
+                                <div className="flex-1 space-y-1 font-sans">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <strong className="text-xs font-black text-slate-800 uppercase">
+                                      {sub.vehicle_plate}
+                                    </strong>
+                                    <span className={`inline-flex items-center px-2 py-0.5 text-[9px] font-black rounded-md uppercase tracking-wider ${
+                                      isPending 
+                                        ? 'bg-amber-100/80 text-amber-700' 
+                                        : 'bg-emerald-50 text-emerald-700 border border-emerald-500/10'
+                                    }`}>
+                                      {isPending ? 'Chờ duyệt' : 'Hoạt động'}
+                                    </span>
+                                  </div>
+                                  
+                                  <p className="text-[11px] text-slate-500 font-bold leading-normal">
+                                    Gói đăng ký: <span className="text-slate-800">{sub.type}</span>
+                                  </p>
+                                  
+                                  {isPending ? (
+                                    <p className="text-[10px] text-amber-600 font-bold leading-normal animate-pulse">
+                                      ⏱️ Hồ sơ đang được Manager xác thực...
+                                    </p>
+                                  ) : (
+                                    <div className="space-y-1 pt-0.5">
+                                      <div className="flex justify-between items-center text-[10px]">
+                                        <span className="text-slate-400 font-bold">Hạn dùng: {sub.endDate}</span>
+                                        <span className={`font-black uppercase ${
+                                          remainingDays <= 5 ? 'text-rose-600 animate-pulse' : 'text-blue-600'
+                                        }`}>
+                                          Còn {remainingDays} ngày
+                                        </span>
+                                      </div>
+                                      
+                                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                        <div 
+                                          className={`h-full rounded-full ${
+                                            remainingDays <= 5 ? 'bg-rose-500' : 'bg-blue-500'
+                                          }`} 
+                                          style={{ width: `${Math.min(100, (remainingDays / 30) * 100)}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Main Grid Data Table */}
                   <div className="bg-white rounded-[24px] border border-slate-250/60 overflow-hidden shadow-xs">
                     <div className="overflow-x-auto">
@@ -2807,15 +3130,13 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       <p className="text-slate-400 text-xs font-semibold">
                         Quản lý thông tin cá nhân, bảo mật và tùy chọn thanh toán.
                       </p>
-                    </div>
-                    <button 
+                    </div>                    <button 
                       onClick={() => {
-                        localStorage.setItem('urbanpark_user_name', profileName);
-                        localStorage.setItem('urbanpark_user_phone', profilePhone);
-                        localStorage.setItem('urbanpark_user_email', profileEmail);
-                        localStorage.setItem('urbanpark_user_address', profileAddress);
+                        localStorage.setItem(`urbanpark_user_name_${user?.phone || 'default'}`, profileName);
+                        localStorage.setItem(`urbanpark_user_phone_${user?.phone || 'default'}`, profilePhone);
+                        localStorage.setItem(`urbanpark_user_email_${user?.phone || 'default'}`, profileEmail);
+                        localStorage.setItem(`urbanpark_user_address_${user?.phone || 'default'}`, profileAddress);
                         
-                        // Cập nhật lại thông tin user trong local storage để các nơi khác trong app đồng bộ
                         const savedUserStr = localStorage.getItem('user');
                         if (savedUserStr) {
                           try {
@@ -3012,6 +3333,45 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           <strong className="text-3xl font-black font-mono tracking-tight block mt-1">
                             {balance.toLocaleString('vi-VN')}₫
                           </strong>
+                        </div>
+
+                        {/* Topup Amount Interactive Controls */}
+                        <div className="space-y-3 pt-1">
+                          <span className="text-[9.5px] font-black text-slate-400 uppercase tracking-widest block leading-none">
+                            MỨC TIỀN MUỐN NẠP VÍ
+                          </span>
+                          <div className="space-y-2">
+                            <div className="relative">
+                              <input 
+                                type="number"
+                                value={topupAmount}
+                                onChange={(e) => setTopupAmount(Math.max(10000, parseInt(e.target.value) || 0))}
+                                className="w-full p-3 pr-10 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-sm font-black font-mono text-slate-800 rounded-xl border border-slate-200 focus:border-blue-500 outline-none transition-all"
+                                placeholder="Nhập số tiền..."
+                                min="10000"
+                                step="10000"
+                              />
+                              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">₫</span>
+                            </div>
+
+                            {/* Quick choices */}
+                            <div className="grid grid-cols-4 gap-2">
+                              {[100000, 200000, 500000, 1000000].map(amt => (
+                                <button
+                                  key={amt}
+                                  type="button"
+                                  onClick={() => setTopupAmount(amt)}
+                                  className={`py-2 px-1 border rounded-lg font-mono font-black text-[11px] text-center cursor-pointer transition-all ${
+                                    topupAmount === amt 
+                                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs' 
+                                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  {(amt / 1000) === 1000 ? '1M' : `${amt / 1000}K`}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
 
                           <button 
                             type="button"
@@ -3020,14 +3380,14 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 triggerToast('Lỗi: Không thể nạp tiền vào ví ở chế độ Ngoại tuyến!', 'error');
                                 return;
                               }
-                              setSelectedPackPrice(500000);
+                              setSelectedPackPrice(topupAmount);
                               setSelectedPackLabel('Nạp tiền vào ví điện tử UrbanPark');
                               setVnpayStep('info');
                               setVnpayModalOpen(true);
                             }}
-                            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 font-black text-[11px] uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer inline-flex items-center gap-1.5"
+                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.98]"
                           >
-                            <Plus className="w-3.5 h-3.5" />
+                            <Plus className="w-4 h-4" />
                             <span>Nạp tiền ngay</span>
                           </button>
                         </div>

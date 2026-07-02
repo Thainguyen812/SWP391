@@ -18,6 +18,9 @@ import com.parking.model.User;
 import com.parking.model.Vehicle;
 import com.parking.repository.UserRepository;
 import com.parking.repository.VehicleRepository;
+import com.parking.repository.TransactionRepository;
+import com.parking.model.Transaction;
+import com.parking.model.VipSubscription;
 import org.springframework.security.core.Authentication;
 import java.util.Optional;
 
@@ -31,6 +34,7 @@ public class DriverController {
     private final VehicleRepository vehicleRepository;
     private final UserRepository userRepository;
     private final VipSubscriptionRepository vipSubscriptionRepository;
+    private final TransactionRepository transactionRepository;
 
     public DriverController(
             VipQrIdentifierRepository qrRepo,
@@ -38,7 +42,8 @@ public class DriverController {
             ParkingService parkingService,
             VehicleRepository vehicleRepository,
             UserRepository userRepository,
-            VipSubscriptionRepository vipSubscriptionRepository) {
+            VipSubscriptionRepository vipSubscriptionRepository,
+            TransactionRepository transactionRepository) {
 
         this.qrRepo = qrRepo;
         this.sessionRepo = sessionRepo;
@@ -46,6 +51,7 @@ public class DriverController {
         this.vehicleRepository = vehicleRepository;
         this.userRepository = userRepository;
         this.vipSubscriptionRepository = vipSubscriptionRepository;
+        this.transactionRepository = transactionRepository;
     }
 
     @PostMapping("/qr/generate")
@@ -155,6 +161,123 @@ public class DriverController {
         List<Vehicle> vehicles = vehicleRepository.findByOwnerId(currentUser.getId());
 
         return ResponseEntity.ok(vehicles);
+    }
+
+    // API lấy lịch sử giao dịch (VIP subscriptions + Check-out transactions) cho tất cả xe của Driver
+    @GetMapping("/billing-history")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ResponseEntity<List<java.util.Map<String, Object>>> getBillingHistory(Authentication authentication) {
+        String username = authentication.getName();
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+
+        List<Vehicle> vehicles = vehicleRepository.findByOwnerId(currentUser.getId());
+        List<java.util.Map<String, Object>> history = new java.util.ArrayList<>();
+
+        for (Vehicle v : vehicles) {
+            // 1. Lấy thông tin các gói VIP đã đăng ký của xe
+            List<VipSubscription> subs = vipSubscriptionRepository.findByVehicleId(v.getId());
+            for (VipSubscription sub : subs) {
+                java.util.Map<String, Object> item = new java.util.HashMap<>();
+                item.put("id", sub.getId().toString().substring(0, 8).toUpperCase());
+                
+                String dateStr = sub.getCreatedAt() != null 
+                    ? java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
+                        .withZone(java.time.ZoneId.systemDefault())
+                        .format(sub.getCreatedAt())
+                    : "01/07/2026 00:00:00";
+                item.put("date", dateStr);
+                
+                String packName = "Thẻ Tháng VIP";
+                if ("QUARTERLY".equals(sub.getSubscriptionType())) packName = "Thẻ 3 Tháng VIP";
+                else if ("HALF_YEARLY".equals(sub.getSubscriptionType())) packName = "Thẻ 6 Tháng VIP";
+                else if ("YEARLY".equals(sub.getSubscriptionType())) packName = "Thẻ 1 Năm VIP";
+                
+                item.put("type", "Đăng kí " + packName);
+                item.put("plate", v.getLicensePlate());
+                
+                String feeVal = sub.getFeeAmount() != null ? sub.getFeeAmount().toString() : "0";
+                if (feeVal.contains(".")) {
+                    feeVal = feeVal.substring(0, feeVal.indexOf("."));
+                }
+                try {
+                    long feeLong = Long.parseLong(feeVal);
+                    if (feeLong == 0) {
+                        if ("QUARTERLY".equals(sub.getSubscriptionType())) feeLong = 2700000;
+                        else if ("HALF_YEARLY".equals(sub.getSubscriptionType())) feeLong = 5000000;
+                        else if ("YEARLY".equals(sub.getSubscriptionType())) feeLong = 9000000;
+                        else feeLong = 1000000;
+                    }
+                    feeVal = String.format("%,d", feeLong).replace(',', '.') + "₫";
+                } catch (Exception e) {
+                    feeVal = feeVal + "₫";
+                }
+                
+                item.put("fee", "-" + feeVal);
+                item.put("isEntry", false);
+                
+                String statusStr = "Đang xử lý";
+                if (sub.getStatus() == VipSubscription.Status.ACTIVE) {
+                    statusStr = "Thành công";
+                } else if (sub.getStatus() == VipSubscription.Status.REJECTED) {
+                    statusStr = "Thất bại";
+                }
+                item.put("status", statusStr);
+                history.add(item);
+            }
+            
+            // 2. Lấy thông tin các lần trả phí gửi xe (Check-out) của xe
+            List<ParkingSession> sessions = sessionRepo.findByLicensePlate(v.getLicensePlate());
+            for (ParkingSession session : sessions) {
+                Optional<Transaction> txOpt = transactionRepository.findBySessionId(session.getId());
+                if (txOpt.isPresent()) {
+                    Transaction tx = txOpt.get();
+                    java.util.Map<String, Object> item = new java.util.HashMap<>();
+                    item.put("id", tx.getId().toString().substring(0, 8).toUpperCase());
+                    
+                    String dateStr = tx.getProcessedAt() != null
+                        ? java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
+                            .withZone(java.time.ZoneId.systemDefault())
+                            .format(tx.getProcessedAt())
+                        : "01/07/2026 00:00:00";
+                    item.put("date", dateStr);
+                    item.put("type", "Gửi xe");
+                    item.put("plate", v.getLicensePlate());
+                    
+                    String feeVal = tx.getTotalAmount() != null ? tx.getTotalAmount().toString() : "0";
+                    if (feeVal.contains(".")) {
+                        feeVal = feeVal.substring(0, feeVal.indexOf("."));
+                    }
+                    try {
+                        long feeLong = Long.parseLong(feeVal);
+                        feeVal = String.format("%,d", feeLong).replace(',', '.') + "₫";
+                    } catch (Exception e) {
+                        feeVal = feeVal + "₫";
+                    }
+                    
+                    item.put("fee", "-" + feeVal);
+                    item.put("isEntry", false);
+                    item.put("status", tx.getPaymentStatus() == Transaction.PaymentStatus.SUCCESS ? "Thành công" : "Đang xử lý");
+                    history.add(item);
+                }
+            }
+        }
+        
+        // Sắp xếp lịch sử giao dịch theo thời gian mới nhất
+        history.sort((a, b) -> {
+            String dateA = (String) a.get("date");
+            String dateB = (String) b.get("date");
+            
+            // Format is dd/MM/yyyy HH:mm:ss -> parse for proper comparison
+            try {
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+                return sdf.parse(dateB).compareTo(sdf.parse(dateA));
+            } catch (Exception e) {
+                return dateB.compareTo(dateA);
+            }
+        });
+        
+        return ResponseEntity.ok(history);
     }
 
 }

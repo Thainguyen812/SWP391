@@ -37,6 +37,17 @@ public class VipServiceImpl implements VipService {
                 return list;
         }
 
+        @Override
+        public List<VipSubscription> getAll() {
+                List<VipSubscription> list = repo.findAll();
+                for (VipSubscription sub : list) {
+                        vehicleRepository.findById(sub.getVehicleId()).ifPresent(v -> {
+                                sub.setLicensePlate(v.getLicensePlate());
+                        });
+                }
+                return list;
+        }
+
 
 
         @Override

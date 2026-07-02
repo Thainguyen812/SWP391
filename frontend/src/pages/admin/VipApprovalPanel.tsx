@@ -65,13 +65,13 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
     }
 
     try {
-      const response = await fetch('/api/vip/pending', {
+      const response = await fetch('/api/vip/all', {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       if (response.ok) {
-        const backendPending = await response.json();
-        if (Array.isArray(backendPending)) {
-          const mappedPending = backendPending.map((bp: any) => {
+        const backendAll = await response.json();
+        if (Array.isArray(backendAll)) {
+          const mappedAll = backendAll.map((bp: any) => {
             let docPhotos = {
               registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
               identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
@@ -94,13 +94,12 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
             };
           });
 
-          // Merge: filter out pending ones from local since live is primary
-          const nonPendingLocal = localSubs.filter(s => s.status !== 'PENDING' && s.status !== 'PENDING_APPROVAL');
-          localSubs = [...mappedPending, ...nonPendingLocal];
+          localSubs = mappedAll;
+          localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(mappedAll));
         }
       }
     } catch (e) {
-      console.warn("Failed to fetch pending VIP list from backend API:", e);
+      console.warn("Failed to fetch VIP list from backend API:", e);
     }
 
     setSubscriptions(localSubs);
@@ -132,7 +131,13 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: body
-      }).catch(err => console.warn("Backend action call failed:", err));
+      })
+      .then(res => {
+        if (res.ok) {
+          loadSubscriptions();
+        }
+      })
+      .catch(err => console.warn("Backend action call failed:", err));
     }
 
     const updated = subscriptions.map(sub => {

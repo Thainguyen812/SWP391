@@ -7,6 +7,20 @@ const clearUserCache = () => {
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key && key.startsWith('urbanpark_')) {
+      // Keep persistent mock states (vehicles, balance, transactions, profile data, subscriptions)
+      if (
+        key.includes('_user_balance') ||
+        key.includes('_user_vehicles') ||
+        key.includes('_user_transactions') ||
+        key.includes('_user_name') ||
+        key.includes('_user_phone') ||
+        key.includes('_user_email') ||
+        key.includes('_user_address') ||
+        key.includes('_phone_verified') ||
+        key === 'urbanpark_vip_subscriptions'
+      ) {
+        continue;
+      }
       keysToRemove.push(key);
     }
   }

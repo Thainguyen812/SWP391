@@ -11,6 +11,8 @@ public interface VipService {
 
     List<VipSubscription> getPending();
 
+    List<VipSubscription> getAll();
+
     VipSubscription register(
             VipRegistrationRequest request);
 }
