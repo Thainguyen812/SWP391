@@ -31,11 +31,11 @@ public interface ParkingSlotRepository extends JpaRepository<ParkingSlot, UUID> 
     Optional<ParkingSlot> findFirstBySlotStatus(String slotStatus);
 
     @Query("SELECT s FROM ParkingSlot s WHERE s.zoneId = :zoneId AND s.slotStatus = 'AVAILABLE' AND (s.evChargerId IS NULL AND (s.slotType IS NULL OR s.slotType != 'EV'))")
-    Optional<ParkingSlot> findAvailableNonEvSlotInZone(@Param("zoneId") UUID zoneId);
+    List<ParkingSlot> findAvailableNonEvSlotInZone(@Param("zoneId") UUID zoneId);
 
     @Query("SELECT s FROM ParkingSlot s WHERE s.slotStatus = 'AVAILABLE' AND (s.evChargerId IS NULL AND (s.slotType IS NULL OR s.slotType != 'EV'))")
-    Optional<ParkingSlot> findAvailableNonEvSlotAnywhere();
+    List<ParkingSlot> findAvailableNonEvSlotAnywhere();
 
     @Query("SELECT s FROM ParkingSlot s WHERE s.zoneId = :zoneId AND s.slotStatus = 'AVAILABLE' AND (s.evChargerId IS NOT NULL OR s.slotType = 'EV')")
-    Optional<ParkingSlot> findAvailableEvSlotInZone(@Param("zoneId") UUID zoneId);
+    List<ParkingSlot> findAvailableEvSlotInZone(@Param("zoneId") UUID zoneId);
 }

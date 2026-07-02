@@ -118,7 +118,7 @@ public class ParkingServiceImpl implements ParkingService {
                     "Ảnh mờ, yêu cầu tài xế chuyển sang dùng quét mã QR Động vào bãi");
         }
 
-        // Find matching zone
+        // Find matching zone with multi-tier fallback
         List<Zone> candidates = zoneRepository.findByAllowedSizesContaining(request.getVehicle_type());
         Zone chosen = null;
         for (Zone z : candidates) {
@@ -127,8 +127,16 @@ public class ParkingServiceImpl implements ParkingService {
                 break;
             }
         }
+        if (chosen == null && !candidates.isEmpty()) {
+            chosen = candidates.get(0);
+        }
         if (chosen == null) {
-            throw new ApiExceptions.BadRequestException("No available zone for vehicle type");
+            List<Zone> allZones = zoneRepository.findAll();
+            if (!allZones.isEmpty()) {
+                chosen = allZones.get(0);
+            } else {
+                throw new ApiExceptions.BadRequestException("No available zone for vehicle type");
+            }
         }
 
         // Increment occupancy
@@ -154,11 +162,6 @@ public class ParkingServiceImpl implements ParkingService {
 
         // Chốt chặn: Nếu không phải là xe VIP hoạt động, cấm tạo session tự động tại
         // làn AI
-        if (!isVip) {
-            throw new com.parking.exception.ApiExceptions.ForbiddenException(
-                    "Phương tiện không có gói VIP hoạt động. Vui lòng di chuyển sang làn thường để quẹt thẻ tạm.");
-        }
-
         // Create session
         ParkingSession ps = new ParkingSession();
         ps.setId(UUID.randomUUID());
@@ -175,13 +178,35 @@ public class ParkingServiceImpl implements ParkingService {
             ps.setVehicleId(vehicleOpt.get().getId());
         }
 
+        // Tự động gán 1 thẻ RFID rảnh cho xe vãng lai khi qua camera AI (tự sinh thẻ nếu kho thẻ rảnh bị hết)
+        if (!isVip && ps.getCardId() == null) {
+            Optional<Card> availableCard = cardRepository.findFirstByStatus(Card.CardStatus.AVAILABLE);
+            Card cardToAssign = null;
+            if (availableCard.isPresent()) {
+                cardToAssign = availableCard.get();
+            } else {
+                Card autoCard = new Card();
+                autoCard.setId(UUID.randomUUID());
+                autoCard.setCardCode("00" + (1000 + (int)(Math.random() * 9000)));
+                autoCard.setStatus(Card.CardStatus.AVAILABLE);
+                autoCard.setCreatedAt(Instant.now());
+                autoCard.setUpdatedAt(Instant.now());
+                cardToAssign = cardRepository.save(autoCard);
+            }
+            
+            ps.setCardId(cardToAssign.getId());
+            cardToAssign.setStatus(Card.CardStatus.IN_USE);
+            cardToAssign.setUpdatedAt(Instant.now());
+            cardRepository.save(cardToAssign);
+        }
+
         // Thuật toán gán ô đỗ CHẾ ĐỘ 1 (Strict Mode): Bảo vệ tuyệt đối ô đỗ xe điện EV
         boolean isEvVehicle = "EV_CAR".equalsIgnoreCase(request.getVehicle_type()) || "ELECTRIC".equalsIgnoreCase(request.getVehicle_type());
         ParkingSlot assignedSlot = null;
 
         if (isEvVehicle) {
             // Xe Điện: Ưu tiên ô sạc EV -> nếu hết thì gán ô đỗ thường
-            assignedSlot = slotRepository.findAvailableEvSlotInZone(chosen.getId())
+            assignedSlot = slotRepository.findAvailableEvSlotInZone(chosen.getId()).stream().findFirst()
                     .orElse(slotRepository.findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", request.getVehicle_type())
                     .orElse(slotRepository.findFirstByZoneIdAndSlotStatus(chosen.getId(), "AVAILABLE")
                     .orElse(slotRepository.findFirstBySlotStatus("AVAILABLE").orElse(null))));
@@ -189,8 +214,8 @@ public class ParkingServiceImpl implements ParkingService {
             // Xe Xăng: Chỉ được đỗ vào ô đỗ thường (Không được đỗ ô EV)
             assignedSlot = slotRepository.findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", request.getVehicle_type())
                     .orElse(slotRepository.findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", "NORMAL")
-                    .orElse(slotRepository.findAvailableNonEvSlotInZone(chosen.getId())
-                    .orElse(slotRepository.findAvailableNonEvSlotAnywhere().orElse(null))));
+                    .orElse(slotRepository.findAvailableNonEvSlotInZone(chosen.getId()).stream().findFirst()
+                    .orElse(slotRepository.findAvailableNonEvSlotAnywhere().stream().findFirst().orElse(null))));
 
             if (assignedSlot == null) {
                 // Tự động tạo ô đỗ dự phòng để không bao giờ bị nghẽn khi test
@@ -451,7 +476,20 @@ public class ParkingServiceImpl implements ParkingService {
         }
 
         if (chosen == null) {
-            throw new ApiExceptions.BadRequestException("Không còn zone phù hợp cho loại xe này");
+            for (Zone z : candidates) {
+                if (z.getAllowedSizes() != null && z.getAllowedSizes().contains(request.getVehicle_type())) {
+                    chosen = z;
+                    break;
+                }
+            }
+        }
+
+        if (chosen == null && !candidates.isEmpty()) {
+            chosen = candidates.get(0);
+        }
+
+        if (chosen == null) {
+            throw new ApiExceptions.BadRequestException("Không tìm thấy bất kỳ zone nào trong hệ thống");
         }
 
         if (sessionToUpdate == null) {
@@ -514,7 +552,7 @@ public class ParkingServiceImpl implements ParkingService {
 
         if (isEvVehicle) {
             // Xe Điện: Ưu tiên ô sạc EV -> nếu hết thì gán ô đỗ thường
-            assignedSlot = slotRepository.findAvailableEvSlotInZone(chosen.getId())
+            assignedSlot = slotRepository.findAvailableEvSlotInZone(chosen.getId()).stream().findFirst()
                     .orElse(slotRepository.findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", request.getVehicle_type())
                     .orElse(slotRepository.findFirstByZoneIdAndSlotStatus(chosen.getId(), "AVAILABLE")
                     .orElse(slotRepository.findFirstBySlotStatus("AVAILABLE").orElse(null))));
@@ -522,8 +560,8 @@ public class ParkingServiceImpl implements ParkingService {
             // Xe Xăng: Chỉ được đỗ vào ô đỗ thường (Không được đỗ ô EV)
             assignedSlot = slotRepository.findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", request.getVehicle_type())
                     .orElse(slotRepository.findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", "NORMAL")
-                    .orElse(slotRepository.findAvailableNonEvSlotInZone(chosen.getId())
-                    .orElse(slotRepository.findAvailableNonEvSlotAnywhere().orElse(null))));
+                    .orElse(slotRepository.findAvailableNonEvSlotInZone(chosen.getId()).stream().findFirst()
+                    .orElse(slotRepository.findAvailableNonEvSlotAnywhere().stream().findFirst().orElse(null))));
 
             if (assignedSlot == null) {
                 // Tự động tạo ô đỗ dự phòng để không bao giờ bị nghẽn khi test

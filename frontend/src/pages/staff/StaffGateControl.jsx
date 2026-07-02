@@ -56,11 +56,16 @@ export const StaffGateControl = () => {
     }
     setIsCheckingIn(true);
     try {
+      let mappedType = 'SEDAN_HATCHBACK';
+      if (manualType && manualType.includes('7')) mappedType = 'SUV_CUV_MPV';
+      if (manualType && (manualType.includes('9') || manualType.includes('16'))) mappedType = 'LARGE_VAN_MINIBUS';
+
       // Gọi API /api/gate/scan thông minh (Tự nhận diện VIP hoặc cấp thẻ vãng lai)
       const response = await apiClient.post(`/gate/scan`, {
         plate: manualPlate.trim().toUpperCase(),
         cardCode: manualCardCode ? manualCardCode.trim() : '',
-        gate: 'Bốt Gác Cổng Trực 1'
+        gate: 'Bốt Gác Cổng Trực 1',
+        vehicleType: mappedType
       });
       
       notification.success({ 

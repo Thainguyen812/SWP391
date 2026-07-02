@@ -4,6 +4,7 @@ import com.parking.model.Vehicle;
 import com.parking.model.ParkingSession;
 import com.parking.repository.VehicleRepository;
 import com.parking.repository.ParkingSessionRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -41,6 +42,7 @@ public class GateController {
         public String cardCode;
         public String qrToken;
         public String gate;
+        public String vehicleType;
     }
 
     @PostMapping("/scan")
@@ -58,7 +60,7 @@ public class GateController {
                 Map<String, Object> dataMap = new HashMap<>();
                 dataMap.put("vehicle", vehicleData);
                 response.put("data", dataMap);
-                return ResponseEntity.ok(response);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
             }
         }
 
@@ -88,6 +90,10 @@ public class GateController {
                     }
                 }
 
+                String resolvedVehicleType = (request.vehicleType != null && !request.vehicleType.trim().isEmpty())
+                        ? request.vehicleType.trim()
+                        : (optVehicle.isPresent() ? optVehicle.get().getVehicleSize() : "SEDAN_HATCHBACK");
+
                 if (isVip) {
                     // Case A: VIP Check-in
                     com.parking.dto.AiCheckInRequest aiReq = new com.parking.dto.AiCheckInRequest();
@@ -95,7 +101,7 @@ public class GateController {
                     aiReq.setConfidence_score(95.0);
                     aiReq.setCamera_id(request.gate);
                     aiReq.setImage_url("https://camera-storage.com/live/gate_scan.jpg");
-                    aiReq.setVehicle_type(optVehicle.isPresent() ? optVehicle.get().getVehicleSize() : "SEDAN_HATCHBACK");
+                    aiReq.setVehicle_type(resolvedVehicleType);
 
                     com.parking.dto.CheckInResponse checkInResponse = parkingService.aiCheckIn(aiReq);
 
@@ -118,7 +124,7 @@ public class GateController {
                     visitorReq.setPlate(plateStr);
                     visitorReq.setCard_code(request.cardCode.trim());
                     visitorReq.setImage_url("https://camera-storage.com/live/gate_scan.jpg");
-                    visitorReq.setVehicle_type(optVehicle.isPresent() ? optVehicle.get().getVehicleSize() : "SEDAN_HATCHBACK");
+                    visitorReq.setVehicle_type(resolvedVehicleType);
 
                     com.parking.dto.CheckInResponse checkInResponse = parkingService.visitorCheckIn(visitorReq);
 
