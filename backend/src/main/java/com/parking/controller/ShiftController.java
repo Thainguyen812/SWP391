@@ -1,6 +1,7 @@
 package com.parking.controller;
 
 import com.parking.model.ShiftHistory;
+import com.parking.dto.HandoverRequest;
 import com.parking.repository.ShiftHistoryRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -26,7 +27,7 @@ public class ShiftController {
     }
 
     @PostMapping("/handover")
-    public ResponseEntity<ShiftHistory> handoverShift(@RequestBody ShiftHistory shift) {
+    public ResponseEntity<ShiftHistory> handoverShift(@RequestBody HandoverRequest request) {
         // Find current active shift and end it
         List<ShiftHistory> allShifts = shiftRepo.findAll();
         for (ShiftHistory s : allShifts) {
@@ -34,16 +35,25 @@ public class ShiftController {
                 s.setIsCurrent(false);
                 s.setEndTime(LocalDateTime.now());
                 s.setStatus("HOÀN THÀNH");
+                s.setSystemRevenue(request.getSystemRevenue());
+                s.setSystemCash(request.getSystemCash());
+                s.setSystemTransfer(request.getSystemTransfer());
+                s.setDeclaredCash(request.getDeclaredCash());
+                s.setVehiclesHandled(request.getVehiclesHandled());
+                s.setNextStaffId(request.getNextStaffId());
                 shiftRepo.save(s);
             }
         }
 
         // Create new shift
-        shift.setStartTime(LocalDateTime.now());
-        shift.setIsCurrent(true);
-        shift.setStatus("ĐANG TRỰC");
-        shift.setVehiclesHandled(0);
-        ShiftHistory saved = shiftRepo.save(shift);
+        ShiftHistory newShift = new ShiftHistory();
+        newShift.setStaffName(request.getNextStaffName());
+        newShift.setShiftType(request.getNextShiftType() != null ? request.getNextShiftType() : "Sáng");
+        newShift.setStartTime(LocalDateTime.now());
+        newShift.setIsCurrent(true);
+        newShift.setStatus("ĐANG TRỰC");
+        newShift.setVehiclesHandled(0);
+        ShiftHistory saved = shiftRepo.save(newShift);
         return ResponseEntity.ok(saved);
     }
 }

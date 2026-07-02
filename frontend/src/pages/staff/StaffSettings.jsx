@@ -10,6 +10,9 @@ import {
 } from '@ant-design/icons';
 import { Switch, Modal, notification, Spin } from 'antd'; // Using antd for components
 import { useGlobalContext } from '../../context/GlobalContext';
+import { useNavigate } from 'react-router-dom';
+import { authService } from '../../services/authService';
+import apiClient from '../../api/apiClient';
 
 export const StaffSettings = () => {
   const { shiftStats, setShiftStats, currentUser, setCurrentUser, shiftHistory, setShiftHistory } = useGlobalContext();
@@ -22,6 +25,8 @@ export const StaffSettings = () => {
     { name: 'Lê Hoàng C', id: 'NV-1102', avatar: 'https://randomuser.me/api/portraits/men/65.jpg' },
   ];
   const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [declaredCash, setDeclaredCash] = useState('');
+  const navigate = useNavigate();
 
   const [isExporting, setIsExporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -35,51 +40,48 @@ export const StaffSettings = () => {
       return;
     }
     const nextStaff = availableStaff.find(s => s.id === selectedStaffId);
+    const declaredCashValue = parseFloat(declaredCash) || 0;
 
     Modal.confirm({
       title: 'Xác nhận chuyển ca trực',
-      content: `Hệ thống sẽ chốt doanh thu ca hiện tại và chuyển ca trực cho ${nextStaff.name}. Bạn có chắc chắn?`,
-      okText: 'Chuyển ca',
+      content: `Hệ thống sẽ chốt doanh thu ca hiện tại với tiền mặt thực tế là ${declaredCashValue.toLocaleString()}đ và bàn giao cho ${nextStaff.name}. Ứng dụng sẽ đăng xuất để nhân viên mới đăng nhập. Bạn có chắc chắn?`,
+      okText: 'Chuyển ca & Đăng xuất',
       cancelText: 'Hủy',
-      onOk() {
+      async onOk() {
         setIsHandoverProcessing(true);
-        return new Promise(resolve => {
+        try {
+          await apiClient.post('/v1/parking/shifts/handover', {
+            nextStaffId: nextStaff.id,
+            nextStaffName: nextStaff.name,
+            nextShiftType: 'Ca Sáng', // Example
+            systemRevenue: shiftStats.revenue,
+            systemCash: shiftStats.cash,
+            systemTransfer: shiftStats.transfer,
+            declaredCash: declaredCashValue,
+            vehiclesHandled: shiftStats.transactions
+          });
+          
+          notification.success({ 
+            message: 'Bàn giao ca thành công', 
+            description: `Đã chốt doanh thu cho ${nextStaff.name}. Đang đăng xuất...`, 
+            placement: 'topRight' 
+          });
+
+          // Reset everything and logout
+          setShiftStats({ revenue: 0, cash: 0, transfer: 0, transactions: 0 });
+          setSelectedStaffId('');
+          setDeclaredCash('');
+          
           setTimeout(() => {
-            setIsHandoverProcessing(false);
-            
-            // 1. Chốt lịch sử ca cũ
-            setShiftHistory(prev => {
-              const newHistory = [...prev];
-              if (newHistory.length > 0 && newHistory[0].status === 'ĐANG TRỰC') {
-                newHistory[0].status = 'HOÀN THÀNH';
-                newHistory[0].end = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-                newHistory[0].vehicles = shiftStats.transactions;
-                newHistory[0].isCurrent = false;
-              }
-              // Thêm ca mới vào đầu danh sách
-              return [
-                { id: Date.now(), staff: nextStaff.name, shift: 'Sáng', start: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), end: '--:--', vehicles: 0, status: 'ĐANG TRỰC', isCurrent: true },
-                ...newHistory
-              ];
-            });
+            authService.logout();
+            navigate('/login');
+          }, 1500);
 
-            // 2. Chuyển người dùng hiện tại
-            setCurrentUser({...nextStaff, shift: 'Sáng', station: "Làn Ra 02 (T-OUT-02)"});
-
-            // 3. Reset thống kê
-            setShiftStats({ revenue: 0, cash: 0, transfer: 0, transactions: 0 });
-            
-            // 4. Reset form
-            setSelectedStaffId('');
-            
-            notification.success({ 
-              message: 'Chuyển ca thành công', 
-              description: `Ca trực mới đã bắt đầu cho ${nextStaff.name}. Thống kê đã được làm mới!`, 
-              placement: 'topRight' 
-            });
-            resolve();
-          }, 1000);
-        });
+        } catch (error) {
+          notification.error({ message: 'Lỗi bàn giao ca', description: 'Không thể kết nối đến máy chủ.' });
+        } finally {
+          setIsHandoverProcessing(false);
+        }
       }
     });
   };
@@ -145,6 +147,15 @@ export const StaffSettings = () => {
                   <div className="text-sm font-bold text-slate-800">{shiftStats.transfer.toLocaleString()}đ</div>
                 </div>
               </div>
+
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3 mt-4">TIỀN MẶT THỰC TẾ (TRONG KÉT)</div>
+              <input 
+                type="number" 
+                placeholder="Nhập số tiền mặt thực tế..."
+                value={declaredCash}
+                onChange={e => setDeclaredCash(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg py-2.5 px-3 text-sm text-slate-800 font-medium bg-slate-50 mb-6 focus:outline-none focus:border-blue-500"
+              />
 
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">CHỌN CA TIẾP NHẬN</div>
               <select 
