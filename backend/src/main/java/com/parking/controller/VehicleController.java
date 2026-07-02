@@ -67,6 +67,9 @@ this.vipSubscriptionRepository = vipSubscriptionRepository;
             map.put("type", v.getVehicleSize());
             map.put("bodyShape", v.getBodyShape());
             map.put("isLocked", v.isLocked());
+            map.put("isActive", v.isActive());
+            map.put("registrationDocUrl", v.getRegistrationDocUrl());
+            map.put("registrationPhotoUrl", v.getRegistrationPhotoUrl());
             mapped.add(map);
         }
         return java.util.Map.of("success", true, "data", mapped);
@@ -154,7 +157,7 @@ this.vipSubscriptionRepository = vipSubscriptionRepository;
 
     vehicle.setViolationCount(0);
 
-    vehicle.setActive(true);
+    vehicle.setActive(false);
 
     vehicle.setCreatedAt(Instant.now());
 

@@ -278,7 +278,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               name: v.brand || v.name,
               type: sizeLabel,
               regDate: '12/10/2023',
-              isActive: true,
+              isActive: v.isActive !== false && v.active !== false,
               image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
               isLocked: activeSub ? (v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false)) : false,
               activeSubscription: activeSub,

@@ -2020,10 +2020,17 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                           {/* Anti-theft live scanner badge */}
                           <div className="absolute top-4 left-4 flex gap-1.5 z-10">
-                            <span className="px-2.5 py-1 bg-white/90 backdrop-blur-xs text-[#10b981] font-bold text-[9px] rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              HOẠT ĐỘNG
-                            </span>
+                            {v.isActive ? (
+                              <span className="px-2.5 py-1 bg-white/90 backdrop-blur-xs text-[#10b981] font-bold text-[9px] rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                HOẠT ĐỘNG
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 bg-white/90 backdrop-blur-xs text-amber-500 font-bold text-[9px] rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                CHỜ PHÊ DUYỆT XE
+                              </span>
+                            )}
                             {v.isLocked && (
                               <span className="px-2.5 py-1 bg-rose-500 text-white font-black text-[9px] rounded-full uppercase tracking-widest shadow-sm flex items-center gap-1">
                                 SHIELD LOCK ON
@@ -2072,7 +2079,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                            {/* Lock Trigger Controller */}
                            <div className="flex items-center justify-between gap-3 pt-1">
-                             {v.activeSubscription ? (
+                            {v.activeSubscription ? (
                                <button
                                  onClick={() => toggleVehicleLock(v.id, v.plate)}
                                  className={`flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] ${
@@ -2093,16 +2100,24 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                    </>
                                  )}
                                </button>
+                             ) : v.subscriptionStatus === 'PENDING_APPROVAL' ? (
+                               <button
+                                 disabled
+                                 className="flex-1 py-2 bg-slate-50 text-slate-400 border border-slate-200/50 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-not-allowed"
+                                >
+                                  <Clock className="w-3.5 h-3.5 text-slate-400 animate-spin" />
+                                  <span>Đang chờ duyệt VIP...</span>
+                                </button>
                              ) : (
                                <button
                                  onClick={() => {
                                    setSelectedVehicleForVIP(v.plate);
                                    setActiveTab('vip_reg');
                                  }}
-                                 className="flex-1 py-2 bg-slate-105 bg-slate-100 hover:bg-amber-100 hover:text-amber-700 text-slate-400 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-all"
+                                 className="flex-1 py-2 bg-slate-100 hover:bg-amber-100 hover:text-amber-700 text-slate-400 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-all"
                                >
                                  <Lock className="w-3.5 h-3.5 text-slate-400" />
-                                 <span>Đăng ký VIP để khoá bánh</span>
+                                 <span>Đăng ký VIP để duyệt xe & khoá bánh</span>
                                </button>
                              )}
 
