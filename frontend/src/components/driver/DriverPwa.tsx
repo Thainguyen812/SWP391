@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Modal } from 'antd';
 import { 
   Home, 
   Car, 
@@ -164,6 +165,21 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
   };
 
+  const parseExpiryDate = (dateStr: string) => {
+    if (!dateStr) return new Date();
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      const parsed = new Date(year, month, day);
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+    return new Date();
+  };
+
   // ----------------------------------------------------
   // --- CORE SYSTEM STATES & SEEDS ---
   // ----------------------------------------------------
@@ -200,6 +216,78 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     return [];
   });
 
+  const [activeQrToken, setActiveQrToken] = useState<string>('');
+  const [qrExpiryTime, setQrExpiryTime] = useState<number | null>(null);
+  const [isGeneratingQr, setIsGeneratingQr] = useState<boolean>(false);
+  const [countdownSec, setCountdownSec] = useState<number>(300);
+
+  const generateQrToken = async (vehicleId: string, direction: 'VÀO' | 'RA') => {
+    if (isOffline) return;
+    if (!vehicleId || vehicleId.startsWith('veh-')) {
+      const activeVeh = vehicles.find(v => v.id === vehicleId) || vehicles[0];
+      const plateStr = activeVeh ? activeVeh.plate : '34G56789';
+      setActiveQrToken(`MOCK_${plateStr}|${direction}|${Date.now()}`);
+      setQrExpiryTime(Date.now() + 300000);
+      return;
+    }
+    setIsGeneratingQr(true);
+    try {
+      const response = await fetch('/api/v1/driver/qr/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          vehicleId: vehicleId,
+          purpose: direction === 'VÀO' ? 'CHECK_IN' : 'CHECK_OUT'
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.qrToken) {
+          setActiveQrToken(data.qrToken);
+          if (data.expiredAt) {
+            setQrExpiryTime(new Date(data.expiredAt).getTime());
+          } else {
+            setQrExpiryTime(Date.now() + 300000);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error generating QR Token:", e);
+    } finally {
+      setIsGeneratingQr(false);
+    }
+  };
+
+  // Tự động generate/refresh token khi thay đổi
+  useEffect(() => {
+    const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+    if (activeVeh) {
+      generateQrToken(activeVeh.id, qrDirection);
+    }
+  }, [selectedVehId, qrDirection, vehicles.length]);
+
+  // Bộ đếm countdown và tự động làm mới
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (qrExpiryTime) {
+        const diff = Math.max(0, Math.round((qrExpiryTime - Date.now()) / 1000));
+        setCountdownSec(diff);
+        if (diff <= 5 && !isGeneratingQr) {
+          const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+          if (activeVeh) {
+            generateQrToken(activeVeh.id, qrDirection);
+          }
+        }
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [qrExpiryTime, selectedVehId, qrDirection, isGeneratingQr, vehicles]);
+
+
+
   // Background synchronize with live backend
   const fetchVehiclesFromApi = async () => {
     if (isOffline) return; // Skip API calls when offline
@@ -210,42 +298,68 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       const data = await response.json();
       const vehicleList = Array.isArray(data) ? data : (data && data.success && Array.isArray(data.data) ? data.data : null);
       if (vehicleList) {
-        const mapped: UserVehicle[] = vehicleList.map((v: any, index: number) => {
-          const sizeType = v.vehicleSize || v.type || 'SEDAN_HATCHBACK';
-          const sizeLabel = sizeType === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
-                            sizeType === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
-                            sizeType === 'EV_CAR' ? 'Xe điện' :
-                            'Ô tô gầm thấp 4-5 chỗ';
-          
-          let regDate = '30/06/2026';
-          if (v.createdAt) {
-            try {
-              const d = new Date(v.createdAt);
-              regDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-            } catch (err) {}
+        setVehicles(prevVehicles => {
+          const mapped: UserVehicle[] = vehicleList.map((v: any, index: number) => {
+            const sizeType = v.vehicleSize || v.type || 'SEDAN_HATCHBACK';
+            const sizeLabel = v.bodyShape ? v.bodyShape :
+                              sizeType === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
+                              sizeType === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
+                              sizeType === 'EV_CAR' ? 'Xe điện' :
+                              'Ô tô gầm thấp 4-5 chỗ';
+            
+            let regDate = '30/06/2026';
+            if (v.createdAt) {
+              try {
+                const d = new Date(v.createdAt);
+                regDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+              } catch (err) {}
+            }
+            
+            // Tìm xe cục bộ hiện tại bằng cách dùng prevVehicles thay vì state vehicles bị dính closure
+            const existingLocal = prevVehicles.find(lv => lv.plate === (v.licensePlate || v.plate));
+            
+            // Lookup latest subscription status from localStorage
+            const savedSubs = localStorage.getItem('urbanpark_vip_subscriptions');
+            let activeSub = undefined;
+            let expiry = undefined;
+            let subStatus = undefined;
+            if (savedSubs) {
+              try {
+                const subs = JSON.parse(savedSubs);
+                const matched = subs.filter((s: any) => s.vehicle_plate === (v.licensePlate || v.plate));
+                if (matched.length > 0) {
+                  const latest = matched[matched.length - 1];
+                  subStatus = latest.status;
+                  if (latest.status === 'ACTIVE') {
+                    activeSub = latest.type;
+                    expiry = latest.endDate;
+                  }
+                }
+              } catch (err) {}
+            }
+
+            return {
+              id: v.id || `veh-${v.licensePlate || v.plate}`,
+              plate: v.licensePlate || v.plate,
+              name: v.brand || v.name || 'Phương tiện',
+              type: sizeLabel,
+              regDate: regDate,
+              isActive: v.isActive !== false && v.active !== false,
+              image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
+              isLocked: v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false),
+              activeSubscription: activeSub,
+              subscriptionExpiry: expiry,
+              subscriptionStatus: subStatus
+            };
+          });
+
+          // Cập nhật selectedVehId bên ngoài nhưng dựa trên mapped list
+          if (mapped.length > 0 && (!selectedVehId || !mapped.some(mv => mv.id === selectedVehId))) {
+            setTimeout(() => setSelectedVehId(mapped[0].id), 0);
           }
-          
-          // Tìm xe cục bộ hiện tại để giữ lại thông tin đăng ký gói cước và trạng thái khoá
-          const existingLocal = vehicles.find(lv => lv.plate === (v.licensePlate || v.plate));
-          
-          return {
-            id: v.id || `veh-${v.licensePlate || v.plate}`,
-            plate: v.licensePlate || v.plate,
-            name: v.brand || v.name || 'Phương tiện',
-            type: sizeLabel,
-            regDate: regDate,
-            isActive: v.isActive !== false && v.active !== false,
-            image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
-            isLocked: existingLocal ? existingLocal.isLocked : (v.isLocked || false),
-            activeSubscription: existingLocal ? existingLocal.activeSubscription : undefined,
-            subscriptionExpiry: existingLocal ? existingLocal.subscriptionExpiry : undefined
-          };
+
+          return mapped;
         });
-        setVehicles(mapped);
-        
-        if (mapped.length > 0 && (!selectedVehId || !mapped.some(mv => mv.id === selectedVehId))) {
-          setSelectedVehId(mapped[0].id);
-        }
       }
     } catch (e) {
       console.warn("Backend not yet connected or starting:", e);
@@ -345,6 +459,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   });
   const [profilePhone, setProfilePhone] = useState(() => {
     return localStorage.getItem('urbanpark_user_phone') || user.phone;
+  });
+  const [isPhoneVerified, setIsPhoneVerified] = useState(() => {
+    return localStorage.getItem('urbanpark_phone_verified') === 'true';
   });
   const [profileEmail, setProfileEmail] = useState(() => {
     return localStorage.getItem('urbanpark_user_email') || user.email || '';
@@ -534,7 +651,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       brand: newName.trim() || 'Phương tiện mới',
       color: 'WHITE',
       colorRgb: '#FFFFFF',
-      bodyShape: 'SEDAN',
+      bodyShape: newType,
       isActive: true,
       fuelType: 'GASOLINE'
     };
@@ -550,7 +667,14 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       });
 
       if (!response.ok) {
-        throw new Error('Thêm xe thất bại. Biển số xe có thể đã tồn tại!');
+        let errMsg = 'Thêm xe thất bại. Biển số xe có thể đã tồn tại!';
+        try {
+          const errData = await response.json();
+          if (errData && errData.message) {
+            errMsg = errData.message;
+          }
+        } catch (e) {}
+        throw new Error(errMsg);
       }
 
       const savedVehicle = await response.json();
@@ -616,7 +740,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       brand: editName.trim() || 'Phương tiện',
       color: 'WHITE',
       colorRgb: '#FFFFFF',
-      bodyShape: 'SEDAN',
+      bodyShape: editType,
       isActive: true,
       fuelType: 'GASOLINE'
     };
@@ -665,7 +789,14 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         setEditVehicleModalOpen(false);
         triggerToast('Cập nhật phương tiện thành công!', 'success');
       } else {
-        triggerToast('Không thể cập nhật phương tiện. Vui lòng thử lại!', 'error');
+        let errMsg = 'Không thể cập nhật phương tiện. Vui lòng thử lại!';
+        try {
+          const errData = await response.json();
+          if (errData && errData.message) {
+            errMsg = errData.message;
+          }
+        } catch (e) {}
+        triggerToast(errMsg, 'error');
       }
     } catch (err) {
       triggerToast('Lỗi kết nối API Backend!', 'error');
@@ -742,33 +873,51 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       };
       setTransactions(prev => [newTx, ...prev]);
       
-      // Update vehicle subscription status in local state
-      setVehicles(prev => prev.map(v => {
-        if (v.plate === selectedVehicleForVIP) {
-          const expiryDate = new Date();
-          if (selectedPackLabel.includes('1 Năm') || selectedPackLabel.includes('1 năm')) {
-            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-          } else if (selectedPackLabel.includes('3 Tháng') || selectedPackLabel.includes('3 tháng')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 3);
-          } else if (selectedPackLabel.includes('6 Tháng') || selectedPackLabel.includes('6 tháng')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 6);
-          } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 1);
-          } else {
-            expiryDate.setDate(expiryDate.getDate() + 1);
-          }
-          const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
-          return {
-            ...v,
-            activeSubscription: selectedPackLabel,
-            subscriptionExpiry: expiryString
-          };
+      // Calculate expiry date by checking if they already have an active subscription
+      const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
+      let expiryDate = new Date();
+      if (targetVeh && targetVeh.activeSubscription && targetVeh.subscriptionExpiry) {
+        const parsedExpiry = parseExpiryDate(targetVeh.subscriptionExpiry);
+        if (parsedExpiry.getTime() > Date.now()) {
+          expiryDate = parsedExpiry;
         }
-        return v;
-      }));
+      }
+
+      if (selectedPackLabel.includes('1 Năm') || selectedPackLabel.includes('1 năm')) {
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      } else if (selectedPackLabel.includes('3 Tháng') || selectedPackLabel.includes('3 tháng')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 3);
+      } else if (selectedPackLabel.includes('6 Tháng') || selectedPackLabel.includes('6 tháng')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 6);
+      } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 1);
+      } else {
+        expiryDate.setDate(expiryDate.getDate() + 1);
+      }
+      const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
+
+      // Create subscription in localStorage with PENDING_APPROVAL status
+      const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+      const newSub = {
+        id: `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
+        vehicle_plate: selectedVehicleForVIP,
+        type: selectedPackLabel,
+        startDate: new Date().toLocaleDateString('vi-VN'),
+        endDate: expiryString,
+        status: 'PENDING_APPROVAL',
+        document_photos: (window as any).lastUploadedPhotos || {
+          registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+          identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+          frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+        },
+        explanation: (window as any).lastUploadedPhotos?.explanation || ''
+      };
+      savedSubs.push(newSub);
+      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(savedSubs));
+      window.dispatchEvent(new Event('storage'));
 
       setRegStep(3); // success step!
-      triggerToast(`Đăng kí thành công bằng Ví UrbanPark cho xe ${selectedVehicleForVIP}!`, 'success');
+      triggerToast(`✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe ${selectedVehicleForVIP}.`, 'success');
     } else {
       setVnpayStep('info');
       setVnpayModalOpen(true);
@@ -828,32 +977,50 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       };
       setTransactions(prev => [newTx, ...prev]);
       
-      // Update vehicle subscription status in local state
-      setVehicles(prev => prev.map(v => {
-        if (v.plate === selectedVehicleForVIP) {
-          const expiryDate = new Date();
-          if (selectedPackLabel.includes('1 Năm') || selectedPackLabel.includes('1 năm')) {
-            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-          } else if (selectedPackLabel.includes('3 Tháng') || selectedPackLabel.includes('3 tháng')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 3);
-          } else if (selectedPackLabel.includes('6 Tháng') || selectedPackLabel.includes('6 tháng')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 6);
-          } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
-            expiryDate.setMonth(expiryDate.getMonth() + 1);
-          } else {
-            expiryDate.setDate(expiryDate.getDate() + 1);
-          }
-          const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
-          return {
-            ...v,
-            activeSubscription: selectedPackLabel,
-            subscriptionExpiry: expiryString
-          };
+      // Calculate expiry date by checking if they already have an active subscription
+      const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
+      let expiryDate = new Date();
+      if (targetVeh && targetVeh.activeSubscription && targetVeh.subscriptionExpiry) {
+        const parsedExpiry = parseExpiryDate(targetVeh.subscriptionExpiry);
+        if (parsedExpiry.getTime() > Date.now()) {
+          expiryDate = parsedExpiry;
         }
-        return v;
-      }));
+      }
 
-      triggerToast(`Đăng kí thành viên thành công cho xe ${selectedVehicleForVIP}!`, 'success');
+      if (selectedPackLabel.includes('1 Năm') || selectedPackLabel.includes('1 năm')) {
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      } else if (selectedPackLabel.includes('3 Tháng') || selectedPackLabel.includes('3 tháng')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 3);
+      } else if (selectedPackLabel.includes('6 Tháng') || selectedPackLabel.includes('6 tháng')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 6);
+      } else if (selectedPackLabel.includes('Tháng') || selectedPackLabel.includes('VIP')) {
+        expiryDate.setMonth(expiryDate.getMonth() + 1);
+      } else {
+        expiryDate.setDate(expiryDate.getDate() + 1);
+      }
+      const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
+
+      // Create subscription in localStorage with PENDING_APPROVAL status
+      const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+      const newSub = {
+        id: `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
+        vehicle_plate: selectedVehicleForVIP,
+        type: selectedPackLabel,
+        startDate: new Date().toLocaleDateString('vi-VN'),
+        endDate: expiryString,
+        status: 'PENDING_APPROVAL',
+        document_photos: (window as any).lastUploadedPhotos || {
+          registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+          identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+          frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+        },
+        explanation: (window as any).lastUploadedPhotos?.explanation || ''
+      };
+      savedSubs.push(newSub);
+      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(savedSubs));
+      window.dispatchEvent(new Event('storage'));
+
+      triggerToast(`✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe ${selectedVehicleForVIP}.`, 'success');
     }
   };
 
@@ -861,6 +1028,108 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     setVnpayModalOpen(false);
     if (vnpayStep === 'success') {
       setRegStep(3); // move progress step to step 3
+    }
+  };
+
+  const getBillingStats = () => {
+    let sumThisMonth = 0;
+    let sumLastMonth = 0;
+    
+    const now = new Date();
+    const currentMonth = now.getMonth(); // 0-11
+    const currentYear = now.getFullYear();
+    
+    // Last month calculations
+    let lastMonth = currentMonth - 1;
+    let lastMonthYear = currentYear;
+    if (lastMonth < 0) {
+      lastMonth = 11;
+      lastMonthYear = currentYear - 1;
+    }
+    
+    transactions.forEach(tx => {
+      if (tx.isEntry === false) {
+        // Parse date DD/MM/YYYY HH:mm:ss
+        const datePart = tx.date ? tx.date.split(' ')[0] : '';
+        const parts = datePart ? datePart.split('/') : [];
+        if (parts.length === 3) {
+          const dMonth = parseInt(parts[1], 10) - 1; // 0-11
+          const dYear = parseInt(parts[2], 10);
+          
+          const feeStr = tx.fee ? tx.fee.replace(/[-+$₫]/g, '').replace(/,/g, '').trim() : '';
+          const value = parseFloat(feeStr);
+          if (!isNaN(value)) {
+            const valVND = tx.fee && tx.fee.includes('$') ? value * 25000 : value;
+            
+            if (dMonth === currentMonth && dYear === currentYear) {
+              sumThisMonth += valVND;
+            } else if (dMonth === lastMonth && dYear === lastMonthYear) {
+              sumLastMonth += valVND;
+            }
+          }
+        }
+      }
+    });
+    
+    let percentText = "0% so với tháng trước";
+    let isDecrease = false;
+    let isIncrease = false;
+    
+    if (sumLastMonth === 0) {
+      if (sumThisMonth > 0) {
+        percentText = "+100% so với tháng trước";
+        isIncrease = true;
+      } else {
+        percentText = "Không thay đổi so với tháng trước";
+      }
+    } else {
+      const diff = ((sumThisMonth - sumLastMonth) / sumLastMonth) * 100;
+      const rounded = Math.round(diff);
+      if (rounded < 0) {
+        percentText = `${rounded}% so với tháng trước`;
+        isDecrease = true;
+      } else if (rounded > 0) {
+        percentText = `+${rounded}% so với tháng trước`;
+        isIncrease = true;
+      } else {
+        percentText = "0% so với tháng trước";
+      }
+    }
+    
+    return {
+      sumThisMonth,
+      percentText,
+      isDecrease,
+      isIncrease
+    };
+  };
+
+  const handleFindCar = () => {
+    if (currentParked && currentParked.isParked) {
+      Modal.info({
+        title: 'Định vị phương tiện của bạn',
+        content: (
+          <div className="space-y-3 mt-3 text-left">
+            <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-3">
+              <MapPin className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">VỊ TRÍ ĐỖ XE</p>
+                <strong className="text-lg font-black text-slate-800">{currentParked.location}</strong>
+              </div>
+            </div>
+            <div className="text-xs text-slate-550 font-semibold space-y-1">
+              <p>• Biển số xe: <strong className="font-mono text-slate-700">{currentParked.plate}</strong></p>
+              <p>• Trạng thái: <span className="text-emerald-600 font-extrabold">{currentParked.status}</span></p>
+              <p className="mt-2 text-slate-400">Chỉ dẫn: Bạn có thể đi bộ qua Lối đi bộ Zone A, bấm thang máy lên Tầng 2 để nhận xe.</p>
+            </div>
+          </div>
+        ),
+        okText: 'Đóng',
+        centered: true,
+        maskClosable: true,
+      });
+    } else {
+      triggerToast('Hiện tại không có phương tiện nào của bạn đang đỗ trong bãi xe!', 'info');
     }
   };
 
@@ -1103,10 +1372,6 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         Giao diện tương tác và bảo mật tức thời kết nối trực tiếp đến Backend Cloud UrbanPark.
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full border border-emerald-200 text-xs font-black">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      MÔI TRƯỜNG API THẬT (LIVE REST CLIENT)
-                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
@@ -1149,6 +1414,38 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             );
                           }
                           const isLocked = activeVeh.isLocked;
+                          const isVip = activeVeh.activeSubscription;
+                          if (!isVip) {
+                            return (
+                              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-150 flex flex-col items-center justify-center text-center space-y-4 relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-450 from-amber-400 to-yellow-500" />
+                                <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-600 shadow-lg shadow-amber-100 flex items-center justify-center relative z-10">
+                                  <Lock className="w-8 h-8" />
+                                </div>
+                                <div className="space-y-1">
+                                  <h4 className="text-sm font-black uppercase tracking-wider text-amber-800">
+                                    DÀNH RIÊNG CHO HỘI VIÊN VIP
+                                  </h4>
+                                  <span className="text-[10px] bg-slate-200/60 font-mono text-slate-500 px-2 py-1 rounded font-bold uppercase tracking-wider">
+                                    {activeVeh.plate}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-400 leading-relaxed font-semibold">
+                                  Tính năng khoá bánh bảo vệ radar và kẹp phanh hơi thông minh chống trộm từ xa chỉ áp dụng cho phương tiện có vé tháng VIP đang hoạt động.
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedVehicleForVIP(activeVeh.plate);
+                                    setActiveTab('vip_reg');
+                                  }}
+                                  className="w-full py-3.5 bg-amber-500 hover:bg-amber-650 hover:bg-amber-600 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer text-center"
+                                >
+                                  Đăng ký VIP ngay để kích hoạt
+                                </button>
+                              </div>
+                            );
+                          }
                           return (
                             <div className="p-6 bg-slate-50 rounded-2xl border border-slate-150 flex flex-col items-center justify-center text-center space-y-4 relative overflow-hidden">
                               <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${isLocked ? 'from-rose-500 to-red-600' : 'from-emerald-400 to-teal-500'}`} />
@@ -1325,21 +1622,27 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                               <div className="w-full text-center space-y-1">
                                 <span className="text-[10px] text-slate-400 font-mono font-bold block uppercase">Chữ ký số bốt gác (Gate Token Hash)</span>
-                                <strong className="text-xs font-mono font-black text-slate-800 tracking-wider block bg-white border border-slate-200 p-2 rounded-xl select-all select-all shadow-inner break-all">
-                                  {qrValueString}
+                                <strong className="text-xs font-mono font-black text-slate-800 tracking-wider block bg-white border border-slate-200 p-2 rounded-xl select-all shadow-inner break-all">
+                                  {activeQrToken || qrValueString}
                                 </strong>
                               </div>
 
                               <button
                                 type="button"
                                 onClick={() => {
-                                  navigator.clipboard.writeText(qrValueString);
+                                  navigator.clipboard.writeText(activeQrToken || qrValueString);
                                   triggerToast("📋 Sao chép mã chữ ký số bốt gác thành công!", "success");
                                 }}
-                                className="w-full py-2 bg-slate-200 hover:bg-slate-350 text-slate-700 font-extrabold text-xs rounded-xl active:scale-95 transition-all outline-none"
+                                className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs rounded-xl active:scale-95 transition-all outline-none"
                               >
                                 Sao chép Mã QR văn bản
                               </button>
+
+                              {qrExpiryTime && (
+                                <p className="text-[10px] text-slate-400 text-center font-semibold pt-1">
+                                  ⏱️ Mã QR động tự động làm mới sau <span className="text-blue-600 font-bold">{countdownSec} giây</span>
+                                </p>
+                              )}
                             </div>
                           );
                         })()}
@@ -1476,9 +1779,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       <div className="grid grid-cols-2 gap-4 flex-1">
                         
                         <button 
-                          onClick={() => {
-                            triggerToast('Đã kích hoạt thiết bị đo lường định vị radar xe của bạn!', 'success');
-                          }}
+                          onClick={handleFindCar}
                           className="p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center gap-2 select-none group cursor-pointer active:scale-95 transition-all"
                         >
                           <div className="p-2.5 bg-blue-50 text-blue-600 rounded-full group-hover:scale-110 transition-transform">
@@ -1797,28 +2098,41 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             </div>
                           </div>
 
-                          {/* Lock Trigger Controller */}
-                          <div className="flex items-center justify-between gap-3 pt-1">
-                            <button
-                              onClick={() => toggleVehicleLock(v.id, v.plate)}
-                              className={`flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] ${
-                                v.isLocked 
-                                  ? 'bg-rose-100 hover:bg-rose-200 text-rose-600' 
-                                  : 'bg-blue-50 hover:bg-blue-100 text-blue-600'
-                              }`}
-                            >
-                              {v.isLocked ? (
-                                <>
-                                  <Lock className="w-4 h-4 text-rose-500 animate-pulse" />
-                                  <span>Mở khoá an ninh</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Unlock className="w-4 h-4 text-blue-500" />
-                                  <span>Khoá an toàn xe</span>
-                                </>
-                              )}
-                            </button>
+                           {/* Lock Trigger Controller */}
+                           <div className="flex items-center justify-between gap-3 pt-1">
+                             {v.activeSubscription ? (
+                               <button
+                                 onClick={() => toggleVehicleLock(v.id, v.plate)}
+                                 className={`flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] ${
+                                   v.isLocked 
+                                     ? 'bg-rose-100 hover:bg-rose-200 text-rose-600' 
+                                     : 'bg-blue-50 hover:bg-blue-100 text-blue-600'
+                                 }`}
+                               >
+                                 {v.isLocked ? (
+                                   <>
+                                     <Lock className="w-4 h-4 text-rose-500 animate-pulse" />
+                                     <span>Mở khoá an ninh</span>
+                                   </>
+                                 ) : (
+                                   <>
+                                     <Unlock className="w-4 h-4 text-blue-500" />
+                                     <span>Khoá an toàn xe</span>
+                                   </>
+                                 )}
+                               </button>
+                             ) : (
+                               <button
+                                 onClick={() => {
+                                   setSelectedVehicleForVIP(v.plate);
+                                   setActiveTab('vip_reg');
+                                 }}
+                                 className="flex-1 py-2 bg-slate-105 bg-slate-100 hover:bg-amber-100 hover:text-amber-700 text-slate-400 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-all"
+                               >
+                                 <Lock className="w-3.5 h-3.5 text-slate-400" />
+                                 <span>Đăng ký VIP để khoá bánh</span>
+                               </button>
+                             )}
 
                             <button 
                               onClick={() => {
@@ -1875,6 +2189,44 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       Thiết lập thẻ tháng hoặc thẻ ngày cho phương tiện của bạn.
                     </p>
                   </div>
+
+                  {vehicles.length === 0 ? (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-white p-8 rounded-3xl border border-slate-200/60 shadow-lg text-center max-w-xl mx-auto space-y-6 mt-8"
+                    >
+                      <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto animate-bounce">
+                        <Car className="w-10 h-10" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-black text-slate-800">Chưa có phương tiện đăng ký</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed">
+                          Bạn cần thêm ít nhất một phương tiện vào tài khoản trước khi thực hiện mua vé tháng VIP hoặc đăng ký gói dịch vụ.
+                        </p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewType('Ô tô gầm thấp 4-5 chỗ');
+                            setAddVehicleModalOpen(true);
+                          }}
+                          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-2xl transition-all shadow-md cursor-pointer"
+                        >
+                          + Thêm xe mới ngay
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('vehicles')}
+                          className="px-6 py-3 border border-slate-200 hover:bg-slate-50 text-slate-650 font-extrabold text-xs uppercase tracking-wider rounded-2xl transition-all cursor-pointer"
+                        >
+                          Quản lý xe của tôi
+                        </button>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <>
 
                   {/* Progressive Horizontal steps */}
                   <div className="bg-white px-8 py-5 rounded-2xl border border-slate-200/60 flex items-center justify-between gap-6 overflow-x-auto">
@@ -2149,6 +2501,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                     </div>
 
                   </div>
+                    </>
+                  )}
 
                 </motion.div>
               )}
@@ -2180,29 +2534,30 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         </span>
                         <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
                           {(() => {
-                            let sumVND = 0;
-                            transactions.forEach(tx => {
-                              if (tx.isEntry === false) {
-                                const feeStr = tx.fee.replace(/[-+$₫]/g, '').replace(/,/g, '').trim();
-                                const value = parseFloat(feeStr);
-                                if (!isNaN(value)) {
-                                  if (tx.fee.includes('$')) {
-                                    sumVND += value * 25000;
-                                  } else {
-                                    sumVND += value;
-                                  }
-                                }
-                              }
-                            });
-                            return sumVND.toLocaleString('vi-VN') + '₫';
+                            const { sumThisMonth } = getBillingStats();
+                            return sumThisMonth.toLocaleString('vi-VN') + '₫';
                           })()}
                         </div>
                       </div>
                       <div className="mt-3">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-extrabold text-emerald-600 bg-emerald-50 rounded-full">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          -12% so với tháng trước
-                        </span>
+                        {(() => {
+                          const { percentText, isDecrease, isIncrease } = getBillingStats();
+                          let textColor = "text-slate-600 bg-slate-50 border border-slate-100";
+                          let dotColor = "bg-slate-400";
+                          if (isDecrease) {
+                            textColor = "text-emerald-600 bg-emerald-50 border border-emerald-500/15";
+                            dotColor = "bg-emerald-500";
+                          } else if (isIncrease) {
+                            textColor = "text-red-600 bg-red-50 border border-red-500/15";
+                            dotColor = "bg-red-500";
+                          }
+                          return (
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-extrabold rounded-full ${textColor}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${dotColor} ${isDecrease || isIncrease ? 'animate-pulse' : ''}`} />
+                              {percentText}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -2455,12 +2810,30 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                               <input
                                 type="text"
                                 value={profilePhone}
-                                onChange={e => setProfilePhone(e.target.value)}
+                                onChange={e => {
+                                  setProfilePhone(e.target.value);
+                                  setIsPhoneVerified(false);
+                                  localStorage.setItem('urbanpark_phone_verified', 'false');
+                                }}
                                 className="w-full p-3 pr-24 border rounded-xl font-bold bg-slate-50 border-slate-200 focus:bg-white text-slate-800 focus:border-blue-500 outline-none transition-colors"
                               />
-                              <span className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-500/15">
-                                ✓ Đã xác thực
-                              </span>
+                              {isPhoneVerified ? (
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-500/15">
+                                  ✓ Đã xác thực
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsPhoneVerified(true);
+                                    localStorage.setItem('urbanpark_phone_verified', 'true');
+                                    triggerToast('Xác thực số điện thoại thành công!', 'success');
+                                  }}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[10px] font-extrabold text-amber-600 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-md border border-amber-500/15 transition-colors cursor-pointer"
+                                >
+                                  ⚠ Chưa xác thực
+                                </button>
+                              )}
                             </div>
                           </div>
 

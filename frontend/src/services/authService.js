@@ -2,6 +2,32 @@ import { apiClient } from '../api/apiClient';
 
 const isMock = import.meta.env.VITE_USE_MOCK_API === 'true';
 
+const clearUserCache = () => {
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('urbanpark_')) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(key => localStorage.removeItem(key));
+};
+
+const extractErrorMessage = (error, defaultMsg) => {
+  if (error.response && error.response.data) {
+    if (typeof error.response.data === 'string') {
+      return error.response.data;
+    }
+    if (error.response.data.message) {
+      return error.response.data.message;
+    }
+    if (error.response.data.error) {
+      return error.response.data.error;
+    }
+  }
+  return error.message || defaultMsg;
+};
+
 export const authService = {
   login: async (username, password, otp = null) => {
     if (isMock) {
@@ -43,9 +69,7 @@ export const authService = {
       localStorage.setItem('user', JSON.stringify(mockUser));
 
       // Xóa dữ liệu cache của người dùng cũ để tránh hiển thị chéo dữ liệu
-      localStorage.removeItem('urbanpark_user_vehicles');
-      localStorage.removeItem('urbanpark_user_balance');
-      localStorage.removeItem('urbanpark_user_transactions');
+      clearUserCache();
 
       return { success: true, user: mockUser };
     }
@@ -82,9 +106,7 @@ export const authService = {
         }
 
         // Xóa dữ liệu cache của người dùng cũ để tránh hiển thị chéo dữ liệu
-        localStorage.removeItem('urbanpark_user_vehicles');
-        localStorage.removeItem('urbanpark_user_balance');
-        localStorage.removeItem('urbanpark_user_transactions');
+        clearUserCache();
 
         return { success: true, user: user };
       } else {
@@ -92,8 +114,7 @@ export const authService = {
       }
     } catch (error) {
       console.error('Lỗi đăng nhập:', error);
-      // Xử lý lỗi trả về từ backend
-      const message = error.response?.data?.message || error.message || "Tài khoản hoặc mật khẩu không đúng!";
+      const message = extractErrorMessage(error, "Tài khoản hoặc mật khẩu không đúng!");
       return { success: false, message: message };
     }
   },
@@ -110,14 +131,12 @@ export const authService = {
         role: "DRIVER" // Mặc định đăng ký từ Driver App là tài xế (DRIVER)
       });
       // Xóa dữ liệu cache của trình duyệt để đảm bảo tài khoản mới tạo 100% trống dữ liệu
-      localStorage.removeItem('urbanpark_user_vehicles');
-      localStorage.removeItem('urbanpark_user_balance');
-      localStorage.removeItem('urbanpark_user_transactions');
+      clearUserCache();
 
       return { success: true, data: response };
     } catch (error) {
       console.error('Lỗi đăng ký:', error);
-      const message = error.response?.data?.message || error.message || "Không thể đăng ký tài khoản!";
+      const message = extractErrorMessage(error, "Không thể đăng ký tài khoản!");
       return { success: false, message: message };
     }
   },
@@ -128,7 +147,7 @@ export const authService = {
       return { success: true, data: response };
     } catch (error) {
       console.error('Lỗi gửi OTP:', error);
-      const message = error.response?.data?.message || error.message || "Không thể gửi OTP!";
+      const message = extractErrorMessage(error, "Không thể gửi OTP!");
       return { success: false, message: message };
     }
   },
@@ -139,7 +158,7 @@ export const authService = {
       return { success: true, data: response };
     } catch (error) {
       console.error('Lỗi xác thực OTP:', error);
-      const message = error.response?.data?.message || error.message || "Mã OTP không đúng hoặc đã hết hạn!";
+      const message = extractErrorMessage(error, "Mã OTP không đúng hoặc đã hết hạn!");
       return { success: false, message: message };
     }
   },
@@ -150,7 +169,7 @@ export const authService = {
       return { success: true, data: response };
     } catch (error) {
       console.error('Lỗi khôi phục mật khẩu:', error);
-      const message = error.response?.data?.message || error.message || "Không thể khôi phục mật khẩu!";
+      const message = extractErrorMessage(error, "Không thể khôi phục mật khẩu!");
       return { success: false, message: message };
     }
   },
@@ -162,13 +181,7 @@ export const authService = {
     localStorage.removeItem('user');
     
     // Xóa dữ liệu cache của tài xế để tránh hiển thị chéo giữa các tài khoản
-    localStorage.removeItem('urbanpark_user_vehicles');
-    localStorage.removeItem('urbanpark_user_balance');
-    localStorage.removeItem('urbanpark_user_transactions');
-    localStorage.removeItem('urbanpark_user_name');
-    localStorage.removeItem('urbanpark_user_phone');
-    localStorage.removeItem('urbanpark_user_email');
-    localStorage.removeItem('urbanpark_user_address');
+    clearUserCache();
     
     // Điều hướng về trang login
     window.location.href = '/login';
