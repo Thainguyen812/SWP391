@@ -11,7 +11,8 @@ import {
   WarningOutlined,
   CreditCardOutlined,
   CarOutlined,
-  QrcodeOutlined
+  QrcodeOutlined,
+  MobileOutlined
 } from '@ant-design/icons';
 import { Tag, Modal, notification, Spin, message, Input, Button, Pagination } from 'antd';
 import { useNavigate } from 'react-router-dom';
@@ -547,12 +548,27 @@ export const StaffDashboard = () => {
               <CreditCardOutlined className="text-slate-600 text-2xl" />
               <span className="text-sm font-bold text-slate-700 text-center">Báo Mất Thẻ</span>
             </button>
+            
+            <button 
+              onClick={() => navigate('/staff-mobile-pos')} 
+              className="col-span-2 bg-gradient-to-r from-blue-600 to-indigo-600 border-none hover:shadow-lg hover:shadow-blue-200 transition-all rounded-xl p-4 flex items-center justify-center gap-3 cursor-pointer group"
+            >
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                <MobileOutlined className="text-xl" />
+              </div>
+              <div className="text-left">
+                <div className="text-white font-bold uppercase tracking-wider text-sm mb-0.5">Mobile POS</div>
+                <div className="text-blue-100 text-xs">Giải tỏa ùn tắc lưu động</div>
+              </div>
+            </button>
           </div>
 
           <div className="bg-[#051424] text-white p-5 rounded-xl flex items-center justify-between">
             <div>
-              <h4 className="font-bold text-sm mb-1">Trạng thái Hệ thống</h4>
-              <p className="text-slate-400 text-xs m-0">Kết nối ổn định. Camera và Barrier hoạt động tốt.</p>
+              <h4 className="font-bold text-sm mb-1">Trạng thái Bãi đỗ xe</h4>
+              <p className="text-slate-400 text-xs m-0">
+                Kết nối ổn định. Đang có <span className="text-emerald-400 font-bold">{vehiclesInLotCount}</span> xe trong bãi.
+              </p>
             </div>
             <CheckCircleFilled className="text-emerald-400 text-2xl" />
           </div>
@@ -702,8 +718,8 @@ export const StaffDashboard = () => {
               const matchedVehicle = activeVehicles?.find(v => v.plate === submittedPlate);
               
               addSecurityAlert({
-                id: `blacklist-${Date.now()}`,
-                type: 'BIỂN SỐ ĐEN',
+                id: `violation-${Date.now()}`,
+                type: 'VI PHẠM NỘI QUY',
                 plate: submittedPlate,
                 reason: submittedReason,
                 time: 'Vừa xong',

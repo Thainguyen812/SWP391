@@ -14,6 +14,8 @@ import java.util.UUID;
 import com.parking.dto.VehicleRegistrationRequest;
 import com.parking.model.User;
 import com.parking.repository.UserRepository;
+import com.parking.repository.VipSubscriptionRepository;
+import com.parking.model.VipSubscription;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -30,13 +32,16 @@ public class VehicleController {
 
 private final VehicleRepository repo;
 private final UserRepository userRepo;
+private final VipSubscriptionRepository vipSubscriptionRepository;
 
 public VehicleController(
         VehicleRepository repo,
-        UserRepository userRepo) {
+        UserRepository userRepo,
+        VipSubscriptionRepository vipSubscriptionRepository) {
 
 this.repo = repo;
 this.userRepo = userRepo;
+this.vipSubscriptionRepository = vipSubscriptionRepository;
 }
 
     @GetMapping
@@ -63,6 +68,9 @@ this.userRepo = userRepo;
             map.put("type", v.getVehicleSize());
             map.put("bodyShape", v.getBodyShape());
             map.put("isLocked", v.isLocked());
+            map.put("isActive", v.isActive());
+            map.put("registrationDocUrl", v.getRegistrationDocUrl());
+            map.put("registrationPhotoUrl", v.getRegistrationPhotoUrl());
             mapped.add(map);
         }
         return java.util.Map.of("success", true, "data", mapped);
@@ -76,9 +84,42 @@ this.userRepo = userRepo;
 
 
 
+    private void validateBrand(String brand) {
+        if (brand == null || brand.trim().isEmpty()) {
+            throw new RuntimeException("Tên xe không được để trống.");
+        }
+        
+        // 1. Kiểm tra không dấu (no accents)
+        if (!brand.matches("^[a-zA-Z0-9\\s-]+$")) {
+            throw new RuntimeException("Tên xe không được phép chứa dấu tiếng Việt hoặc ký tự đặc biệt.");
+        }
+        
+        // 2. Kiểm tra hãng xe hợp lệ trên thị trường
+        String upper = brand.toUpperCase();
+        java.util.List<String> validBrands = java.util.List.of(
+            "TOYOTA", "HONDA", "VINFAST", "MAZDA", "MERCEDES", "BMW", "HYUNDAI", "KIA", "FORD", 
+            "AUDI", "LEXUS", "PORSCHE", "MITSUBISHI", "CHEVROLET", "NISSAN", "SUZUKI", "PEUGEOT", 
+            "VOLVO", "LAND", "JAGUAR", "TESLA", "VOLKSWAGEN", "SUBARU", "MG", "BYD", "JEEP", 
+            "ROLLS", "BENTLEY", "MINI", "FIAT", "FERRARI", "LAMBORGHINI", "ASTON", "MASERATI"
+        );
+        
+        boolean isValid = false;
+        for (String vb : validBrands) {
+            if (upper.contains(vb)) {
+                isValid = true;
+                break;
+            }
+        }
+        
+        if (!isValid) {
+            throw new RuntimeException("Hãng xe/Dòng xe không tồn tại trên thị trường hoặc không hợp lệ.");
+        }
+    }
+
     //ĐĂNG KÝ XE MỚI 
     @PostMapping
     public Vehicle create(@Valid @RequestBody VehicleRegistrationRequest request) {
+        validateBrand(request.getBrand());
     
         // KTRA XEM BIỂN SỐ XE NÀY ĐÃ DC ĐĂNG KÝ CHƯA 
         Authentication authentication =
@@ -115,18 +156,45 @@ this.userRepo = userRepo;
     vehicle.setBodyShape(safeBodyShape);
 
     vehicle.setBrand(request.getBrand());
-
     vehicle.setFuelType(request.getFuelType());
+    vehicle.setRegistrationDocUrl(request.getRegistrationDocUrl());
+    vehicle.setRegistrationPhotoUrl(request.getRegistrationPhotoUrl());
 
     vehicle.setViolationCount(0);
 
-    vehicle.setActive(true);
+    vehicle.setActive(false);
 
     vehicle.setCreatedAt(Instant.now());
 
     vehicle.setUpdatedAt(Instant.now());
 
-    return repo.save(vehicle);
+    Vehicle saved = repo.save(vehicle);
+
+    // Auto-create pending VIP subscription to submit documents for manager approval
+    VipSubscription vip = new VipSubscription();
+    vip.setId(UUID.randomUUID());
+    vip.setVehicleId(saved.getId());
+    vip.setSubscriptionType("MONTHLY");
+    vip.setStatus(VipSubscription.Status.PENDING_APPROVAL);
+    vip.setStartDate(java.time.LocalDate.now());
+    vip.setEndDate(java.time.LocalDate.now().plusMonths(1));
+    vip.setFeeAmount(java.math.BigDecimal.ZERO);
+    vip.setPaymentMethod("FREE_DUYET_XE");
+    vip.setPaymentStatus("PAID");
+
+    String regDoc = saved.getRegistrationDocUrl() != null ? saved.getRegistrationDocUrl() : "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80";
+    String regPhoto = saved.getRegistrationPhotoUrl() != null ? saved.getRegistrationPhotoUrl() : "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80";
+    vip.setDocumentPhotos(String.format(
+        "{\"registrationPaper\":\"%s\",\"identityCard\":\"%s\",\"frontPhoto\":\"%s\"}",
+        regDoc,
+        regPhoto,
+        "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80"
+    ));
+    vip.setCreatedAt(Instant.now());
+    vip.setUpdatedAt(Instant.now());
+    vipSubscriptionRepository.save(vip);
+
+    return saved;
 }
 
 //SỬA THÔNG TIN XE 
@@ -136,6 +204,7 @@ this.userRepo = userRepo;
         @Valid @RequestBody VehicleRegistrationRequest request) {
 
     return repo.findById(id).map(existing -> {
+        validateBrand(request.getBrand());
     // ktra xem có đúng tk đăng nhập đang sửa xe của họ ko , ko thì ko cho
         Authentication authentication =
         SecurityContextHolder.getContext().getAuthentication();
@@ -167,6 +236,8 @@ this.userRepo = userRepo;
         existing.setBodyShape(request.getBodyShape());
         existing.setBrand(request.getBrand());
         existing.setFuelType(request.getFuelType());
+        existing.setRegistrationDocUrl(request.getRegistrationDocUrl());
+        existing.setRegistrationPhotoUrl(request.getRegistrationPhotoUrl());
 
         existing.setUpdatedAt(Instant.now());
 
@@ -209,6 +280,14 @@ User currentUser = userRepo
         Optional<Vehicle> optVehicle = repo.findByLicensePlate(request.getPlate());
         if (optVehicle.isPresent()) {
             Vehicle v = optVehicle.get();
+
+            // Chỉ cho phép khóa xe nếu xe đó đã đăng ký VIP và gói cước đang ACTIVE
+            Optional<com.parking.model.VipSubscription> vipSub = vipSubscriptionRepository
+                    .findByVehicleIdAndStatus(v.getId(), com.parking.model.VipSubscription.Status.ACTIVE);
+            if (vipSub.isEmpty()) {
+                return ResponseEntity.badRequest().body(java.util.Map.of("success", false, "message", "Chỉ phương tiện có gói VIP đang hoạt động mới được sử dụng tính năng khóa xe!"));
+            }
+
             v.setLocked(isLocked);
             repo.save(v);
         }

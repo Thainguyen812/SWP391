@@ -15,11 +15,12 @@ import {
 import { notification, Input, Button, Modal, Spin } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
 import { apiClient } from '../../api/apiClient';
+import { parkingService } from '../../services/parkingService';
 
 export const StaffPayment = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { transactions, fetchAllDataFromBackend, addTransaction, updateShiftStats, shiftStats, addActivityLog, currentVehicle, activeVehicles, removeActiveVehicle, isEmergency } = useGlobalContext();
+  const { transactions, fetchAllDataFromBackend, addTransaction, updateShiftStats, shiftStats, addActivityLog, currentVehicle, activeVehicles, removeActiveVehicle, isEmergency, currentUser, getVehicleFines, clearVehicleFines } = useGlobalContext();
   
   const totalSlots = 400; // Static capacity for now until API provides it
   const activeCount = activeVehicles ? activeVehicles.filter(v => !v.gate).length : 0;
@@ -69,38 +70,56 @@ export const StaffPayment = () => {
   }, [activeVehicles, lpr, currentVehicle]);
 
   const isVip = vehicleToPay?.type === 'VIP' || vehicleToPay?.type === 'Vé tháng' || backendTxn?.ticketType === 'VIP' || backendTxn?.ticketType === 'Vé tháng' || location.state?.isVip === true || location.state?.type === 'VIP' || location.state?.type === 'Vé tháng';
+  const isAtEntryGate = vehicleToPay?.gate?.toUpperCase().includes('VÀO');
 
   useEffect(() => {
     setIsPaid(false);
   }, [vehicleToPay]);
 
   useEffect(() => {
-    if (backendTxn) {
-      setTotalAmount(backendTxn.totalAmount);
-      setCashGiven(backendTxn.totalAmount);
-      return;
-    }
-    
-    const isError = vehicleToPay?.status === 'Lỗi thẻ';
-    
-    // Auto-select payment method if VIP has card error
-    if (isVip && isError) {
+    // Auto-select payment method if VIP
+    if (isVip) {
       setPaymentMethod('card');
     } else if (paymentMethod === 'card' && !isVip) {
       setPaymentMethod('cash'); // Reset to cash if it's not VIP
     }
 
-    let amount = 0;
-    if (isLostCard) {
-      amount = calculateVisitorFee(lostCardData?.duration) + penaltyAmount;
-    } else if (isVip) {
-      amount = 0;
-    } else {
-      amount = calculateVisitorFee(vehicleToPay?.duration);
+    if (backendTxn) {
+      setTotalAmount(prev => {
+        if (prev !== backendTxn.totalAmount) {
+          setCashGiven(backendTxn.totalAmount);
+          return backendTxn.totalAmount;
+        }
+        return prev;
+      });
+      return;
     }
     
-    setTotalAmount(amount);
-    setCashGiven(amount);
+    const isError = vehicleToPay?.status === 'Lỗi thẻ';
+
+    let amount;
+    let evPenalty = backendTxn?.violationPenalty || (lpr && lpr.includes('EV') ? 500000 : 0);
+    
+    // Calculate accumulated fines
+    const accumulatedFines = lpr ? getVehicleFines(lpr).reduce((sum, fine) => sum + fine.amount, 0) : 0;
+    
+    if (isLostCard) {
+      amount = calculateVisitorFee(lostCardData?.duration) + penaltyAmount + evPenalty;
+    } else if (isVip) {
+      amount = evPenalty;
+    } else {
+      amount = calculateVisitorFee(vehicleToPay?.duration) + evPenalty;
+    }
+    
+    amount += accumulatedFines;
+    
+    setTotalAmount(prev => {
+      if (prev !== amount) {
+        setCashGiven(amount);
+        return amount;
+      }
+      return prev;
+    });
   }, [lpr, vehicleToPay, isLostCard, backendTxn]);
 
   const getCarImages = (plate) => {
@@ -153,7 +172,7 @@ export const StaffPayment = () => {
   };
 
   const handlePayment = () => {
-    if (isPaid || isCheckingOut) return;
+    if (isPaid || isCheckingOut || isAtEntryGate) return;
     if (isEmergency) {
       notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể thanh toán và mở cổng lúc này.' });
       return;
@@ -168,11 +187,30 @@ export const StaffPayment = () => {
       okButtonProps: { className: 'bg-emerald-600 border-emerald-600 hover:bg-emerald-700' },
       async onOk() {
         try {
-          // Send mock transaction to backend so it saves in DB
-          await apiClient.post('/revenue/transactions/mock', {
-            amount: totalAmount,
-            plate: lpr
-          });
+          if (backendTxn && backendTxn.id) {
+            await parkingService.confirmCheckout(backendTxn.id);
+          } else {
+            // NEW LOGIC FOR LOST CARD
+            if (isLostCard) {
+              const staffId = currentUser?.id; // Fixed mock Staff ID
+              try {
+                await apiClient.post('/api/blacklisted-cards/block-by-plate', null, {
+                  params: {
+                    plate: lpr,
+                    reason: 'LOST',
+                    staffId: staffId
+                  }
+                });
+              } catch (err) {
+                console.error("Failed to block card by plate", err);
+              }
+            }
+            // Send mock transaction to backend so it saves in DB
+            await apiClient.post('/revenue/transactions/mock', {
+              amount: totalAmount,
+              plate: lpr
+            });
+          }
           // Refresh global context to pull latest transactions and remove from active
           if (fetchAllDataFromBackend) fetchAllDataFromBackend();
         } catch (e) {
@@ -199,6 +237,7 @@ export const StaffPayment = () => {
         });
 
         removeActiveVehicle(lpr);
+        if (lpr) clearVehicleFines(lpr);
 
         setHasVehicle(false);
         setBackendTxn(null);
@@ -265,8 +304,9 @@ export const StaffPayment = () => {
           
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-slate-800 m-0">
+                <h3 className="text-lg font-bold text-slate-800 m-0 flex items-center gap-2">
                   {isLostCard ? <span className="text-red-600"><WarningFilled className="mr-2"/> Xử lý Sự cố Mất thẻ</span> : "Xử lý vé vãng lai"}
+                  {isAtEntryGate && <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded border border-red-200">Xe đang ở Cổng Vào</span>}
                 </h3>
                 <span className="bg-slate-100 text-slate-500 font-mono text-xs px-3 py-1 rounded">TICKET #{useMemo(() => {
                   if (!lpr) return 1000;
@@ -350,7 +390,9 @@ export const StaffPayment = () => {
                   <div className="text-right">
                     <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Tổng tiền thu</h4>
                     <div className="text-2xl font-black text-red-600">{totalAmount.toLocaleString()} <span className="text-sm font-bold">VND</span></div>
-                    {isLostCard && <div className="text-[10px] text-red-500 mt-1">Đã bao gồm 200k tiền phạt</div>}
+                    {isLostCard && <div className="text-[10px] text-red-500 mt-1">Đã bao gồm 200k tiền phạt thẻ</div>}
+                    {(backendTxn?.violationPenalty > 0 || (lpr && lpr.includes('EV'))) && <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">⚠️ Bị phạt Đỗ sai vị trí EV (+500k)</div>}
+                    {lpr && getVehicleFines(lpr).length > 0 && <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">⚠️ Đã bao gồm phạt cộng dồn (+{getVehicleFines(lpr).reduce((sum, f) => sum + f.amount, 0).toLocaleString()}đ)</div>}
                   </div>
                 </div>
 
@@ -358,8 +400,15 @@ export const StaffPayment = () => {
                   <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Phương thức thanh toán</h4>
                   <div className="grid grid-cols-3 gap-3">
                     <button 
-                      onClick={() => setPaymentMethod('cash')}
+                      onClick={() => {
+                        if (isVip) {
+                          notification.warning({ message: 'Không khả dụng', description: 'Khách VIP bắt buộc thanh toán bằng QR Động theo quy trình.' });
+                          return;
+                        }
+                        setPaymentMethod('cash');
+                      }}
                       className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                        isVip ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400' :
                         paymentMethod === 'cash' ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-slate-200 text-slate-500 hover:border-blue-300'
                       }`}
                     >
@@ -367,8 +416,15 @@ export const StaffPayment = () => {
                       <span className="text-[11px] font-bold">Tiền mặt</span>
                     </button>
                     <button 
-                      onClick={() => setPaymentMethod('qr')}
+                      onClick={() => {
+                        if (isVip) {
+                          notification.warning({ message: 'Không khả dụng', description: 'Khách VIP bắt buộc thanh toán bằng QR Động theo quy trình.' });
+                          return;
+                        }
+                        setPaymentMethod('qr');
+                      }}
                       className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                        isVip ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400' :
                         paymentMethod === 'qr' ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-slate-200 text-slate-500 hover:border-blue-300'
                       }`}
                     >
@@ -409,7 +465,7 @@ export const StaffPayment = () => {
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium text-slate-600">Tiền thối lại:</span>
                         <span className="text-lg font-black text-slate-800">
-                          {Math.max(0, parseInt(cashGiven || 0) - 50000).toLocaleString('en-US')} <span className="text-xs font-bold text-slate-500">VND</span>
+                          {Math.max(0, parseInt(cashGiven || 0) - totalAmount).toLocaleString('en-US')} <span className="text-xs font-bold text-slate-500">VND</span>
                         </span>
                       </div>
                     </div>
@@ -427,12 +483,15 @@ export const StaffPayment = () => {
                     </div>
                   )}
                   {paymentMethod === 'card' && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 flex flex-col items-center justify-center animate-fadeIn">
-                      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-3 shadow-sm border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors" onClick={handlePayment} title="Click để giả lập quét mã">
-                        <QrcodeOutlined className="text-3xl text-blue-500 animate-bounce" />
+                    <div className="bg-white border border-blue-200 rounded-lg p-4 flex flex-col items-center justify-center animate-fadeIn shadow-sm relative overflow-hidden">
+                      <div className="w-28 h-28 bg-slate-50 rounded-lg flex items-center justify-center mb-3 border border-slate-200 overflow-hidden relative">
+                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=VIP_Checkout_${lpr || 'Unknown'}`} alt="QR Code VIP" className="w-24 h-24 object-contain" />
+                        <div className="absolute inset-0 bg-amber-500/10 animate-pulse pointer-events-none"></div>
                       </div>
-                      <span className="text-sm font-bold text-blue-800 mb-1">Xác thực QR Thành Viên VIP</span>
-                      <span className="text-xs font-medium text-blue-600 text-center">Đang chờ tín hiệu quét mã QR...<br/>(Click vào mã để giả lập quét)</span>
+                      <span className="text-xs font-medium text-slate-500 text-center mb-3">Mã QR dành cho Thành viên VIP<br/>(Dùng app hệ thống để quét)</span>
+                      <button onClick={handlePayment} className="w-full bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200 text-xs font-bold py-2 rounded transition-colors cursor-pointer flex items-center justify-center gap-2">
+                        <QrcodeOutlined /> Giả lập đã quét mã VIP
+                      </button>
                     </div>
                   )}
                 </div>
@@ -443,9 +502,9 @@ export const StaffPayment = () => {
                   </button>
                   <button 
                     onClick={handlePayment} 
-                    disabled={isPaid || isCheckingOut}
+                    disabled={isPaid || isCheckingOut || isAtEntryGate}
                     className={`flex-[2] text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md ${
-                      isPaid || isCheckingOut ? 'bg-slate-400 cursor-not-allowed shadow-none' : 'bg-[#1677ff] hover:bg-blue-600 shadow-blue-500/20 cursor-pointer'
+                      isPaid || isCheckingOut || isAtEntryGate ? 'bg-slate-400 cursor-not-allowed shadow-none' : 'bg-[#1677ff] hover:bg-blue-600 shadow-blue-500/20 cursor-pointer'
                     }`}
                   >
                     <CheckCircleFilled />

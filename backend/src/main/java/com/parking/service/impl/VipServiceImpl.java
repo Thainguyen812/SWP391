@@ -28,8 +28,13 @@ public class VipServiceImpl implements VipService {
 
         @Override
         public List<VipSubscription> getPending() {
-                return repo.findByStatus(
-                                VipSubscription.Status.PENDING_APPROVAL);
+                List<VipSubscription> list = repo.findByStatus(VipSubscription.Status.PENDING_APPROVAL);
+                for (VipSubscription sub : list) {
+                        vehicleRepository.findById(sub.getVehicleId()).ifPresent(v -> {
+                                sub.setLicensePlate(v.getLicensePlate());
+                        });
+                }
+                return list;
         }
 
 
@@ -48,6 +53,15 @@ public class VipServiceImpl implements VipService {
                 vip.setVehicleId(request.getVehicleId());
                 vip.setSubscriptionType(request.getSubscriptionType());
                 vip.setStatus(VipSubscription.Status.PENDING_APPROVAL);
+
+                String regDoc = vehicle.getRegistrationDocUrl() != null ? vehicle.getRegistrationDocUrl() : "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80";
+                String regPhoto = vehicle.getRegistrationPhotoUrl() != null ? vehicle.getRegistrationPhotoUrl() : "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80";
+                vip.setDocumentPhotos(String.format(
+                    "{\"registrationPaper\":\"%s\",\"identityCard\":\"%s\",\"frontPhoto\":\"%s\"}",
+                    regDoc,
+                    regPhoto,
+                    "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80"
+                ));
 
                 java.time.LocalDate startDate = java.time.LocalDate.now();
                 vip.setStartDate(startDate);
