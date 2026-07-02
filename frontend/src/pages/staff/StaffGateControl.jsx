@@ -7,7 +7,7 @@ import {
   ExclamationCircleFilled,
   CarOutlined
 } from '@ant-design/icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { notification, Modal, Dropdown, Input, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../api/apiClient';
@@ -15,7 +15,7 @@ import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffGateControl = () => {
   const navigate = useNavigate();
-  const { addActivityLog, activeVehicles, currentVehicle, setCurrentVehicle, addActiveVehicle, removeActiveVehicle, processEntryVehicle, addTransaction, updateShiftStats, dailyVolume, setDailyVolume, fetchAllDataFromBackend, totalGates, isEmergency, setIsEmergency, gates, setGates, gateLogs, setGateLogs, addSecurityAlert } = useGlobalContext();
+  const { activityLogs, addActivityLog, activeVehicles, currentVehicle, setCurrentVehicle, addActiveVehicle, removeActiveVehicle, processEntryVehicle, addTransaction, updateShiftStats, dailyVolume, setDailyVolume, fetchAllDataFromBackend, totalGates, isEmergency, setIsEmergency, gates, setGates, gateLogs, setGateLogs, addSecurityAlert } = useGlobalContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('Tất cả');
 
@@ -45,6 +45,9 @@ export const StaffGateControl = () => {
     }
   };
 
+  const isAiPlateDuplicate = aiPlate && activeVehicles?.some(v => v.plate === aiPlate.toUpperCase());
+  const isManualPlateDuplicate = manualPlate && activeVehicles?.some(v => v.plate === manualPlate.toUpperCase());
+
   const handleManualCheckIn = async () => {
     if (isEmergency) {
       notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể check-in lúc này.' });
@@ -54,6 +57,33 @@ export const StaffGateControl = () => {
       notification.error({ message: 'Lỗi', description: 'Vui lòng nhập đầy đủ biển số xe và mã thẻ!' });
       return;
     }
+    if (isManualPlateDuplicate) {
+      const existingVehicle = activeVehicles?.find(v => v.plate === manualPlate.toUpperCase());
+      if (existingVehicle && existingVehicle.gate && existingVehicle.gate.toUpperCase().includes('VÀO')) {
+        // Simulated car is waiting at the IN gate. We simulate a successful manual confirmation.
+        notification.success({ message: 'Check-in Thành công', description: `Biển số ${manualPlate} đã được nhân viên xác nhận vào bãi.` });
+        setManualPlate('');
+        setManualCardCode('');
+        
+        addActivityLog({
+          plate: manualPlate,
+          model: "Xác nhận Thủ Công",
+          type: "Vãng lai",
+          gate: existingVehicle.gate,
+          action: "Vào Cổng (Thủ công)",
+          time: "Vừa xong",
+          status: "Thành Công",
+          typeColor: "text-blue-600",
+          statusColor: "bg-emerald-100 text-emerald-700",
+          actionColor: "text-emerald-600"
+        });
+        return;
+      }
+      
+      notification.error({ message: 'Lỗi Check-in', description: 'Xe này ĐÃ CÓ trong bãi (phiên gửi xe ACTIVE).' });
+      return;
+    }
+    
     setIsCheckingIn(true);
     try {
       const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -66,7 +96,7 @@ export const StaffGateControl = () => {
 
       // Using apiClient so the Bearer token is automatically attached!
       const response = await apiClient.post(`/v1/parking/check-in/visitor`, {
-        plate: manualPlate,
+        plate: manualPlate.toUpperCase(),
         vehicle_type: mappedType,
         card_code: manualCardCode,
         image_url: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80'
@@ -100,13 +130,49 @@ export const StaffGateControl = () => {
       return;
     }
     if (!aiPlate) {
-      notification.error({ message: 'Lỗi', description: 'Vui lòng nhập biển số xe!' });
+      notification.warning({ message: 'Lỗi', description: 'Vui lòng nhập biển số.' });
       return;
     }
+    
+    if (isAiPlateDuplicate) {
+      const existingVehicle = activeVehicles?.find(v => v.plate === aiPlate.toUpperCase());
+      if (existingVehicle && existingVehicle.gate && existingVehicle.gate.toUpperCase().includes('VÀO')) {
+        // Clear the gate in the backend so the UI updates immediately
+        try {
+          await apiClient.post(`/v1/parking/clear-gate`, { plate: aiPlate.toUpperCase() });
+        } catch (err) {
+          console.error("Error clearing gate:", err);
+        }
+        
+        notification.success({ message: 'AI Nhận diện Thành công', description: `Biển số ${aiPlate} hợp lệ và đã vào bãi.` });
+        addLog(`[AI_LPR] Success (Cleared Gate): Plate ${aiPlate}, Conf: ${aiConfidence}%`, 'OK');
+        
+        // Refresh global context to pull latest transactions and remove from active
+        if (fetchAllDataFromBackend) fetchAllDataFromBackend();
+        
+        addActivityLog({
+          plate: aiPlate,
+          model: "Vào thẳng bãi",
+          type: "VIP",
+          gate: existingVehicle.gate || "CAM-01-IN",
+          action: "Vào Bãi (Đã thông cổng)",
+          time: "Vừa xong",
+          status: "Thành Công",
+          typeColor: "text-amber-600",
+          statusColor: "bg-emerald-100 text-emerald-700",
+          actionColor: "text-blue-600"
+        });
+        
+        setIsAiModalVisible(false);
+        setAiPlate('');
+        return;
+      }
+      notification.error({ message: 'Lỗi', description: 'Xe này đang có phiên gửi xe ACTIVE trong bãi.' });
+      return;
+    }
+
     setIsAiProcessing(true);
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
-      
       const response = await apiClient.post(`/v1/parking/check-in/ai`, {
         plate: aiPlate.toUpperCase(),
         vehicle_type: 'SEDAN_HATCHBACK',
@@ -163,6 +229,26 @@ export const StaffGateControl = () => {
     if (type === 'ERROR') colorClass = "text-red-400";
     setGateLogs(prev => [`<span class="${colorClass}"><span class="opacity-70">[${type}]</span> ${msg}</span>`, ...prev].slice(0, 20));
   };
+
+  const processedLogIds = useRef(new Set());
+
+  useEffect(() => {
+    if (!activityLogs || activityLogs.length === 0) return;
+    activityLogs.slice(0, 10).reverse().forEach(log => {
+      const logId = log.id || `${log.plate}-${log.time}-${log.action}`;
+      if (!processedLogIds.current.has(logId)) {
+        processedLogIds.current.add(logId);
+        if (!log.isManual) {
+          let typeStr = 'INFO';
+          if (log.status === 'Thành Công' || log.status === 'Success') typeStr = 'OK';
+          if (log.status === 'Cảnh Báo' || log.status === 'Warning' || log.status === 'Cảnh báo') typeStr = 'WARN';
+          if (log.status === 'Lỗi' || log.status === 'ERROR') typeStr = 'ERROR';
+          const timeStr = log.time && log.time !== 'Vừa xong' ? `[${new Date(log.time).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit', second:'2-digit'})}] ` : '';
+          addLog(`${timeStr}[${log.gate || 'Hệ thống'}] ${log.action}: ${log.plate}`, typeStr);
+        }
+      }
+    });
+  }, [activityLogs]);
 
   const handleApprove = (id, plate) => {
     if (isEmergency) {
