@@ -189,6 +189,76 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [qrDirection, setQrDirection] = useState<'VÀO' | 'RA'>('VÀO');
   const [isTogglingLock, setIsTogglingLock] = useState<string | null>(null);
 
+  const [activeQrToken, setActiveQrToken] = useState<string>('');
+  const [qrExpiryTime, setQrExpiryTime] = useState<number | null>(null);
+  const [isGeneratingQr, setIsGeneratingQr] = useState<boolean>(false);
+  const [countdownSec, setCountdownSec] = useState<number>(300);
+
+  const generateQrToken = async (vehicleId: string, direction: 'VÀO' | 'RA') => {
+    if (isOffline) return;
+    if (!vehicleId || vehicleId.startsWith('veh-')) {
+      const activeVeh = vehicles.find(v => v.id === vehicleId) || vehicles[0];
+      const plateStr = activeVeh ? activeVeh.plate : '34G56789';
+      setActiveQrToken(`MOCK_${plateStr}|${direction}|${Date.now()}`);
+      setQrExpiryTime(Date.now() + 300000);
+      return;
+    }
+    setIsGeneratingQr(true);
+    try {
+      const response = await fetch('/api/v1/driver/qr/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          vehicleId: vehicleId,
+          purpose: direction === 'VÀO' ? 'CHECK_IN' : 'CHECK_OUT'
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.qrToken) {
+          setActiveQrToken(data.qrToken);
+          if (data.expiredAt) {
+            setQrExpiryTime(new Date(data.expiredAt).getTime());
+          } else {
+            setQrExpiryTime(Date.now() + 300000);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error generating QR Token:", e);
+    } finally {
+      setIsGeneratingQr(false);
+    }
+  };
+
+  // Tự động generate/refresh token khi thay đổi
+  useEffect(() => {
+    const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+    if (activeVeh) {
+      generateQrToken(activeVeh.id, qrDirection);
+    }
+  }, [selectedVehId, qrDirection, vehicles.length]);
+
+  // Bộ đếm countdown và tự động làm mới
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (qrExpiryTime) {
+        const diff = Math.max(0, Math.round((qrExpiryTime - Date.now()) / 1000));
+        setCountdownSec(diff);
+        if (diff <= 5 && !isGeneratingQr) {
+          const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+          if (activeVeh) {
+            generateQrToken(activeVeh.id, qrDirection);
+          }
+        }
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [qrExpiryTime, selectedVehId, qrDirection, isGeneratingQr, vehicles]);
+
   const [vehicles, setVehicles] = useState<UserVehicle[]>(() => {
     const saved = localStorage.getItem('urbanpark_user_vehicles');
     if (saved) {
@@ -1478,21 +1548,27 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                               <div className="w-full text-center space-y-1">
                                 <span className="text-[10px] text-slate-400 font-mono font-bold block uppercase">Chữ ký số bốt gác (Gate Token Hash)</span>
-                                <strong className="text-xs font-mono font-black text-slate-800 tracking-wider block bg-white border border-slate-200 p-2 rounded-xl select-all select-all shadow-inner break-all">
-                                  {qrValueString}
+                                <strong className="text-xs font-mono font-black text-slate-800 tracking-wider block bg-white border border-slate-200 p-2 rounded-xl select-all shadow-inner break-all">
+                                  {activeQrToken || qrValueString}
                                 </strong>
                               </div>
 
                               <button
                                 type="button"
                                 onClick={() => {
-                                  navigator.clipboard.writeText(qrValueString);
+                                  navigator.clipboard.writeText(activeQrToken || qrValueString);
                                   triggerToast("📋 Sao chép mã chữ ký số bốt gác thành công!", "success");
                                 }}
-                                className="w-full py-2 bg-slate-200 hover:bg-slate-350 text-slate-700 font-extrabold text-xs rounded-xl active:scale-95 transition-all outline-none"
+                                className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs rounded-xl active:scale-95 transition-all outline-none"
                               >
                                 Sao chép Mã QR văn bản
                               </button>
+
+                              {qrExpiryTime && (
+                                <p className="text-[10px] text-slate-400 text-center font-semibold pt-1">
+                                  ⏱️ Mã QR động tự động làm mới sau <span className="text-blue-600 font-bold">{countdownSec} giây</span>
+                                </p>
+                              )}
                             </div>
                           );
                         })()}

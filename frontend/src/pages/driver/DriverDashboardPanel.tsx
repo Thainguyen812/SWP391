@@ -34,7 +34,8 @@ export function DriverDashboardPanel() {
     billingTimeFilter, setBillingTimeFilter, billingTypeFilter, setBillingTypeFilter,
     searchSupportQuery, setSearchSupportQuery, expandedFaq, setExpandedFaq,
     ticketTopic, setTicketTopic, ticketMessage, setTicketMessage,
-    ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout
+    ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout,
+    activeQrToken, qrExpiryTime, isGeneratingQr, countdownSec
   } = ctx;
 
   return (
@@ -260,21 +261,27 @@ export function DriverDashboardPanel() {
 
                               <div className="w-full text-center space-y-1">
                                 <span className="text-[10px] text-slate-400 font-mono font-bold block uppercase">Chữ ký số bốt gác (Gate Token Hash)</span>
-                                <strong className="text-xs font-mono font-black text-slate-800 tracking-wider block bg-white border border-slate-200 p-2 rounded-xl select-all select-all shadow-inner break-all">
-                                  {qrValueString}
+                                <strong className="text-xs font-mono font-black text-slate-800 tracking-wider block bg-white border border-slate-200 p-2 rounded-xl select-all shadow-inner break-all">
+                                  {activeQrToken || qrValueString}
                                 </strong>
                               </div>
 
                               <button
                                 type="button"
                                 onClick={() => {
-                                  navigator.clipboard.writeText(qrValueString);
+                                  navigator.clipboard.writeText(activeQrToken || qrValueString);
                                   triggerToast("📋 Sao chép mã chữ ký số bốt gác thành công!", "success");
                                 }}
-                                className="w-full py-2 bg-slate-200 hover:bg-slate-350 text-slate-700 font-extrabold text-xs rounded-xl active:scale-95 transition-all outline-none"
+                                className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs rounded-xl active:scale-95 transition-all outline-none"
                               >
                                 Sao chép Mã QR văn bản
                               </button>
+
+                              {qrExpiryTime && (
+                                <p className="text-[10px] text-slate-400 text-center font-semibold pt-1">
+                                  ⏱️ Mã QR động tự động làm mới sau <span className="text-blue-600 font-bold">{countdownSec} giây</span>
+                                </p>
+                              )}
                             </div>
                           );
                         })()}
