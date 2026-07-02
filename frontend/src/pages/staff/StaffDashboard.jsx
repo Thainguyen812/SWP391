@@ -478,9 +478,16 @@ export const StaffDashboard = () => {
                     <div className={`absolute bottom-0 left-0 w-full p-3 bg-gradient-to-t from-black/90 to-transparent transition-all ${isSelected ? 'from-blue-900/90' : ''}`}>
                       <div className="flex justify-between items-end">
                         <div>
-                          <div className={`text-xl font-bold tracking-widest drop-shadow-md ${isSelected ? 'text-blue-100' : 'text-white'}`}>{vehicle.plate}</div>
+                          <div className={`text-xl font-bold tracking-widest drop-shadow-md ${isSelected ? 'text-blue-100' : 'text-white'} flex items-center gap-1.5`}>
+                            {vehicle.plate}
+                            {vehicle.type === 'VIP' && (
+                              <span className="text-amber-400 bg-amber-500/20 border border-amber-500/40 text-[9px] font-black px-1.5 py-0.5 rounded shadow-[0_0_10px_rgba(245,158,11,0.4)] animate-pulse">
+                                VIP
+                              </span>
+                            )}
+                          </div>
                           <div className={`${vehicle.status === 'Hợp lệ' ? 'text-emerald-400' : 'text-red-400'} text-[10px] font-bold uppercase tracking-wider`}>
-                            {vehicle.type === 'Vé tháng' && vehicle.status === 'Lỗi thẻ' ? 'Khớp đặt chỗ: LỖI' : `Độ tin cậy: ${vehicle.confidence}`}
+                            {vehicle.type === 'VIP' ? 'Khách VIP' : 'Khách Vãng Lai'} • {vehicle.type === 'Vé tháng' && vehicle.status === 'Lỗi thẻ' ? 'Khớp đặt chỗ: LỖI' : `Độ tin cậy: ${vehicle.confidence}`}
                           </div>
                         </div>
                         {getStatusBadge(vehicle.type, vehicle.status)}
