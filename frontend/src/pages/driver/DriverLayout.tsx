@@ -275,15 +275,17 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
             return {
               id: v.id || `veh-${v.plate}`,
               plate: v.plate,
-              name: v.name,
+              name: v.brand || v.name,
               type: sizeLabel,
               regDate: '12/10/2023',
-              isActive: true,
+              isActive: v.isActive !== false && v.active !== false,
               image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
               isLocked: activeSub ? (v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false)) : false,
               activeSubscription: activeSub,
               subscriptionExpiry: expiry,
-              subscriptionStatus: subStatus
+              subscriptionStatus: subStatus,
+              registrationDocUrl: v.registrationDocUrl,
+              registrationPhotoUrl: v.registrationPhotoUrl
             };
           });
 
@@ -355,6 +357,12 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   const [editPlate, setEditPlate] = useState('');
   const [editName, setEditName] = useState('');
   const [editType, setEditType] = useState('Ô tô gầm thấp 4-5 chỗ');
+
+  // Documents
+  const [newRegDoc, setNewRegDoc] = useState<string | null>(null);
+  const [newRegPhoto, setNewRegPhoto] = useState<string | null>(null);
+  const [editRegDoc, setEditRegDoc] = useState<string | null>(null);
+  const [editRegPhoto, setEditRegPhoto] = useState<string | null>(null);
 
   // VIP Step Subscription State
   const [regStep, setRegStep] = useState<1 | 2 | 3>(2); // Default on select package for full mockup fidelity
@@ -600,7 +608,9 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       colorRgb: '#FFFFFF',
       bodyShape: bodyShapeDb,
       isActive: true,
-      fuelType: 'GASOLINE'
+      fuelType: 'GASOLINE',
+      registrationDocUrl: newRegDoc,
+      registrationPhotoUrl: newRegPhoto
     };
 
     if (isOffline) {
@@ -617,6 +627,8 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       setVehicles(prev => [...prev, modelItem]);
       setNewPlate('');
       setNewName('');
+      setNewRegDoc(null);
+      setNewRegPhoto(null);
       setAddVehicleModalOpen(false);
       triggerToast(`Đăng ký thêm phương tiện ${modelItem.plate} thành công (Ngoại tuyến)!`, 'success');
       return;
@@ -659,6 +671,8 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       setVehicles(prev => [...prev, modelItem]);
       setNewPlate('');
       setNewName('');
+      setNewRegDoc(null);
+      setNewRegPhoto(null);
       setAddVehicleModalOpen(false);
       triggerToast(`Đăng ký thêm phương tiện ${modelItem.plate} thành công!`, 'success');
       
@@ -741,7 +755,9 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       colorRgb: '#FFFFFF',
       bodyShape: bodyShapeDb,
       isActive: true,
-      fuelType: 'GASOLINE'
+      fuelType: 'GASOLINE',
+      registrationDocUrl: editRegDoc,
+      registrationPhotoUrl: editRegPhoto
     };
 
     if (isOffline) {
@@ -756,6 +772,8 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         }
         return v;
       }));
+      setEditRegDoc(null);
+      setEditRegPhoto(null);
       setEditVehicleModalOpen(false);
       triggerToast('Đã sửa phương tiện thành công (Chế độ Ngoại tuyến)!', 'success');
       return;
@@ -780,11 +798,15 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               id: savedVehicle.id,
               plate: editPlate.toUpperCase().trim(),
               name: editName.trim() || 'Phương tiện',
-              type: editType
+              type: editType,
+              registrationDocUrl: editRegDoc,
+              registrationPhotoUrl: editRegPhoto
             };
           }
           return v;
         }));
+        setEditRegDoc(null);
+        setEditRegPhoto(null);
         setEditVehicleModalOpen(false);
         triggerToast('Cập nhật phương tiện thành công!', 'success');
       } else {
@@ -913,20 +935,59 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
 
       // Create subscription in localStorage with PENDING_APPROVAL status
       const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+      const tempId = `VIP-${Math.floor(1000 + Math.random() * 9000)}`;
       const newSub = {
-        id: `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: tempId,
         vehicle_plate: selectedVehicleForVIP,
         type: selectedPackLabel,
         startDate: new Date().toLocaleDateString('vi-VN'),
         endDate: expiryString,
         status: 'PENDING_APPROVAL',
-        document_photos: (window as any).lastUploadedPhotos || {
-          registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-          identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-          frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
-        },
+        document_photos: (() => {
+          return (window as any).lastUploadedPhotos || {
+            registrationPaper: targetVeh?.registrationDocUrl || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+            identityCard: targetVeh?.registrationPhotoUrl || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+            frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+          };
+        })(),
         explanation: (window as any).lastUploadedPhotos?.explanation || ''
       };
+
+      // Call Backend API to register VIP subscription
+      if (targetVeh?.id) {
+        let subType = 'MONTHLY';
+        if (selectedPackLabel.includes('3 Tháng')) {
+          subType = 'QUARTERLY';
+        } else if (selectedPackLabel.includes('6 Tháng')) {
+          subType = 'HALF_YEARLY';
+        } else if (selectedPackLabel.includes('1 Năm')) {
+          subType = 'YEARLY';
+        }
+
+        fetch('/api/vip/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            vehicleId: targetVeh.id,
+            subscriptionType: subType
+          })
+        }).then(res => {
+          if (res.ok) {
+            return res.json();
+          }
+        }).then(data => {
+          if (data && data.id) {
+            const currentSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+            const updated = currentSubs.map((s: any) => s.id === tempId ? { ...s, id: data.id } : s);
+            localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updated));
+            window.dispatchEvent(new Event('storage'));
+          }
+        }).catch(err => console.warn("Backend VIP registration failed:", err));
+      }
+
       savedSubs.push(newSub);
       localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(savedSubs));
       window.dispatchEvent(new Event('storage'));
@@ -1018,20 +1079,59 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
 
       // Create subscription in localStorage with PENDING_APPROVAL status
       const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+      const tempId = `VIP-${Math.floor(1000 + Math.random() * 9000)}`;
       const newSub = {
-        id: `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: tempId,
         vehicle_plate: selectedVehicleForVIP,
         type: selectedPackLabel,
         startDate: new Date().toLocaleDateString('vi-VN'),
         endDate: expiryString,
         status: 'PENDING_APPROVAL',
-        document_photos: (window as any).lastUploadedPhotos || {
-          registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-          identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-          frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
-        },
+        document_photos: (() => {
+          return (window as any).lastUploadedPhotos || {
+            registrationPaper: targetVeh?.registrationDocUrl || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+            identityCard: targetVeh?.registrationPhotoUrl || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+            frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+          };
+        })(),
         explanation: (window as any).lastUploadedPhotos?.explanation || ''
       };
+
+      // Call Backend API to register VIP subscription
+      if (targetVeh?.id) {
+        let subType = 'MONTHLY';
+        if (selectedPackLabel.includes('3 Tháng')) {
+          subType = 'QUARTERLY';
+        } else if (selectedPackLabel.includes('6 Tháng')) {
+          subType = 'HALF_YEARLY';
+        } else if (selectedPackLabel.includes('1 Năm')) {
+          subType = 'YEARLY';
+        }
+
+        fetch('/api/vip/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            vehicleId: targetVeh.id,
+            subscriptionType: subType
+          })
+        }).then(res => {
+          if (res.ok) {
+            return res.json();
+          }
+        }).then(data => {
+          if (data && data.id) {
+            const currentSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+            const updated = currentSubs.map((s: any) => s.id === tempId ? { ...s, id: data.id } : s);
+            localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updated));
+            window.dispatchEvent(new Event('storage'));
+          }
+        }).catch(err => console.warn("Backend VIP registration failed:", err));
+      }
+
       savedSubs.push(newSub);
       localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(savedSubs));
       window.dispatchEvent(new Event('storage'));
@@ -1298,6 +1398,10 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               editName, setEditName,
               editType, setEditType,
               handleEditVehicle,
+              newRegDoc, setNewRegDoc,
+              newRegPhoto, setNewRegPhoto,
+              editRegDoc, setEditRegDoc,
+              editRegPhoto, setEditRegPhoto,
               triggerSecurityTest,
               activeQrToken,
               qrExpiryTime,
@@ -1381,7 +1485,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
                     />
                   </div>
 
-                  <div className="space-y-1">
+                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Loại phương tiện</label>
                     <select
                       value={newType}
@@ -1393,6 +1497,58 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
                       <option value="Xe 9 chỗ">🚐 Xe 9 chỗ</option>
                       <option value="Xe 16 chỗ">🚌 Xe 16 chỗ</option>
                     </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    {/* Cà vẹt xe */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Ảnh Cà vẹt xe</label>
+                      {newRegDoc ? (
+                        <div className="relative h-20 rounded-lg overflow-hidden border border-slate-200 group">
+                          <img src={newRegDoc} alt="Cà vẹt" className="w-full h-full object-cover" />
+                          <button 
+                            type="button"
+                            onClick={() => setNewRegDoc(null)}
+                            className="absolute top-1 right-1 p-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setNewRegDoc('https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80')}
+                          className="w-full h-20 border border-dashed border-slate-200 hover:border-blue-400 rounded-lg flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer transition-colors"
+                        >
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-center block px-1">+ Tải ảnh Cà vẹt</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Ảnh CCCD */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Ảnh CMND/CCCD</label>
+                      {newRegPhoto ? (
+                        <div className="relative h-20 rounded-lg overflow-hidden border border-slate-200 group">
+                          <img src={newRegPhoto} alt="CCCD" className="w-full h-full object-cover" />
+                          <button 
+                            type="button"
+                            onClick={() => setNewRegPhoto(null)}
+                            className="absolute top-1 right-1 p-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setNewRegPhoto('https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80')}
+                          className="w-full h-20 border border-dashed border-slate-200 hover:border-blue-400 rounded-lg flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer transition-colors"
+                        >
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-center block px-1">+ Tải ảnh CCCD</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex gap-2.5 pt-2">
@@ -1474,7 +1630,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
                     />
                   </div>
 
-                  <div className="space-y-1">
+                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Loại phương tiện</label>
                     <select
                       value={editType}
@@ -1486,6 +1642,58 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
                       <option value="Xe 9 chỗ">🚐 Xe 9 chỗ</option>
                       <option value="Xe 16 chỗ">🚌 Xe 16 chỗ</option>
                     </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    {/* Cà vẹt xe */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Ảnh Cà vẹt xe</label>
+                      {editRegDoc ? (
+                        <div className="relative h-20 rounded-lg overflow-hidden border border-slate-200 group">
+                          <img src={editRegDoc} alt="Cà vẹt" className="w-full h-full object-cover" />
+                          <button 
+                            type="button"
+                            onClick={() => setEditRegDoc(null)}
+                            className="absolute top-1 right-1 p-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setEditRegDoc('https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80')}
+                          className="w-full h-20 border border-dashed border-slate-200 hover:border-blue-400 rounded-lg flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer transition-colors"
+                        >
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-center block px-1">+ Tải ảnh Cà vẹt</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Ảnh CCCD */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Ảnh CMND/CCCD</label>
+                      {editRegPhoto ? (
+                        <div className="relative h-20 rounded-lg overflow-hidden border border-slate-200 group">
+                          <img src={editRegPhoto} alt="CCCD" className="w-full h-full object-cover" />
+                          <button 
+                            type="button"
+                            onClick={() => setEditRegPhoto(null)}
+                            className="absolute top-1 right-1 p-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setEditRegPhoto('https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80')}
+                          className="w-full h-20 border border-dashed border-slate-200 hover:border-blue-400 rounded-lg flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer transition-colors"
+                        >
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-center block px-1">+ Tải ảnh CCCD</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex gap-2.5 pt-2">

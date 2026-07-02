@@ -16,6 +16,17 @@ public class VipSubscription {
     @Column(name = "vehicle_id", nullable = false)
     private UUID vehicleId;
 
+    @Transient
+    private String licensePlate;
+
+    public String getLicensePlate() {
+        return licensePlate;
+    }
+
+    public void setLicensePlate(String licensePlate) {
+        this.licensePlate = licensePlate;
+    }
+
     @Column(name = "subscription_type", nullable = false)
     private String subscriptionType;
 
