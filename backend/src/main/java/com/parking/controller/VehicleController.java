@@ -148,8 +148,9 @@ this.vipSubscriptionRepository = vipSubscriptionRepository;
     vehicle.setBodyShape(request.getBodyShape());
 
     vehicle.setBrand(request.getBrand());
-
     vehicle.setFuelType(request.getFuelType());
+    vehicle.setRegistrationDocUrl(request.getRegistrationDocUrl());
+    vehicle.setRegistrationPhotoUrl(request.getRegistrationPhotoUrl());
 
     vehicle.setViolationCount(0);
 
@@ -201,6 +202,8 @@ this.vipSubscriptionRepository = vipSubscriptionRepository;
         existing.setBodyShape(request.getBodyShape());
         existing.setBrand(request.getBrand());
         existing.setFuelType(request.getFuelType());
+        existing.setRegistrationDocUrl(request.getRegistrationDocUrl());
+        existing.setRegistrationPhotoUrl(request.getRegistrationPhotoUrl());
 
         existing.setUpdatedAt(Instant.now());
 

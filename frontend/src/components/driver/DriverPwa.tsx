@@ -360,7 +360,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
               isLocked: activeSub ? (v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false)) : false,
               activeSubscription: activeSub,
               subscriptionExpiry: expiry,
-              subscriptionStatus: subStatus
+              subscriptionStatus: subStatus,
+              registrationDocUrl: v.registrationDocUrl,
+              registrationPhotoUrl: v.registrationPhotoUrl
             };
           });
 
@@ -416,6 +418,12 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [editPlate, setEditPlate] = useState('');
   const [editName, setEditName] = useState('');
   const [editType, setEditType] = useState('Ô tô gầm thấp 4-5 chỗ');
+
+  // Documents
+  const [newRegDoc, setNewRegDoc] = useState<string | null>(null);
+  const [newRegPhoto, setNewRegPhoto] = useState<string | null>(null);
+  const [editRegDoc, setEditRegDoc] = useState<string | null>(null);
+  const [editRegPhoto, setEditRegPhoto] = useState<string | null>(null);
 
   // VIP Step Subscription State
   const [regStep, setRegStep] = useState<1 | 2 | 3>(2); // Default on select package for full mockup fidelity
@@ -701,7 +709,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       colorRgb: '#FFFFFF',
       bodyShape: bodyShapeDb,
       isActive: true,
-      fuelType: 'GASOLINE'
+      fuelType: 'GASOLINE',
+      registrationDocUrl: newRegDoc,
+      registrationPhotoUrl: newRegPhoto
     };
 
     try {
@@ -741,6 +751,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       setVehicles(prev => [...prev, modelItem]);
       setNewPlate('');
       setNewName('');
+      setNewRegDoc(null);
+      setNewRegPhoto(null);
       setAddVehicleModalOpen(false);
       triggerToast(`Đăng ký thêm phương tiện ${modelItem.plate} thành công!`, 'success');
       
@@ -827,7 +839,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       colorRgb: '#FFFFFF',
       bodyShape: bodyShapeDb,
       isActive: true,
-      fuelType: 'GASOLINE'
+      fuelType: 'GASOLINE',
+      registrationDocUrl: editRegDoc,
+      registrationPhotoUrl: editRegPhoto
     };
 
     if (isOffline) {
@@ -842,6 +856,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         }
         return v;
       }));
+      setEditRegDoc(null);
+      setEditRegPhoto(null);
       setEditVehicleModalOpen(false);
       triggerToast('Đã sửa phương tiện thành công (Chế độ Ngoại tuyến)!', 'success');
       return;
@@ -866,11 +882,15 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
               id: savedVehicle.id,
               plate: editPlate.toUpperCase().trim(),
               name: editName.trim() || 'Phương tiện',
-              type: editType
+              type: editType,
+              registrationDocUrl: editRegDoc,
+              registrationPhotoUrl: editRegPhoto
             };
           }
           return v;
         }));
+        setEditRegDoc(null);
+        setEditRegPhoto(null);
         setEditVehicleModalOpen(false);
         triggerToast('Cập nhật phương tiện thành công!', 'success');
       } else {
@@ -990,11 +1010,14 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         startDate: new Date().toLocaleDateString('vi-VN'),
         endDate: expiryString,
         status: 'PENDING_APPROVAL',
-        document_photos: (window as any).lastUploadedPhotos || {
-          registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-          identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-          frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
-        },
+        document_photos: (() => {
+          const targetVeh = vehicles.find((v: any) => v.plate === selectedVehicleForVIP);
+          return (window as any).lastUploadedPhotos || {
+            registrationPaper: targetVeh?.registrationDocUrl || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+            identityCard: targetVeh?.registrationPhotoUrl || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+            frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+          };
+        })(),
         explanation: (window as any).lastUploadedPhotos?.explanation || ''
       };
       savedSubs.push(newSub);
@@ -1094,11 +1117,14 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         startDate: new Date().toLocaleDateString('vi-VN'),
         endDate: expiryString,
         status: 'PENDING_APPROVAL',
-        document_photos: (window as any).lastUploadedPhotos || {
-          registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-          identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-          frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
-        },
+        document_photos: (() => {
+          const targetVeh = vehicles.find((v: any) => v.plate === selectedVehicleForVIP);
+          return (window as any).lastUploadedPhotos || {
+            registrationPaper: targetVeh?.registrationDocUrl || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+            identityCard: targetVeh?.registrationPhotoUrl || 'https://images.unsplash.com/photo-1557804506-669a67955ba0?w=500&auto=format&fit=crop&q=80',
+            frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+          };
+        })(),
         explanation: (window as any).lastUploadedPhotos?.explanation || ''
       };
       savedSubs.push(newSub);
@@ -2086,6 +2112,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 setEditPlate(v.plate);
                                 setEditName(v.name);
                                 setEditType(v.type);
+                                setEditRegDoc(v.registrationDocUrl || null);
+                                setEditRegPhoto(v.registrationPhotoUrl || null);
                                 setEditVehicleModalOpen(true);
                               }}
                               className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs rounded-xl cursor-pointer transition-all"
@@ -3388,6 +3416,58 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                     </select>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    {/* Cà vẹt xe */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Ảnh Cà vẹt xe</label>
+                      {newRegDoc ? (
+                        <div className="relative h-20 rounded-lg overflow-hidden border border-slate-200 group">
+                          <img src={newRegDoc} alt="Cà vẹt" className="w-full h-full object-cover" />
+                          <button 
+                            type="button"
+                            onClick={() => setNewRegDoc(null)}
+                            className="absolute top-1 right-1 p-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setNewRegDoc('https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80')}
+                          className="w-full h-20 border border-dashed border-slate-200 hover:border-blue-400 rounded-lg flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer transition-colors"
+                        >
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-center block px-1">+ Tải ảnh Cà vẹt</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Ảnh CCCD */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Ảnh CMND/CCCD</label>
+                      {newRegPhoto ? (
+                        <div className="relative h-20 rounded-lg overflow-hidden border border-slate-200 group">
+                          <img src={newRegPhoto} alt="CCCD" className="w-full h-full object-cover" />
+                          <button 
+                            type="button"
+                            onClick={() => setNewRegPhoto(null)}
+                            className="absolute top-1 right-1 p-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setNewRegPhoto('https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80')}
+                          className="w-full h-20 border border-dashed border-slate-200 hover:border-blue-400 rounded-lg flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer transition-colors"
+                        >
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-center block px-1">+ Tải ảnh CCCD</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="flex gap-2.5 pt-2">
                     <button
                       type="button"
@@ -3479,6 +3559,58 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       <option value="Xe 9 chỗ">🚐 Xe 9 chỗ</option>
                       <option value="Xe 16 chỗ">🚌 Xe 16 chỗ</option>
                     </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    {/* Cà vẹt xe */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Ảnh Cà vẹt xe</label>
+                      {editRegDoc ? (
+                        <div className="relative h-20 rounded-lg overflow-hidden border border-slate-200 group">
+                          <img src={editRegDoc} alt="Cà vẹt" className="w-full h-full object-cover" />
+                          <button 
+                            type="button"
+                            onClick={() => setEditRegDoc(null)}
+                            className="absolute top-1 right-1 p-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setEditRegDoc('https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80')}
+                          className="w-full h-20 border border-dashed border-slate-200 hover:border-blue-400 rounded-lg flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer transition-colors"
+                        >
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-center block px-1">+ Tải ảnh Cà vẹt</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Ảnh CCCD */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Ảnh CMND/CCCD</label>
+                      {editRegPhoto ? (
+                        <div className="relative h-20 rounded-lg overflow-hidden border border-slate-200 group">
+                          <img src={editRegPhoto} alt="CCCD" className="w-full h-full object-cover" />
+                          <button 
+                            type="button"
+                            onClick={() => setEditRegPhoto(null)}
+                            className="absolute top-1 right-1 p-0.5 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setEditRegPhoto('https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80')}
+                          className="w-full h-20 border border-dashed border-slate-200 hover:border-blue-400 rounded-lg flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer transition-colors"
+                        >
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-center block px-1">+ Tải ảnh CCCD</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex gap-2.5 pt-2">

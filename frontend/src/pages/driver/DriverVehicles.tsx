@@ -39,7 +39,11 @@ export function DriverVehicles() {
     editingVehicleId, setEditingVehicleId,
     editPlate, setEditPlate,
     editName, setEditName,
-    editType, setEditType
+    editType, setEditType,
+    newRegDoc, setNewRegDoc,
+    newRegPhoto, setNewRegPhoto,
+    editRegDoc, setEditRegDoc,
+    editRegPhoto, setEditRegPhoto
   } = ctx;
 
   // Let's find toggleVehicleLock from parent
@@ -223,6 +227,8 @@ export function DriverVehicles() {
                                 setEditPlate(v.plate);
                                 setEditName(v.name);
                                 setEditType(v.type);
+                                setEditRegDoc(v.registrationDocUrl || null);
+                                setEditRegPhoto(v.registrationPhotoUrl || null);
                                 setEditVehicleModalOpen(true);
                               }}
                               className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs rounded-xl cursor-pointer transition-all"
