@@ -79,7 +79,7 @@ export function DriverHome() {
               <p>• Trạng thái: <span className="text-emerald-600 font-extrabold">{currentParked.status}</span></p>
               {currentParked.assignedZone ? (
                 <p className="mt-2 text-blue-600 font-bold bg-blue-50/50 p-2.5 rounded-lg border border-blue-100/60 leading-relaxed">
-                  📍 Vị trí đỗ chỉ định: Tầng {getFloorNumber(currentParked.assignedZone)} - {getFloorName(currentParked.assignedZone)}
+                  📍 Vị trí đỗ chỉ định: {getFloorName(currentParked.assignedZone)}
                 </p>
               ) : (
                 <p className="mt-2 text-slate-400">Chỉ dẫn: Bạn có thể đi bộ qua Lối đi bộ Zone A, bấm thang máy lên Tầng 2 để nhận xe.</p>

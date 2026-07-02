@@ -688,7 +688,7 @@ export const StaffGateControl = () => {
                     style={{ textShadow: '0 0 8px rgba(245, 158, 11, 0.8)' }}
                     scrollamount="6"
                   >
-                    WELCOME VIP {lastCheckInResult.plate} ➔ HƯỚNG ĐI: TẦNG {lastCheckInResult.floorName.toUpperCase()}
+                    WELCOME VIP {lastCheckInResult.plate} ➔ HƯỚNG ĐI: {lastCheckInResult.floorName.toUpperCase()}
                   </marquee>
                 ) : (
                   <marquee 
@@ -696,7 +696,7 @@ export const StaffGateControl = () => {
                     style={{ textShadow: '0 0 8px rgba(52, 211, 153, 0.8)' }}
                     scrollamount="6"
                   >
-                    BIỂN SỐ: {lastCheckInResult.plate} ➔ XE {lastCheckInResult.vehicleType} ➔ HƯỚNG ĐI: TẦNG {lastCheckInResult.floorName.toUpperCase()}
+                    BIỂN SỐ: {lastCheckInResult.plate} ➔ XE {lastCheckInResult.vehicleType} ➔ HƯỚNG ĐI: {lastCheckInResult.floorName.toUpperCase()}
                   </marquee>
                 )
               ) : (

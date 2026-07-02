@@ -416,6 +416,17 @@ export const StaffDashboard = () => {
                 return <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded">HỢP LỆ</span>;
               };
 
+              const getFloorDisplayName = (v) => {
+                if (v.floorName) return v.floorName;
+                const code = v.assignedZoneCode || v.assignedZoneId || '';
+                const c = code.toUpperCase();
+                if (c === "F1") return "Tầng 1";
+                if (c === "F2") return "Tầng 2";
+                if (c === "B1") return "Tầng B1";
+                if (c === "G") return "Tầng G";
+                return code || "F1";
+              };
+
               return (
                 <div 
                   key={cam.id}
@@ -445,6 +456,21 @@ export const StaffDashboard = () => {
                     <div className="absolute top-2 right-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg flex items-center gap-1 animate-pulse">
                       <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                       ĐANG CHỌN
+                    </div>
+                  )}
+
+                  {/* Mini LED Board Widget */}
+                  {vehicle && (
+                    <div className={`absolute ${isSelected ? 'top-10' : 'top-2'} right-2 w-[155px] bg-slate-950/90 border border-slate-800 rounded px-1.5 py-0.5 shadow-md flex items-center overflow-hidden z-10`}>
+                      {vehicle.type === 'VIP' ? (
+                        <marquee scrollamount="4" className="font-mono text-[9px] font-bold text-amber-500 tracking-wider w-full" style={{ textShadow: '0 0 4px rgba(245, 158, 11, 0.6)' }}>
+                          WELCOME VIP {vehicle.plate} ➔ HƯỚNG ĐI: {getFloorDisplayName(vehicle).toUpperCase()}
+                        </marquee>
+                      ) : (
+                        <marquee scrollamount="4" className="font-mono text-[9px] font-bold text-emerald-400 tracking-wider w-full" style={{ textShadow: '0 0 4px rgba(52, 211, 153, 0.6)' }}>
+                          BIỂN SỐ: {vehicle.plate} ➔ HƯỚNG ĐI: {getFloorDisplayName(vehicle).toUpperCase()}
+                        </marquee>
+                      )}
                     </div>
                   )}
 
