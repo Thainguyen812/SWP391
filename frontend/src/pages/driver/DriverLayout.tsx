@@ -137,6 +137,18 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   const [qrDirection, setQrDirection] = useState<'VÀO' | 'RA'>('VÀO');
   const [isTogglingLock, setIsTogglingLock] = useState<string | null>(null);
 
+  const [vehicles, setVehicles] = useState<UserVehicle[]>(() => {
+    const saved = localStorage.getItem(`urbanpark_user_vehicles_${user?.username || 'default'}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    return [];
+  });
+
   const [activeQrToken, setActiveQrToken] = useState<string>('');
   const [qrExpiryTime, setQrExpiryTime] = useState<number | null>(null);
   const [isGeneratingQr, setIsGeneratingQr] = useState<boolean>(false);
@@ -207,17 +219,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     return () => clearInterval(interval);
   }, [qrExpiryTime, selectedVehId, qrDirection, isGeneratingQr, vehicles]);
 
-  const [vehicles, setVehicles] = useState<UserVehicle[]>(() => {
-    const saved = localStorage.getItem(`urbanpark_user_vehicles_${user?.username || 'default'}`);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    return [];
-  });
+
 
   // Background synchronize with live backend
   const fetchVehiclesFromApi = async () => {
