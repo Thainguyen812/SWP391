@@ -11,10 +11,6 @@ public interface VipService {
 
     List<VipSubscription> getPending();
 
-    VipSubscription approve(UUID id);
-
-    VipSubscription reject(UUID id);
-
     VipSubscription register(
             VipRegistrationRequest request);
 }
