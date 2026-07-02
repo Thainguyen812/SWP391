@@ -585,7 +585,7 @@ export const StaffGateControl = () => {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
           <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Tổng lượt vào/ra hôm nay</h4>
           <div className="flex items-baseline gap-3">
-            <span className="text-4xl font-extrabold text-slate-800">{dailyVolume.toLocaleString()}</span>
+            <span className="text-4xl font-extrabold text-slate-800">{(dailyVolume || 0).toLocaleString()}</span>
           </div>
         </div>
 
