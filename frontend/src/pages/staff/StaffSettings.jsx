@@ -12,7 +12,7 @@ import { Switch, Modal, notification, Spin } from 'antd'; // Using antd for comp
 import { useGlobalContext } from '../../context/GlobalContext';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
-import apiClient from '../../api/apiClient';
+import { apiClient } from '../../api/apiClient';
 
 export const StaffSettings = () => {
   const { shiftStats, setShiftStats, currentUser, setCurrentUser, shiftHistory, setShiftHistory } = useGlobalContext();
