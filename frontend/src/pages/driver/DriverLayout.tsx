@@ -756,6 +756,21 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     }
   };
 
+  const parseExpiryDate = (dateStr: string) => {
+    if (!dateStr) return new Date();
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      const parsed = new Date(year, month, day);
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+    return new Date();
+  };
+
   // Checkout VIP flow
   const handleStartVnpay = () => {
     if (isOffline) {
@@ -781,8 +796,16 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       };
       setTransactions(prev => [newTx, ...prev]);
       
-      // Calculate expiry date
-      const expiryDate = new Date();
+      // Calculate expiry date by checking if they already have an active subscription
+      const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
+      let expiryDate = new Date();
+      if (targetVeh && targetVeh.activeSubscription && targetVeh.subscriptionExpiry) {
+        const parsedExpiry = parseExpiryDate(targetVeh.subscriptionExpiry);
+        if (parsedExpiry.getTime() > Date.now()) {
+          expiryDate = parsedExpiry;
+        }
+      }
+
       if (selectedPackLabel.includes('3 Tháng')) {
         expiryDate.setMonth(expiryDate.getMonth() + 3);
       } else if (selectedPackLabel.includes('6 Tháng')) {
@@ -878,8 +901,16 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       };
       setTransactions(prev => [newTx, ...prev]);
       
-      // Calculate expiry date
-      const expiryDate = new Date();
+      // Calculate expiry date by checking if they already have an active subscription
+      const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
+      let expiryDate = new Date();
+      if (targetVeh && targetVeh.activeSubscription && targetVeh.subscriptionExpiry) {
+        const parsedExpiry = parseExpiryDate(targetVeh.subscriptionExpiry);
+        if (parsedExpiry.getTime() > Date.now()) {
+          expiryDate = parsedExpiry;
+        }
+      }
+
       if (selectedPackLabel.includes('3 Tháng')) {
         expiryDate.setMonth(expiryDate.getMonth() + 3);
       } else if (selectedPackLabel.includes('6 Tháng')) {
