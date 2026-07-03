@@ -884,7 +884,7 @@ public class ParkingServiceImpl implements ParkingService {
 
         Instant checkOutTime = Instant.now();
 
-        BigDecimal parkingFee = transactionRepository.calculateParkingFee( // gọi transaction để tính phí
+        BigDecimal parkingFee = this.calculateParkingFeeSafe(
                 vehicle.getVehicleSize(),
                 session.getCheckInTime(),
                 checkOutTime);
@@ -1029,7 +1029,7 @@ public class ParkingServiceImpl implements ParkingService {
 
         Instant checkoutTime = Instant.now();
 
-        BigDecimal parkingFee = transactionRepository.calculateParkingFee(
+        BigDecimal parkingFee = this.calculateParkingFeeSafe(
                 vehicle.getVehicleSize(),
                 session.getCheckInTime(),
                 checkoutTime);
@@ -1152,7 +1152,7 @@ public class ParkingServiceImpl implements ParkingService {
         Instant checkOutTime = Instant.now();
         BigDecimal parkingFee = BigDecimal.ZERO;
         if (session.getIsVip() == null || !session.getIsVip()) {
-            parkingFee = transactionRepository.calculateParkingFee(
+            parkingFee = this.calculateParkingFeeSafe(
                     vehicle.getVehicleSize(),
                     session.getCheckInTime(),
                     checkOutTime);
@@ -1161,6 +1161,35 @@ public class ParkingServiceImpl implements ParkingService {
         java.util.Map<String, Object> response = new java.util.HashMap<>();
         response.put("sessionId", session.getId().toString());
         response.put("cardId", cardId.toString());
+        response.put("licensePlate", session.getLicensePlate());
+        response.put("checkInTime", session.getCheckInTime());
+        response.put("checkOutTime", checkOutTime);
+        response.put("parkingFee", parkingFee);
+        response.put("isVip", session.getIsVip() != null && session.getIsVip());
+        return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> getParkingFeeByPlate(String plate) {
+        ParkingSession session = parkingSessionRepository
+                .findByLicensePlateAndSessionStatus(plate, ParkingSession.SessionStatus.ACTIVE)
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy phiên gửi xe hợp lệ cho biển số này"));
+
+        Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin xe để tính phí"));
+
+        Instant checkOutTime = Instant.now();
+        BigDecimal parkingFee = BigDecimal.ZERO;
+        if (session.getIsVip() == null || !session.getIsVip()) {
+            parkingFee = this.calculateParkingFeeSafe(
+                    vehicle.getVehicleSize(),
+                    session.getCheckInTime(),
+                    checkOutTime);
+        }
+
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("sessionId", session.getId().toString());
         response.put("licensePlate", session.getLicensePlate());
         response.put("checkInTime", session.getCheckInTime());
         response.put("checkOutTime", checkOutTime);
@@ -1483,5 +1512,12 @@ public class ParkingServiceImpl implements ParkingService {
                 true,
                 "Xác nhận rời tầng thành công. Mở barrier.",
                 null);
+    }
+    private BigDecimal calculateParkingFeeSafe(String vehicleSize, Instant checkIn, Instant checkOut) {
+        try {
+            return transactionRepository.calculateParkingFee(vehicleSize, checkIn, checkOut);
+        } catch (org.springframework.dao.DataAccessException e) {
+            throw new ApiExceptions.BadRequestException("Không tìm thấy bảng giá hệ thống phù hợp đang kích hoạt cho loại xe: " + vehicleSize);
+        }
     }
 }

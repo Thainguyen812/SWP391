@@ -121,6 +121,12 @@ public class ParkingController {
         return ResponseEntity.ok(parkingService.getParkingFee(cardId));
     }
 
+    @GetMapping("/fee-by-plate/{plate}")
+    @PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
+    public ResponseEntity<java.util.Map<String, Object>> getParkingFeeByPlate(@PathVariable String plate) {
+        return ResponseEntity.ok(parkingService.getParkingFeeByPlate(plate));
+    }
+
     // 7. Tìm xe: Đã được cấu hình .permitAll() ở SecurityConfig nên không cần đặt
     // @PreAuthorize tại đây
     @GetMapping("/find-car")
