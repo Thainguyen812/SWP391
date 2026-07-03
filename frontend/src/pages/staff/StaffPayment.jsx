@@ -164,8 +164,10 @@ export const StaffPayment = () => {
       setLan1Status('busy');
       notification.success({message: 'Quét thẻ thành công', description: `Đã tính phí: ${txn.totalAmount} VND. Vui lòng thu tiền.`});
     } catch (error) {
-      notification.error({message: 'Lỗi Check-out', description: error.response?.data?.message || 'Không thể check-out bằng thẻ này'});
-    } finally {
+        notification.error({message: 'Lỗi Check-out', description: error.response?.data?.message || 'Không thể check-out bằng thẻ này'});
+        setHasVehicle(false);
+        setBackendTxn(null);
+      } finally {
       setIsCheckingOut(false);
     }
   };
@@ -201,15 +203,18 @@ export const StaffPayment = () => {
                   }
                 });
               } catch (err) {
-                console.error("Failed to block card by plate", err);
+                  console.error("Failed to block card by plate", err);
+                }
+                // Send mock transaction to backend so it saves in DB
+                await apiClient.post('/revenue/transactions/mock', {
+                  amount: totalAmount,
+                  plate: lpr
+                });
+              } else {
+                notification.error({message: 'Lỗi thanh toán', description: 'Giao dịch không hợp lệ, vui lòng quét lại thẻ!'});
+                return;
               }
             }
-            // Send mock transaction to backend so it saves in DB
-            await apiClient.post('/revenue/transactions/mock', {
-              amount: totalAmount,
-              plate: lpr
-            });
-          }
           // Refresh global context to pull latest transactions and remove from active
           if (fetchAllDataFromBackend) fetchAllDataFromBackend();
         } catch (e) {
