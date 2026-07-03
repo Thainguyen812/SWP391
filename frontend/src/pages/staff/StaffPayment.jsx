@@ -157,7 +157,7 @@ export const StaffPayment = () => {
       const txn = response.data;
       
       setBackendTxn(txn);
-      setLpr(`THẺ: ${cardCode}`); // Since backend doesn't return plate directly in Transaction
+      if (!lpr) setLpr(`THẺ: ${cardCode}`); // Only fallback to card code if plate is unknown
       setTotalAmount(txn.totalAmount);
       setCashGiven(txn.totalAmount);
       setHasVehicle(true);

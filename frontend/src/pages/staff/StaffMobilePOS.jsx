@@ -13,7 +13,7 @@ import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffMobilePOS = () => {
   const navigate = useNavigate();
-  const { activeVehicles, currentUser, getVehicleFines, clearVehicleFines, currentVehicle } = useGlobalContext();
+  const { activeVehicles, currentUser, getVehicleFines, clearVehicleFines, currentVehicle, removeActiveVehicle } = useGlobalContext();
   const [plate, setPlate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [vehicle, setVehicle] = useState(null);
@@ -135,7 +135,10 @@ export const StaffMobilePOS = () => {
         message: 'Thanh toán thành công', 
         description: `Xe ${vehicle.plate} đã thanh toán và có thể ra thẳng qua cổng.` 
       });
-      if (vehicle?.plate) clearVehicleFines(vehicle.plate);
+      if (vehicle?.plate) {
+        clearVehicleFines(vehicle.plate);
+        removeActiveVehicle(vehicle.plate);
+      }
       
     } catch (error) {
       const errorMsg = error.response?.data?.message || error.message || 'Đã có lỗi xảy ra.';
