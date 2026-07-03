@@ -23,6 +23,7 @@ public class DataInitializer implements CommandLineRunner {
         createOrUpdateAccount("staffdemo9@gmail.com", "123456", User.Role.STAFF, "Staff Demo");
         createOrUpdateAccount("managerdemo626@gmail.com", "123456", User.Role.MANAGER, "Manager Demo");
         createOrUpdateAccount("admindemo8@gmail.com", "123456", User.Role.ADMIN, "Admin Demo");
+        createOrUpdateAccount("phuongbui10022005@gmail.com", "123456", User.Role.DRIVER, "Phuong Driver Demo");
     }
 
     private void createOrUpdateAccount(String email, String password, User.Role role, String fullName) {
