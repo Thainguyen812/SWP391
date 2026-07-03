@@ -16,6 +16,8 @@ import com.parking.model.User;
 import com.parking.repository.UserRepository;
 import com.parking.repository.VipSubscriptionRepository;
 import com.parking.model.VipSubscription;
+import com.parking.repository.SecurityAlertRepository;
+import com.parking.model.SecurityAlert;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -33,15 +35,18 @@ public class VehicleController {
 private final VehicleRepository repo;
 private final UserRepository userRepo;
 private final VipSubscriptionRepository vipSubscriptionRepository;
+private final SecurityAlertRepository securityAlertRepository;
 
 public VehicleController(
         VehicleRepository repo,
         UserRepository userRepo,
-        VipSubscriptionRepository vipSubscriptionRepository) {
+        VipSubscriptionRepository vipSubscriptionRepository,
+        SecurityAlertRepository securityAlertRepository) {
 
 this.repo = repo;
 this.userRepo = userRepo;
 this.vipSubscriptionRepository = vipSubscriptionRepository;
+this.securityAlertRepository = securityAlertRepository;
 }
 
     @GetMapping
@@ -316,6 +321,25 @@ User currentUser = userRepo
 
             v.setLocked(isLocked);
             repo.save(v);
+
+            if (isLocked) {
+                SecurityAlert alert = new SecurityAlert();
+                alert.setAlertType("KHÓA CHỐNG TRỘM");
+                alert.setLicensePlate(v.getLicensePlate());
+                alert.setReason("Tài xế vừa bật khóa an ninh từ xa qua App");
+                alert.setIsActionable(false);
+                securityAlertRepository.save(alert);
+            } else {
+                List<SecurityAlert> activeAlerts = securityAlertRepository.findByIsResolvedFalseOrderByCreatedAtDesc().stream()
+                        .filter(a -> "KHÓA CHỐNG TRỘM".equals(a.getAlertType()) 
+                                && v.getLicensePlate().equals(a.getLicensePlate()))
+                        .toList();
+                for (SecurityAlert a : activeAlerts) {
+                    a.setIsResolved(true);
+                    a.setResolvedAt(java.time.LocalDateTime.now());
+                    securityAlertRepository.save(a);
+                }
+            }
         }
 
         String msg = isLocked ? "Kích hoạt radar khóa bánh thành công cho xe " + request.getPlate() + "!"
