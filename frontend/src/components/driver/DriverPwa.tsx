@@ -1292,7 +1292,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
           const dMonth = parseInt(parts[1], 10) - 1; // 0-11
           const dYear = parseInt(parts[2], 10);
           
-          const feeStr = tx.fee ? tx.fee.replace(/[-+$₫]/g, '').replace(/,/g, '').trim() : '';
+          const feeStr = tx.fee
+            ? tx.fee.includes('$')
+              ? tx.fee.replace(/[-+$₫]/g, '').replace(/,/g, '').trim()
+              : tx.fee.replace(/[-+$₫]/g, '').replace(/[,.]/g, '').trim()
+            : '';
           const value = parseFloat(feeStr);
           if (!isNaN(value)) {
             const valVND = tx.fee && tx.fee.includes('$') ? value * 25000 : value;
