@@ -92,16 +92,30 @@ public class ParkingSessionController {
             return dto;
         }).collect(Collectors.toList());
 
-        pendingGateVehicleService.findAll().forEach(pending -> result.add(new ParkingSessionDto(
-                pending.getId(),
-                pending.getLicensePlate(),
-                pending.getDetectedAt(),
-                ParkingSession.SessionStatus.ACTIVE.name(),
-                pending.getEntryGate(),
-                pending.isVip(),
-                pending.isSuspicious(),
-                pending.getSuspiciousReason()
-        )));
+        pendingGateVehicleService.findAll().forEach(pending -> {
+            ParkingSessionDto dto = new ParkingSessionDto(
+                    pending.getId(),
+                    pending.getLicensePlate(),
+                    pending.getDetectedAt(),
+                    ParkingSession.SessionStatus.ACTIVE.name(),
+                    pending.getEntryGate(),
+                    pending.isVip(),
+                    pending.isSuspicious(),
+                    pending.getSuspiciousReason()
+            );
+            List<Zone> candidates = zoneRepo.findByAllowedSizesContaining(pending.getVehicleType());
+            if (!candidates.isEmpty()) {
+                Zone chosen = candidates.stream()
+                        .filter(z -> z.getTotalSlots() - z.getCurrentOccupied() > 0)
+                        .findFirst()
+                        .orElse(candidates.get(0));
+                dto.setAssignedZoneCode(chosen.getCode());
+                dto.setAssignedZoneId(chosen.getId());
+            } else {
+                dto.setAssignedZoneCode("F1");
+            }
+            result.add(dto);
+        });
 
         return result;
     }

@@ -64,6 +64,7 @@ public class ParkingSessionDto {
     public UUID getId() { return id; }
     public String getLicensePlate() { return licensePlate; }
     public UUID getAssignedZoneId() { return assignedZoneId; }
+    public void setAssignedZoneId(UUID assignedZoneId) { this.assignedZoneId = assignedZoneId; }
     public String getAssignedZoneCode() { return assignedZoneCode; }
     public void setAssignedZoneCode(String assignedZoneCode) { this.assignedZoneCode = assignedZoneCode; }
     public UUID getCardId() { return cardId; }
