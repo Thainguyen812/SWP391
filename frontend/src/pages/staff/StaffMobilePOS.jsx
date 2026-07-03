@@ -13,7 +13,7 @@ import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffMobilePOS = () => {
   const navigate = useNavigate();
-  const { activeVehicles, currentUser, getVehicleFines, clearVehicleFines } = useGlobalContext();
+  const { activeVehicles, currentUser, getVehicleFines, clearVehicleFines, currentVehicle, removeActiveVehicle } = useGlobalContext();
   const [plate, setPlate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [vehicle, setVehicle] = useState(null);
@@ -85,18 +85,23 @@ export const StaffMobilePOS = () => {
     setShowScanner(true);
     setTimeout(() => {
       setShowScanner(false);
-      // Pick a random vehicle from activeVehicles to guarantee success
-      if (activeVehicles && activeVehicles.length > 0) {
+      // Try to use currentVehicle if it exists in activeVehicles
+      let selectedVehicle = null;
+      if (currentVehicle && activeVehicles && activeVehicles.find(v => v.plate === currentVehicle.plate)) {
+        selectedVehicle = activeVehicles.find(v => v.plate === currentVehicle.plate);
+      } else if (activeVehicles && activeVehicles.length > 0) {
         // Ưu tiên khách vãng lai để hiện tính phí
         const guests = activeVehicles.filter(v => v.type === 'Khách Vãng Lai' || v.type === 'Vãng lai' || !v.type);
         const listToPick = guests.length > 0 ? guests : activeVehicles;
-        const randomVehicle = listToPick[Math.floor(Math.random() * listToPick.length)];
-        
-        setPlate(randomVehicle.plate);
-        notification.success({message: `Đã nhận diện biển số: ${randomVehicle.plate}`});
+        selectedVehicle = listToPick[Math.floor(Math.random() * listToPick.length)];
+      }
+      
+      if (selectedVehicle) {
+        setPlate(selectedVehicle.plate);
+        notification.success({message: `Đã nhận diện biển số: ${selectedVehicle.plate}`});
         
         // Auto trigger search with the found vehicle
-        handleSearchWithPlate(randomVehicle.plate);
+        handleSearchWithPlate(selectedVehicle.plate);
       } else {
         const fallback = '30A-12345';
         setPlate(fallback);
@@ -130,7 +135,10 @@ export const StaffMobilePOS = () => {
         message: 'Thanh toán thành công', 
         description: `Xe ${vehicle.plate} đã thanh toán và có thể ra thẳng qua cổng.` 
       });
-      if (vehicle?.plate) clearVehicleFines(vehicle.plate);
+      if (vehicle?.plate) {
+        clearVehicleFines(vehicle.plate);
+        removeActiveVehicle(vehicle.plate);
+      }
       
     } catch (error) {
       const errorMsg = error.response?.data?.message || error.message || 'Đã có lỗi xảy ra.';

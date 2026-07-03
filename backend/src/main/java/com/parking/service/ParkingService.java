@@ -17,6 +17,7 @@ public interface ParkingService {
     CheckInResponse aiCheckIn(AiCheckInRequest request);
     CheckInResponse approveEntry(String plate);
     CheckInResponse approvePendingEntry(PendingGateVehicleService.PendingEntry pendingEntry);
+    Transaction approveExit(String plate);
     void verifyExitQr(String detectedPlate, String qrToken);
     
     CheckInResponse visitorCheckIn(VisitorCheckInRequest request);//task 5 check in vãn lai

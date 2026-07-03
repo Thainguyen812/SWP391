@@ -285,6 +285,58 @@ public class ParkingServiceImpl implements ParkingService {
 
     @Override
     @Transactional
+    public Transaction approveExit(String plate) {
+        ParkingSession session = parkingSessionRepository
+                .findByLicensePlateAndSessionStatus(plate, ParkingSession.SessionStatus.ACTIVE)
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay phien xe dang hoat dong"));
+
+        if (session.getIsLocked() != null && session.getIsLocked()) {
+            SecurityAlert alert = new SecurityAlert();
+            alert.setAlertType("NGHI NGỜ TRỘM CẮP");
+            alert.setLicensePlate(session.getLicensePlate() != null ? session.getLicensePlate() : "N/A");
+            alert.setReason("Phát hiện cố tình xuất bãi khi xe đang bật Khóa chống trộm.");
+            alert.setIsActionable(true);
+            securityAlertRepository.save(alert);
+
+            throw new ApiExceptions.ForbiddenException(
+                    "Xe đang ở trạng thái KHÓA AN TOÀN chống trộm! Không thể xuất bãi.");
+        }
+
+        if (session.getIsVip() == null || !session.getIsVip()) {
+            throw new ApiExceptions.BadRequestException("Chỉ có xe VIP mới được phê duyệt mở cổng thủ công khi ra");
+        }
+
+        session.setCheckOutTime(Instant.now());
+        session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
+        
+        if (session.getParkedSlotId() != null) {
+            slotRepository.findById(session.getParkedSlotId()).ifPresent(slot -> {
+                slot.setSlotStatus("AVAILABLE");
+                slotRepository.save(slot);
+            });
+            session.setParkedSlotId(null);
+        }
+
+        Zone zone = zoneRepository.findById(session.getAssignedZoneId())
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay Zone"));
+        if (zone.getCurrentOccupied() > 0) {
+            zone.setCurrentOccupied(zone.getCurrentOccupied() - 1);
+            zoneRepository.save(zone);
+        }
+        
+        parkingSessionRepository.save(session);
+
+        Transaction transaction = new Transaction();
+        transaction.setSessionId(session.getId());
+        transaction.setTotalAmount(java.math.BigDecimal.ZERO);
+        transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
+        transaction.setPaymentStatus(Transaction.PaymentStatus.SUCCESS);
+        transaction.setProcessedAt(Instant.now());
+        return transactionRepository.save(transaction);
+    }
+
+    @Override
+    @Transactional
     public CheckInResponse approvePendingEntry(com.parking.service.PendingGateVehicleService.PendingEntry pendingEntry) {
         if (pendingEntry == null) {
             throw new ApiExceptions.NotFoundException("Khong tim thay xe dang cho vao cong");
