@@ -56,7 +56,7 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
   const loadSubscriptions = async () => {
     try {
       const response = await fetch('/api/vip/all', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}` }
       });
       if (response.ok) {
         const backendAll = await response.json();
@@ -117,7 +117,7 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: body
       })

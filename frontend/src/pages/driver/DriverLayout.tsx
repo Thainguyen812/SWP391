@@ -169,7 +169,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify({
           vehicleId: vehicleId,
@@ -242,7 +242,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     if (isOffline) return; // Skip API calls when offline
     try {
       const response = await fetch('/api/vehicles', {
-        headers: { 'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}` }
       });
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
@@ -392,7 +392,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     const fetchTransactions = async () => {
       try {
         const response = await fetch('/api/logs', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}` }
         });
         if (response.ok) {
           const data = await response.json();
@@ -711,7 +711,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify(payload)
       });
@@ -850,7 +850,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify(payload)
       });
@@ -900,7 +900,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify({ plate: plate, isLocked: nextState })
       });
@@ -927,7 +927,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify({ plate: plateStr, isLocked: !currentIsLocked })
       });

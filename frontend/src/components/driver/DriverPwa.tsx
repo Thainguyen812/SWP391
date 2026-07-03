@@ -267,7 +267,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify({
           vehicleId: vehicleId,
@@ -340,7 +340,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     if (isOffline) return; // Skip API calls when offline
     try {
       const response = await fetch('/api/vehicles', {
-        headers: { 'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}` }
       });
       const data = await response.json();
       const vehicleList = Array.isArray(data) ? data : (data && data.success && Array.isArray(data.data) ? data.data : null);
@@ -848,7 +848,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify(payload)
       });
@@ -991,7 +991,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify(payload)
       });
@@ -1055,7 +1055,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify({ plate: plateStr, isLocked: !currentIsLocked })
       });

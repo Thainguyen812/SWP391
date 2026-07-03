@@ -108,7 +108,7 @@ const DriverAppWrapper = () => {
         role: user.role,
         email: user.email
       }}
-      accessToken={localStorage.getItem('token')}
+      accessToken={sessionStorage.getItem('token') || localStorage.getItem('token')}
       onLogout={() => {
         authService.logout();
         navigate('/login');
