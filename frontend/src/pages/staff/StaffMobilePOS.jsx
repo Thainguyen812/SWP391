@@ -24,9 +24,6 @@ export const StaffMobilePOS = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [auditData, setAuditData] = useState(null);
 
-  const calculateFee = (inTime) => {
-    // Giả lập tính phí như backend
-    if (!inTime) return 10000;
   // Function calculateFee is removed as we now fetch from backend
 
   const handleSearchWithPlate = async (searchPlate) => {
