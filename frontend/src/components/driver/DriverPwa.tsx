@@ -2602,7 +2602,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 badge: 'PHỔ BIẾN', 
                                 features: [
                                   'Chỗ đỗ xe cố định (Tầng B1)',
-                                  'Rửa xe miễn phí 1 lần/tháng',
+                                  'Thanh toán bằng mã QR code lưu động',
                                   'Hỗ trợ kỹ thuật 24/7 tức thì'
                                 ] 
                               },
@@ -2614,7 +2614,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 badge: 'TIẾT KIỆM', 
                                 features: [
                                   'Chỗ đỗ xe cố định (Tầng B1)',
-                                  'Rửa xe miễn phí 1 lần/tháng',
+                                  'Thanh toán bằng mã QR code lưu động',
                                   'Hỗ trợ kỹ thuật 24/7 tức thì'
                                 ] 
                               },
@@ -2626,7 +2626,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 badge: 'ƯU ĐÃI LỚN', 
                                 features: [
                                   'Chỗ đỗ xe cố định (Tầng B1)',
-                                  'Rửa xe miễn phí 1 lần/tháng',
+                                  'Thanh toán bằng mã QR code lưu động',
                                   'Hỗ trợ kỹ thuật 24/7 tức thì'
                                 ] 
                               },
@@ -2638,7 +2638,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 badge: 'SIÊU TIẾT KIỆM', 
                                 features: [
                                   'Chỗ đỗ xe cố định (Tầng B1)',
-                                  'Rửa xe miễn phí 1 lần/tháng',
+                                  'Thanh toán bằng mã QR code lưu động',
                                   'Hỗ trợ kỹ thuật 24/7 tức thì'
                                 ] 
                               }
