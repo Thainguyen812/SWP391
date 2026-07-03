@@ -1689,6 +1689,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
               <input 
                 type="text" 
                 placeholder={activeTab === 'vehicles' ? 'Tìm biển số xe...' : 'Tìm dịch vụ bãi đỗ...'}
+                value={searchSupportQuery}
+                onChange={(e) => setSearchSupportQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-slate-50 hover:bg-slate-100 focus:bg-white text-xs border border-slate-200 focus:border-blue-500 rounded-full font-medium"
               />
             </div>
@@ -2284,7 +2286,12 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                   {/* Registered Vehicle Listings list */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {vehicles.map(v => (
+                    {vehicles.filter(v => {
+                      if (!searchSupportQuery) return true;
+                      return (v.plate || '').toLowerCase().includes(searchSupportQuery.toLowerCase()) ||
+                             (v.name || '').toLowerCase().includes(searchSupportQuery.toLowerCase()) ||
+                             (v.type || '').toLowerCase().includes(searchSupportQuery.toLowerCase());
+                    }).map(v => (
                       <div 
                         key={v.id} 
                         className={`bg-white rounded-3xl border overflow-hidden flex flex-col justify-between transition-all hover:shadow-md ${
