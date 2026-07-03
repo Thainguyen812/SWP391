@@ -85,14 +85,6 @@ export function DriverVipReg() {
 
   const packages = [
     { 
-      id: 'pkg-1', 
-      label: 'Vé Ngày', 
-      price: pricingTier.day, 
-      desc: 'Giá trị trong 24 giờ kể từ thời điểm đăng ký.', 
-      badge: 'RA VÀO NHIỀU LẦN', 
-      features: [] 
-    },
-    { 
       id: 'pkg-2', 
       label: 'Thẻ Tháng VIP', 
       price: pricingTier.month, 

@@ -97,7 +97,7 @@ public class VipServiceImpl implements VipService {
                 vip.setVehicleId(vehicle.getId());
                 vip.setSubscriptionType(request.getSubscriptionType());
                 vip.setDocumentPhotos(request.getDocumentPhotos());
-                vip.setStatus(VipSubscription.Status.PENDING_APPROVAL);
+                vip.setStatus(("DAILY".equals(request.getSubscriptionType()) || "DAY".equals(request.getSubscriptionType())) ? VipSubscription.Status.ACTIVE : VipSubscription.Status.PENDING_APPROVAL);
 
                 java.time.LocalDate startDate = java.time.LocalDate.now();
                 vip.setStartDate(startDate);
@@ -107,16 +107,18 @@ public class VipServiceImpl implements VipService {
                 String type = request.getSubscriptionType() != null ? request.getSubscriptionType().toUpperCase() : "MONTHLY";
 
                 // 1. Calculate endDate based on subscription type
-                if ("MONTHLY".equals(type)) {
-                        vip.setEndDate(startDate.plusMonths(1));
+                if ("DAILY".equals(type) || "DAY".equals(type)) {
+                        vip.setEndDate(startDate.plusDays(1));
+                } else if ("MONTHLY".equals(type)) {
+                        vip.setEndDate(startDate.plusDays(30));
                 } else if ("QUARTERLY".equals(type) || "QUATERLY".equals(type)) {
-                        vip.setEndDate(startDate.plusMonths(3));
+                        vip.setEndDate(startDate.plusDays(90));
                 } else if ("HALF_YEARLY".equals(type) || "6_MONTHS".equals(type) || "6_MONTH".equals(type)) {
-                        vip.setEndDate(startDate.plusMonths(6));
+                        vip.setEndDate(startDate.plusDays(180));
                 } else if ("YEARLY".equals(type) || "YEAR".equals(type)) {
-                        vip.setEndDate(startDate.plusYears(1));
+                        vip.setEndDate(startDate.plusDays(365));
                 } else {
-                        vip.setEndDate(startDate.plusMonths(1));
+                        vip.setEndDate(startDate.plusDays(30));
                 }
 
                 // 2. Resolve fee amount (Dynamic from DB with fallback)
@@ -134,7 +136,9 @@ public class VipServiceImpl implements VipService {
                 if (feeAmount == null) {
                         long fallbackFee = 0;
                         if ("SUV_CUV_MPV".equals(size)) {
-                                if ("MONTHLY".equals(type)) {
+                                if ("DAILY".equals(type) || "DAY".equals(type)) {
+                                        fallbackFee = 70000;
+                                } else if ("MONTHLY".equals(type)) {
                                         fallbackFee = 1400000;
                                 } else if ("QUARTERLY".equals(type) || "QUATERLY".equals(type)) {
                                         fallbackFee = 3800000;
@@ -144,7 +148,9 @@ public class VipServiceImpl implements VipService {
                                         fallbackFee = 12500000;
                                 }
                         } else if ("LARGE_VAN_MINIBUS".equals(size)) {
-                                if ("MONTHLY".equals(type)) {
+                                if ("DAILY".equals(type) || "DAY".equals(type)) {
+                                        fallbackFee = 100000;
+                                } else if ("MONTHLY".equals(type)) {
                                         fallbackFee = 2000000;
                                 } else if ("QUARTERLY".equals(type) || "QUATERLY".equals(type)) {
                                         fallbackFee = 5400000;
@@ -154,7 +160,9 @@ public class VipServiceImpl implements VipService {
                                         fallbackFee = 18000000;
                                 }
                         } else { // SEDAN_HATCHBACK or other
-                                if ("MONTHLY".equals(type)) {
+                                if ("DAILY".equals(type) || "DAY".equals(type)) {
+                                        fallbackFee = 50000;
+                                } else if ("MONTHLY".equals(type)) {
                                         fallbackFee = 1000000;
                                 } else if ("QUARTERLY".equals(type) || "QUATERLY".equals(type)) {
                                         fallbackFee = 2700000;
@@ -169,7 +177,7 @@ public class VipServiceImpl implements VipService {
                 vip.setFeeAmount(feeAmount);
 
                 vip.setPaymentMethod("BANK_TRANSFER");
-                vip.setPaymentStatus("PENDING");
+                vip.setPaymentStatus(("DAILY".equals(request.getSubscriptionType()) || "DAY".equals(request.getSubscriptionType())) ? "PAID" : "PENDING");
                 vip.setCreatedAt(java.time.Instant.now());
                 vip.setUpdatedAt(java.time.Instant.now());
 

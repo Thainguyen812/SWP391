@@ -116,9 +116,25 @@ public class TrafficSimulatorTask {
                     session.setEntryGate(selectedGate);
                     session.setIsVip(Math.random() < 0.2);
                     
-                    List<Zone> zones = zoneRepo.findAll();
-                    if (!zones.isEmpty()) {
-                        session.setAssignedZoneId(zones.get(0).getId());
+                    String[] vehicleTypes = {"SEDAN_HATCHBACK", "SUV_CUV_MPV", "LARGE_VAN_MINIBUS", "EV_CAR"};
+                    String resolvedVehicleType = vehicleTypes[(int)(Math.random() * vehicleTypes.length)];
+                    
+                    List<Zone> candidates = zoneRepo.findByAllowedSizesContaining(resolvedVehicleType);
+                    Zone chosen = null;
+                    if (!candidates.isEmpty()) {
+                        chosen = candidates.stream()
+                                .filter(z -> z.getTotalSlots() - z.getCurrentOccupied() > 0)
+                                .findFirst()
+                                .orElse(candidates.get(0));
+                    } else {
+                        List<Zone> allZones = zoneRepo.findAll();
+                        if (!allZones.isEmpty()) {
+                            chosen = allZones.get(0);
+                        }
+                    }
+                    
+                    if (chosen != null) {
+                        session.setAssignedZoneId(chosen.getId());
                     } else {
                         return; // Cannot simulate without zones
                     }
@@ -142,7 +158,7 @@ public class TrafficSimulatorTask {
                         Boolean.TRUE.equals(session.getIsVip()),
                         Boolean.TRUE.equals(session.getIsSuspicious()),
                         session.getSuspiciousReason(),
-                        "SEDAN_HATCHBACK",
+                        resolvedVehicleType,
                         session.getCheckInTime()
                     ));
                 }

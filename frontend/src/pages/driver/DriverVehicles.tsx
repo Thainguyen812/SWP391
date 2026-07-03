@@ -91,7 +91,12 @@ export function DriverVehicles() {
 
                   {/* Registered Vehicle Listings list */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {vehicles.map(v => (
+                    {vehicles.filter((v: any) => {
+                      if (!searchSupportQuery) return true;
+                      return (v.plate || '').toLowerCase().includes(searchSupportQuery.toLowerCase()) ||
+                             (v.name || '').toLowerCase().includes(searchSupportQuery.toLowerCase()) ||
+                             (v.type || '').toLowerCase().includes(searchSupportQuery.toLowerCase());
+                    }).map((v: any) => (
                       <div 
                         key={v.id} 
                         className={`bg-white rounded-3xl border overflow-hidden flex flex-col justify-between transition-all hover:shadow-md ${

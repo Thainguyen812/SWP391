@@ -189,7 +189,8 @@ public class DriverController {
                 item.put("date", dateStr);
                 
                 String packName = "Thẻ Tháng VIP";
-                if ("QUARTERLY".equals(sub.getSubscriptionType())) packName = "Thẻ 3 Tháng VIP";
+                if ("DAILY".equals(sub.getSubscriptionType()) || "DAY".equals(sub.getSubscriptionType())) packName = "Vé Ngày";
+                else if ("QUARTERLY".equals(sub.getSubscriptionType())) packName = "Thẻ 3 Tháng VIP";
                 else if ("HALF_YEARLY".equals(sub.getSubscriptionType())) packName = "Thẻ 6 Tháng VIP";
                 else if ("YEARLY".equals(sub.getSubscriptionType())) packName = "Thẻ 1 Năm VIP";
                 
@@ -203,7 +204,8 @@ public class DriverController {
                 try {
                     long feeLong = Long.parseLong(feeVal);
                     if (feeLong == 0) {
-                        if ("QUARTERLY".equals(sub.getSubscriptionType())) feeLong = 2700000;
+                        if ("DAILY".equals(sub.getSubscriptionType()) || "DAY".equals(sub.getSubscriptionType())) feeLong = 50000;
+                        else if ("QUARTERLY".equals(sub.getSubscriptionType())) feeLong = 2700000;
                         else if ("HALF_YEARLY".equals(sub.getSubscriptionType())) feeLong = 5000000;
                         else if ("YEARLY".equals(sub.getSubscriptionType())) feeLong = 9000000;
                         else feeLong = 1000000;
