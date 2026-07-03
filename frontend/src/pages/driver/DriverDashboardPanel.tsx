@@ -35,7 +35,8 @@ export function DriverDashboardPanel() {
     searchSupportQuery, setSearchSupportQuery, expandedFaq, setExpandedFaq,
     ticketTopic, setTicketTopic, ticketMessage, setTicketMessage,
     ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout,
-    activeQrToken, qrExpiryTime, isGeneratingQr, countdownSec
+    activeQrToken, qrExpiryTime, isGeneratingQr, countdownSec,
+    isQrRequested, setIsQrRequested
   } = ctx;
 
   return (
@@ -212,6 +213,28 @@ export function DriverDashboardPanel() {
                           const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
                           if (!activeVeh) return null;
                           const qrValueString = `${activeVeh.plate}|${qrDirection}|${Date.now()}`;
+                          if (!isQrRequested) {
+                            return (
+                              <div className="bg-slate-50 rounded-2xl border border-slate-150 p-6 flex flex-col items-center justify-center text-center space-y-4">
+                                <div className="p-4 bg-blue-50 rounded-full text-blue-650 border border-blue-100/80">
+                                  <QrCode className="w-10 h-10 opacity-75" />
+                                </div>
+                                <div className="space-y-1">
+                                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide">Mã QR đang ẩn</h4>
+                                  <p className="text-[10.5px] text-slate-500 max-w-[260px] leading-relaxed">
+                                    Để bảo mật thông tin ra vào, vui lòng nhấn nút bên dưới để tạo mã QR động có hiệu lực trong 5 phút.
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsQrRequested(true)}
+                                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer transition-all active:scale-95 shrink-0"
+                                >
+                                  Yêu cầu xuất mã QR
+                                </button>
+                              </div>
+                            );
+                          }
                           return (
                             <div className="bg-slate-50 rounded-2xl border border-slate-150 p-5 flex flex-col items-center justify-center space-y-4">
                               <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-inner w-44 h-44 flex flex-col items-center justify-center relative group">
@@ -220,39 +243,11 @@ export function DriverDashboardPanel() {
                                 <div className="absolute top-2 right-2 w-3 h-3 border-t-2 border-r-2 border-blue-600" />
                                 <div className="absolute bottom-2 left-2 w-3 h-3 border-b-2 border-l-2 border-blue-600" />
                                 <div className="absolute bottom-2 right-2 w-3 h-3 border-b-2 border-r-2 border-blue-600" />
-
-                                {/* A highly stylized custom vector matrix blocks grid representing a high contrast QR code */}
-                                <div className="grid grid-cols-5 gap-1.5 w-28 h-28 opacity-95">
-                                  <div className="bg-slate-900 rounded" />
-                                  <div className="bg-slate-900 rounded" />
-                                  <div className="bg-slate-900 rounded" />
-                                  <div className="bg-slate-300 rounded" />
-                                  <div className="bg-slate-900 rounded" />
-
-                                  <div className="bg-slate-900 rounded" />
-                                  <div className="bg-slate-300 rounded" />
-                                  <div className="bg-slate-900 rounded" />
-                                  <div className="bg-slate-900 rounded" />
-                                  <div className="bg-slate-900 rounded" />
-
-                                  <div className="bg-slate-900 rounded" />
-                                  <div className="bg-slate-900 rounded" />
-                                  <div className="bg-sky-500 rounded animate-pulse" />
-                                  <div className="bg-slate-300 rounded" />
-                                  <div className="bg-slate-900 rounded" />
-
-                                  <div className="bg-slate-300 rounded" />
-                                  <div className="bg-slate-900 rounded" />
-                                  <div className="bg-slate-900 rounded" />
-                                  <div className="bg-slate-900 rounded" />
-                                  <div className="bg-slate-300 rounded" />
-
-                                  <div className="bg-slate-900 rounded" />
-                                  <div className="bg-slate-900 rounded" />
-                                  <div className="bg-slate-300 rounded" />
-                                  <div className="bg-slate-900 rounded" />
-                                  <div className="bg-slate-900 rounded" />
-                                </div>
+                                <img
+                                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(activeQrToken || qrValueString)}`}
+                                  alt="QR Code"
+                                  className="w-28 h-28 object-contain"
+                                />
 
                                 <div className="text-[8px] text-blue-600 font-bold block bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 mt-2">
                                   MÃ VÉ KHÁCH VIP
@@ -266,16 +261,25 @@ export function DriverDashboardPanel() {
                                 </strong>
                               </div>
 
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(activeQrToken || qrValueString);
-                                  triggerToast("📋 Sao chép mã chữ ký số bốt gác thành công!", "success");
-                                }}
-                                className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs rounded-xl active:scale-95 transition-all outline-none"
-                              >
-                                Sao chép Mã QR văn bản
-                              </button>
+                              <div className="w-full space-y-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(activeQrToken || qrValueString);
+                                    triggerToast("📋 Sao chép mã chữ ký số bốt gác thành công!", "success");
+                                  }}
+                                  className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs rounded-xl active:scale-95 transition-all outline-none"
+                                >
+                                  Sao chép Mã QR văn bản
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsQrRequested(false)}
+                                  className="w-full py-2 bg-rose-55 hover:bg-rose-100 text-rose-700 font-extrabold text-xs rounded-xl active:scale-95 transition-all outline-none border border-rose-200/50"
+                                >
+                                  Ẩn mã QR bảo mật
+                                </button>
+                              </div>
 
                               {qrExpiryTime && (
                                 <p className="text-[10px] text-slate-400 text-center font-semibold pt-1">
