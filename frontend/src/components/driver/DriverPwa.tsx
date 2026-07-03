@@ -2177,13 +2177,25 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           {transactions.slice(0, 3).map(tx => (
                             <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors">
                               <td className="py-3.5 px-4 font-medium text-slate-500">{tx.date}</td>
-                              <td className="py-3.5 px-4 font-black">
-                                <span className={`inline-flex items-center gap-1.5 ${tx.isEntry ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                  {tx.isEntry ? '➔ Xe vào' : '➔ Xe ra'}
+                               <td className="py-3.5 px-4 font-black">
+                                <span className={`inline-flex items-center gap-1.5 ${
+                                  tx.type?.includes('Đăng kí') || tx.type?.includes('Thanh toán') || tx.type?.includes('Nạp tiền')
+                                    ? 'text-blue-600 font-semibold' 
+                                    : tx.isEntry 
+                                      ? 'text-emerald-600' 
+                                      : 'text-rose-600'
+                                }`}>
+                                  {tx.type?.includes('Đăng kí') || tx.type?.includes('Thanh toán') || tx.type?.includes('Nạp tiền') ? tx.type : (tx.isEntry ? '➔ Xe vào' : '➔ Xe ra')}
                                 </span>
                               </td>
-                              <td className="py-3.5 px-4 font-mono font-bold text-slate-700">{tx.plate}</td>
-                              <td className={`py-3.5 px-4 text-right font-bold ${tx.isEntry ? 'text-slate-400' : 'text-rose-600 font-mono'}`}>
+                              <td className="py-3.5 px-4 font-mono font-bold text-slate-700">{tx.plate === '-' ? '—' : tx.plate}</td>
+                              <td className={`py-3.5 px-4 text-right font-bold ${
+                                tx.type?.includes('Nạp tiền')
+                                  ? 'text-emerald-600 font-mono'
+                                  : tx.isEntry 
+                                    ? 'text-slate-400' 
+                                    : 'text-rose-600 font-mono'
+                              }`}>
                                 {tx.fee}
                               </td>
                             </tr>
