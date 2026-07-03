@@ -120,7 +120,7 @@ public class RevenueController {
     }
 
     @PostMapping("/transactions/mock")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
     public Map<String, Object> mockTransaction(@RequestBody Map<String, Object> payload) {
         Transaction t = new Transaction();
         t.setPaymentMethod(Transaction.PaymentMethod.CASH);
