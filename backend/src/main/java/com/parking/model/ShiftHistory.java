@@ -32,16 +32,16 @@ public class ShiftHistory {
     @Column(name = "is_current")
     private Boolean isCurrent;
 
-    @Column(name = "system_revenue")
+    @Column(name = "system_revenue", columnDefinition = "numeric(19, 2)")
     private Double systemRevenue;
 
-    @Column(name = "system_cash")
+    @Column(name = "system_cash", columnDefinition = "numeric(19, 2)")
     private Double systemCash;
 
-    @Column(name = "system_transfer")
+    @Column(name = "system_transfer", columnDefinition = "numeric(19, 2)")
     private Double systemTransfer;
 
-    @Column(name = "declared_cash")
+    @Column(name = "declared_cash", columnDefinition = "numeric(19, 2)")
     private Double declaredCash;
 
     @Column(name = "next_staff_id")
