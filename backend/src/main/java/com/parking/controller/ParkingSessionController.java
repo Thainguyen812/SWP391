@@ -172,6 +172,18 @@ public class ParkingSessionController {
         }
     }
 
+    @PostMapping("/approve-exit")
+    @PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
+    public ResponseEntity<?> approveExit(@RequestBody java.util.Map<String, String> payload) {
+        String plate = payload.get("plate");
+        try {
+            parkingService.approveExit(plate);
+            return ResponseEntity.ok(java.util.Collections.singletonMap("success", true));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     // 7. Xem thống kê lưu lượng xe trong ngày (Chỉ dành cho Manager và Admin xem
     // báo cáo)
     @GetMapping("/daily-volume")
