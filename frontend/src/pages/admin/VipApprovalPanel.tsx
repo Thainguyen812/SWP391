@@ -85,7 +85,7 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
             return {
               id: bp.id,
               vehicle_plate: bp.licensePlate || `XE-${bp.vehicleId}`,
-              type: bp.subscriptionType === 'YEARLY' ? 'Thẻ Năm VIP' : bp.subscriptionType === 'QUARTERLY' ? 'Thẻ 3 Tháng VIP' : 'Thẻ Tháng VIP',
+              type: bp.subscriptionType === 'YEARLY' ? 'Thẻ Năm VIP' : bp.subscriptionType === 'QUARTERLY' ? 'Thẻ 3 Tháng VIP' : bp.subscriptionType === 'HALF_YEARLY' ? 'Thẻ 6 Tháng VIP' : bp.subscriptionType === 'DAILY' ? 'Vé Ngày' : 'Thẻ Tháng VIP',
               startDate: bp.startDate ? new Date(bp.startDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
               endDate: bp.endDate ? new Date(bp.endDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
               status: bp.status === 'PENDING_APPROVAL' ? 'PENDING' : bp.status,
