@@ -488,6 +488,49 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     return [];
   });
 
+  // Seeder effect to load and keep transactions list up-to-date when user logs in
+  useEffect(() => {
+    if (user && (user.username === 'phuongbui10022005@gmail.com' || user.email === 'phuongbui10022005@gmail.com')) {
+      const saved = localStorage.getItem('urbanpark_user_transactions_phuongbui10022005@gmail.com');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const cleaned = parsed.filter(tx => !tx.type.includes('Vé Ngày') && !tx.type.includes('1 ngày') && !tx.id.includes('1783040011082'));
+            setTransactions(cleaned);
+            localStorage.setItem('urbanpark_user_transactions_phuongbui10022005@gmail.com', JSON.stringify(cleaned));
+            return;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      
+      const mockHistory = [
+        {
+          id: 'txn-1783040011084',
+          date: '03/07/2026 07:20:55',
+          type: 'Đăng kí Thẻ Tháng VIP (Ví UrbanPark)',
+          plate: '10K-348.29',
+          fee: '-1.400.000đ',
+          isEntry: false,
+          status: 'Thành công'
+        },
+        {
+          id: 'txn-1783040011083',
+          date: '03/07/2026 07:20:45',
+          type: 'Nạp tiền vào tài khoản',
+          plate: '-',
+          fee: '+1.150.000đ',
+          isEntry: true,
+          status: 'Thành công'
+        }
+      ];
+      localStorage.setItem('urbanpark_user_transactions_phuongbui10022005@gmail.com', JSON.stringify(mockHistory));
+      setTransactions(mockHistory);
+    }
+  }, [user]);
+
   // Current parked vehicle mock details
   const [currentParked, setCurrentParked] = useState<{
     plate: string;
