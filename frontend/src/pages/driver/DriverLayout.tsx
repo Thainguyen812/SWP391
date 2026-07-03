@@ -169,7 +169,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify({
           vehicleId: vehicleId,
@@ -242,7 +242,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     if (isOffline) return; // Skip API calls when offline
     try {
       const response = await fetch('/api/vehicles', {
-        headers: { 'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}` }
       });
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
@@ -375,13 +375,24 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     return () => clearInterval(timer);
   }, []);
 
-  const [transactions, setTransactions] = useState<TransactionItem[]>([]);
+  const [transactions, setTransactions] = useState<TransactionItem[]>(() => {
+    const saved = localStorage.getItem(`urbanpark_user_transactions_${user?.username || 'default'}`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    return [];
+  });
 
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
         const response = await fetch('/api/logs', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}` }
         });
         if (response.ok) {
           const data = await response.json();
@@ -395,7 +406,10 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               isEntry: item.action === 'Vào bãi',
               status: item.status === 'Thành Công' ? 'Thành công' : 'Đang xử lý'
             }));
-            setTransactions(mapped);
+            setTransactions(prev => {
+              const localPayments = prev.filter(tx => !tx.id.startsWith('#TRX-'));
+              return [...localPayments, ...mapped];
+            });
           }
         }
       } catch (err) {
@@ -697,7 +711,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify(payload)
       });
@@ -836,7 +850,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify(payload)
       });
@@ -886,7 +900,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify({ plate: plate, isLocked: nextState })
       });
@@ -913,7 +927,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify({ plate: plateStr, isLocked: !currentIsLocked })
       });

@@ -267,7 +267,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify({
           vehicleId: vehicleId,
@@ -340,7 +340,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     if (isOffline) return; // Skip API calls when offline
     try {
       const response = await fetch('/api/vehicles', {
-        headers: { 'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}` }
       });
       const data = await response.json();
       const vehicleList = Array.isArray(data) ? data : (data && data.success && Array.isArray(data.data) ? data.data : null);
@@ -487,6 +487,49 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     }
     return [];
   });
+
+  // Seeder effect to load and keep transactions list up-to-date when user logs in
+  useEffect(() => {
+    if (user && (user.username === 'phuongbui10022005@gmail.com' || user.email === 'phuongbui10022005@gmail.com')) {
+      const saved = localStorage.getItem('urbanpark_user_transactions_phuongbui10022005@gmail.com');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const cleaned = parsed.filter(tx => !tx.type.includes('Vé Ngày') && !tx.type.includes('1 ngày') && !tx.id.includes('1783040011082'));
+            setTransactions(cleaned);
+            localStorage.setItem('urbanpark_user_transactions_phuongbui10022005@gmail.com', JSON.stringify(cleaned));
+            return;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      
+      const mockHistory = [
+        {
+          id: 'txn-1783040011084',
+          date: '03/07/2026 07:20:55',
+          type: 'Đăng kí Thẻ Tháng VIP (Ví UrbanPark)',
+          plate: '10K-348.29',
+          fee: '-1.400.000đ',
+          isEntry: false,
+          status: 'Thành công'
+        },
+        {
+          id: 'txn-1783040011083',
+          date: '03/07/2026 07:20:45',
+          type: 'Nạp tiền vào tài khoản',
+          plate: '-',
+          fee: '+1.150.000đ',
+          isEntry: true,
+          status: 'Thành công'
+        }
+      ];
+      localStorage.setItem('urbanpark_user_transactions_phuongbui10022005@gmail.com', JSON.stringify(mockHistory));
+      setTransactions(mockHistory);
+    }
+  }, [user]);
 
   // Current parked vehicle mock details
   const [currentParked, setCurrentParked] = useState<{
@@ -805,7 +848,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify(payload)
       });
@@ -948,7 +991,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify(payload)
       });
@@ -1012,7 +1055,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
         body: JSON.stringify({ plate: plateStr, isLocked: !currentIsLocked })
       });
@@ -1249,7 +1292,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
           const dMonth = parseInt(parts[1], 10) - 1; // 0-11
           const dYear = parseInt(parts[2], 10);
           
-          const feeStr = tx.fee ? tx.fee.replace(/[-+$₫]/g, '').replace(/,/g, '').trim() : '';
+          const feeStr = tx.fee
+            ? tx.fee.includes('$')
+              ? tx.fee.replace(/[-+$₫]/g, '').replace(/,/g, '').trim()
+              : tx.fee.replace(/[-+$₫]/g, '').replace(/[,.]/g, '').trim()
+            : '';
           const value = parseFloat(feeStr);
           if (!isNaN(value)) {
             const valVND = tx.fee && tx.fee.includes('$') ? value * 25000 : value;
@@ -1642,6 +1689,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
               <input 
                 type="text" 
                 placeholder={activeTab === 'vehicles' ? 'Tìm biển số xe...' : 'Tìm dịch vụ bãi đỗ...'}
+                value={searchSupportQuery}
+                onChange={(e) => setSearchSupportQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-slate-50 hover:bg-slate-100 focus:bg-white text-xs border border-slate-200 focus:border-blue-500 rounded-full font-medium"
               />
             </div>
@@ -2177,13 +2226,25 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           {transactions.slice(0, 3).map(tx => (
                             <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors">
                               <td className="py-3.5 px-4 font-medium text-slate-500">{tx.date}</td>
-                              <td className="py-3.5 px-4 font-black">
-                                <span className={`inline-flex items-center gap-1.5 ${tx.isEntry ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                  {tx.isEntry ? '➔ Xe vào' : '➔ Xe ra'}
+                               <td className="py-3.5 px-4 font-black">
+                                <span className={`inline-flex items-center gap-1.5 ${
+                                  tx.type?.includes('Đăng kí') || tx.type?.includes('Thanh toán') || tx.type?.includes('Nạp tiền')
+                                    ? 'text-blue-600 font-semibold' 
+                                    : tx.isEntry 
+                                      ? 'text-emerald-600' 
+                                      : 'text-rose-600'
+                                }`}>
+                                  {tx.type?.includes('Đăng kí') || tx.type?.includes('Thanh toán') || tx.type?.includes('Nạp tiền') ? tx.type : (tx.isEntry ? '➔ Xe vào' : '➔ Xe ra')}
                                 </span>
                               </td>
-                              <td className="py-3.5 px-4 font-mono font-bold text-slate-700">{tx.plate}</td>
-                              <td className={`py-3.5 px-4 text-right font-bold ${tx.isEntry ? 'text-slate-400' : 'text-rose-600 font-mono'}`}>
+                              <td className="py-3.5 px-4 font-mono font-bold text-slate-700">{tx.plate === '-' ? '—' : tx.plate}</td>
+                              <td className={`py-3.5 px-4 text-right font-bold ${
+                                tx.type?.includes('Nạp tiền')
+                                  ? 'text-emerald-600 font-mono'
+                                  : tx.isEntry 
+                                    ? 'text-slate-400' 
+                                    : 'text-rose-600 font-mono'
+                              }`}>
                                 {tx.fee}
                               </td>
                             </tr>
@@ -2225,7 +2286,12 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                   {/* Registered Vehicle Listings list */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {vehicles.map(v => (
+                    {vehicles.filter(v => {
+                      if (!searchSupportQuery) return true;
+                      return (v.plate || '').toLowerCase().includes(searchSupportQuery.toLowerCase()) ||
+                             (v.name || '').toLowerCase().includes(searchSupportQuery.toLowerCase()) ||
+                             (v.type || '').toLowerCase().includes(searchSupportQuery.toLowerCase());
+                    }).map(v => (
                       <div 
                         key={v.id} 
                         className={`bg-white rounded-3xl border overflow-hidden flex flex-col justify-between transition-all hover:shadow-md ${
@@ -2309,26 +2375,21 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                            {/* Lock Trigger Controller */}
                            <div className="flex items-center justify-between gap-3 pt-1">
                              {v.activeSubscription ? (
-                               <button
-                                 onClick={() => toggleVehicleLock(v.id, v.plate)}
-                                 className={`flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] ${
-                                   v.isLocked 
-                                     ? 'bg-rose-100 hover:bg-rose-200 text-rose-600' 
-                                     : 'bg-blue-50 hover:bg-blue-100 text-blue-600'
-                                 }`}
-                               >
-                                 {v.isLocked ? (
-                                   <>
-                                     <Lock className="w-4 h-4 text-rose-500 animate-pulse" />
-                                     <span>Mở khoá an ninh</span>
-                                   </>
-                                 ) : (
-                                   <>
-                                     <Unlock className="w-4 h-4 text-blue-500" />
-                                     <span>Khoá an toàn xe</span>
-                                   </>
-                                 )}
-                               </button>
+                                v.isLocked ? (
+                                  <div
+                                    className="flex-1 py-2 bg-rose-50 text-rose-600 border border-rose-200/50 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-default select-none"
+                                  >
+                                    <Lock className="w-4 h-4 text-rose-500" />
+                                    <span>Xe đang khoá bảo vệ</span>
+                                  </div>
+                                ) : (
+                                  <div
+                                    className="flex-1 py-2 bg-slate-50 text-slate-600 border border-slate-200/50 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-default select-none"
+                                  >
+                                    <Unlock className="w-4 h-4 text-slate-400" />
+                                    <span>Xe đang mở khoá</span>
+                                  </div>
+                                )
                              ) : (
                                <button
                                  onClick={() => {
@@ -2534,14 +2595,6 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             const pricing = VEHICLE_PRICING[selectedVehicleType] || VEHICLE_PRICING['Ô tô gầm thấp 4-5 chỗ'];
                             return [
                               { 
-                                id: 'pkg-1', 
-                                label: 'Vé Ngày', 
-                                price: pricing.day, 
-                                desc: 'Giá trị trong 24 giờ kể từ thời điểm đăng ký.', 
-                                badge: 'RA VÀO NHIỀU LẦN', 
-                                features: [] 
-                              },
-                              { 
                                 id: 'pkg-2', 
                                 label: 'Thẻ Tháng VIP', 
                                 price: pricing.month, 
@@ -2549,7 +2602,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 badge: 'PHỔ BIẾN', 
                                 features: [
                                   'Chỗ đỗ xe cố định (Tầng B1)',
-                                  'Rửa xe miễn phí 1 lần/tháng',
+                                  'Thanh toán bằng mã QR code lưu động',
                                   'Hỗ trợ kỹ thuật 24/7 tức thì'
                                 ] 
                               },
@@ -2561,7 +2614,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 badge: 'TIẾT KIỆM', 
                                 features: [
                                   'Chỗ đỗ xe cố định (Tầng B1)',
-                                  'Rửa xe miễn phí 1 lần/tháng',
+                                  'Thanh toán bằng mã QR code lưu động',
                                   'Hỗ trợ kỹ thuật 24/7 tức thì'
                                 ] 
                               },
@@ -2573,7 +2626,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 badge: 'ƯU ĐÃI LỚN', 
                                 features: [
                                   'Chỗ đỗ xe cố định (Tầng B1)',
-                                  'Rửa xe miễn phí 1 lần/tháng',
+                                  'Thanh toán bằng mã QR code lưu động',
                                   'Hỗ trợ kỹ thuật 24/7 tức thì'
                                 ] 
                               },
@@ -2585,7 +2638,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 badge: 'SIÊU TIẾT KIỆM', 
                                 features: [
                                   'Chỗ đỗ xe cố định (Tầng B1)',
-                                  'Rửa xe miễn phí 1 lần/tháng',
+                                  'Thanh toán bằng mã QR code lưu động',
                                   'Hỗ trợ kỹ thuật 24/7 tức thì'
                                 ] 
                               }

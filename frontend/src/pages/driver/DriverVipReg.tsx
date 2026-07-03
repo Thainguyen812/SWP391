@@ -92,7 +92,7 @@ export function DriverVipReg() {
       badge: 'PHỔ BIẾN', 
       features: [
         'Chỗ đỗ xe cố định (Tầng B1)',
-        'Rửa xe miễn phí 1 lần/tháng',
+        'Thanh toán bằng mã QR code lưu động',
         'Hỗ trợ kỹ thuật 24/7 tức thì'
       ] 
     },
@@ -126,7 +126,7 @@ export function DriverVipReg() {
       badge: 'VIP CLUB', 
       features: [
         'Quyền lợi tương đương Thẻ Tháng VIP',
-        'Miễn phí 12 lần rửa xe/năm',
+        'Thanh toán bằng mã QR code lưu động',
         'Tặng bộ quà tặng thành viên UrbanPark'
       ] 
     }

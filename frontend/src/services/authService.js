@@ -79,8 +79,8 @@ export const authService = {
         email: username.includes('@') ? username : `${username}@urbanpark.com`,
         phone: username.match(/^\d+$/) ? username : '0912345678'
       };
-      localStorage.setItem('token', 'mock-jwt-token-12345');
-      localStorage.setItem('user', JSON.stringify(mockUser));
+      sessionStorage.setItem('token', 'mock-jwt-token-12345'); localStorage.setItem('token', 'mock-jwt-token-12345');
+      sessionStorage.setItem('user', JSON.stringify(mockUser)); localStorage.setItem('user', JSON.stringify(mockUser));
 
       // Xóa dữ liệu cache của người dùng cũ để tránh hiển thị chéo dữ liệu
       clearUserCache();
@@ -111,12 +111,12 @@ export const authService = {
         const { accessToken, refreshToken, user } = response;
 
         // CẤT TOKEN VÀO KHO
-        localStorage.setItem('token', accessToken);
+        sessionStorage.setItem('token', accessToken); localStorage.setItem('token', accessToken);
         if (refreshToken) {
-          localStorage.setItem('refreshToken', refreshToken);
+          sessionStorage.setItem('refreshToken', refreshToken); localStorage.setItem('refreshToken', refreshToken);
         }
         if (user) {
-          localStorage.setItem('user', JSON.stringify(user));
+          sessionStorage.setItem('user', JSON.stringify(user)); localStorage.setItem('user', JSON.stringify(user));
         }
 
         // Xóa dữ liệu cache của người dùng cũ để tránh hiển thị chéo dữ liệu
@@ -190,9 +190,7 @@ export const authService = {
 
   logout: () => {
     // Xóa toàn bộ token và thông tin người dùng khỏi localStorage
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('token'); sessionStorage.removeItem('refreshToken'); sessionStorage.removeItem('user'); localStorage.removeItem('token'); localStorage.removeItem('refreshToken'); localStorage.removeItem('user');
     
     // Xóa dữ liệu cache của tài xế để tránh hiển thị chéo giữa các tài khoản
     clearUserCache();
@@ -203,12 +201,12 @@ export const authService = {
 
   isAuthenticated: () => {
     // Kiểm tra xem có token trong kho không
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
     return !!token;
   },
 
   getUser: () => {
-    const userStr = localStorage.getItem('user');
+    const userStr = sessionStorage.getItem('user') || localStorage.getItem('user');
     if (!userStr) return null;
     try {
       return JSON.parse(userStr);
