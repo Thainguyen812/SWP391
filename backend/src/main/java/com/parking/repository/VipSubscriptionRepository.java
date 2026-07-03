@@ -9,6 +9,10 @@ import java.util.List;
 public interface VipSubscriptionRepository extends JpaRepository<VipSubscription, UUID> {
     Optional<VipSubscription> findByVehicleIdAndStatus(UUID vehicleId, VipSubscription.Status status);
 
+    List<VipSubscription> findByVehicleIdOrderByCreatedAtDesc(UUID vehicleId);
+
+    List<VipSubscription> findByVehicleId(UUID vehicleId);
+
     List<VipSubscription> findByStatus( // đăng ký vip
             VipSubscription.Status status);
 

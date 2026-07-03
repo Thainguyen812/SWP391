@@ -12,6 +12,8 @@ public interface VipService {
 
     List<VipSubscriptionResponseDTO> getPending();
 
+    List<VipSubscription> getAll();
+
     VipSubscription register(
             VipRegistrationRequest request);
 }

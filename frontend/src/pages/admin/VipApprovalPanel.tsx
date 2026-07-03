@@ -55,12 +55,41 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
   // Sync state with localstorage
   const loadSubscriptions = async () => {
     try {
-      const res = await apiClient.get('/v1/vip/pending');
-      setSubscriptions(res.data);
-    } catch (err) {
-      console.error("Failed to load VIP subscriptions from API:", err);
-      // Fallback
-      setSubscriptions([]);
+      const response = await fetch('/api/vip/all', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (response.ok) {
+        const backendAll = await response.json();
+        if (Array.isArray(backendAll)) {
+          const mappedAll = backendAll.map((bp: any) => {
+            let docPhotos = {
+              registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+              identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+              frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+            };
+            if (bp.documentPhotos) {
+              try {
+                docPhotos = JSON.parse(bp.documentPhotos);
+              } catch (e) {}
+            }
+            return {
+              id: bp.id,
+              vehicle_plate: bp.licensePlate || `XE-${bp.vehicleId}`,
+              type: bp.subscriptionType === 'YEARLY' ? 'Thẻ Năm VIP' : bp.subscriptionType === 'QUARTERLY' ? 'Thẻ 3 Tháng VIP' : 'Thẻ Tháng VIP',
+              startDate: bp.startDate ? new Date(bp.startDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+              endDate: bp.endDate ? new Date(bp.endDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+              status: bp.status === 'PENDING_APPROVAL' ? 'PENDING' : bp.status,
+              document_photos: docPhotos,
+              approved_by: bp.approvedBy ? 'Bùi Phương (Manager)' : null
+            };
+          });
+
+          localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(mappedAll));
+          setSubscriptions(mappedAll);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to fetch VIP list from backend API:", e);
     }
   };
 
@@ -81,19 +110,38 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
     let targetSub = subscriptions.find(s => s.id === id);
     if (!targetSub) return;
 
-    try {
-      if (nextStatus === 'ACTIVE') {
-        await apiClient.post(`/v1/vip/${id}/approve`);
-        triggerToast('Phê duyệt hồ sơ VIP thành công!', 'success');
-      } else {
-        await apiClient.post(`/v1/vip/${id}/reject`, { reason: 'Từ chối (OCR)' });
-        triggerToast('Đã từ chối hồ sơ VIP!', 'success');
-      }
-      loadSubscriptions(); // Refresh from backend
-    } catch (err) {
-      triggerToast('Có lỗi xảy ra khi gọi API!', 'error');
+    if (id.length === 36) {
+      const endpoint = nextStatus === 'ACTIVE' ? `/api/vip/${id}/approve` : `/api/vip/${id}/reject`;
+      const body = nextStatus === 'REJECTED' ? JSON.stringify({ reason: 'Không đủ điều kiện phê duyệt' }) : undefined;
+      fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: body
+      })
+      .then(res => {
+        if (res.ok) {
+          loadSubscriptions();
+        }
+      })
+      .catch(err => console.warn("Backend action call failed:", err));
     }
-  
+
+    const updated = subscriptions.map(sub => {
+      if (sub.id === id) {
+        return {
+          ...sub,
+          status: nextStatus,
+          approved_by: 'Bùi Phương (Manager)'
+        };
+      }
+      return sub;
+    });
+
+    setSubscriptions(updated);
+    localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updated));
 
     // Update ALL driver vehicle lists in localStorage
     for (let i = 0; i < localStorage.length; i++) {

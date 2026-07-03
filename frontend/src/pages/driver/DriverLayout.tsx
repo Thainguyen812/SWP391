@@ -257,7 +257,52 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
             let activeSub = undefined;
             let expiry = undefined;
             let subStatus = undefined;
-            if (savedSubs) {
+
+            if (v.subscriptionStatus) {
+              subStatus = v.subscriptionStatus === 'PENDING_APPROVAL' ? 'PENDING' : v.subscriptionStatus;
+              if (v.subscriptionStatus === 'ACTIVE') {
+                activeSub = v.subscriptionType;
+                expiry = v.subscriptionExpiry ? new Date(v.subscriptionExpiry).toLocaleDateString('vi-VN') : undefined;
+              }
+
+              // Sync back to localStorage to keep other components in sync
+              try {
+                const subs = savedSubs ? JSON.parse(savedSubs) : [];
+                let changed = false;
+                let found = false;
+                const updatedSubs = subs.map((s: any) => {
+                  if (s.vehicle_plate === v.plate) {
+                    found = true;
+                    const newStatus = v.subscriptionStatus === 'PENDING_APPROVAL' ? 'PENDING' : v.subscriptionStatus;
+                    if (s.status !== newStatus) {
+                      changed = true;
+                      return { 
+                        ...s, 
+                        status: newStatus,
+                        endDate: v.subscriptionExpiry ? new Date(v.subscriptionExpiry).toLocaleDateString('vi-VN') : s.endDate
+                      };
+                    }
+                  }
+                  return s;
+                });
+
+                if (!found && v.subscriptionStatus) {
+                  changed = true;
+                  updatedSubs.push({
+                    id: v.subscriptionId || `VIP-${Math.floor(1000 + Math.random() * 9000)}`,
+                    vehicle_plate: v.plate,
+                    type: v.subscriptionType || 'Thẻ Tháng VIP',
+                    startDate: new Date().toLocaleDateString('vi-VN'),
+                    endDate: v.subscriptionExpiry ? new Date(v.subscriptionExpiry).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+                    status: v.subscriptionStatus === 'PENDING_APPROVAL' ? 'PENDING' : v.subscriptionStatus
+                  });
+                }
+
+                if (changed) {
+                  localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updatedSubs));
+                }
+              } catch (err) {}
+            } else if (savedSubs) {
               try {
                 const subs = JSON.parse(savedSubs);
                 const matched = subs.filter((s: any) => s.vehicle_plate === v.plate);
