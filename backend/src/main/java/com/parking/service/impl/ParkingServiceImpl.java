@@ -1218,14 +1218,18 @@ public class ParkingServiceImpl implements ParkingService {
             subscription.setStartDate(startDate);
             String type = subscription.getSubscriptionType() != null ? subscription.getSubscriptionType().toUpperCase()
                     : "MONTHLY";
-            if ("MONTHLY".equals(type)) {
-                subscription.setEndDate(startDate.plusMonths(1));
+            if ("DAILY".equals(type) || "DAY".equals(type)) {
+                subscription.setEndDate(startDate.plusDays(1));
+            } else if ("MONTHLY".equals(type)) {
+                subscription.setEndDate(startDate.plusDays(30));
             } else if ("QUARTERLY".equals(type) || "QUATERLY".equals(type)) {
-                subscription.setEndDate(startDate.plusMonths(3));
+                subscription.setEndDate(startDate.plusDays(90));
+            } else if ("HALF_YEARLY".equals(type) || "6_MONTHS".equals(type) || "6_MONTH".equals(type)) {
+                subscription.setEndDate(startDate.plusDays(180));
             } else if ("YEARLY".equals(type) || "YEAR".equals(type)) {
-                subscription.setEndDate(startDate.plusYears(1));
+                subscription.setEndDate(startDate.plusDays(365));
             } else {
-                subscription.setEndDate(startDate.plusMonths(1));
+                subscription.setEndDate(startDate.plusDays(30));
             }
         }
 

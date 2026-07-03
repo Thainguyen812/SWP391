@@ -16,6 +16,10 @@ import com.parking.model.User;
 import com.parking.repository.UserRepository;
 import com.parking.repository.VipSubscriptionRepository;
 import com.parking.model.VipSubscription;
+import com.parking.model.ParkingSession;
+import com.parking.repository.ParkingSessionRepository;
+import com.parking.repository.SecurityAlertRepository;
+import com.parking.model.SecurityAlert;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -33,15 +37,21 @@ public class VehicleController {
 private final VehicleRepository repo;
 private final UserRepository userRepo;
 private final VipSubscriptionRepository vipSubscriptionRepository;
+private final ParkingSessionRepository sessionRepo;
+private final SecurityAlertRepository securityAlertRepository;
 
 public VehicleController(
         VehicleRepository repo,
         UserRepository userRepo,
-        VipSubscriptionRepository vipSubscriptionRepository) {
+        VipSubscriptionRepository vipSubscriptionRepository,
+        ParkingSessionRepository sessionRepo,
+        SecurityAlertRepository securityAlertRepository) {
 
 this.repo = repo;
 this.userRepo = userRepo;
 this.vipSubscriptionRepository = vipSubscriptionRepository;
+this.sessionRepo = sessionRepo;
+this.securityAlertRepository = securityAlertRepository;
 }
 
     @GetMapping
@@ -81,7 +91,9 @@ this.vipSubscriptionRepository = vipSubscriptionRepository;
                 map.put("subscriptionStatus", latestSub.getStatus().name());
                 
                 String typeStr = "Thẻ Tháng VIP";
-                if ("QUARTERLY".equals(latestSub.getSubscriptionType())) {
+                if ("DAILY".equals(latestSub.getSubscriptionType()) || "DAY".equals(latestSub.getSubscriptionType())) {
+                    typeStr = "Vé Ngày";
+                } else if ("QUARTERLY".equals(latestSub.getSubscriptionType())) {
                     typeStr = "Thẻ 3 Tháng VIP";
                 } else if ("HALF_YEARLY".equals(latestSub.getSubscriptionType())) {
                     typeStr = "Thẻ 6 Tháng VIP";
@@ -302,20 +314,59 @@ User currentUser = userRepo
     @PostMapping("/lock")
     public ResponseEntity<?> lockVehicle(@RequestBody VehicleLockRequest request) {
         boolean isLocked = request.getIsLocked() != null && request.getIsLocked();
+        System.out.println("[LOCK_VEHICLE] Plate: " + request.getPlate() + ", isLocked: " + isLocked);
 
         Optional<Vehicle> optVehicle = repo.findByLicensePlate(request.getPlate());
         if (optVehicle.isPresent()) {
             Vehicle v = optVehicle.get();
+            System.out.println("[LOCK_VEHICLE] Found vehicle: " + v.getId());
 
             // Chỉ cho phép khóa xe nếu xe đó đã đăng ký VIP và gói cước đang ACTIVE
             Optional<com.parking.model.VipSubscription> vipSub = vipSubscriptionRepository
                     .findByVehicleIdAndStatus(v.getId(), com.parking.model.VipSubscription.Status.ACTIVE);
             if (vipSub.isEmpty()) {
+                System.out.println("[LOCK_VEHICLE] No active VIP subscription for vehicle: " + v.getId());
                 return ResponseEntity.badRequest().body(java.util.Map.of("success", false, "message", "Chỉ phương tiện có gói VIP đang hoạt động mới được sử dụng tính năng khóa xe!"));
             }
 
             v.setLocked(isLocked);
             repo.save(v);
+            System.out.println("[LOCK_VEHICLE] Saved vehicle locked status: " + isLocked);
+
+            // 1. Create or resolve Security Alert logs
+            if (isLocked) {
+                SecurityAlert alert = new SecurityAlert();
+                alert.setAlertType("KHÓA CHỐNG TRỘM");
+                alert.setLicensePlate(v.getLicensePlate());
+                alert.setReason("Tài xế vừa bật khóa an ninh từ xa qua App");
+                alert.setIsActionable(false);
+                securityAlertRepository.save(alert);
+            } else {
+                List<SecurityAlert> activeAlerts = securityAlertRepository.findByIsResolvedFalseOrderByCreatedAtDesc().stream()
+                        .filter(a -> "KHÓA CHỐNG TRỘM".equals(a.getAlertType()) 
+                                && v.getLicensePlate().equals(a.getLicensePlate()))
+                        .toList();
+                for (SecurityAlert a : activeAlerts) {
+                    a.setIsResolved(true);
+                    a.setResolvedAt(java.time.LocalDateTime.now());
+                    securityAlertRepository.save(a);
+                }
+            }
+
+            // 2. Cập nhật cả session gửi xe hoạt động (nếu có)
+            List<ParkingSession> activeSessions = sessionRepo.findByVehicleIdAndSessionStatusIn(
+                    v.getId(),
+                    List.of(ParkingSession.SessionStatus.ACTIVE, ParkingSession.SessionStatus.PASSED_CONFIRMED));
+            if (!activeSessions.isEmpty()) {
+                for (ParkingSession session : activeSessions) {
+                    session.setIsLocked(isLocked);
+                    sessionRepo.save(session);
+                    System.out.println("[LOCK_VEHICLE] Updated session: " + session.getId() + " to locked: " + isLocked);
+                }
+            }
+        } else {
+            System.out.println("[LOCK_VEHICLE] Vehicle not found for plate: " + request.getPlate());
+            return ResponseEntity.badRequest().body(java.util.Map.of("success", false, "message", "Không tìm thấy phương tiện với biển số " + request.getPlate()));
         }
 
         String msg = isLocked ? "Kích hoạt radar khóa bánh thành công cho xe " + request.getPlate() + "!"
