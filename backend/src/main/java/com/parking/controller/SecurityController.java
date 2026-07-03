@@ -13,7 +13,8 @@ import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/security")
-@PreAuthorize("hasRole('ADMIN')") // Khóa chặt đồng bộ tuyệt đối với SecurityConfig
+// Bỏ khóa cứng class-level để mở cho method-level
+// @PreAuthorize("hasRole('ADMIN')") 
 public class SecurityController {
 
     private final SecurityPolicyRepository policyRepo;
@@ -24,6 +25,7 @@ public class SecurityController {
         this.alertRepo = alertRepo;
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/policies")
     public List<Map<String, Object>> getPolicies() {
         List<Map<String, Object>> result = new ArrayList<>();
@@ -38,6 +40,7 @@ public class SecurityController {
         return result;
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/policies")
     public Map<String, Object> updatePolicies(@RequestBody List<Map<String, Object>> policies) {
         for (Map<String, Object> pol : policies) {
@@ -57,6 +60,7 @@ public class SecurityController {
         return Map.of("success", true, "message", "Cập nhật chính sách thành công");
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping({ "/stats", "/rbac-stats" })
     public Map<String, Object> getSecurityStats() {
         Map<String, Object> result = new HashMap<>();
@@ -68,6 +72,7 @@ public class SecurityController {
         return result;
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/logs")
     public List<Map<String, Object>> getSecurityLogs() {
         return Arrays.asList(
@@ -77,6 +82,7 @@ public class SecurityController {
     }
 
     //hiện cảnh bảo trên hệ thống
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
     @GetMapping("/alerts")
     public List<Map<String, Object>> getSecurityAlerts() {
         List<SecurityAlert> alerts = alertRepo.findByIsResolvedFalseOrderByCreatedAtDesc();
@@ -99,6 +105,7 @@ public class SecurityController {
         return result;
     }
     // cập nhật trạng thái đã xử lý cho các cảnh báo 
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
     @PutMapping("/alerts/{id}/resolve")
     public Map<String, Object> resolveSecurityAlert(@PathVariable UUID id) {
 
