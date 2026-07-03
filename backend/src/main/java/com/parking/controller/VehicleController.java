@@ -18,6 +18,8 @@ import com.parking.repository.VipSubscriptionRepository;
 import com.parking.model.VipSubscription;
 import com.parking.model.ParkingSession;
 import com.parking.repository.ParkingSessionRepository;
+import com.parking.repository.SecurityAlertRepository;
+import com.parking.model.SecurityAlert;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,17 +38,20 @@ private final VehicleRepository repo;
 private final UserRepository userRepo;
 private final VipSubscriptionRepository vipSubscriptionRepository;
 private final ParkingSessionRepository sessionRepo;
+private final SecurityAlertRepository securityAlertRepository;
 
 public VehicleController(
         VehicleRepository repo,
         UserRepository userRepo,
         VipSubscriptionRepository vipSubscriptionRepository,
-        ParkingSessionRepository sessionRepo) {
+        ParkingSessionRepository sessionRepo,
+        SecurityAlertRepository securityAlertRepository) {
 
 this.repo = repo;
 this.userRepo = userRepo;
 this.vipSubscriptionRepository = vipSubscriptionRepository;
 this.sessionRepo = sessionRepo;
+this.securityAlertRepository = securityAlertRepository;
 }
 
     @GetMapping
@@ -182,7 +187,11 @@ this.sessionRepo = sessionRepo;
 
     vehicle.setColorRgb(request.getColorRgb());
 
-    vehicle.setBodyShape(request.getBodyShape());
+    String safeBodyShape = request.getBodyShape();
+    if (safeBodyShape == null || safeBodyShape.trim().isEmpty() || safeBodyShape.contains(" ")) {
+        safeBodyShape = request.getVehicleSize() != null ? request.getVehicleSize() : "SEDAN_HATCHBACK";
+    }
+    vehicle.setBodyShape(safeBodyShape);
 
     vehicle.setBrand(request.getBrand());
     vehicle.setFuelType(request.getFuelType());
@@ -324,7 +333,27 @@ User currentUser = userRepo
             repo.save(v);
             System.out.println("[LOCK_VEHICLE] Saved vehicle locked status: " + isLocked);
 
-            // Cập nhật cả session gửi xe hoạt động (nếu có)
+            // 1. Create or resolve Security Alert logs
+            if (isLocked) {
+                SecurityAlert alert = new SecurityAlert();
+                alert.setAlertType("KHÓA CHỐNG TRỘM");
+                alert.setLicensePlate(v.getLicensePlate());
+                alert.setReason("Tài xế vừa bật khóa an ninh từ xa qua App");
+                alert.setIsActionable(false);
+                securityAlertRepository.save(alert);
+            } else {
+                List<SecurityAlert> activeAlerts = securityAlertRepository.findByIsResolvedFalseOrderByCreatedAtDesc().stream()
+                        .filter(a -> "KHÓA CHỐNG TRỘM".equals(a.getAlertType()) 
+                                && v.getLicensePlate().equals(a.getLicensePlate()))
+                        .toList();
+                for (SecurityAlert a : activeAlerts) {
+                    a.setIsResolved(true);
+                    a.setResolvedAt(java.time.LocalDateTime.now());
+                    securityAlertRepository.save(a);
+                }
+            }
+
+            // 2. Cập nhật cả session gửi xe hoạt động (nếu có)
             List<ParkingSession> activeSessions = sessionRepo.findByVehicleIdAndSessionStatusIn(
                     v.getId(),
                     List.of(ParkingSession.SessionStatus.ACTIVE, ParkingSession.SessionStatus.PASSED_CONFIRMED));

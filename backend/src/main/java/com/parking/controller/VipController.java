@@ -3,6 +3,7 @@ package com.parking.controller;
 import com.parking.dto.VipRegistrationRequest;
 import com.parking.model.User;
 import com.parking.model.VipSubscription;
+import com.parking.dto.VipSubscriptionResponseDTO;
 import com.parking.repository.UserRepository;
 import com.parking.service.ParkingService;
 import com.parking.service.VipService;
@@ -30,7 +31,7 @@ public class VipController {
 
     @GetMapping("/pending")
     @PreAuthorize("hasRole('MANAGER')") // Chỉ quản lý được xem danh sách chờ
-    public List<VipSubscription> getPending() {
+    public List<VipSubscriptionResponseDTO> getPending() {
         return vipService.getPending();
     }
 
@@ -44,7 +45,13 @@ public class VipController {
 
     @PostMapping("/register")
     @PreAuthorize("hasAnyRole('DRIVER', 'STAFF', 'MANAGER')")
-    public VipSubscription register(@RequestBody VipRegistrationRequest request) {
+    public VipSubscription register(@RequestBody VipRegistrationRequest request, Principal principal) {
+        if (principal != null) {
+            User user = userRepository.findByUsername(principal.getName()).orElse(null);
+            if (user != null) {
+                request.setOwnerId(user.getId());
+            }
+        }
         return vipService.register(request);
     }
 

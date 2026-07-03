@@ -54,16 +54,6 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
 
   // Sync state with localstorage
   const loadSubscriptions = async () => {
-    let localSubs: VipSubscription[] = [];
-    const saved = localStorage.getItem('urbanpark_vip_subscriptions');
-    if (saved) {
-      try {
-        localSubs = JSON.parse(saved);
-      } catch (err) {
-        console.error("Failed to parse VIP subscriptions:", err);
-      }
-    }
-
     try {
       const response = await fetch('/api/vip/all', {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
@@ -94,15 +84,13 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
             };
           });
 
-          localSubs = mappedAll;
           localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(mappedAll));
+          setSubscriptions(mappedAll);
         }
       }
     } catch (e) {
       console.warn("Failed to fetch VIP list from backend API:", e);
     }
-
-    setSubscriptions(localSubs);
   };
 
   useEffect(() => {
@@ -117,7 +105,8 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const handleAction = (id: string, nextStatus: 'ACTIVE' | 'REJECTED') => {
+  const handleAction = async (id: string, nextStatus: 'ACTIVE' | 'REJECTED') => {
+    
     let targetSub = subscriptions.find(s => s.id === id);
     if (!targetSub) return;
 

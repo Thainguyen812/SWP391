@@ -26,12 +26,15 @@ public class TrafficSimulatorTask {
     private final TransactionRepository transactionRepo;
     private final ZoneRepository zoneRepo;
     private final SecurityAlertRepository alertRepo;
+    private final PendingGateVehicleService pendingGateVehicleService;
 
-    public TrafficSimulatorTask(ParkingSessionRepository sessionRepo, TransactionRepository transactionRepo, ZoneRepository zoneRepo, SecurityAlertRepository alertRepo) {
+    public TrafficSimulatorTask(ParkingSessionRepository sessionRepo, TransactionRepository transactionRepo, ZoneRepository zoneRepo,
+            SecurityAlertRepository alertRepo, PendingGateVehicleService pendingGateVehicleService) {
         this.sessionRepo = sessionRepo;
         this.transactionRepo = transactionRepo;
         this.zoneRepo = zoneRepo;
         this.alertRepo = alertRepo;
+        this.pendingGateVehicleService = pendingGateVehicleService;
     }
 
     private final List<String> IN_GATES = Arrays.asList("CỔNG VÀO 1", "CỔNG VÀO 2", "CỔNG VÀO 3");
@@ -42,9 +45,7 @@ public class TrafficSimulatorTask {
         try {
             // Logic Check-in: Clear entry gates that have been occupied for > 90s
             Instant threshold = Instant.now().minus(90, ChronoUnit.SECONDS);
-            List<ParkingSession> processingIns = sessionRepo.findAll().stream()
-                .filter(s -> s.getSessionStatus() == ParkingSession.SessionStatus.ACTIVE && s.getEntryGate() != null)
-                .collect(Collectors.toList());
+            List<PendingGateVehicleService.PendingEntry> processingIns = pendingGateVehicleService.findAll();
 
             // AUTOMATIC CHECK-IN COMMENTED OUT - wait for manual staff approval
             /*
@@ -92,7 +93,13 @@ public class TrafficSimulatorTask {
 
             // Randomly check in a new vehicle to an EMPTY entry gate
             if (Math.random() > 0.5) {
-                List<String> occupiedInGates = processingIns.stream().map(ParkingSession::getEntryGate).collect(Collectors.toList());
+                List<String> occupiedInGates = processingIns.stream()
+                    .map(PendingGateVehicleService.PendingEntry::getEntryGate)
+                    .collect(Collectors.toList());
+                occupiedInGates.addAll(sessionRepo.findAll().stream()
+                    .filter(s -> s.getSessionStatus() == ParkingSession.SessionStatus.ACTIVE && s.getEntryGate() != null)
+                    .map(ParkingSession::getEntryGate)
+                    .collect(Collectors.toList()));
                 List<String> emptyInGates = IN_GATES.stream().filter(g -> !occupiedInGates.contains(g)).collect(Collectors.toList());
                 
                 if (!emptyInGates.isEmpty()) {
@@ -109,9 +116,25 @@ public class TrafficSimulatorTask {
                     session.setEntryGate(selectedGate);
                     session.setIsVip(Math.random() < 0.2);
                     
-                    List<Zone> zones = zoneRepo.findAll();
-                    if (!zones.isEmpty()) {
-                        session.setAssignedZoneId(zones.get(0).getId());
+                    String[] vehicleTypes = {"SEDAN_HATCHBACK", "SUV_CUV_MPV", "LARGE_VAN_MINIBUS", "EV_CAR"};
+                    String resolvedVehicleType = vehicleTypes[(int)(Math.random() * vehicleTypes.length)];
+                    
+                    List<Zone> candidates = zoneRepo.findByAllowedSizesContaining(resolvedVehicleType);
+                    Zone chosen = null;
+                    if (!candidates.isEmpty()) {
+                        chosen = candidates.stream()
+                                .filter(z -> z.getTotalSlots() - z.getCurrentOccupied() > 0)
+                                .findFirst()
+                                .orElse(candidates.get(0));
+                    } else {
+                        List<Zone> allZones = zoneRepo.findAll();
+                        if (!allZones.isEmpty()) {
+                            chosen = allZones.get(0);
+                        }
+                    }
+                    
+                    if (chosen != null) {
+                        session.setAssignedZoneId(chosen.getId());
                     } else {
                         return; // Cannot simulate without zones
                     }
@@ -128,7 +151,16 @@ public class TrafficSimulatorTask {
                         alert.setIsResolved(false);
                         alertRepo.save(alert);
                     }
-                    sessionRepo.save(session);
+                    pendingGateVehicleService.add(new PendingGateVehicleService.PendingEntry(
+                        session.getId(),
+                        session.getLicensePlate(),
+                        session.getEntryGate(),
+                        Boolean.TRUE.equals(session.getIsVip()),
+                        Boolean.TRUE.equals(session.getIsSuspicious()),
+                        session.getSuspiciousReason(),
+                        resolvedVehicleType,
+                        session.getCheckInTime()
+                    ));
                 }
             } // Added missing closing brace here
 

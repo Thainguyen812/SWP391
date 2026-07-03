@@ -17,6 +17,7 @@ import { TransactionHistory } from './pages/manager/transactions/TransactionHist
 import { StaffDashboard } from './pages/staff/StaffDashboard';
 import { StaffGateControl } from './pages/staff/StaffGateControl';
 import { StaffPayment } from './pages/staff/StaffPayment';
+import { StaffMobilePOS } from './pages/staff/StaffMobilePOS';
 import { StaffMonitoring } from './pages/staff/StaffMonitoring';
 import { StaffSecurityAlerts } from './pages/staff/StaffSecurityAlerts';
 import { StaffLostCard } from './pages/staff/StaffLostCard';
@@ -116,7 +117,7 @@ const DriverAppWrapper = () => {
   );
 };
 
-import React from 'react';
+
 
 
 function App() {
@@ -179,6 +180,9 @@ function App() {
         <Route path="/staff-payment" element={
           <StaffProtectedPage><StaffPayment /></StaffProtectedPage>
         } />
+        <Route path="/staff-mobile-pos" element={
+          <StaffProtectedPage><StaffMobilePOS /></StaffProtectedPage>
+        } />
         <Route path="/staff-monitoring" element={
           <StaffProtectedPage><StaffMonitoring /></StaffProtectedPage>
         } />
@@ -197,12 +201,12 @@ function App() {
 
         {/* Catch-all */}
         <Route path="*" element={
-          <ProtectedPage allowedRoles={managementRoles}>
-            <div className="flex flex-col items-center justify-center w-full h-full p-8">
-              <h2 className="text-2xl font-bold text-gray-700">Tính năng đang phát triển</h2>
-              <p className="text-gray-500 mt-2">Vui lòng quay lại sau.</p>
+          <ProtectedRoute allowedRoles={['STAFF', 'MANAGER', 'ADMIN']}>
+            <div className="flex flex-col items-center justify-center w-full h-screen p-8 bg-slate-50">
+              <h2 className="text-2xl font-bold text-gray-700">Trang không tồn tại hoặc tính năng đang phát triển</h2>
+              <p className="text-gray-500 mt-2">Vui lòng quay lại sau hoặc sử dụng thanh điều hướng.</p>
             </div>
-          </ProtectedPage>
+          </ProtectedRoute>
         } />
           </Routes>
         </GlobalProvider>

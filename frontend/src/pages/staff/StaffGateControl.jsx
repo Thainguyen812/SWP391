@@ -7,7 +7,7 @@ import {
   ExclamationCircleFilled,
   CarOutlined
 } from '@ant-design/icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { notification, Modal, Dropdown, Input, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../api/apiClient';
@@ -15,7 +15,7 @@ import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffGateControl = () => {
   const navigate = useNavigate();
-  const { addActivityLog, activeVehicles, currentVehicle, setCurrentVehicle, addActiveVehicle, removeActiveVehicle, processEntryVehicle, addTransaction, updateShiftStats, dailyVolume, setDailyVolume, fetchAllDataFromBackend, totalGates, isEmergency, setIsEmergency, gates, setGates, gateLogs, setGateLogs, addSecurityAlert } = useGlobalContext();
+  const { activityLogs, addActivityLog, activeVehicles, currentVehicle, setCurrentVehicle, addActiveVehicle, removeActiveVehicle, processEntryVehicle, addTransaction, updateShiftStats, dailyVolume, setDailyVolume, fetchAllDataFromBackend, totalGates, isEmergency, setIsEmergency, gates, setGates, gateLogs, setGateLogs, addSecurityAlert } = useGlobalContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('Tất cả');
 
@@ -23,6 +23,35 @@ export const StaffGateControl = () => {
   const [manualCardCode, setManualCardCode] = useState('');
   const [manualType, setManualType] = useState('Ô tô gầm thấp 4-5 chỗ');
   const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [lastCheckInResult, setLastCheckInResult] = useState(null);
+  
+  const [terminalTime, setTerminalTime] = useState(new Date().toLocaleTimeString('en-GB') + ' GMT+7');
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTerminalTime(new Date().toLocaleTimeString('en-GB') + ' GMT+7');
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const getFloorShortName = (code) => {
+    if (!code) return "Chưa gán";
+    const c = code.toUpperCase();
+    if (c === "F1") return "Tầng 1";
+    if (c === "F2") return "Tầng 2";
+    if (c === "B1") return "Tầng B1";
+    if (c === "G") return "Tầng G";
+    return c;
+  };
+
+  const getFloorFullName = (code) => {
+    if (!code) return "Chưa gán";
+    const c = code.toUpperCase();
+    if (c === "F1") return "Tầng 1 — Khu Xe Gia Đình 4-5 Chỗ (Sedan, Hatchback, EV)";
+    if (c === "F2") return "Tầng 2 — Khu Xe 7-9 Chỗ (SUV, CUV, MPV)";
+    if (c === "B1") return "Tầng B1 — Khu Xe Van & Xe Tải Nhỏ";
+    if (c === "G") return "Tầng G — Khu Xe Khách 12-16 Chỗ";
+    return `Tầng ${c}`;
+  };
 
   useEffect(() => {
     if (currentVehicle && currentVehicle.plate) {
@@ -45,6 +74,9 @@ export const StaffGateControl = () => {
     }
   };
 
+  const isAiPlateDuplicate = aiPlate && activeVehicles?.some(v => v.plate === aiPlate.toUpperCase());
+  const isManualPlateDuplicate = manualPlate && activeVehicles?.some(v => v.plate === manualPlate.toUpperCase());
+
   const handleManualCheckIn = async () => {
     if (isEmergency) {
       notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể check-in lúc này.' });
@@ -54,6 +86,50 @@ export const StaffGateControl = () => {
       notification.error({ message: 'Lỗi', description: 'Vui lòng nhập biển số xe!' });
       return;
     }
+    if (isManualPlateDuplicate) {
+      const existingVehicle = activeVehicles?.find(v => v.plate === manualPlate.toUpperCase());
+      if (existingVehicle && existingVehicle.gate && existingVehicle.gate.toUpperCase().includes('VÀO')) {
+        // Simulated car is waiting at the IN gate. We simulate a successful manual confirmation.
+        notification.success({ message: 'Check-in Thành công', description: `Biển số ${manualPlate} đã được nhân viên xác nhận vào bãi.` });
+        setManualPlate('');
+        setManualCardCode('');
+        
+        addActivityLog({
+          plate: manualPlate,
+          model: "Xác nhận Thủ Công",
+          type: "Vãng lai",
+          gate: existingVehicle.gate,
+          action: "Vào Cổng (Thủ công)",
+          time: new Date().toISOString(),
+          status: "Thành Công",
+          typeColor: "text-blue-600",
+          statusColor: "bg-emerald-100 text-emerald-700",
+          actionColor: "text-emerald-600",
+          image: existingVehicle.image || existingVehicle.imageUrl || "https://camera-storage.com/live/gate_scan.jpg"
+        });
+        processEntryVehicle(existingVehicle.plate);
+        
+        // Notify backend so it persists the log and session!
+        apiClient.post('/sessions/approve-entry', { plate: existingVehicle.plate }).catch(e => console.log(e));
+        
+        addLog(`[OK] [${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}] [${existingVehicle.gate}] Vào bãi: ${manualPlate.toUpperCase()}`, 'OK');
+        
+        setLastCheckInResult({
+          plate: manualPlate.toUpperCase(),
+          type: 'Vãng lai',
+          vehicleType: 'SEDAN_HATCHBACK',
+          assignedZoneCode: 'F1',
+          floorName: 'Tầng 1',
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        });
+        
+        return;
+      }
+      
+      notification.error({ message: 'Lỗi Check-in', description: 'Xe này ĐÃ CÓ trong bãi (phiên gửi xe ACTIVE).' });
+      return;
+    }
+    
     setIsCheckingIn(true);
     try {
       let mappedType = 'SEDAN_HATCHBACK';
@@ -74,9 +150,36 @@ export const StaffGateControl = () => {
       });
       addLog(`[GATE_SCAN] Success: ${response.data?.message}`, 'SUCCESS');
       
+      const isVip = response.data?.message?.toLowerCase().includes('vip') || false;
+      const zone = response.data?.data?.assignedZoneCode || 'F1';
+      setLastCheckInResult({
+        plate: manualPlate.trim().toUpperCase(),
+        type: isVip ? 'VIP' : 'Vãng lai',
+        vehicleType: mappedType,
+        assignedZoneCode: zone,
+        floorName: getFloorShortName(zone),
+        floorFullName: getFloorFullName(zone),
+        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      });
+
       if (fetchAllDataFromBackend) {
         fetchAllDataFromBackend();
       }
+      
+      addActivityLog({
+        plate: manualPlate.trim().toUpperCase(),
+        model: 'Khách vãng lai',
+        type: 'MỞ BARRIER',
+        gate: 'Bốt Gác Cổng Trực 1',
+        action: 'Mở Thủ công',
+        time: new Date().toISOString(),
+        status: 'THÀNH CÔNG',
+        typeColor: 'text-orange-600',
+        statusColor: 'bg-emerald-100 text-emerald-700',
+        actionColor: 'text-emerald-600',
+        image: null
+      });
+      
       setDailyVolume(prev => prev + 1);
       setManualPlate('');
       setManualCardCode('');
@@ -96,13 +199,49 @@ export const StaffGateControl = () => {
       return;
     }
     if (!aiPlate) {
-      notification.error({ message: 'Lỗi', description: 'Vui lòng nhập biển số xe!' });
+      notification.warning({ message: 'Lỗi', description: 'Vui lòng nhập biển số.' });
       return;
     }
+    
+    if (isAiPlateDuplicate) {
+      const existingVehicle = activeVehicles?.find(v => v.plate === aiPlate.toUpperCase());
+      if (existingVehicle && existingVehicle.gate && existingVehicle.gate.toUpperCase().includes('VÀO')) {
+        // Clear the gate in the backend so the UI updates immediately
+        try {
+          await apiClient.post(`/v1/parking/clear-gate`, { plate: aiPlate.toUpperCase() });
+        } catch (err) {
+          console.error("Error clearing gate:", err);
+        }
+        
+        notification.success({ message: 'AI Nhận diện Thành công', description: `Biển số ${aiPlate} hợp lệ và đã vào bãi.` });
+        addLog(`[AI_LPR] Success (Cleared Gate): Plate ${aiPlate}, Conf: ${aiConfidence}%`, 'OK');
+        
+        // Refresh global context to pull latest transactions and remove from active
+        if (fetchAllDataFromBackend) fetchAllDataFromBackend();
+        
+        addActivityLog({
+          plate: aiPlate,
+          model: "Vào thẳng bãi",
+          type: "VIP",
+          gate: existingVehicle.gate || "CAM-01-IN",
+          action: "Vào Bãi (Đã thông cổng)",
+          time: "Vừa xong",
+          status: "Thành Công",
+          typeColor: "text-amber-600",
+          statusColor: "bg-emerald-100 text-emerald-700",
+          actionColor: "text-blue-600"
+        });
+        
+        setIsAiModalVisible(false);
+        setAiPlate('');
+        return;
+      }
+      notification.error({ message: 'Lỗi', description: 'Xe này đang có phiên gửi xe ACTIVE trong bãi.' });
+      return;
+    }
+
     setIsAiProcessing(true);
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
-      
       const response = await apiClient.post(`/v1/parking/check-in/ai`, {
         plate: aiPlate.toUpperCase(),
         vehicle_type: 'SEDAN_HATCHBACK',
@@ -111,6 +250,17 @@ export const StaffGateControl = () => {
         image_url: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80'
       });
       
+      const zone = response.data?.assigned_zone_code || 'F1';
+      setLastCheckInResult({
+        plate: aiPlate.toUpperCase(),
+        type: 'VIP',
+        vehicleType: 'SEDAN_HATCHBACK',
+        assignedZoneCode: zone,
+        floorName: getFloorShortName(zone),
+        floorFullName: getFloorFullName(zone),
+        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      });
+
       notification.success({ message: 'AI Nhận diện Thành công', description: `Biển số ${aiPlate} hợp lệ.` });
       addLog(`[AI_LPR] Success: Plate ${aiPlate}, Conf: ${aiConfidence}%`, 'OK');
       setIsAiModalVisible(false);
@@ -159,6 +309,26 @@ export const StaffGateControl = () => {
     if (type === 'ERROR') colorClass = "text-red-400";
     setGateLogs(prev => [`<span class="${colorClass}"><span class="opacity-70">[${type}]</span> ${msg}</span>`, ...prev].slice(0, 20));
   };
+
+  const processedLogIds = useRef(new Set());
+
+  useEffect(() => {
+    if (!activityLogs || activityLogs.length === 0) return;
+    activityLogs.slice(0, 10).reverse().forEach(log => {
+      const logId = log.id || `${log.plate}-${log.time}-${log.action}`;
+      if (!processedLogIds.current.has(logId)) {
+        processedLogIds.current.add(logId);
+        if (!log.isManual) {
+          let typeStr = 'INFO';
+          if (log.status === 'Thành Công' || log.status === 'Success') typeStr = 'OK';
+          if (log.status === 'Cảnh Báo' || log.status === 'Warning' || log.status === 'Cảnh báo') typeStr = 'WARN';
+          if (log.status === 'Lỗi' || log.status === 'ERROR') typeStr = 'ERROR';
+          const timeStr = log.time && log.time !== 'Vừa xong' ? `[${new Date(log.time).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit', second:'2-digit'})}] ` : '';
+          addLog(`${timeStr}[${log.gate || 'Hệ thống'}] ${log.action}: ${log.plate}`, typeStr);
+        }
+      }
+    });
+  }, [activityLogs]);
 
   const handleApprove = (id, plate) => {
     if (isEmergency) {
@@ -415,7 +585,7 @@ export const StaffGateControl = () => {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
           <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Tổng lượt vào/ra hôm nay</h4>
           <div className="flex items-baseline gap-3">
-            <span className="text-4xl font-extrabold text-slate-800">{dailyVolume.toLocaleString()}</span>
+            <span className="text-4xl font-extrabold text-slate-800">{(dailyVolume || 0).toLocaleString()}</span>
           </div>
         </div>
 
@@ -629,6 +799,92 @@ export const StaffGateControl = () => {
         {/* Right Column: Cameras & Logs */}
         <div className="lg:col-span-4 flex flex-col gap-6">
           
+          {/* Virtual LED Board Widget */}
+          <div className="bg-slate-950 border-4 border-slate-800 rounded-xl p-4 shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex flex-col justify-center overflow-hidden relative">
+            <div className="absolute inset-0 bg-radial-gradient from-transparent to-black/40 pointer-events-none"></div>
+            <div className="flex justify-between items-center mb-2 border-b border-slate-800 pb-1">
+              <span className="text-[9px] font-mono font-bold text-slate-500 tracking-wider">LED BOARD SIMULATOR — LÀN VÀO</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping"></div>
+            </div>
+            <div className="bg-slate-950/80 rounded px-2 py-3 border border-slate-900 flex items-center justify-center min-h-[50px]">
+              {lastCheckInResult ? (
+                lastCheckInResult.type === 'VIP' ? (
+                  <marquee 
+                    className="font-mono text-sm sm:text-base font-extrabold tracking-widest text-amber-500" 
+                    style={{ textShadow: '0 0 8px rgba(245, 158, 11, 0.8)' }}
+                    scrollamount="6"
+                  >
+                    WELCOME VIP {lastCheckInResult.plate} ➔ HƯỚNG ĐI: {lastCheckInResult.floorName.toUpperCase()}
+                  </marquee>
+                ) : (
+                  <marquee 
+                    className="font-mono text-sm sm:text-base font-extrabold tracking-widest text-emerald-400" 
+                    style={{ textShadow: '0 0 8px rgba(52, 211, 153, 0.8)' }}
+                    scrollamount="6"
+                  >
+                    BIỂN SỐ: {lastCheckInResult.plate} ➔ XE {lastCheckInResult.vehicleType} ➔ HƯỚNG ĐI: {lastCheckInResult.floorName.toUpperCase()}
+                  </marquee>
+                )
+              ) : (
+                <span 
+                  className="font-mono text-xs text-orange-600/70 font-semibold tracking-wider uppercase animate-pulse"
+                  style={{ textShadow: '0 0 4px rgba(234, 88, 12, 0.3)' }}
+                >
+                  Hệ thống LED đang chờ phương tiện...
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* AI Info Card with Glassmorphism */}
+          {lastCheckInResult && (
+            <div className="backdrop-blur-md bg-white/80 border border-slate-100 p-4 rounded-xl shadow-sm transition-all duration-350 transform translate-y-0 opacity-100 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Trích xuất Camera AI</span>
+                <span className="text-[9px] font-mono text-slate-500">{lastCheckInResult.timestamp}</span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-medium">Biển số</span>
+                  <span className="font-mono text-lg font-bold text-slate-800 tracking-wider">{lastCheckInResult.plate}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-medium">Vé xe</span>
+                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-extrabold uppercase mt-0.5 ${
+                    lastCheckInResult.type === 'VIP' ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-blue-100 text-blue-800 border border-blue-200'
+                  }`}>
+                    {lastCheckInResult.type}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-medium">Nhận diện xe</span>
+                  <span className="text-xs font-bold text-slate-700">{lastCheckInResult.vehicleType}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-medium">Phân Tầng Đỗ</span>
+                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold mt-0.5 ${
+                    lastCheckInResult.assignedZoneCode === 'F1' ? 'bg-emerald-100 text-emerald-800' :
+                    lastCheckInResult.assignedZoneCode === 'F2' ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-800'
+                  }`}>
+                    {lastCheckInResult.floorName}
+                  </span>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 pt-2 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                <span className="flex items-center gap-1 text-emerald-600">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                  Đã phân tầng thành công
+                </span>
+                <span className="text-slate-400 font-normal">Zone: {lastCheckInResult.assignedZoneCode?.length > 10 ? 'Khu Vực Chung' : lastCheckInResult.assignedZoneCode}</span>
+              </div>
+            </div>
+          )}
+          
           {/* Camera Monitor */}
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
             <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-white">
@@ -735,7 +991,7 @@ export const StaffGateControl = () => {
           <div className="bg-[#0f172a] rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 border border-slate-800 min-h-[250px]">
             <div className="px-4 py-2 border-b border-slate-800 flex justify-between items-center bg-[#0b1121]">
               <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nhật ký Hệ thống</h3>
-              <span className="text-[9px] font-mono text-slate-500">14:45:22 GMT+7</span>
+              <span className="text-[9px] font-mono text-slate-500">{terminalTime}</span>
             </div>
             {gateLogs.length === 0 ? (
               <div className="h-full flex items-center justify-center text-slate-500">Chưa có sự kiện nào</div>
@@ -841,6 +1097,7 @@ export const StaffGateControl = () => {
                 <tr className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                   <th className="p-3 border-b border-slate-200">Biển số</th>
                   <th className="p-3 border-b border-slate-200">Loại vé</th>
+                  <th className="p-3 border-b border-slate-200">Tầng đỗ</th>
                   <th className="p-3 border-b border-slate-200">Giờ vào</th>
                   <th className="p-3 border-b border-slate-200 text-right">Thao tác</th>
                 </tr>
@@ -854,6 +1111,22 @@ export const StaffGateControl = () => {
                         <span className={`px-2 py-1 rounded text-[10px] font-bold ${v.type === 'VIP' ? 'bg-slate-800 text-white' : 'bg-blue-100 text-blue-700'}`}>
                           {v.type}
                         </span>
+                      </td>
+                      <td className="p-3">
+                        {v.assignedZoneCode ? (
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${
+                            v.assignedZoneCode.length > 10 ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                            v.assignedZoneCode.toUpperCase() === 'F1' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            v.assignedZoneCode.toUpperCase() === 'F2' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            v.assignedZoneCode.toUpperCase() === 'B1' ? 'bg-slate-100 text-slate-600 border-slate-200' :
+                            v.assignedZoneCode.toUpperCase() === 'G' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                            'bg-slate-50 text-slate-700'
+                          }`}>
+                            {v.assignedZoneCode.length > 10 ? ((v.floorName && v.floorName.length < 10) ? v.floorName : 'Khu Vực Chung') : `${(v.floorName && v.floorName.length < 10) ? v.floorName : v.assignedZoneCode} (${v.assignedZoneCode.toUpperCase()})`}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 font-medium">Chưa gán</span>
+                        )}
                       </td>
                       <td className="p-3 text-slate-600 text-sm">{v.inTime}</td>
                       <td className="p-3 text-right">

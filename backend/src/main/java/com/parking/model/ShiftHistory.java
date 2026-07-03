@@ -32,6 +32,21 @@ public class ShiftHistory {
     @Column(name = "is_current")
     private Boolean isCurrent;
 
+    @Column(name = "system_revenue", columnDefinition = "numeric(19, 2)")
+    private Double systemRevenue;
+
+    @Column(name = "system_cash", columnDefinition = "numeric(19, 2)")
+    private Double systemCash;
+
+    @Column(name = "system_transfer", columnDefinition = "numeric(19, 2)")
+    private Double systemTransfer;
+
+    @Column(name = "declared_cash", columnDefinition = "numeric(19, 2)")
+    private Double declaredCash;
+
+    @Column(name = "next_staff_id")
+    private String nextStaffId;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getStaffName() { return staffName; }
@@ -48,4 +63,14 @@ public class ShiftHistory {
     public void setStatus(String status) { this.status = status; }
     public Boolean getIsCurrent() { return isCurrent; }
     public void setIsCurrent(Boolean isCurrent) { this.isCurrent = isCurrent; }
+    public Double getSystemRevenue() { return systemRevenue; }
+    public void setSystemRevenue(Double systemRevenue) { this.systemRevenue = systemRevenue; }
+    public Double getSystemCash() { return systemCash; }
+    public void setSystemCash(Double systemCash) { this.systemCash = systemCash; }
+    public Double getSystemTransfer() { return systemTransfer; }
+    public void setSystemTransfer(Double systemTransfer) { this.systemTransfer = systemTransfer; }
+    public Double getDeclaredCash() { return declaredCash; }
+    public void setDeclaredCash(Double declaredCash) { this.declaredCash = declaredCash; }
+    public String getNextStaffId() { return nextStaffId; }
+    public void setNextStaffId(String nextStaffId) { this.nextStaffId = nextStaffId; }
 }
