@@ -27,21 +27,9 @@ export const StaffMobilePOS = () => {
   const calculateFee = (inTime) => {
     // Giả lập tính phí như backend
     if (!inTime) return 10000;
-    try {
-      const [hours, minutes] = inTime.split(':').map(Number);
-      const now = new Date();
-      const inDate = new Date();
-      inDate.setHours(hours, minutes, 0);
-      let diffMs = now - inDate;
-      if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
-      const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
-      return diffHours > 4 ? 30000 : 10000;
-    } catch {
-      return 10000;
-    }
-  };
+  // Function calculateFee is removed as we now fetch from backend
 
-  const handleSearchWithPlate = (searchPlate) => {
+  const handleSearchWithPlate = async (searchPlate) => {
     const p = searchPlate || plate;
     if (!p) {
       notification.warning({ message: 'Vui lòng nhập biển số xe' });
@@ -62,7 +50,13 @@ export const StaffMobilePOS = () => {
           baseFee = 0;
           setPaymentMethod('card'); // VIP bắt buộc QR động (card)
         } else {
-          baseFee = calculateFee(found.inTime);
+          try {
+            const feeResponse = await apiClient.get(`/v1/parking/fee-by-plate/${found.plate}`);
+            baseFee = feeResponse.data.parkingFee || 0;
+          } catch (feeError) {
+            console.error("Failed to fetch fee from backend:", feeError);
+            baseFee = 10000; // fallback
+          }
           setPaymentMethod('cash');
         }
         
