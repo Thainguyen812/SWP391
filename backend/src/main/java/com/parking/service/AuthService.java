@@ -125,6 +125,10 @@ public class AuthService implements org.springframework.security.core.userdetail
     }
 
     public LoginResponse register(RegisterRequest req) {
+        if (userRepo.findByUsername(req.getUsername()).isPresent()) {
+            throw new RuntimeException("Tài khoản (Số điện thoại) này đã được đăng ký.");
+        }
+        
         try {
             User u = new User();
             u.setId(UUID.randomUUID());

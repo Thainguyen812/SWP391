@@ -24,6 +24,14 @@ export const StaffGateControl = () => {
   const [manualType, setManualType] = useState('Ô tô gầm thấp 4-5 chỗ');
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [lastCheckInResult, setLastCheckInResult] = useState(null);
+  
+  const [terminalTime, setTerminalTime] = useState(new Date().toLocaleTimeString('en-GB') + ' GMT+7');
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTerminalTime(new Date().toLocaleTimeString('en-GB') + ' GMT+7');
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const getFloorShortName = (code) => {
     if (!code) return "Chưa gán";
@@ -92,12 +100,29 @@ export const StaffGateControl = () => {
           type: "Vãng lai",
           gate: existingVehicle.gate,
           action: "Vào Cổng (Thủ công)",
-          time: "Vừa xong",
+          time: new Date().toISOString(),
           status: "Thành Công",
           typeColor: "text-blue-600",
           statusColor: "bg-emerald-100 text-emerald-700",
-          actionColor: "text-emerald-600"
+          actionColor: "text-emerald-600",
+          image: existingVehicle.image || existingVehicle.imageUrl || "https://camera-storage.com/live/gate_scan.jpg"
         });
+        processEntryVehicle(existingVehicle.plate);
+        
+        // Notify backend so it persists the log and session!
+        apiClient.post('/sessions/approve-entry', { plate: existingVehicle.plate }).catch(e => console.log(e));
+        
+        addLog(`[OK] [${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}] [${existingVehicle.gate}] Vào bãi: ${manualPlate.toUpperCase()}`, 'OK');
+        
+        setLastCheckInResult({
+          plate: manualPlate.toUpperCase(),
+          type: 'Vãng lai',
+          vehicleType: 'SEDAN_HATCHBACK',
+          assignedZoneCode: 'F1',
+          floorName: 'Tầng 1',
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        });
+        
         return;
       }
       
@@ -140,6 +165,21 @@ export const StaffGateControl = () => {
       if (fetchAllDataFromBackend) {
         fetchAllDataFromBackend();
       }
+      
+      addActivityLog({
+        plate: manualPlate.trim().toUpperCase(),
+        model: 'Khách vãng lai',
+        type: 'MỞ BARRIER',
+        gate: 'Bốt Gác Cổng Trực 1',
+        action: 'Mở Thủ công',
+        time: new Date().toISOString(),
+        status: 'THÀNH CÔNG',
+        typeColor: 'text-orange-600',
+        statusColor: 'bg-emerald-100 text-emerald-700',
+        actionColor: 'text-emerald-600',
+        image: null
+      });
+      
       setDailyVolume(prev => prev + 1);
       setManualPlate('');
       setManualCardCode('');
@@ -545,7 +585,7 @@ export const StaffGateControl = () => {
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
           <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Tổng lượt vào/ra hôm nay</h4>
           <div className="flex items-baseline gap-3">
-            <span className="text-4xl font-extrabold text-slate-800">{dailyVolume.toLocaleString()}</span>
+            <span className="text-4xl font-extrabold text-slate-800">{(dailyVolume || 0).toLocaleString()}</span>
           </div>
         </div>
 
@@ -840,7 +880,7 @@ export const StaffGateControl = () => {
                   <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
                   Đã phân tầng thành công
                 </span>
-                <span className="text-slate-400 font-normal">Zone: {lastCheckInResult.assignedZoneCode}</span>
+                <span className="text-slate-400 font-normal">Zone: {lastCheckInResult.assignedZoneCode?.length > 10 ? 'Khu Vực Chung' : lastCheckInResult.assignedZoneCode}</span>
               </div>
             </div>
           )}
@@ -951,7 +991,7 @@ export const StaffGateControl = () => {
           <div className="bg-[#0f172a] rounded-xl shadow-sm overflow-hidden flex flex-col flex-1 border border-slate-800 min-h-[250px]">
             <div className="px-4 py-2 border-b border-slate-800 flex justify-between items-center bg-[#0b1121]">
               <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nhật ký Hệ thống</h3>
-              <span className="text-[9px] font-mono text-slate-500">14:45:22 GMT+7</span>
+              <span className="text-[9px] font-mono text-slate-500">{terminalTime}</span>
             </div>
             {gateLogs.length === 0 ? (
               <div className="h-full flex items-center justify-center text-slate-500">Chưa có sự kiện nào</div>
@@ -1075,13 +1115,14 @@ export const StaffGateControl = () => {
                       <td className="p-3">
                         {v.assignedZoneCode ? (
                           <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${
+                            v.assignedZoneCode.length > 10 ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
                             v.assignedZoneCode.toUpperCase() === 'F1' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                             v.assignedZoneCode.toUpperCase() === 'F2' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                             v.assignedZoneCode.toUpperCase() === 'B1' ? 'bg-slate-100 text-slate-600 border-slate-200' :
                             v.assignedZoneCode.toUpperCase() === 'G' ? 'bg-orange-50 text-orange-700 border-orange-200' :
                             'bg-slate-50 text-slate-700'
                           }`}>
-                            {v.floorName || v.assignedZoneCode} ({v.assignedZoneCode.toUpperCase()})
+                            {v.assignedZoneCode.length > 10 ? ((v.floorName && v.floorName.length < 10) ? v.floorName : 'Khu Vực Chung') : `${(v.floorName && v.floorName.length < 10) ? v.floorName : v.assignedZoneCode} (${v.assignedZoneCode.toUpperCase()})`}
                           </span>
                         ) : (
                           <span className="text-[10px] text-slate-400 font-medium">Chưa gán</span>

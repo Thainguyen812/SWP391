@@ -6,13 +6,14 @@ import {
   CheckCircleOutlined,
   AudioOutlined,
   TeamOutlined,
-  MoreOutlined
+  MoreOutlined,
+  VideoCameraOutlined
 } from '@ant-design/icons';
 import { notification, Modal, Input } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffSecurityAlerts = () => {
-  const { securityAlerts, removeSecurityAlert, restoreSecurityAlerts, addVehicleFine } = useGlobalContext();
+  const { securityAlerts, removeSecurityAlert, restoreSecurityAlerts, addVehicleFine, addActivityLog } = useGlobalContext();
   
   const [resolvingAlerts, setResolvingAlerts] = useState({});
   const [isFineModalVisible, setIsFineModalVisible] = useState(false);
@@ -28,6 +29,24 @@ export const StaffSecurityAlerts = () => {
       cancelText: 'Hủy',
       onOk() {
         notification.success({ message: `Đã ghi nhận xử lý cảnh báo: ${type}`, placement: 'topRight' });
+        
+        const alert = securityAlerts.find(a => a.id === id);
+        if (alert) {
+          addActivityLog({
+            plate: alert.plate || 'N/A',
+            model: 'Bỏ qua cảnh báo',
+            type: 'AN NINH',
+            gate: 'Phòng Điều hành',
+            action: 'Bỏ qua (Xác nhận)',
+            time: new Date().toISOString(),
+            status: 'Hoàn tất',
+            typeColor: 'text-slate-500',
+            statusColor: 'bg-slate-100 text-slate-700',
+            actionColor: 'text-slate-600',
+            image: alert.image || null
+          });
+        }
+        
         removeSecurityAlert(id);
         setResolvingAlerts(prev => { const n = {...prev}; delete n[id]; return n; });
       }
@@ -43,7 +62,25 @@ export const StaffSecurityAlerts = () => {
       okButtonProps: { className: btnClass },
       onOk() {
         notification.success({ message: successMsg, placement: 'topRight' });
-        setResolvingAlerts(prev => ({ ...prev, [id]: true }));
+        
+        const alert = securityAlerts.find(a => a.id === id);
+        if (alert) {
+          addActivityLog({
+            plate: alert.plate || 'N/A',
+            model: 'Xử lý An ninh',
+            type: 'AN NINH',
+            gate: 'Phòng Điều hành',
+            action: title,
+            time: new Date().toISOString(),
+            status: 'Hoàn tất',
+            typeColor: 'text-red-600',
+            statusColor: 'bg-emerald-100 text-emerald-700',
+            actionColor: 'text-red-600',
+            image: alert.image || null
+          });
+        }
+        
+        setResolvingAlerts(prev => ({ ...prev, [id]: title }));
       }
     });
   };
@@ -135,9 +172,15 @@ export const StaffSecurityAlerts = () => {
                   <button onClick={() => handleResolve(alert.type, alert.id)} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-md shadow-red-500/20 cursor-pointer">
                     <CheckCircleOutlined /> Xác nhận
                   </button>
-                  <button onClick={() => handleCustomAction(alert.id, 'Điều phối An ninh', 'Gửi yêu cầu đội an ninh hỗ trợ tại hiện trường?', 'Đã điều động lực lượng an ninh', 'bg-emerald-600')} className="bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-700 font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer">
-                    <SafetyCertificateOutlined /> An ninh
-                  </button>
+                  {resolvingAlerts[alert.id] ? (
+                    <div className="bg-emerald-100 border-2 border-emerald-200 text-emerald-700 font-bold py-2.5 rounded-lg flex items-center justify-center gap-2">
+                      <CheckCircleOutlined /> Đã {resolvingAlerts[alert.id]}
+                    </div>
+                  ) : (
+                    <button onClick={() => handleCustomAction(alert.id, 'Điều phối An ninh', 'Gửi yêu cầu đội an ninh hỗ trợ tại hiện trường?', 'Đã điều động lực lượng an ninh', 'bg-emerald-600')} className="bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-700 font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer">
+                      <SafetyCertificateOutlined /> An ninh
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -187,7 +230,7 @@ export const StaffSecurityAlerts = () => {
             <div className={`flex mt-auto`}>
               {resolvingAlerts[alert.id] ? (
                 <div className="w-full bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col mt-2">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">Hướng xử lý tiếp theo</div>
+                  <div className="text-[10px] font-bold text-emerald-600 uppercase mb-2">✅ Đã {resolvingAlerts[alert.id]} - Hướng xử lý tiếp theo</div>
                   <div className="flex gap-2">
                     <button onClick={() => {
                     setCurrentFineAlertId(alert.id);
@@ -251,6 +294,24 @@ export const StaffSecurityAlerts = () => {
                   </button>
                   <button onClick={() => handleCustomAction(alert.id, 'Bảo vệ hiện trường', 'Cử đội an ninh đến phong tỏa và bảo vệ hiện trường?', 'Đã cử đội bảo vệ hiện trường', 'bg-blue-600')} className="bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-700 font-bold px-4 rounded-lg flex items-center justify-center transition-colors cursor-pointer gap-2 text-sm">
                     Bảo vệ HT
+                  </button>
+                </>
+              ) : alert.type === 'CẢNH BÁO LPR' ? (
+                <>
+                  <button onClick={() => handleCustomAction(alert.id, 'Kiểm tra Camera', 'Mở kết nối luồng camera an ninh tại khu vực này?', 'Đã mở luồng camera', 'bg-blue-600')} className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold py-2 rounded-lg text-sm transition-colors cursor-pointer flex items-center justify-center gap-2">
+                    <VideoCameraOutlined /> KT Camera
+                  </button>
+                  <button onClick={() => handleCustomAction(alert.id, 'Báo Lỗi AI', 'Gửi báo cáo lỗi nhận diện hệ thống cho kỹ thuật?', 'Đã báo cáo lỗi hệ thống', 'bg-red-600')} className="bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-700 font-bold px-4 rounded-lg flex items-center justify-center transition-colors cursor-pointer gap-2 text-sm">
+                    Báo lỗi AI
+                  </button>
+                </>
+              ) : alert.type === 'HỆ THỐNG LỖI' ? (
+                <>
+                  <button onClick={() => handleCustomAction(alert.id, 'Khởi động lại', 'Khởi động lại thiết bị tại cổng này?', 'Đã gửi lệnh khởi động lại', 'bg-orange-600')} className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold py-2 rounded-lg text-sm transition-colors cursor-pointer flex items-center justify-center gap-2">
+                    Restart
+                  </button>
+                  <button onClick={() => handleCustomAction(alert.id, 'Báo Kỹ thuật', 'Báo cáo sự cố phần cứng cho bộ phận IT?', 'Đã báo sự cố kỹ thuật', 'bg-blue-600')} className="bg-slate-100 border border-slate-200 hover:bg-slate-200 text-slate-700 font-bold px-4 rounded-lg flex items-center justify-center transition-colors cursor-pointer gap-2 text-sm">
+                    Báo Kỹ thuật
                   </button>
                 </>
               ) : (

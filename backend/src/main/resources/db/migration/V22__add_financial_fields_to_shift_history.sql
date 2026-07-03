@@ -1,0 +1,6 @@
+ALTER TABLE shift_history
+ADD COLUMN system_revenue NUMERIC(19, 2) DEFAULT 0,
+ADD COLUMN system_cash NUMERIC(19, 2) DEFAULT 0,
+ADD COLUMN system_transfer NUMERIC(19, 2) DEFAULT 0,
+ADD COLUMN declared_cash NUMERIC(19, 2) DEFAULT 0,
+ADD COLUMN next_staff_id VARCHAR(255);
