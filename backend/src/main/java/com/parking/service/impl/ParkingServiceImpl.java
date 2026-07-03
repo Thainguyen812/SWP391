@@ -311,7 +311,7 @@ public class ParkingServiceImpl implements ParkingService {
         
         if (session.getParkedSlotId() != null) {
             slotRepository.findById(session.getParkedSlotId()).ifPresent(slot -> {
-                slot.setStatus(ParkingSlot.SlotStatus.AVAILABLE);
+                slot.setSlotStatus("AVAILABLE");
                 slotRepository.save(slot);
             });
             session.setParkedSlotId(null);
@@ -328,10 +328,10 @@ public class ParkingServiceImpl implements ParkingService {
 
         Transaction transaction = new Transaction();
         transaction.setSessionId(session.getId());
-        transaction.setAmount(java.math.BigDecimal.ZERO);
+        transaction.setTotalAmount(java.math.BigDecimal.ZERO);
         transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
-        transaction.setPaymentStatus(Transaction.PaymentStatus.COMPLETED);
-        transaction.setTransactionTime(Instant.now());
+        transaction.setPaymentStatus(Transaction.PaymentStatus.SUCCESS);
+        transaction.setProcessedAt(Instant.now());
         return transactionRepository.save(transaction);
     }
 
