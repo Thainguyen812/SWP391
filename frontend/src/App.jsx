@@ -103,7 +103,7 @@ const DriverAppWrapper = () => {
   return (
     <DriverPwa 
       user={{ 
-        phone: user.phone || user.username, 
+        phone: user.phone || (user.username && !user.username.includes('@') ? user.username : ''), 
         name: user.fullName, 
         role: user.role,
         email: user.email
