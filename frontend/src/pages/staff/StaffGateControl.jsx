@@ -354,7 +354,18 @@ export const StaffGateControl = () => {
       okText: 'Xác nhận',
       cancelText: 'Hủy',
       okButtonProps: { className: 'bg-blue-600' },
-      onOk() {
+      async onOk() {
+        try {
+          if (isExitGate && isVip) {
+            await apiClient.post('/sessions/approve-exit', { plate });
+          } else if (!isExitGate) {
+            await apiClient.post('/sessions/approve-entry', { plate });
+          }
+        } catch (e) {
+          notification.error({ message: 'Lỗi', description: e.response?.data?.message || 'Không thể mở cổng!' });
+          return;
+        }
+
         // Clear from active vehicles so the UI updates
         if (!isExitGate) {
           processEntryVehicle(plate);
@@ -371,9 +382,7 @@ export const StaffGateControl = () => {
         }));
 
         addLog(`${id}: Phê duyệt thủ công, Barrier MỞ cho xe ${plate}`, 'OK');
-        if (!isExitGate) {
-          apiClient.post('/sessions/approve-entry', { plate }).catch(e => console.log(e));
-        } else {
+        if (isExitGate) {
           addTransaction({
             id: 'TX' + Date.now().toString().slice(-6),
             plate: plate,
