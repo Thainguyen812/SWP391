@@ -49,7 +49,7 @@ export const StaffMobilePOS = () => {
         } else {
           try {
             const feeResponse = await apiClient.get(`/v1/parking/fee-by-plate/${found.plate}`);
-            baseFee = feeResponse.data.parkingFee || 0;
+            baseFee = feeResponse.parkingFee || 0;
           } catch (feeError) {
             console.error("Failed to fetch fee from backend:", feeError);
             baseFee = 10000; // fallback
