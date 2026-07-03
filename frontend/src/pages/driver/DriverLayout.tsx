@@ -375,7 +375,52 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     return () => clearInterval(timer);
   }, []);
 
-  const [transactions, setTransactions] = useState<TransactionItem[]>([]);
+  const [transactions, setTransactions] = useState<TransactionItem[]>(() => {
+    const saved = localStorage.getItem(`urbanpark_user_transactions_${user?.username || 'default'}`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+        // Fallback seed for phuongbui10022005@gmail.com
+    if (user && user.username === 'phuongbui10022005@gmail.com') {
+      const mockHistory = [
+        {
+          id: 'txn-1783040011084',
+          date: '03/07/2026 07:20:55',
+          type: 'Đăng kí Thẻ Tháng VIP (Ví UrbanPark)',
+          plate: '10K-348.29',
+          fee: '-1.400.000đ',
+          isEntry: false,
+          status: 'Thành công'
+        },
+        {
+          id: 'txn-1783040011083',
+          date: '03/07/2026 07:20:45',
+          type: 'Nạp tiền vào tài khoản',
+          plate: '-',
+          fee: '+1.150.000đ',
+          isEntry: true,
+          status: 'Thành công'
+        },
+        {
+          id: 'txn-1783040011082',
+          date: '03/07/2026 07:13:50',
+          type: 'Đăng kí Vé Ngày VIP (Ví UrbanPark)',
+          plate: '10K-348.29',
+          fee: '-70.000đ',
+          isEntry: false,
+          status: 'Thành công'
+        }
+      ];
+      localStorage.setItem('urbanpark_user_transactions_phuongbui10022005@gmail.com', JSON.stringify(mockHistory));
+      return mockHistory;
+    }
+    return [];
+  });
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -395,7 +440,10 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               isEntry: item.action === 'Vào bãi',
               status: item.status === 'Thành Công' ? 'Thành công' : 'Đang xử lý'
             }));
-            setTransactions(mapped);
+            setTransactions(prev => {
+              const localPayments = prev.filter(tx => !tx.id.startsWith('#TRX-'));
+              return [...localPayments, ...mapped];
+            });
           }
         }
       } catch (err) {
