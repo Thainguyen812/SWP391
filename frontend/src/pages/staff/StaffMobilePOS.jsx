@@ -54,8 +54,13 @@ export const StaffMobilePOS = () => {
           const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
           audio.play().catch(e => console.log(e));
           stopScanner();
+          // Extract plate if format is PLATE|DIRECTION|TIMESTAMP or VIP_PLATE
           let parsedPlate = decodedText;
-          if (decodedText.includes('_')) {
+          if (decodedText.includes('|')) {
+            // Format từ App Driver: 30A-12345|RA|169999999
+            parsedPlate = decodedText.split('|')[0];
+          } else if (decodedText.includes('_')) {
+            // Format cũ: VIP_Checkout_30A-12345
             parsedPlate = decodedText.split('_').pop();
           }
           setPlate(parsedPlate);
