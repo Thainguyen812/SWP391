@@ -451,14 +451,28 @@ export const StaffMobilePOS = () => {
                 <span>LƯU Ý: Staff KHÔNG THU HỒI Thẻ Tạm tại bước này. Trả lại thẻ cho khách giữ để đảm bảo kiểm soát đầu ra đồng bộ tại cổng trạm.</span>
               </div>
               <button 
-                onClick={handleCheckout}
+                onClick={() => {
+                  if (vehicle.type === 'VIP' || vehicle.type === 'Vé tháng' || vehicle.type === 'Khách VIP') {
+                    setAuditData({ gps: "Bypass", time: dayjs().format('HH:mm:ss DD/MM/YYYY') });
+                    setIsSuccess(true);
+                    notification.success({ 
+                      message: 'Hoàn tất kiểm tra', 
+                      description: `Xe ${vehicle.plate} là xe ưu tiên. Mời khách ra thẳng cổng tự động.` 
+                    });
+                  } else {
+                    handleCheckout();
+                  }
+                }}
                 disabled={isProcessing}
                 className="w-full bg-slate-900 hover:bg-black text-white font-black py-4 rounded-xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer uppercase tracking-wider text-sm border-2 border-slate-800"
               >
                 {isProcessing ? <Spin size="small" /> : (
                   <>
                     <CheckOutlined className="text-lg" />
-                    Xác nhận thanh toán lưu động
+                    {(vehicle.type === 'VIP' || vehicle.type === 'Vé tháng' || vehicle.type === 'Khách VIP') 
+                      ? 'XÁC NHẬN CHO XE ƯU TIÊN QUA' 
+                      : 'Xác nhận thanh toán lưu động'
+                    }
                   </>
                 )}
               </button>
