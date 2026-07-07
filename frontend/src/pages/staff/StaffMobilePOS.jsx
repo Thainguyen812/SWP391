@@ -334,13 +334,10 @@ export const StaffMobilePOS = () => {
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col items-center animate-fade-in">
                       <div className="w-48 h-48 bg-slate-50 rounded-xl mb-4 p-3 relative border border-slate-100 shadow-sm">
                         <img 
-                          src={`https://img.vietqr.io/image/970422-0123456789-compact2.png?amount=${fee}&addInfo=${encodeURIComponent('Thanh toan do xe ' + vehicle.plate)}&accountName=PARKING%20SYSTEM`} 
-                          alt="QR Code" 
+                          src={`https://vietqr.app/img?acc=0818756569&bank=VietinBank&amount=${fee}&des=${vehicle.plate}&template=compact&holder=DUONG PHUOC HUNG&store=Urban Park System`} 
+                          alt='QR thanh toán VietQR'
                           className="w-full h-full object-contain mix-blend-multiply" 
                         />
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-1.5 shadow-md border border-slate-100 flex items-center justify-center">
-                          <DollarOutlined className="text-blue-500 text-xl" />
-                        </div>
                       </div>
                       <p className="text-sm font-bold text-slate-700 text-center mb-1">Khách hàng quét mã VietQR</p>
                       <p className="text-xs font-medium text-slate-500 text-center">Đưa màn hình này cho khách để họ dùng App ngân hàng quét thanh toán.</p>
