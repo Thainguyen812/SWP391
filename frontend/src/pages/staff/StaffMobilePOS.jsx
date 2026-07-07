@@ -334,7 +334,7 @@ export const StaffMobilePOS = () => {
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col items-center animate-fade-in">
                       <div className="w-48 h-48 bg-slate-50 rounded-xl mb-4 p-3 relative border border-slate-100 shadow-sm">
                         <img 
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=PAYMENT_${vehicle.plate}_${fee}`} 
+                          src={`https://img.vietqr.io/image/970422-0123456789-compact2.png?amount=${fee}&addInfo=${encodeURIComponent('Thanh toan do xe ' + vehicle.plate)}&accountName=PARKING%20SYSTEM`} 
                           alt="QR Code" 
                           className="w-full h-full object-contain mix-blend-multiply" 
                         />
