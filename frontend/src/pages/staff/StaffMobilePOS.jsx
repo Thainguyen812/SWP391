@@ -27,12 +27,6 @@ export const StaffMobilePOS = () => {
   const [isScanning, setIsScanning] = useState(false);
   const scannerRef = React.useRef(null);
 
-  React.useEffect(() => {
-    return () => {
-      stopScanner();
-    };
-  }, []);
-
   const stopScanner = () => {
     if (scannerRef.current) {
       scannerRef.current.stop().then(() => {
@@ -43,37 +37,46 @@ export const StaffMobilePOS = () => {
     setIsScanning(false);
   };
 
+  React.useEffect(() => {
+    return () => {
+      stopScanner();
+    };
+  }, []);
+
   const startScanner = async () => {
     setIsScanning(true);
-    try {
-      scannerRef.current = new Html5Qrcode("reader");
-      await scannerRef.current.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-          audio.play().catch(e => console.log(e));
-          stopScanner();
-          // Extract plate if format is PLATE|DIRECTION|TIMESTAMP or VIP_PLATE
-          let parsedPlate = decodedText;
-          if (decodedText.includes('|')) {
-            // Format từ App Driver: 30A-12345|RA|169999999
-            parsedPlate = decodedText.split('|')[0];
-          } else if (decodedText.includes('_')) {
-            // Format cũ: VIP_Checkout_30A-12345
-            parsedPlate = decodedText.split('_').pop();
-          }
+    // Wait for React to render the <div id="reader">
+    setTimeout(async () => {
+      try {
+        scannerRef.current = new Html5Qrcode("reader");
+        await scannerRef.current.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+            audio.play().catch(e => console.log(e));
+            stopScanner();
+            // Extract plate if format is PLATE|DIRECTION|TIMESTAMP or VIP_PLATE
+            let parsedPlate = decodedText;
+            if (decodedText.includes('|')) {
+              // Format từ App Driver: 30A-12345|RA|169999999
+              parsedPlate = decodedText.split('|')[0];
+            } else if (decodedText.includes('_')) {
+              // Format cũ: VIP_Checkout_30A-12345
+              parsedPlate = decodedText.split('_').pop();
+            }
           setPlate(parsedPlate);
           handleSearchWithPlate(parsedPlate);
           notification.success({ message: 'Quét thành công!', description: `Biển số: ${parsedPlate}` });
         },
         (error) => {}
-      );
-    } catch (err) {
-      console.error(err);
-      notification.error({ message: 'Lỗi', description: 'Không thể truy cập camera.' });
-      setIsScanning(false);
-    }
+        );
+      } catch (err) {
+        console.error(err);
+        notification.error({ message: 'Lỗi', description: 'Không thể truy cập camera.' });
+        setIsScanning(false);
+      }
+    }, 100);
   };
 
   // Function calculateFee is removed as we now fetch from backend
