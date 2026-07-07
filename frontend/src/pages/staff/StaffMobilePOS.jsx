@@ -6,7 +6,6 @@ import {
   BankOutlined, CheckOutlined, MobileOutlined,
   ClockCircleOutlined, CloseOutlined, ScanOutlined, EnvironmentOutlined, CameraOutlined
 } from '@ant-design/icons';
-import { Html5Qrcode } from 'html5-qrcode';
 import { notification, Spin } from 'antd';
 import { apiClient } from '../../api/apiClient';
 import dayjs from 'dayjs';
@@ -48,6 +47,7 @@ export const StaffMobilePOS = () => {
     // Wait for React to render the <div id="reader">
     setTimeout(async () => {
       try {
+        const { Html5Qrcode } = await import('html5-qrcode');
         scannerRef.current = new Html5Qrcode("reader");
         await scannerRef.current.start(
           { facingMode: "environment" },
