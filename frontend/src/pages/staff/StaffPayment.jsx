@@ -476,7 +476,8 @@ export const StaffPayment = () => {
                   {paymentMethod === 'qr' && (
                     <div className="bg-white border border-blue-200 rounded-lg p-4 flex flex-col items-center justify-center animate-fadeIn shadow-sm relative overflow-hidden">
                       <div className="w-28 h-28 bg-slate-50 rounded-lg flex items-center justify-center mb-3 border border-slate-200 overflow-hidden relative">
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ThanhToanVeXe" alt="QR Code" className="w-24 h-24 object-contain" />
+                        <img src={`https://vietqr.app/img?acc=0818756569&bank=VietinBank&amount=${totalAmount}&des=${lpr}&template=compact&holder=DUONG PHUOC HUNG&store=Urban Park System`} 
+                        alt='QR thanh toán VietQR' className="w-24 h-24 object-contain" />
                         <div className="absolute inset-0 bg-blue-500/10 animate-pulse pointer-events-none"></div>
                       </div>
                       <span className="text-xs font-medium text-slate-500 text-center mb-3">Vui lòng yêu cầu khách hàng quét mã QR<br/>bằng ứng dụng Ngân hàng</span>

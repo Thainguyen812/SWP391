@@ -4,7 +4,7 @@ import {
   ArrowLeftOutlined, QrcodeOutlined, SearchOutlined, 
   CheckCircleFilled, CarOutlined, DollarOutlined, 
   BankOutlined, CheckOutlined, MobileOutlined,
-  ClockCircleOutlined, CloseOutlined, ScanOutlined, EnvironmentOutlined
+  ClockCircleOutlined, CloseOutlined, ScanOutlined, EnvironmentOutlined, CameraOutlined
 } from '@ant-design/icons';
 import { notification, Spin } from 'antd';
 import { apiClient } from '../../api/apiClient';
@@ -23,25 +23,65 @@ export const StaffMobilePOS = () => {
   const [fee, setFee] = useState(0);
   const [showScanner, setShowScanner] = useState(false);
   const [auditData, setAuditData] = useState(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = React.useRef(null);
 
-  const calculateFee = (inTime) => {
-    // Giả lập tính phí như backend
-    if (!inTime) return 10000;
-    try {
-      const [hours, minutes] = inTime.split(':').map(Number);
-      const now = new Date();
-      const inDate = new Date();
-      inDate.setHours(hours, minutes, 0);
-      let diffMs = now - inDate;
-      if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000;
-      const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
-      return diffHours > 4 ? 30000 : 10000;
-    } catch {
-      return 10000;
+  const stopScanner = () => {
+    if (scannerRef.current) {
+      scannerRef.current.stop().then(() => {
+        scannerRef.current.clear();
+        scannerRef.current = null;
+      }).catch(err => console.log('Error stopping scanner', err));
     }
+    setIsScanning(false);
   };
 
-  const handleSearchWithPlate = (searchPlate) => {
+  React.useEffect(() => {
+    return () => {
+      stopScanner();
+    };
+  }, []);
+
+  const startScanner = async () => {
+    setIsScanning(true);
+    // Wait for React to render the <div id="reader">
+    setTimeout(async () => {
+      try {
+        const { Html5Qrcode } = await import('html5-qrcode');
+        scannerRef.current = new Html5Qrcode("reader");
+        await scannerRef.current.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+            audio.play().catch(e => console.log(e));
+            stopScanner();
+            // Extract plate if format is PLATE|DIRECTION|TIMESTAMP or VIP_PLATE
+            let parsedPlate = decodedText;
+            if (decodedText.includes('|')) {
+              // Format từ App Driver: 30A-12345|RA|169999999
+              parsedPlate = decodedText.split('|')[0];
+            } else if (decodedText.includes('_')) {
+              // Format cũ: VIP_Checkout_30A-12345
+              parsedPlate = decodedText.split('_').pop();
+            }
+          setPlate(parsedPlate);
+          handleSearchWithPlate(parsedPlate);
+          notification.success({ message: 'Quét thành công!', description: `Biển số: ${parsedPlate}` });
+        },
+        (error) => {}
+        );
+      } catch (err) {
+        console.error(err);
+        notification.error({ message: 'Lỗi', description: 'Không thể truy cập camera.' });
+        setIsScanning(false);
+      }
+    }, 100);
+  };
+
+  // Function calculateFee is removed as we now fetch from backend
+
+  const handleSearchWithPlate = async (searchPlate) => {
     const p = searchPlate || plate;
     if (!p) {
       notification.warning({ message: 'Vui lòng nhập biển số xe' });
@@ -62,7 +102,13 @@ export const StaffMobilePOS = () => {
           baseFee = 0;
           setPaymentMethod('card'); // VIP bắt buộc QR động (card)
         } else {
-          baseFee = calculateFee(found.inTime);
+          try {
+            const feeResponse = await apiClient.get(`/v1/parking/fee-by-plate/${found.plate}`);
+            baseFee = feeResponse.parkingFee || 0;
+          } catch (feeError) {
+            console.error("Failed to fetch fee from backend:", feeError);
+            baseFee = 10000; // fallback
+          }
           setPaymentMethod('cash');
         }
         
@@ -262,6 +308,14 @@ export const StaffMobilePOS = () => {
                       className="flex-1 bg-transparent border-none py-3 px-4 font-bold text-slate-700 focus:outline-none focus:ring-0 uppercase text-lg"
                     />
                     <button 
+                      onClick={startScanner}
+                      disabled={isLoading}
+                      className="text-slate-400 hover:text-blue-600 px-3 cursor-pointer transition-colors"
+                      title="Quét mã QR bằng Camera"
+                    >
+                      <CameraOutlined className="text-xl" />
+                    </button>
+                    <button 
                       onClick={() => handleSearchWithPlate(null)}
                       disabled={isLoading}
                       className="bg-slate-800 text-white px-6 rounded-xl font-bold active:scale-95 transition-transform cursor-pointer"
@@ -343,13 +397,10 @@ export const StaffMobilePOS = () => {
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col items-center animate-fade-in">
                       <div className="w-48 h-48 bg-slate-50 rounded-xl mb-4 p-3 relative border border-slate-100 shadow-sm">
                         <img 
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=PAYMENT_${vehicle.plate}_${fee}`} 
-                          alt="QR Code" 
+                          src={`https://vietqr.app/img?acc=0818756569&bank=VietinBank&amount=${fee}&des=${vehicle.plate}&template=compact&holder=DUONG PHUOC HUNG&store=Urban Park System`} 
+                          alt='QR thanh toán VietQR'
                           className="w-full h-full object-contain mix-blend-multiply" 
                         />
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-1.5 shadow-md border border-slate-100 flex items-center justify-center">
-                          <DollarOutlined className="text-blue-500 text-xl" />
-                        </div>
                       </div>
                       <p className="text-sm font-bold text-slate-700 text-center mb-1">Khách hàng quét mã VietQR</p>
                       <p className="text-xs font-medium text-slate-500 text-center">Đưa màn hình này cho khách để họ dùng App ngân hàng quét thanh toán.</p>
@@ -400,14 +451,28 @@ export const StaffMobilePOS = () => {
                 <span>LƯU Ý: Staff KHÔNG THU HỒI Thẻ Tạm tại bước này. Trả lại thẻ cho khách giữ để đảm bảo kiểm soát đầu ra đồng bộ tại cổng trạm.</span>
               </div>
               <button 
-                onClick={handleCheckout}
+                onClick={() => {
+                  if (vehicle.type === 'VIP' || vehicle.type === 'Vé tháng' || vehicle.type === 'Khách VIP') {
+                    setAuditData({ gps: "Bypass", time: dayjs().format('HH:mm:ss DD/MM/YYYY') });
+                    setIsSuccess(true);
+                    notification.success({ 
+                      message: 'Hoàn tất kiểm tra', 
+                      description: `Xe ${vehicle.plate} là xe ưu tiên. Mời khách ra thẳng cổng tự động.` 
+                    });
+                  } else {
+                    handleCheckout();
+                  }
+                }}
                 disabled={isProcessing}
                 className="w-full bg-slate-900 hover:bg-black text-white font-black py-4 rounded-xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer uppercase tracking-wider text-sm border-2 border-slate-800"
               >
                 {isProcessing ? <Spin size="small" /> : (
                   <>
                     <CheckOutlined className="text-lg" />
-                    Xác nhận thanh toán lưu động
+                    {(vehicle.type === 'VIP' || vehicle.type === 'Vé tháng' || vehicle.type === 'Khách VIP') 
+                      ? 'XÁC NHẬN CHO XE ƯU TIÊN QUA' 
+                      : 'Xác nhận thanh toán lưu động'
+                    }
                   </>
                 )}
               </button>
@@ -417,59 +482,60 @@ export const StaffMobilePOS = () => {
       </div>
       
       {/* Camera Scanner Modal */}
-      {showScanner && (
-        <div className="fixed inset-0 bg-black z-[100] flex flex-col font-sans animate-fade-in">
-          <div className="p-4 flex justify-between items-center text-white bg-black/60 z-10 absolute top-0 left-0 right-0 backdrop-blur-md border-b border-white/10">
-            <span className="font-bold text-lg flex items-center gap-2"><ScanOutlined /> Quét Biển Số</span>
-            <button onClick={() => setShowScanner(false)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full cursor-pointer transition-colors backdrop-blur-md">
+      {isScanning && (
+        <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center animate-fade-in">
+          <div className="absolute top-6 right-6 z-50">
+            <button 
+              onClick={stopScanner}
+              className="bg-white/20 hover:bg-white/40 text-white rounded-full w-12 h-12 flex items-center justify-center backdrop-blur-sm cursor-pointer transition-colors"
+            >
               <CloseOutlined className="text-xl" />
             </button>
           </div>
           
-          <div className="flex-1 relative bg-slate-900 flex items-center justify-center overflow-hidden">
-            {/* Fake camera feed background */}
-            <img 
-              src="https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80" 
-              alt="camera feed" 
-              className="absolute inset-0 w-full h-full object-cover opacity-50 grayscale" 
-            />
-            
-            {/* Dark overlay with cutout (using borders trick) */}
-            <div className="absolute inset-0 z-0 opacity-70 bg-black" style={{ clipPath: 'polygon(0% 0%, 0% 100%, 15% 100%, 15% 35%, 85% 35%, 85% 65%, 15% 65%, 15% 100%, 100% 100%, 100% 0%)' }}></div>
-            
-            {/* Viewfinder box */}
-            <div className="w-[70%] h-[30%] relative z-10">
-              {/* Corner brackets */}
-              <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-emerald-400 rounded-tl"></div>
-              <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-emerald-400 rounded-tr"></div>
-              <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-emerald-400 rounded-bl"></div>
-              <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-emerald-400 rounded-br"></div>
+          <div className="w-full max-w-md p-4 flex flex-col items-center mt-12">
+            <h3 className="text-white text-center font-bold text-lg mb-6 flex items-center gap-2"><ScanOutlined/> Quét QR VIP / Biển Số</h3>
+            <div className="bg-white rounded-3xl overflow-hidden shadow-[0_0_40px_rgba(59,130,246,0.3)] w-full max-w-[320px] aspect-square relative ring-4 ring-slate-800">
+              {/* Vùng Render Camera của Html5Qrcode */}
+              <div id="reader" className="w-full h-full object-cover"></div>
               
-              {/* Target crosshair center */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-emerald-400/50">
-                <ScanOutlined className="text-4xl" />
+              {/* Overlay ngắm (Target crosshair) */}
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div className="w-[75%] h-[75%] border-2 border-green-500 relative">
+                  {/* Góc */}
+                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-500"></div>
+                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-green-500"></div>
+                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-green-500"></div>
+                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-green-500"></div>
+                  {/* Tia quét */}
+                  <div className="absolute top-0 left-0 w-full h-0.5 bg-green-400 shadow-[0_0_15px_rgba(74,222,128,1)] animate-[scan_2s_ease-in-out_infinite]"></div>
+                </div>
               </div>
-              
-              {/* Scanning line animation */}
-              <style>{`
-                @keyframes scan-line {
-                  0% { top: 0; opacity: 0; }
-                  10% { opacity: 1; }
-                  50% { opacity: 1; }
-                  90% { opacity: 1; }
-                  100% { top: 100%; opacity: 0; }
-                }
-                .animate-scan {
-                  animation: scan-line 2s ease-in-out infinite;
-                }
-              `}</style>
-              <div className="w-full h-1 bg-emerald-400 absolute left-0 shadow-[0_0_20px_5px_rgba(52,211,153,0.8)] animate-scan z-20"></div>
             </div>
-            
-            <div className="absolute bottom-12 text-white font-bold text-sm bg-black/60 px-6 py-3 rounded-full backdrop-blur-md z-10 shadow-lg border border-white/10 flex items-center gap-2 animate-pulse">
-              <ScanOutlined /> Đang nhận diện biển số...
+            <div className="bg-slate-800/80 text-white px-6 py-3 rounded-full mt-8 text-sm font-medium border border-slate-700 shadow-xl backdrop-blur-sm flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              Hệ thống đang quét...
             </div>
           </div>
+
+          <style>{`
+            @keyframes scan {
+              0%, 100% { top: 0; opacity: 0; }
+              10%, 90% { opacity: 1; }
+              50% { top: 100%; opacity: 1; }
+            }
+            /* Ẩn các phần tử UI rác của html5-qrcode */
+            #reader img { object-fit: cover !important; }
+            #reader select { display: none !important; }
+            #reader a { display: none !important; }
+            #reader span { display: none !important; }
+            #reader div[style*="text-align: center"] { display: none !important; }
+            #reader video { 
+              object-fit: cover !important; 
+              width: 100% !important; 
+              height: 100% !important; 
+            }
+          `}</style>
         </div>
       )}
     </div>

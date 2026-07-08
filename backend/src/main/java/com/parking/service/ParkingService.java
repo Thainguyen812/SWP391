@@ -36,6 +36,7 @@ public interface ParkingService {
     void cleanupTestData();
 
     java.util.Map<String, Object> getParkingFee(UUID cardId);
+    java.util.Map<String, Object> getParkingFeeByPlate(String plate);
     List<java.util.Map<String, Object>> findCarByDigits(String digits);
     List<java.util.Map<String, Object>> getMonitoringMap();
     java.util.Map<String, Object> getVehicleStatus(UUID vehicleId);
