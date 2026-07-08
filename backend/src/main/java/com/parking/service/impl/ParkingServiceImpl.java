@@ -27,6 +27,8 @@ import com.parking.repository.VehicleRepository;
 import com.parking.repository.VipQrIdentifierRepository;
 import com.parking.repository.AuditLogRepository;
 import com.parking.repository.AiScanLogRepository;
+import com.parking.repository.SecurityAlertRepository;
+import com.parking.model.SecurityAlert;
 
 import com.parking.repository.TransactionRepository;// task 5
 
@@ -70,6 +72,7 @@ public class ParkingServiceImpl implements ParkingService {
     private final UserRepository userRepository;
 
     private final PricingRuleRepository pricingRuleRepository;
+    private final SecurityAlertRepository securityAlertRepository;
 
     public ParkingServiceImpl(BlacklistRepository blacklistRepository,
             ParkingSessionRepository parkingSessionRepository,
@@ -83,7 +86,8 @@ public class ParkingServiceImpl implements ParkingService {
             CardRepository cardRepository,
             ParkingSlotRepository slotRepository,
             UserRepository userRepository,
-            PricingRuleRepository pricingRuleRepository) { // task 5
+            PricingRuleRepository pricingRuleRepository,
+            SecurityAlertRepository securityAlertRepository) { // task 5
         this.blacklistRepository = blacklistRepository;
         this.parkingSessionRepository = parkingSessionRepository;
         this.zoneRepository = zoneRepository;
@@ -97,6 +101,7 @@ public class ParkingServiceImpl implements ParkingService {
         this.slotRepository = slotRepository;
         this.userRepository = userRepository;
         this.pricingRuleRepository = pricingRuleRepository;
+        this.securityAlertRepository = securityAlertRepository;
     }
 
     @Override
@@ -280,6 +285,58 @@ public class ParkingServiceImpl implements ParkingService {
 
     @Override
     @Transactional
+    public Transaction approveExit(String plate) {
+        ParkingSession session = parkingSessionRepository
+                .findByLicensePlateAndSessionStatus(plate, ParkingSession.SessionStatus.ACTIVE)
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay phien xe dang hoat dong"));
+
+        if (session.getIsLocked() != null && session.getIsLocked()) {
+            SecurityAlert alert = new SecurityAlert();
+            alert.setAlertType("NGHI NGỜ TRỘM CẮP");
+            alert.setLicensePlate(session.getLicensePlate() != null ? session.getLicensePlate() : "N/A");
+            alert.setReason("Phát hiện cố tình xuất bãi khi xe đang bật Khóa chống trộm.");
+            alert.setIsActionable(true);
+            securityAlertRepository.save(alert);
+
+            throw new ApiExceptions.ForbiddenException(
+                    "Xe đang ở trạng thái KHÓA AN TOÀN chống trộm! Không thể xuất bãi.");
+        }
+
+        if (session.getIsVip() == null || !session.getIsVip()) {
+            throw new ApiExceptions.BadRequestException("Chỉ có xe VIP mới được phê duyệt mở cổng thủ công khi ra");
+        }
+
+        session.setCheckOutTime(Instant.now());
+        session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
+        
+        if (session.getParkedSlotId() != null) {
+            slotRepository.findById(session.getParkedSlotId()).ifPresent(slot -> {
+                slot.setSlotStatus("AVAILABLE");
+                slotRepository.save(slot);
+            });
+            session.setParkedSlotId(null);
+        }
+
+        Zone zone = zoneRepository.findById(session.getAssignedZoneId())
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay Zone"));
+        if (zone.getCurrentOccupied() > 0) {
+            zone.setCurrentOccupied(zone.getCurrentOccupied() - 1);
+            zoneRepository.save(zone);
+        }
+        
+        parkingSessionRepository.save(session);
+
+        Transaction transaction = new Transaction();
+        transaction.setSessionId(session.getId());
+        transaction.setTotalAmount(java.math.BigDecimal.ZERO);
+        transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
+        transaction.setPaymentStatus(Transaction.PaymentStatus.SUCCESS);
+        transaction.setProcessedAt(Instant.now());
+        return transactionRepository.save(transaction);
+    }
+
+    @Override
+    @Transactional
     public CheckInResponse approvePendingEntry(com.parking.service.PendingGateVehicleService.PendingEntry pendingEntry) {
         if (pendingEntry == null) {
             throw new ApiExceptions.NotFoundException("Khong tim thay xe dang cho vao cong");
@@ -357,6 +414,13 @@ public class ParkingServiceImpl implements ParkingService {
             audit.setNewValue("{\"is_locked\": true}");
             audit.setCreatedAt(Instant.now());
             auditLogRepository.save(audit);
+
+            SecurityAlert alert = new SecurityAlert();
+            alert.setAlertType("NGHI NGỜ TRỘM CẮP");
+            alert.setLicensePlate(session.getLicensePlate() != null ? session.getLicensePlate() : qrVehiclePlate);
+            alert.setReason("Phát hiện cố tình xuất bãi khi xe đang bật Khóa chống trộm.");
+            alert.setIsActionable(true);
+            securityAlertRepository.save(alert);
 
             // Mock còi hú / notification FCM
             System.out.println("MOCK FCM PUSH NOTIFICATION: [CẢNH BÁO CHỐNG TRỘM] Phát hiện xe " + qrVehiclePlate
@@ -756,6 +820,13 @@ public class ParkingServiceImpl implements ParkingService {
                                 "Không tìm thấy phiên gửi xe hợp lệ"));
 
         if (session.getIsLocked() != null && session.getIsLocked()) {
+            SecurityAlert alert = new SecurityAlert();
+            alert.setAlertType("NGHI NGỜ TRỘM CẮP");
+            alert.setLicensePlate(session.getLicensePlate() != null ? session.getLicensePlate() : "N/A");
+            alert.setReason("Phát hiện cố tình xuất bãi khi xe đang bật Khóa chống trộm.");
+            alert.setIsActionable(true);
+            securityAlertRepository.save(alert);
+
             throw new ApiExceptions.ForbiddenException(
                     "Xe đang ở trạng thái KHÓA AN TOÀN chống trộm! Không thể xuất bãi.");
         }
@@ -924,6 +995,13 @@ public class ParkingServiceImpl implements ParkingService {
                                 "Không tìm thấy phiên gửi xe ACTIVE"));
 
         if (session.getIsLocked() != null && session.getIsLocked()) {
+            SecurityAlert alert = new SecurityAlert();
+            alert.setAlertType("NGHI NGỜ TRỘM CẮP");
+            alert.setLicensePlate(session.getLicensePlate() != null ? session.getLicensePlate() : "N/A");
+            alert.setReason("Phát hiện cố tình xuất bãi khi xe đang bật Khóa chống trộm.");
+            alert.setIsActionable(true);
+            securityAlertRepository.save(alert);
+
             throw new ApiExceptions.ForbiddenException(
                     "Xe đang ở trạng thái KHÓA AN TOÀN chống trộm! Không thể xuất bãi.");
         }
@@ -1389,6 +1467,13 @@ public class ParkingServiceImpl implements ParkingService {
         }
 
         if (Boolean.TRUE.equals(session.getIsLocked())) {
+            SecurityAlert alert = new SecurityAlert();
+            alert.setAlertType("NGHI NGỜ TRỘM CẮP");
+            alert.setLicensePlate(session.getLicensePlate() != null ? session.getLicensePlate() : "N/A");
+            alert.setReason("Phát hiện cố tình xuất bãi khi xe đang bật Khóa chống trộm.");
+            alert.setIsActionable(true);
+            securityAlertRepository.save(alert);
+
 
             throw new ApiExceptions.ForbiddenException(
                     "Xe đang bị khóa chống trộm.");

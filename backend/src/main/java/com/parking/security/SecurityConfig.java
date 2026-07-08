@@ -49,6 +49,7 @@ public class SecurityConfig {
 
                         // 2. Phân vùng API chỉ dành riêng cho ADMIN
                         .requestMatchers("/api/users/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/api/security/alerts/**").hasAnyRole("ADMIN", "MANAGER", "STAFF")
                         .requestMatchers("/api/security/**").hasRole("ADMIN")
 
                         // 3. Phân vùng API dành cho Quản lý (MANAGER) và Nhân viên (STAFF)
