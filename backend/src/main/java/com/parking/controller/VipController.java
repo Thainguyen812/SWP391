@@ -64,7 +64,7 @@ public class VipController {
         try {
             VipSubscription subscription = vipService.register(request);
             String ipAddress = servletRequest.getRemoteAddr();
-            long amount = 500000; 
+            long amount = subscription.getFeeAmount() != null ? subscription.getFeeAmount().longValue() : 500000;
             
             // Bước D: Gọi VNPayService để tạo Link thanh toán
             String paymentUrl = vnpayService.createPaymentUrl(
