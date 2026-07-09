@@ -204,11 +204,11 @@ public class DriverController {
                 try {
                     long feeLong = Long.parseLong(feeVal);
                     if (feeLong == 0) {
-                        if ("DAILY".equals(sub.getSubscriptionType()) || "DAY".equals(sub.getSubscriptionType())) feeLong = 50000;
-                        else if ("QUARTERLY".equals(sub.getSubscriptionType())) feeLong = 2700000;
-                        else if ("HALF_YEARLY".equals(sub.getSubscriptionType())) feeLong = 5000000;
-                        else if ("YEARLY".equals(sub.getSubscriptionType())) feeLong = 9000000;
-                        else feeLong = 1000000;
+                        if ("DAILY".equals(sub.getSubscriptionType()) || "DAY".equals(sub.getSubscriptionType())) feeLong = 70000;
+                        else if ("QUARTERLY".equals(sub.getSubscriptionType())) feeLong = 3800000;
+                        else if ("HALF_YEARLY".equals(sub.getSubscriptionType())) feeLong = 7000000;
+                        else if ("YEARLY".equals(sub.getSubscriptionType())) feeLong = 12500000;
+                        else feeLong = 1400000;
                     }
                     feeVal = String.format("%,d", feeLong).replace(',', '.') + "₫";
                 } catch (Exception e) {

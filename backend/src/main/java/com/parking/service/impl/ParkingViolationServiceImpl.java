@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class ParkingViolationServiceImpl implements ParkingViolationService {
@@ -24,6 +25,11 @@ public class ParkingViolationServiceImpl implements ParkingViolationService {
             "EV_ZONE_MISUSE",
             "DISABLED_ZONE_MISUSE",
             "DOUBLE_PARKING"
+    );
+
+    private static final Set<String> ALLOWED_STATUSES = Set.of(
+            "PENDING",
+            "PROCESSED"
     );
 
     private final ParkingViolationRepository parkingViolationRepository;
@@ -91,7 +97,6 @@ public class ParkingViolationServiceImpl implements ParkingViolationService {
         ParkingViolation violation = new ParkingViolation();
 
         violation.setSessionId(session.getId());
-        // violation.setSlotId(session.getParkedSlotId());
         violation.setViolationType(violationType);
         violation.setDetectedBy(detectedUser.getId());
         violation.setDetectedAt(Instant.now());
@@ -101,6 +106,35 @@ public class ParkingViolationServiceImpl implements ParkingViolationService {
         violation.setPhotoUrls(
                 convertPhotoUrlsToJson(request.getPhotoUrls())
         );
+
+        return parkingViolationRepository.save(violation);
+    }
+
+    @Override
+    public List<ParkingViolation> getAllViolations() {
+        return parkingViolationRepository.findAll();
+    }
+
+    @Override
+    @Transactional
+    public ParkingViolation resolveViolation(UUID id, String status) {
+
+        String normalizedStatus = status.trim().toUpperCase();
+
+        if (!ALLOWED_STATUSES.contains(normalizedStatus)) {
+            throw new IllegalArgumentException(
+                    "Trạng thái không hợp lệ: " + normalizedStatus
+            );
+        }
+
+        ParkingViolation violation = parkingViolationRepository.findById(id)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Không tìm thấy vi phạm với ID: " + id
+                        )
+                );
+
+        violation.setStatus(normalizedStatus);
 
         return parkingViolationRepository.save(violation);
     }
