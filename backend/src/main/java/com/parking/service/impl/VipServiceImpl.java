@@ -88,6 +88,10 @@ public class VipServiceImpl implements VipService {
                             newV.setLicensePlate(request.getLicensePlate());
                             newV.setOwnerId(request.getOwnerId() != null ? request.getOwnerId() : UUID.randomUUID());
                             newV.setVehicleSize("SEDAN_HATCHBACK");
+
+                            newV.setCreatedAt(java.time.Instant.now()); 
+                            newV.setUpdatedAt(java.time.Instant.now());
+
                             return vehicleRepository.save(newV);
                         });
 
