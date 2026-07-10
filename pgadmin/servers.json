@@ -1,0 +1,14 @@
+{
+    "Servers": {
+        "1": {
+            "Name": "Parking DB",
+            "Group": "Servers",
+            "Host": "postgres",
+            "Port": 5432,
+            "MaintenanceDB": "postgres",
+            "Username": "parking_user",
+            "SSLMode": "prefer",
+            "PassFile": "/pgadmin4/pgpass"
+        }
+    }
+}
