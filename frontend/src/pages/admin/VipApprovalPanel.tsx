@@ -55,11 +55,9 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
   // Sync state with localstorage
   const loadSubscriptions = async () => {
     try {
-      const response = await fetch('/api/vip/all', {
-        headers: { 'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}` }
-      });
-      if (response.ok) {
-        const backendAll = await response.json();
+      const response = await apiClient.get('/vip/all');
+      if (response.data) {
+        const backendAll = response.data;
         if (Array.isArray(backendAll)) {
           const mappedAll = backendAll.map((bp: any) => {
             let docPhotos = {
@@ -111,18 +109,11 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
     if (!targetSub) return;
 
     if (id.length === 36) {
-      const endpoint = nextStatus === 'ACTIVE' ? `/api/vip/${id}/approve` : `/api/vip/${id}/reject`;
-      const body = nextStatus === 'REJECTED' ? JSON.stringify({ reason: 'Không đủ điều kiện phê duyệt' }) : undefined;
-      fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}`
-        },
-        body: body
-      })
+      const endpoint = nextStatus === 'ACTIVE' ? `/vip/${id}/approve` : `/vip/${id}/reject`;
+      const body = nextStatus === 'REJECTED' ? { reason: 'Không đủ điều kiện phê duyệt' } : undefined;
+      apiClient.post(endpoint, body)
       .then(res => {
-        if (res.ok) {
+        if (res.data) {
           loadSubscriptions();
         }
       })
@@ -141,34 +132,7 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
     });
 
     setSubscriptions(updated);
-    localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updated));
-
-    // Update ALL driver vehicle lists in localStorage
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('urbanpark_user_vehicles')) {
-        try {
-          const vehs = JSON.parse(localStorage.getItem(key) || '[]');
-          if (Array.isArray(vehs)) {
-            const updatedVehs = vehs.map((v: any) => {
-              if (v.plate === targetSub.vehicle_plate) {
-                return {
-                  ...v,
-                  activeSubscription: nextStatus === 'ACTIVE' ? targetSub.type : undefined,
-                  subscriptionExpiry: nextStatus === 'ACTIVE' ? targetSub.endDate : undefined,
-                  subscriptionStatus: nextStatus
-                };
-              }
-              return v;
-            });
-            localStorage.setItem(key, JSON.stringify(updatedVehs));
-          }
-        } catch (e) {
-          console.error("Error synchronizing vehicle status:", e);
-        }
-      }
-    }
-
+    
     // Record Audit Log (Step 4 of Flow 5)
     try {
       const savedLogs = JSON.parse(localStorage.getItem('urbanpark_audit_logs') || '[]');
