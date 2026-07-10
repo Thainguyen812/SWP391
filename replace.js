@@ -4,8 +4,8 @@ let content = fs.readFileSync(file, 'utf8');
 
 // 1. qr generate
 content = content.replace(
-  /const response = await fetch\('\/api\/v1\/driver\/qr\/generate', \{\s*method: 'POST',\s*headers: \{\s*'Content-Type': 'application\/json',\s*'Authorization': [^\}]+\},\s*body: JSON\.stringify\(\{\s*vehicleId: vehicleId,\s*purpose: direction === 'VAO' \? 'CHECK_IN' : 'CHECK_OUT'\s*\}\)\s*\}\);\s*const data = await response\.json\(\);/g,
-  "const response = await apiClient.post('/v1/driver/qr/generate', { vehicleId: vehicleId, purpose: direction === 'VAO' ? 'CHECK_IN' : 'CHECK_OUT' }); const data = response.data;"
+  /const response = await fetch\('\/api\/v1\/driver\/qr\/generate', \{\s*method: 'POST',\s*headers: \{\s*'Content-Type': 'application\/json',\s*'Authorization': [^\}]+\},\s*body: JSON\.stringify\(\{\s*vehicleId: vehicleId,\s*purpose: direction === 'VÀO' \? 'CHECK_IN' : 'CHECK_OUT'\s*\}\)\s*\}\);\s*if \(response\.ok\) \{\s*const data = await response\.json\(\);/g,
+  "const response = await apiClient.post('/v1/driver/qr/generate', { vehicleId: vehicleId, purpose: direction === 'VÀO' ? 'CHECK_IN' : 'CHECK_OUT' }); const data = response.data; if (true) {"
 );
 
 // 2. vehicles get
