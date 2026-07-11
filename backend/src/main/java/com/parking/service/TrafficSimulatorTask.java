@@ -180,7 +180,7 @@ public class TrafficSimulatorTask {
                         ParkingSession session = insideVehicles.get((int) (Math.random() * insideVehicles.size()));
                         String selectedGate = emptyOutGates.get((int) (Math.random() * emptyOutGates.size()));
                         session.setExitGate(selectedGate);
-                        session.setCheckOutTime(Instant.now()); 
+                        // session.setCheckOutTime(Instant.now()); 
                         sessionRepo.save(session);
                     }
                 }
