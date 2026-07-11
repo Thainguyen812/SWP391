@@ -19,6 +19,7 @@ import com.parking.repository.UserRepository;
 import com.parking.model.Transaction; // task 5
 import com.parking.dto.FloorEntryVerificationRequest;
 import com.parking.dto.FloorEntryVerificationResponse;
+import com.parking.dto.SlotOccupancyRequest;
 import com.parking.repository.BlacklistRepository;
 import com.parking.repository.ParkingSessionRepository;
 import com.parking.repository.ZoneRepository;
@@ -44,7 +45,7 @@ import com.parking.dto.VisitorCheckInRequest;// task 5
 import com.parking.model.Card;// task 5
 import com.parking.repository.CardRepository;// task 5
 
-import com.parking.dto.CongestionCheckoutRequest; // task 7 
+import com.parking.dto.CongestionCheckoutRequest; // task 7
 
 import java.util.List;
 import java.util.Optional;
@@ -107,8 +108,12 @@ public class ParkingServiceImpl implements ParkingService {
     @Override
     @Transactional
     public CheckInResponse aiCheckIn(AiCheckInRequest request) {
-        String plate = request.getPlate();
+        String plate = request.getPlate() != null ? request.getPlate().trim().toUpperCase() : "";
         Double confidence = request.getConfidence_score() != null ? request.getConfidence_score() : 0.0;
+
+        if (plate.isBlank()) {
+            throw new ApiExceptions.BadRequestException("Yêu cầu biển số để xác thực VIP bằng AI");
+        }
 
         // Duplicate active session check
         Optional<ParkingSession> existing = parkingSessionRepository.findByLicensePlateAndSessionStatus(plate,
@@ -120,28 +125,7 @@ public class ParkingServiceImpl implements ParkingService {
         // Confidence threshold
         if (confidence < 70.0) {
             throw new ApiExceptions.BadRequestException(
-                    "Ảnh mờ, yêu cầu tài xế chuyển sang dùng quét mã QR Động vào bãi");
-        }
-
-        // Find matching zone with multi-tier fallback
-        List<Zone> candidates = zoneRepository.findByAllowedSizesContaining(request.getVehicle_type());
-        Zone chosen = null;
-        for (Zone z : candidates) {
-            if (z.getTotalSlots() - z.getCurrentOccupied() > 0) {
-                chosen = z;
-                break;
-            }
-        }
-        if (chosen == null && !candidates.isEmpty()) {
-            chosen = candidates.get(0);
-        }
-        if (chosen == null) {
-            List<Zone> allZones = zoneRepository.findAll();
-            if (!allZones.isEmpty()) {
-                chosen = allZones.get(0);
-            } else {
-                throw new ApiExceptions.BadRequestException("No available zone for vehicle type");
-            }
+                "Ảnh mờ, yêu cầu tài xế chuyển sang dùng quét mã QR Động vào bãi");
         }
 
         // VIP check: resolve vehicle then lookup subscription by vehicle id
@@ -161,8 +145,40 @@ public class ParkingServiceImpl implements ParkingService {
             }
         }
 
-        // Chốt chặn: Nếu không phải là xe VIP hoạt động, cấm tạo session tự động tại
-        // làn AI
+        // Chốt chặn: AI/LPR chỉ được tự tạo session cho VIP đang hoạt động.
+        // Khách vãng lai phải được staff cấp/quẹt thẻ ở form check-in.
+        if (!isVip) {
+            throw new ApiExceptions.BadRequestException(
+                    "Xe không phải VIP đang hoạt động. Khách vãng lai cần quẹt thẻ tạm tại làn staff.");
+        }
+
+        // Find matching zone with multi-tier fallback
+        List<Zone> candidates = zoneRepository.findByAllowedSizesContaining(request.getVehicle_type());
+        Zone chosen = null;
+        List<Zone> availableCandidates = new java.util.ArrayList<>();
+        for (Zone z : candidates) {
+            if (z.getTotalSlots() - z.getCurrentOccupied() > 0) {
+                availableCandidates.add(z);
+            }
+        }
+        if (!availableCandidates.isEmpty()) {
+            int randomIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(availableCandidates.size());
+            chosen = availableCandidates.get(randomIndex);
+        }
+        if (chosen == null && !candidates.isEmpty()) {
+            int randomIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(candidates.size());
+            chosen = candidates.get(randomIndex);
+        }
+        if (chosen == null) {
+            List<Zone> allZones = zoneRepository.findAll();
+            if (!allZones.isEmpty()) {
+                int randomIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(allZones.size());
+                chosen = allZones.get(randomIndex);
+            } else {
+                throw new ApiExceptions.BadRequestException("No available zone for vehicle type");
+            }
+        }
+
         // Create session
         ParkingSession ps = new ParkingSession();
         ps.setId(UUID.randomUUID());
@@ -170,8 +186,8 @@ public class ParkingServiceImpl implements ParkingService {
         ps.setCheckInTime(Instant.now());
         ps.setAssignedZoneId(chosen.getId());
         ps.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
-        ps.setIsVip(isVip);
-        ps.setEntryGate(request.getCamera_id());
+        ps.setIsVip(true);
+        ps.setEntryGate(null);
         // store image url if provided
         ps.setMobileCheckoutPhoto(request.getImage_url());
 
@@ -179,31 +195,7 @@ public class ParkingServiceImpl implements ParkingService {
             ps.setVehicleId(vehicleOpt.get().getId());
         }
 
-        // Tự động gán 1 thẻ RFID rảnh cho xe vãng lai khi qua camera AI (tự sinh thẻ
-        // nếu kho thẻ rảnh bị hết)
-        if (!isVip && ps.getCardId() == null) {
-            Optional<Card> availableCard = cardRepository.findFirstByStatus(Card.CardStatus.AVAILABLE);
-            Card cardToAssign = null;
-            if (availableCard.isPresent()) {
-                cardToAssign = availableCard.get();
-            } else {
-                Card autoCard = new Card();
-                autoCard.setId(UUID.randomUUID());
-                autoCard.setCardCode("00" + (1000 + (int) (Math.random() * 9000)));
-                autoCard.setStatus(Card.CardStatus.AVAILABLE);
-                autoCard.setCreatedAt(Instant.now());
-                autoCard.setUpdatedAt(Instant.now());
-                cardToAssign = cardRepository.save(autoCard);
-            }
-
-            ps.setCardId(cardToAssign.getId());
-            cardToAssign.setStatus(Card.CardStatus.IN_USE);
-            cardToAssign.setUpdatedAt(Instant.now());
-            cardRepository.save(cardToAssign);
-        }
-
-        // Việc gán ô đỗ (Slot) không thực hiện ở đây vì xe chỉ mới tới cổng chính.
-        // Ô đỗ sẽ được gán chính thức khi bảo vệ bấm Mở cổng (gọi hàm approveEntry -> ensureApprovedParkingSlot).
+        zoneRepository.increaseOccupied(chosen.getId());
 
         parkingSessionRepository.save(ps);
 
@@ -217,6 +209,14 @@ public class ParkingServiceImpl implements ParkingService {
                 .findByLicensePlateAndSessionStatus(plate, ParkingSession.SessionStatus.ACTIVE)
                 .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay phien xe dang cho vao bai"));
 
+        if (session.getEntryGate() == null || session.getEntryGate().isBlank()) {
+            throw new ApiExceptions.BadRequestException("Xe nay da vao bai, khong con nam o cong cho duyet");
+        }
+
+        if (!Boolean.TRUE.equals(session.getIsVip()) && session.getCardId() == null) {
+            throw new ApiExceptions.BadRequestException("Khach vang lai phai quet the tam truoc khi vao bai");
+        }
+
         String vehicleType = "SEDAN_HATCHBACK";
         Optional<Vehicle> vehicleOpt = vehicleRepository.findByLicensePlate(session.getLicensePlate());
         if (vehicleOpt.isPresent()) {
@@ -229,7 +229,7 @@ public class ParkingServiceImpl implements ParkingService {
             }
         }
 
-        Zone zone = ensureApprovedParkingSlot(session, vehicleType);
+        Zone zone = ensureApprovedZone(session, vehicleType);
         session.setEntryGate(null);
         session.setCheckInTime(Instant.now());
         session.setUpdatedAt(Instant.now());
@@ -263,7 +263,7 @@ public class ParkingServiceImpl implements ParkingService {
 
         session.setCheckOutTime(Instant.now());
         session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
-        
+
         if (session.getParkedSlotId() != null) {
             slotRepository.findById(session.getParkedSlotId()).ifPresent(slot -> {
                 slot.setSlotStatus("AVAILABLE");
@@ -278,7 +278,7 @@ public class ParkingServiceImpl implements ParkingService {
             zone.setCurrentOccupied(zone.getCurrentOccupied() - 1);
             zoneRepository.save(zone);
         }
-        
+
         parkingSessionRepository.save(session);
 
         Transaction transaction = new Transaction();
@@ -295,6 +295,10 @@ public class ParkingServiceImpl implements ParkingService {
     public CheckInResponse approvePendingEntry(com.parking.service.PendingGateVehicleService.PendingEntry pendingEntry) {
         if (pendingEntry == null) {
             throw new ApiExceptions.NotFoundException("Khong tim thay xe dang cho vao cong");
+        }
+
+        if (!pendingEntry.isVip()) {
+            throw new ApiExceptions.BadRequestException("Khach vang lai phai quet the tam tai lan staff truoc khi vao bai");
         }
 
         Optional<ParkingSession> existing = parkingSessionRepository.findByLicensePlateAndSessionStatus(
@@ -320,7 +324,7 @@ public class ParkingServiceImpl implements ParkingService {
         session.setEntryGate(null);
         vehicleOpt.ifPresent(vehicle -> session.setVehicleId(vehicle.getId()));
 
-        Zone zone = ensureApprovedParkingSlot(session, vehicleType);
+        Zone zone = ensureApprovedZone(session, vehicleType);
         parkingSessionRepository.save(session);
 
         return new CheckInResponse(session.getId().toString(), zone.getCode(), "ENTRY_APPROVED");
@@ -541,8 +545,21 @@ public class ParkingServiceImpl implements ParkingService {
             }
         }
 
-        Card card = cardRepository.findByCardCode(request.getCard_code()) // tìm thẻ để sử dụng
-                .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thẻ tạm này"));
+        String cardCode = request.getCard_code() != null ? request.getCard_code().trim() : "";
+        if (cardCode.isBlank()) {
+            throw new ApiExceptions.BadRequestException("Khách vãng lai phải có mã thẻ tạm");
+        }
+
+        Card card = cardRepository.findByCardCode(cardCode)
+                .orElseGet(() -> {
+                    Card newCard = new Card();
+                    newCard.setId(UUID.randomUUID());
+                    newCard.setCardCode(cardCode);
+                    newCard.setStatus(Card.CardStatus.AVAILABLE);
+                    newCard.setCreatedAt(Instant.now());
+                    newCard.setUpdatedAt(Instant.now());
+                    return cardRepository.save(newCard);
+                });
 
         if (card.getStatus() != Card.CardStatus.AVAILABLE) {
             throw new ApiExceptions.BadRequestException("Thẻ này không khả dụng để cấp cho khách vãng lai");
@@ -554,34 +571,43 @@ public class ParkingServiceImpl implements ParkingService {
         List<Zone> candidates = zoneRepository.findAll(); // tim zone phù hợp
         Zone chosen = null;
 
+        List<Zone> availableCandidates = new java.util.ArrayList<>();
         for (Zone z : candidates) {
             if (z.getAllowedSizes() != null
                     && z.getAllowedSizes().contains(request.getVehicle_type())
                     && z.getTotalSlots() - z.getCurrentOccupied() > 0) {
-                chosen = z;
-                break;
+                availableCandidates.add(z);
             }
+        }
+        if (!availableCandidates.isEmpty()) {
+            int randomIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(availableCandidates.size());
+            chosen = availableCandidates.get(randomIndex);
         }
 
         if (chosen == null) {
+            List<Zone> matchedCandidates = new java.util.ArrayList<>();
             for (Zone z : candidates) {
                 if (z.getAllowedSizes() != null && z.getAllowedSizes().contains(request.getVehicle_type())) {
-                    chosen = z;
-                    break;
+                    matchedCandidates.add(z);
                 }
+            }
+            if (!matchedCandidates.isEmpty()) {
+                int randomIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(matchedCandidates.size());
+                chosen = matchedCandidates.get(randomIndex);
             }
         }
 
         if (chosen == null && !candidates.isEmpty()) {
-            chosen = candidates.get(0);
+            int randomIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(candidates.size());
+            chosen = candidates.get(randomIndex);
         }
 
         if (chosen == null) {
             throw new ApiExceptions.BadRequestException("Không tìm thấy bất kỳ zone nào trong hệ thống");
         }
 
-        if (sessionToUpdate == null || sessionToUpdate.getParkedSlotId() == null) {
-            zoneRepository.increaseOccupied(chosen.getId()); // trừ số lượng slot còn trống
+        if (sessionToUpdate == null || sessionToUpdate.getEntryGate() != null) {
+            zoneRepository.increaseOccupied(chosen.getId());
         }
 
         Vehicle vehicle = vehicleRepository // chưa có thì tạo và lưu vehicle
@@ -636,51 +662,6 @@ public class ParkingServiceImpl implements ParkingService {
             session.setCheckInTime(Instant.now());
         }
 
-        // Thuật toán gán ô đỗ CHẾ ĐỘ 1 (Strict Mode): Bảo vệ tuyệt đối ô đỗ xe điện EV
-        boolean isEvVehicle = "EV_CAR".equalsIgnoreCase(request.getVehicle_type())
-                || "ELECTRIC".equalsIgnoreCase(request.getVehicle_type());
-        ParkingSlot assignedSlot = null;
-
-        if (isEvVehicle) {
-            // Xe Điện: Ưu tiên ô sạc EV -> nếu hết thì gán ô đỗ thường
-            assignedSlot = slotRepository.findAvailableEvSlotInZone(chosen.getId()).stream().findFirst()
-                    .orElse(slotRepository
-                            .findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE",
-                                    request.getVehicle_type())
-                            .orElse(slotRepository.findFirstByZoneIdAndSlotStatus(chosen.getId(), "AVAILABLE")
-                                    .orElse(slotRepository.findFirstBySlotStatus("AVAILABLE").orElse(null))));
-        } else {
-            // Xe Xăng: Chỉ được đỗ vào ô đỗ thường (Không được đỗ ô EV)
-            assignedSlot = slotRepository
-                    .findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", request.getVehicle_type())
-                    .orElse(slotRepository
-                            .findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", "NORMAL")
-                            .orElse(slotRepository.findAvailableNonEvSlotInZone(chosen.getId()).stream().findFirst()
-                                    .orElse(slotRepository.findAvailableNonEvSlotAnywhere().stream().findFirst()
-                                            .orElse(null))));
-
-            if (assignedSlot == null) {
-                // Tự động tạo ô đỗ dự phòng để không bao giờ bị nghẽn khi test
-                ParkingSlot autoSlot = new ParkingSlot();
-                autoSlot.setId(UUID.randomUUID());
-                autoSlot.setZoneId(chosen.getId());
-                autoSlot.setSlotNumber(chosen.getCode() + "-" + (System.currentTimeMillis() % 1000));
-                autoSlot.setSlotType("NORMAL");
-                autoSlot.setSlotStatus("AVAILABLE");
-                autoSlot.setLastUpdated(Instant.now());
-                autoSlot.setSensorMockId("SN-AUTO-" + System.currentTimeMillis());
-                assignedSlot = slotRepository.save(autoSlot);
-            }
-        }
-
-        if (assignedSlot != null) {
-            assignedSlot.setSlotStatus("OCCUPIED");
-            assignedSlot.setLastUpdated(Instant.now());
-            slotRepository.save(assignedSlot);
-            session.setParkedSlotId(assignedSlot.getId());
-            session.setSlotPhotoUrl("https://mock-sensor-camera.com/slots/" + assignedSlot.getId() + ".jpg");
-        }
-
         parkingSessionRepository.save(session); // save vào database
 
         // Đổi trạng thái thẻ
@@ -694,64 +675,39 @@ public class ParkingServiceImpl implements ParkingService {
                 "VISITOR_CHECK_IN_OK");
     }
 
-    private Zone ensureApprovedParkingSlot(ParkingSession session, String vehicleType) {
+    private Zone ensureApprovedZone(ParkingSession session, String vehicleType) {
         Zone chosen = null;
         if (session.getAssignedZoneId() != null) {
             chosen = zoneRepository.findById(session.getAssignedZoneId()).orElse(null);
         }
         if (chosen == null) {
             List<Zone> candidates = zoneRepository.findByAllowedSizesContaining(vehicleType);
+            List<Zone> availableCandidates = new java.util.ArrayList<>();
             for (Zone z : candidates) {
                 if (z.getTotalSlots() - z.getCurrentOccupied() > 0) {
-                    chosen = z;
-                    break;
+                    availableCandidates.add(z);
                 }
             }
+            if (!availableCandidates.isEmpty()) {
+                int randomIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(availableCandidates.size());
+                chosen = availableCandidates.get(randomIndex);
+            }
             if (chosen == null && !candidates.isEmpty()) {
-                chosen = candidates.get(0);
+                int randomIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(candidates.size());
+                chosen = candidates.get(randomIndex);
             }
         }
         if (chosen == null) {
-            chosen = zoneRepository.findAll().stream().findFirst()
-                    .orElseThrow(() -> new ApiExceptions.BadRequestException("Khong tim thay zone de cho xe vao bai"));
+            List<Zone> allZones = zoneRepository.findAll();
+            if (!allZones.isEmpty()) {
+                int randomIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(allZones.size());
+                chosen = allZones.get(randomIndex);
+            } else {
+                throw new ApiExceptions.BadRequestException("Khong tim thay zone de cho xe vao bai");
+            }
         }
 
         session.setAssignedZoneId(chosen.getId());
-        if (session.getParkedSlotId() != null) {
-            return chosen;
-        }
-
-        boolean isEvVehicle = "EV_CAR".equalsIgnoreCase(vehicleType) || "ELECTRIC".equalsIgnoreCase(vehicleType);
-        ParkingSlot assignedSlot;
-        if (isEvVehicle) {
-            assignedSlot = slotRepository.findAvailableEvSlotInZone(chosen.getId()).stream().findFirst()
-                    .orElse(slotRepository.findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", vehicleType)
-                    .orElse(slotRepository.findFirstByZoneIdAndSlotStatus(chosen.getId(), "AVAILABLE")
-                    .orElse(slotRepository.findFirstBySlotStatus("AVAILABLE").orElse(null))));
-        } else {
-            assignedSlot = slotRepository.findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", vehicleType)
-                    .orElse(slotRepository.findFirstByZoneIdAndSlotStatusAndSlotType(chosen.getId(), "AVAILABLE", "NORMAL")
-                    .orElse(slotRepository.findAvailableNonEvSlotInZone(chosen.getId()).stream().findFirst()
-                    .orElse(slotRepository.findAvailableNonEvSlotAnywhere().stream().findFirst().orElse(null))));
-        }
-
-        if (assignedSlot == null) {
-            ParkingSlot autoSlot = new ParkingSlot();
-            autoSlot.setId(UUID.randomUUID());
-            autoSlot.setZoneId(chosen.getId());
-            autoSlot.setSlotNumber(chosen.getCode() + "-" + (System.currentTimeMillis() % 1000));
-            autoSlot.setSlotType("NORMAL");
-            autoSlot.setSlotStatus("AVAILABLE");
-            autoSlot.setLastUpdated(Instant.now());
-            autoSlot.setSensorMockId("SN-AUTO-" + System.currentTimeMillis());
-            assignedSlot = slotRepository.save(autoSlot);
-        }
-
-        assignedSlot.setSlotStatus("OCCUPIED");
-        assignedSlot.setLastUpdated(Instant.now());
-        slotRepository.save(assignedSlot);
-        session.setParkedSlotId(assignedSlot.getId());
-        session.setSlotPhotoUrl("https://mock-sensor-camera.com/slots/" + assignedSlot.getId() + ".jpg");
         zoneRepository.increaseOccupied(chosen.getId());
 
         return chosen;
@@ -1143,6 +1099,11 @@ public class ParkingServiceImpl implements ParkingService {
                     checkOutTime);
         }
 
+        Card card = null;
+        if (session.getCardId() != null) {
+            card = cardRepository.findById(session.getCardId()).orElse(null);
+        }
+
         java.util.Map<String, Object> response = new java.util.HashMap<>();
         response.put("sessionId", session.getId().toString());
         response.put("licensePlate", session.getLicensePlate());
@@ -1150,6 +1111,7 @@ public class ParkingServiceImpl implements ParkingService {
         response.put("checkOutTime", checkOutTime);
         response.put("parkingFee", parkingFee);
         response.put("isVip", session.getIsVip() != null && session.getIsVip());
+        response.put("cardCode", card != null ? card.getCardCode() : "");
         return response;
     }
 
@@ -1200,6 +1162,11 @@ public class ParkingServiceImpl implements ParkingService {
             map.put("sensorMockId", slot.getSensorMockId());
             map.put("evChargerId", slot.getEvChargerId());
             map.put("lastUpdated", slot.getLastUpdated());
+            zoneRepository.findById(slot.getZoneId()).ifPresent(zone -> {
+                map.put("zoneCode", zone.getCode());
+                map.put("zoneName", zone.getZoneName());
+                map.put("allowedVehicleTypes", formatAllowedVehicleTypes(zone.getAllowedSizes()));
+            });
 
             parkingSessionRepository
                     .findByParkedSlotIdAndSessionStatus(slot.getId(), ParkingSession.SessionStatus.ACTIVE)
@@ -1209,10 +1176,144 @@ public class ParkingServiceImpl implements ParkingService {
                         map.put("checkInTime", session.getCheckInTime());
                         map.put("isVip", session.getIsVip());
                         map.put("slotPhotoUrl", session.getSlotPhotoUrl());
+                        vehicleRepository.findByLicensePlate(session.getLicensePlate()).ifPresent(vehicle -> {
+                            map.put("vehicleType", vehicle.getVehicleSize());
+                        });
                     });
             result.add(map);
         }
         return result;
+    }
+
+    private List<String> formatAllowedVehicleTypes(String allowedSizes) {
+        if (allowedSizes == null || allowedSizes.isBlank()) {
+            return new java.util.ArrayList<>();
+        }
+        return java.util.Arrays.stream(allowedSizes.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<java.util.Map<String, Object>> getZoneOverview() {
+        List<Zone> zones = zoneRepository.findAll();
+        List<ParkingSlot> slots = slotRepository.findAll();
+        List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+
+        for (Zone zone : zones) {
+            long totalSensorSlots = slots.stream()
+                    .filter(slot -> zone.getId().equals(slot.getZoneId()))
+                    .count();
+            long occupiedSensorSlots = slots.stream()
+                    .filter(slot -> zone.getId().equals(slot.getZoneId()))
+                    .filter(slot -> "OCCUPIED".equalsIgnoreCase(slot.getSlotStatus()))
+                    .count();
+            long availableSensorSlots = slots.stream()
+                    .filter(slot -> zone.getId().equals(slot.getZoneId()))
+                    .filter(slot -> !"OCCUPIED".equalsIgnoreCase(slot.getSlotStatus()))
+                    .count();
+            long onlineSensors = slots.stream()
+                    .filter(slot -> zone.getId().equals(slot.getZoneId()))
+                    .filter(slot -> slot.getSensorMockId() != null && !slot.getSensorMockId().isBlank())
+                    .count();
+
+            java.util.Map<String, Object> map = new java.util.HashMap<>();
+            map.put("zoneId", zone.getId());
+            map.put("zoneCode", zone.getCode());
+            map.put("zoneName", zone.getZoneName());
+            map.put("allowedSizes", zone.getAllowedSizes());
+            map.put("allowedVehicleTypes", formatAllowedVehicleTypes(zone.getAllowedSizes()));
+            map.put("totalSlots", zone.getTotalSlots());
+            map.put("currentOccupied", zone.getCurrentOccupied());
+            map.put("availableSlots", Math.max(0, zone.getTotalSlots() - zone.getCurrentOccupied()));
+            map.put("sensorTotal", totalSensorSlots);
+            map.put("sensorOccupied", occupiedSensorSlots);
+            map.put("sensorAvailable", availableSensorSlots);
+            map.put("sensorOnline", onlineSensors);
+            map.put("sensorStatus", totalSensorSlots == 0 ? "NO_SENSOR"
+                    : (onlineSensors == totalSensorSlots ? "ONLINE" : "PARTIAL"));
+            result.add(map);
+        }
+
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public java.util.Map<String, Object> recordSlotOccupancy(SlotOccupancyRequest request) {
+        if (request.getSlotId() == null) {
+            throw new ApiExceptions.BadRequestException("Yeu cau slotId de cap nhat cam bien o do");
+        }
+
+        ParkingSlot slot = slotRepository.findById(request.getSlotId())
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay o do"));
+
+        boolean occupied = request.getOccupied() == null || request.getOccupied();
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("slotId", slot.getId());
+        response.put("slotNumber", slot.getSlotNumber());
+        response.put("zoneId", slot.getZoneId());
+
+        if (!occupied) {
+            parkingSessionRepository
+                    .findByParkedSlotIdAndSessionStatus(slot.getId(), ParkingSession.SessionStatus.ACTIVE)
+                    .ifPresent(session -> {
+                        session.setParkedSlotId(null);
+                        session.setSlotPhotoUrl(null);
+                        parkingSessionRepository.save(session);
+                    });
+            slot.setSlotStatus("AVAILABLE");
+            slot.setLastUpdated(Instant.now());
+            slotRepository.save(slot);
+            response.put("slotStatus", slot.getSlotStatus());
+            response.put("message", "SENSOR_SLOT_RELEASED");
+            return response;
+        }
+
+        String plate = request.getLicensePlate() != null ? request.getLicensePlate().trim() : "";
+        if (plate.isBlank()) {
+            throw new ApiExceptions.BadRequestException("Yeu cau bien so khi sensor bao o do co xe");
+        }
+
+        ParkingSession session = parkingSessionRepository
+                .findByLicensePlateAndSessionStatus(plate, ParkingSession.SessionStatus.ACTIVE)
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay session ACTIVE cua bien so nay"));
+
+        parkingSessionRepository
+                .findByParkedSlotIdAndSessionStatus(slot.getId(), ParkingSession.SessionStatus.ACTIVE)
+                .ifPresent(existingAtSlot -> {
+                    if (!existingAtSlot.getId().equals(session.getId())) {
+                        throw new ApiExceptions.ConflictException("O do nay dang duoc gan cho xe khac");
+                    }
+                });
+
+        if (session.getParkedSlotId() != null && !session.getParkedSlotId().equals(slot.getId())) {
+            slotRepository.findById(session.getParkedSlotId()).ifPresent(previousSlot -> {
+                previousSlot.setSlotStatus("AVAILABLE");
+                previousSlot.setLastUpdated(Instant.now());
+                slotRepository.save(previousSlot);
+            });
+        }
+
+        slot.setSlotStatus("OCCUPIED");
+        slot.setLastUpdated(Instant.now());
+        slotRepository.save(slot);
+
+        session.setParkedSlotId(slot.getId());
+        session.setSlotPhotoUrl(request.getImageUrl() != null && !request.getImageUrl().isBlank()
+                ? request.getImageUrl()
+                : "https://mock-sensor-camera.com/slots/" + slot.getId() + ".jpg");
+        parkingSessionRepository.save(session);
+
+        boolean zoneMismatch = session.getAssignedZoneId() != null && !session.getAssignedZoneId().equals(slot.getZoneId());
+        response.put("sessionId", session.getId());
+        response.put("licensePlate", session.getLicensePlate());
+        response.put("slotStatus", slot.getSlotStatus());
+        response.put("zoneMismatch", zoneMismatch);
+        response.put("message", zoneMismatch ? "SENSOR_SLOT_RECORDED_ZONE_MISMATCH" : "SENSOR_SLOT_RECORDED");
+        return response;
     }
 
     @Override

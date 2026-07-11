@@ -8,6 +8,7 @@ import com.parking.dto.VisitorCheckInRequest;
 import com.parking.dto.CongestionCheckoutRequest; // task 7 
 import com.parking.dto.FloorEntryVerificationRequest;
 import com.parking.dto.FloorEntryVerificationResponse;
+import com.parking.dto.SlotOccupancyRequest;
 
 import com.parking.model.Transaction;
 import java.util.List;
@@ -39,6 +40,8 @@ public interface ParkingService {
     java.util.Map<String, Object> getParkingFeeByPlate(String plate);
     List<java.util.Map<String, Object>> findCarByDigits(String digits);
     List<java.util.Map<String, Object>> getMonitoringMap();
+    List<java.util.Map<String, Object>> getZoneOverview();
+    java.util.Map<String, Object> recordSlotOccupancy(SlotOccupancyRequest request);
     java.util.Map<String, Object> getVehicleStatus(UUID vehicleId);
     void approveVipSubscription(UUID id, String status, String rejectionReason, UUID managerId);
     FloorEntryVerificationResponse verifyFloorEntry(FloorEntryVerificationRequest request);

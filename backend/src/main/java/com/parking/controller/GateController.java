@@ -15,6 +15,7 @@ import java.util.Optional;
 import com.parking.repository.VipSubscriptionRepository;
 import com.parking.repository.ZoneRepository;
 import com.parking.service.ParkingService;
+import com.parking.service.PendingGateVehicleService;
 import com.parking.model.Transaction;
 
 @RestController
@@ -28,17 +29,20 @@ public class GateController {
     private final VipSubscriptionRepository vipSubscriptionRepository;
     private final ZoneRepository zoneRepo;
     private final ParkingService parkingService;
+    private final PendingGateVehicleService pendingGateVehicleService;
 
     public GateController(VehicleRepository vehicleRepo, 
                           ParkingSessionRepository sessionRepo,
                           VipSubscriptionRepository vipSubscriptionRepository,
                           ZoneRepository zoneRepo,
-                          ParkingService parkingService) {
+                          ParkingService parkingService,
+                          PendingGateVehicleService pendingGateVehicleService) {
         this.vehicleRepo = vehicleRepo;
         this.sessionRepo = sessionRepo;
         this.vipSubscriptionRepository = vipSubscriptionRepository;
         this.zoneRepo = zoneRepo;
         this.parkingService = parkingService;
+        this.pendingGateVehicleService = pendingGateVehicleService;
     }
 
     public static class GateScanRequest {
@@ -47,6 +51,7 @@ public class GateController {
         public String qrToken;
         public String gate;
         public String vehicleType;
+        public String direction;
     }
 
     @PostMapping("/scan")
@@ -71,9 +76,12 @@ public class GateController {
         try {
             // Determine Direction (Entrance vs Exit)
             boolean isEntrance = true;
-            if (request.gate != null) {
+            if (request.direction != null && !request.direction.trim().isEmpty()) {
+                String direction = request.direction.trim().toUpperCase();
+                isEntrance = !direction.equals("EXIT") && !direction.equals("OUT") && !direction.equals("RA");
+            } else if (request.gate != null) {
                 String gateLower = request.gate.toLowerCase();
-                if (gateLower.contains("ra") || gateLower.endsWith("3")) {
+                if (gateLower.contains("ra") || gateLower.contains("out") || gateLower.contains("exit")) {
                     isEntrance = false;
                 }
             }
@@ -90,7 +98,9 @@ public class GateController {
                         Optional<com.parking.model.VipSubscription> vipSub = vipSubscriptionRepository
                                 .findByVehicleIdAndStatus(vehicle.getId(), com.parking.model.VipSubscription.Status.ACTIVE);
                         if (vipSub.isPresent()) {
-                            isVip = true;
+                            java.time.LocalDate today = java.time.LocalDate.now();
+                            isVip = !today.isBefore(vipSub.get().getStartDate())
+                                    && !today.isAfter(vipSub.get().getEndDate());
                         }
                     }
                     if (!isVip) {
@@ -141,8 +151,7 @@ public class GateController {
                         aiReq.setImage_url("https://camera-storage.com/live/gate_scan.jpg");
                         aiReq.setVehicle_type(resolvedVehicleType);
 
-                        parkingService.aiCheckIn(aiReq);
-                        com.parking.dto.CheckInResponse checkInResponse = parkingService.approveEntry(plateStr);
+                        com.parking.dto.CheckInResponse checkInResponse = parkingService.aiCheckIn(aiReq);
 
                         response.put("success", true);
                         response.put("message", "VIP Check-in thành công tại " + request.gate);
@@ -167,6 +176,7 @@ public class GateController {
                     visitorReq.setVehicle_type(resolvedVehicleType);
 
                     com.parking.dto.CheckInResponse checkInResponse = parkingService.visitorCheckIn(visitorReq);
+                    pendingGateVehicleService.removeByPlate(plateStr);
 
                     response.put("success", true);
                     response.put("message", "Visitor Check-in thành công tại " + request.gate);
