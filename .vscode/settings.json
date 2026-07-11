@@ -2,11 +2,11 @@
     "java.configuration.runtimes": [
         {
             "name": "JavaSE-17",
-            "path": "C:\\Program Files\\Microsoft\\jdk-17.0.19.10-hotspot",
+            "path": "C:\\Program Files\\Java\\jdk-17",
             "default": true
         }
     ],
-    "java.jdt.ls.java.home": "C:\\Program Files\\Microsoft\\jdk-17.0.19.10-hotspot",
+    "java.jdt.ls.java.home": "C:\\Program Files\\Java\\jdk-17",
     "java.compile.nullAnalysis.mode": "automatic",
     "sqltools.connections": [
         {
