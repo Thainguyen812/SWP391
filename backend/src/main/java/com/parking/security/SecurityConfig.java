@@ -43,7 +43,9 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html")
+                                "/swagger-ui.html",
+                                "/api/v1/parking/find-car",
+                                "/api/v1/momo/momo-ipn")
                         .permitAll()
 
                         // 2. Phân vùng API chỉ dành riêng cho ADMIN

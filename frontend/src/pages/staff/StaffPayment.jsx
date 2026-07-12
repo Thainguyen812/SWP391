@@ -276,7 +276,7 @@ export const StaffPayment = () => {
             if (isLostCard) {
               const staffId = currentUser?.id; // Fixed mock Staff ID
               try {
-                await apiClient.post('/api/blacklisted-cards/block-by-plate', null, {
+                await apiClient.post('/blacklisted-cards/block-by-plate', null, {
                   params: {
                     plate: lpr,
                     reason: 'LOST',
