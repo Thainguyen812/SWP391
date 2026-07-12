@@ -51,6 +51,7 @@ public class GateController {
         public String qrToken;
         public String gate;
         public String vehicleType;
+        public String fuelType;
         public String direction;
     }
 
@@ -174,6 +175,7 @@ public class GateController {
                     visitorReq.setCard_code(request.cardCode.trim());
                     visitorReq.setImage_url("https://camera-storage.com/live/gate_scan.jpg");
                     visitorReq.setVehicle_type(resolvedVehicleType);
+                    visitorReq.setFuel_type(request.fuelType);
 
                     com.parking.dto.CheckInResponse checkInResponse = parkingService.visitorCheckIn(visitorReq);
                     pendingGateVehicleService.removeByPlate(plateStr);

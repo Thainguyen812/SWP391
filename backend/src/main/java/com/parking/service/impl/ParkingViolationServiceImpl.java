@@ -6,9 +6,11 @@ import com.parking.dto.CreateViolationRequest;
 import com.parking.model.ParkingSession;
 import com.parking.model.ParkingViolation;
 import com.parking.model.User;
+import com.parking.model.Vehicle;
 import com.parking.repository.ParkingSessionRepository;
 import com.parking.repository.ParkingViolationRepository;
 import com.parking.repository.UserRepository;
+import com.parking.repository.VehicleRepository;
 import com.parking.service.ParkingViolationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,16 +35,19 @@ public class ParkingViolationServiceImpl implements ParkingViolationService {
 
     private final ParkingViolationRepository parkingViolationRepository;
     private final ParkingSessionRepository parkingSessionRepository;
+    private final VehicleRepository vehicleRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
     public ParkingViolationServiceImpl(
             ParkingViolationRepository parkingViolationRepository,
             ParkingSessionRepository parkingSessionRepository,
+            VehicleRepository vehicleRepository,
             UserRepository userRepository,
             ObjectMapper objectMapper) {
         this.parkingViolationRepository = parkingViolationRepository;
         this.parkingSessionRepository = parkingSessionRepository;
+        this.vehicleRepository = vehicleRepository;
         this.userRepository = userRepository;
         this.objectMapper = objectMapper;
     }
@@ -93,6 +98,14 @@ public class ParkingViolationServiceImpl implements ParkingViolationService {
             );
         }
 
+        Vehicle vehicle = session.getVehicleId() != null
+                ? vehicleRepository.findById(session.getVehicleId())
+                        .orElseThrow(() -> new IllegalArgumentException("Khong tim thay phuong tien cua phien do xe"))
+                : vehicleRepository.findByLicensePlate(licensePlate)
+                        .orElseThrow(() -> new IllegalArgumentException("Khong tim thay phuong tien: " + licensePlate));
+        long historyViolations = parkingViolationRepository.countByVehicleId(vehicle.getId());
+        boolean firstViolation = historyViolations == 0;
+
         ParkingViolation violation = new ParkingViolation();
 
         violation.setSessionId(session.getId());
@@ -100,11 +113,19 @@ public class ParkingViolationServiceImpl implements ParkingViolationService {
         violation.setDetectedBy(detectedUser.getId());
         violation.setDetectedAt(Instant.now());
         violation.setStatus("PENDING");
+        violation.setFirstViolation(firstViolation);
         violation.setNotes(request.getNotes());
 
         violation.setPhotoUrls(
                 convertPhotoUrlsToJson(request.getPhotoUrls())
         );
+
+        if (firstViolation) {
+            vehicle.setViolationCount(1);
+        } else {
+            vehicle.setViolationCount(vehicle.getViolationCount() + 1);
+        }
+        vehicleRepository.save(vehicle);
 
         return parkingViolationRepository.save(violation);
     }

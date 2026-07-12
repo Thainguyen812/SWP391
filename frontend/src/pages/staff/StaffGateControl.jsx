@@ -180,7 +180,8 @@ export const StaffGateControl = () => {
         cardCode: manualCardCode.trim(),
         gate: waitingVehicleForForm?.gate || 'L-VÀO 1',
         direction: 'ENTRY',
-        vehicleType: mappedType
+        vehicleType: mappedType,
+        fuelType: mappedType === 'EV_CAR' ? 'ELECTRIC' : 'GASOLINE'
       });
       const payload = response?.data || response;
 

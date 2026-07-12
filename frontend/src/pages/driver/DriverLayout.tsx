@@ -59,6 +59,7 @@ interface UserVehicle {
   isActive: boolean;
   image: string;
   isLocked: boolean;
+  fuelType?: string;
   activeSubscription?: string;
   subscriptionExpiry?: string;
 }
@@ -351,6 +352,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               isActive: true,
               image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
               isLocked: activeSub ? (v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false)) : false,
+              fuelType: v.fuelType || existingLocal?.fuelType || 'GASOLINE',
               activeSubscription: activeSub,
               subscriptionExpiry: expiry,
               subscriptionStatus: subStatus
@@ -432,6 +434,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   const [newPlate, setNewPlate] = useState('');
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState('Ô tô gầm thấp 4-5 chỗ');
+  const [newFuelType, setNewFuelType] = useState('GASOLINE');
 
   // Edit Vehicle Modal controls
   const [editVehicleModalOpen, setEditVehicleModalOpen] = useState(false);
@@ -684,7 +687,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       colorRgb: '#FFFFFF',
       bodyShape: bodyShapeDb,
       isActive: true,
-      fuelType: 'GASOLINE'
+      fuelType: newFuelType
     };
 
     if (isOffline) {
@@ -696,11 +699,13 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         regDate: new Date().toLocaleDateString('vi-VN'),
         isActive: true,
         image: '',
-        isLocked: false
+        isLocked: false,
+        fuelType: newFuelType
       };
       setVehicles(prev => [...prev, modelItem]);
       setNewPlate('');
       setNewName('');
+      setNewFuelType('GASOLINE');
       setAddVehicleModalOpen(false);
       triggerToast(`Đăng ký thêm phương tiện ${modelItem.plate} thành công (Ngoại tuyến)!`, 'success');
       return;
@@ -737,12 +742,14 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         regDate: new Date().toLocaleDateString('vi-VN'),
         isActive: true,
         image: '',
-        isLocked: false
+        isLocked: false,
+        fuelType: savedVehicle.fuelType || newFuelType
       };
 
       setVehicles(prev => [...prev, modelItem]);
       setNewPlate('');
       setNewName('');
+      setNewFuelType('GASOLINE');
       setAddVehicleModalOpen(false);
       triggerToast(`Đăng ký thêm phương tiện ${modelItem.plate} thành công!`, 'success');
       
@@ -825,7 +832,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       colorRgb: '#FFFFFF',
       bodyShape: bodyShapeDb,
       isActive: true,
-      fuelType: 'GASOLINE'
+      fuelType: vehicles.find(v => v.id === editingVehicleId)?.fuelType || 'GASOLINE'
     };
 
     if (isOffline) {
@@ -1597,6 +1604,18 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
                       <option value="Xe 7 chỗ">🚙 Xe 7 chỗ</option>
                       <option value="Xe 9 chỗ">🚐 Xe 9 chỗ</option>
                       <option value="Xe 16 chỗ">🚌 Xe 16 chỗ</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Loại động cơ</label>
+                    <select
+                      value={newFuelType}
+                      onChange={e => setNewFuelType(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 border rounded-lg font-bold border-slate-200 text-slate-850 outline-hidden"
+                    >
+                      <option value="GASOLINE">Xe Xăng</option>
+                      <option value="ELECTRIC">Xe Điện</option>
                     </select>
                   </div>
 
