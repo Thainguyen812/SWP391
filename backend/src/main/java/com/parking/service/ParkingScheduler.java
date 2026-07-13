@@ -88,6 +88,8 @@ public class ParkingScheduler {
                             if (isViolation) {
                                 final UUID finalAdminId = adminId;
                                 final String finalNotes = notes;
+                                long historyViolations = violationRepository.countByVehicleId(vehicle.getId());
+                                boolean firstViolation = historyViolations == 0;
                                 // 1. Lưu bản ghi vi phạm vào DB
                                 ParkingViolation violation = new ParkingViolation();
                                 violation.setSessionId(session.getId());
@@ -97,8 +99,16 @@ public class ParkingScheduler {
                                 violation.setViolationType("EV_ZONE_MISUSE");
                                 violation.setNotes(finalNotes);
                                 violation.setStatus("PENDING");
+                                violation.setFirstViolation(firstViolation);
 
                                 violationRepository.save(violation);
+
+                                if (firstViolation) {
+                                    vehicle.setViolationCount(1);
+                                } else {
+                                    vehicle.setViolationCount(vehicle.getViolationCount() + 1);
+                                }
+                                vehicleRepository.save(vehicle);
 
                                 // 2. Ghi nhận hành động vào audit log
                                 AuditLog audit = new AuditLog();

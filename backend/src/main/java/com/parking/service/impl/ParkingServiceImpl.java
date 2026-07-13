@@ -6,6 +6,7 @@ import com.parking.dto.CongestionCheckoutRequest;
 import com.parking.exception.ApiExceptions;
 import com.parking.model.BlacklistEntry;
 import com.parking.model.ParkingSession;
+import com.parking.model.ParkingViolation;
 import com.parking.model.VipSubscription;
 import com.parking.model.Zone;
 import com.parking.model.Vehicle;
@@ -22,6 +23,7 @@ import com.parking.dto.FloorEntryVerificationResponse;
 import com.parking.dto.SlotOccupancyRequest;
 import com.parking.repository.BlacklistRepository;
 import com.parking.repository.ParkingSessionRepository;
+import com.parking.repository.ParkingViolationRepository;
 import com.parking.repository.ZoneRepository;
 import com.parking.repository.VipSubscriptionRepository;
 import com.parking.repository.VehicleRepository;
@@ -33,6 +35,7 @@ import com.parking.model.SecurityAlert;
 
 import com.parking.repository.TransactionRepository;// task 5
 
+import com.parking.service.FCMService;
 import com.parking.service.ParkingService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,8 +47,6 @@ import java.math.BigDecimal;// task 5
 import com.parking.dto.VisitorCheckInRequest;// task 5
 import com.parking.model.Card;// task 5
 import com.parking.repository.CardRepository;// task 5
-
-import com.parking.dto.CongestionCheckoutRequest; // task 7
 
 import java.util.List;
 import java.util.Optional;
@@ -73,7 +74,9 @@ public class ParkingServiceImpl implements ParkingService {
     private final UserRepository userRepository;
 
     private final PricingRuleRepository pricingRuleRepository;
+    private final ParkingViolationRepository parkingViolationRepository;
     private final SecurityAlertRepository securityAlertRepository;
+    private final FCMService fcmService;
 
     public ParkingServiceImpl(BlacklistRepository blacklistRepository,
             ParkingSessionRepository parkingSessionRepository,
@@ -88,7 +91,9 @@ public class ParkingServiceImpl implements ParkingService {
             ParkingSlotRepository slotRepository,
             UserRepository userRepository,
             PricingRuleRepository pricingRuleRepository,
-            SecurityAlertRepository securityAlertRepository) { // task 5
+            ParkingViolationRepository parkingViolationRepository,
+            SecurityAlertRepository securityAlertRepository,
+            FCMService fcmService) { // task 5
         this.blacklistRepository = blacklistRepository;
         this.parkingSessionRepository = parkingSessionRepository;
         this.zoneRepository = zoneRepository;
@@ -102,7 +107,9 @@ public class ParkingServiceImpl implements ParkingService {
         this.slotRepository = slotRepository;
         this.userRepository = userRepository;
         this.pricingRuleRepository = pricingRuleRepository;
+        this.parkingViolationRepository = parkingViolationRepository;
         this.securityAlertRepository = securityAlertRepository;
+        this.fcmService = fcmService;
     }
 
     @Override
@@ -381,9 +388,26 @@ public class ParkingServiceImpl implements ParkingService {
             alert.setIsActionable(true);
             securityAlertRepository.save(alert);
 
-            // Mock còi hú / notification FCM
-            System.out.println("MOCK FCM PUSH NOTIFICATION: [CẢNH BÁO CHỐNG TRỘM] Phát hiện xe " + qrVehiclePlate
-                    + " đang có hành vi di chuyển bất hợp pháp ra cổng trong khi cờ khóa đang bật! Còi hú tại bốt trực đang kích hoạt khẩn cấp, Barrier được khóa cứng!");
+            // Gửi Push Notification thực tế qua FCMService
+            String plate = session.getLicensePlate() != null ? session.getLicensePlate() : qrVehiclePlate;
+            String fcmToken = null;
+            if (plate != null) {
+                Optional<com.parking.model.Vehicle> vehicleOpt = vehicleRepository.findByLicensePlate(plate);
+                if (vehicleOpt.isPresent()) {
+                    java.util.UUID ownerId = vehicleOpt.get().getOwnerId();
+                    if (ownerId != null) {
+                        Optional<com.parking.model.User> ownerOpt = userRepository.findById(ownerId);
+                        if (ownerOpt.isPresent()) {
+                            fcmToken = ownerOpt.get().getFcmToken();
+                        }
+                    }
+                }
+            }
+            fcmService.sendPushNotification(
+                fcmToken != null ? fcmToken : "",
+                "[CẢNH BÁO CHỐNG TRỘM]",
+                "Phát hiện xe " + (plate != null ? plate : "N/A") + " cố tình di chuyển ra khỏi bãi xe khi đang ở trạng thái KHÓA AN TOÀN!"
+            );
 
             throw new ApiExceptions.ForbiddenException(
                     "Xe đang ở trạng thái KHÓA AN TOÀN chống trộm! Không thể xuất bãi.");
@@ -628,6 +652,12 @@ public class ParkingServiceImpl implements ParkingService {
                     newVehicle.setVehicleSize(
                             request.getVehicle_type());
 
+                    String requestedFuelType = request.getFuel_type();
+                    newVehicle.setFuelType(
+                            requestedFuelType != null && !requestedFuelType.trim().isEmpty()
+                                    ? requestedFuelType.trim().toUpperCase()
+                                    : "GASOLINE");
+
                     newVehicle.setActive(true);
 
                     newVehicle.setCreatedAt(Instant.now());
@@ -738,6 +768,27 @@ public class ParkingServiceImpl implements ParkingService {
             alert.setIsActionable(true);
             securityAlertRepository.save(alert);
 
+            // Gửi Push Notification thực tế qua FCMService
+            String plate = session.getLicensePlate();
+            String fcmToken = null;
+            if (plate != null) {
+                Optional<com.parking.model.Vehicle> vehicleOpt = vehicleRepository.findByLicensePlate(plate);
+                if (vehicleOpt.isPresent()) {
+                    java.util.UUID ownerId = vehicleOpt.get().getOwnerId();
+                    if (ownerId != null) {
+                        Optional<com.parking.model.User> ownerOpt = userRepository.findById(ownerId);
+                        if (ownerOpt.isPresent()) {
+                            fcmToken = ownerOpt.get().getFcmToken();
+                        }
+                    }
+                }
+            }
+            fcmService.sendPushNotification(
+                fcmToken != null ? fcmToken : "",
+                "[CẢNH BÁO CHỐNG TRỘM]",
+                "Phát hiện xe " + (plate != null ? plate : "N/A") + " cố tình di chuyển ra khỏi bãi xe khi đang ở trạng thái KHÓA AN TOÀN!"
+            );
+
             throw new ApiExceptions.ForbiddenException(
                     "Xe đang ở trạng thái KHÓA AN TOÀN chống trộm! Không thể xuất bãi.");
         }
@@ -816,10 +867,12 @@ public class ParkingServiceImpl implements ParkingService {
             lostCardPenalty = pricingRule.getLostCardPenalty();
         }
 
+        BigDecimal violationPenalty = applyPendingViolationPenalties(session, vehicle, false);
+
         transaction.setParkingFee(parkingFee);
         transaction.setLostCardPenalty(lostCardPenalty);
-        transaction.setViolationPenalty(BigDecimal.ZERO);
-        transaction.setTotalAmount(parkingFee.add(lostCardPenalty));
+        transaction.setViolationPenalty(violationPenalty);
+        transaction.setTotalAmount(parkingFee.add(lostCardPenalty).add(violationPenalty));
         transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
         transaction.setPaymentStatus(Transaction.PaymentStatus.PENDING);
         transaction.setIsMobileCheckout(false);
@@ -828,6 +881,51 @@ public class ParkingServiceImpl implements ParkingService {
         transaction = transactionRepository.save(transaction);
 
         return transaction;
+    }
+
+    private BigDecimal applyPendingViolationPenalties(ParkingSession session, Vehicle vehicle, boolean markProcessed) {
+        List<ParkingViolation> pendingViolations = parkingViolationRepository
+                .findBySessionIdAndStatus(session.getId(), "PENDING");
+
+        if (pendingViolations.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        PricingRule pricingRule = pricingRuleRepository
+                .findFirstByVehicleSizeAndIsActiveTrueOrderByEffectiveFromDesc(vehicle.getVehicleSize())
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay cau hinh bang gia"));
+        BigDecimal evPenaltyRate = pricingRule.getEvViolationPenalty() != null
+                ? pricingRule.getEvViolationPenalty()
+                : BigDecimal.ZERO;
+        BigDecimal totalFines = BigDecimal.ZERO;
+
+        for (ParkingViolation violation : pendingViolations) {
+            if (violation.isFirstViolation()) {
+                violation.setPenaltyAmount(BigDecimal.ZERO);
+            } else {
+                violation.setPenaltyAmount(evPenaltyRate);
+                totalFines = totalFines.add(evPenaltyRate);
+            }
+            violation.setPenaltyApplied(true);
+            if (markProcessed) {
+                violation.setStatus("PROCESSED");
+            }
+        }
+
+        parkingViolationRepository.saveAll(pendingViolations);
+        return totalFines;
+    }
+
+    private void markPendingViolationsProcessed(UUID sessionId) {
+        List<ParkingViolation> pendingViolations = parkingViolationRepository
+                .findBySessionIdAndStatus(sessionId, "PENDING");
+        if (pendingViolations.isEmpty()) {
+            return;
+        }
+        for (ParkingViolation violation : pendingViolations) {
+            violation.setStatus("PROCESSED");
+        }
+        parkingViolationRepository.saveAll(pendingViolations);
     }
 
     // confirm check out cho visitor
@@ -872,6 +970,8 @@ public class ParkingServiceImpl implements ParkingService {
         }
 
         parkingSessionRepository.save(session); //
+
+        markPendingViolationsProcessed(session.getId());
 
         Card card = cardRepository
                 .findById(session.getCardId())
@@ -945,6 +1045,8 @@ public class ParkingServiceImpl implements ParkingService {
                 session.getCheckInTime(),
                 checkoutTime);
 
+        BigDecimal violationPenalty = applyPendingViolationPenalties(session, vehicle, true);
+
         Transaction transaction = new Transaction();
 
         transaction.setId(UUID.randomUUID());
@@ -959,10 +1061,10 @@ public class ParkingServiceImpl implements ParkingService {
                 BigDecimal.ZERO);
 
         transaction.setViolationPenalty(
-                BigDecimal.ZERO);
+                violationPenalty);
 
         transaction.setTotalAmount(
-                parkingFee);
+                parkingFee.add(violationPenalty));
 
         transaction.setPaymentMethod(
                 request.getPaymentMethod());

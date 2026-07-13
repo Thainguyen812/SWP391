@@ -2,28 +2,28 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Modal } from 'antd';
 import { apiClient } from '../../api/apiClient';
-import { 
-  Home, 
-  Car, 
-  Calendar, 
-  CreditCard, 
-  Settings, 
-  LogOut, 
-  HelpCircle, 
-  Bell, 
-  Search, 
-  MapPin, 
-  Activity, 
-  CheckCircle, 
-  Lock, 
-  Unlock, 
-  Plus, 
-  ChevronRight, 
-  ArrowRight, 
-  ShieldAlert, 
-  Volume2, 
-  VolumeX, 
-  X, 
+import {
+  Home,
+  Car,
+  Calendar,
+  CreditCard,
+  Settings,
+  LogOut,
+  HelpCircle,
+  Bell,
+  Search,
+  MapPin,
+  Activity,
+  CheckCircle,
+  Lock,
+  Unlock,
+  Plus,
+  ChevronRight,
+  ArrowRight,
+  ShieldAlert,
+  Volume2,
+  VolumeX,
+  X,
   RefreshCw,
   Clock,
   QrCode,
@@ -40,6 +40,12 @@ import {
   Sliders,
   Award
 } from 'lucide-react';
+import { createContext } from 'react';
+import { VehicleManagementList } from './subcomponents/VehicleManagementList';
+import { VipRegistrationModal } from './subcomponents/VipRegistrationModal';
+import { BillingHistoryTable } from './subcomponents/BillingHistoryTable';
+
+export const DriverContext = createContext<any>(null);
 
 interface DriverPwaProps {
   user: {
@@ -53,7 +59,7 @@ interface DriverPwaProps {
   isDarkMode?: boolean;
 }
 
-interface UserVehicle {
+export interface UserVehicle {
   id: string;
   plate: string;
   name: string;
@@ -62,11 +68,12 @@ interface UserVehicle {
   isActive: boolean;
   image: string;
   isLocked: boolean;
+  fuelType?: string;
   activeSubscription?: string;
   subscriptionExpiry?: string;
 }
 
-interface TransactionItem {
+export interface TransactionItem {
   id: string;
   date: string;
   type: string;
@@ -78,10 +85,10 @@ interface TransactionItem {
 
 const isTxDateInFilter = (txDateStr: string, filter: string) => {
   if (!txDateStr || filter === 'Tất cả') return true;
-  
+
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  
+
   let txDate: Date;
   if (txDateStr === 'Vừa xong') {
     txDate = today;
@@ -91,11 +98,11 @@ const isTxDateInFilter = (txDateStr: string, filter: string) => {
     if (parts.length !== 3) return true;
     txDate = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
   }
-  
+
   // Calculate difference in days (allowing same day to be 0)
   const diffTime = today.getTime() - txDate.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  
+
   switch (filter) {
     case 'Hôm nay':
       return diffDays === 0;
@@ -124,7 +131,7 @@ const isTxDateInFilter = (txDateStr: string, filter: string) => {
   }
 };
 
-const VEHICLE_PRICING: Record<string, { day: number; month: number; month3: number; month6: number; year: number }> = {
+export const VEHICLE_PRICING: Record<string, { day: number; month: number; month3: number; month6: number; year: number }> = {
   'Ô tô gầm thấp 4-5 chỗ': {
     day: 50000,
     month: 1000000,
@@ -360,11 +367,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
             } else if (v.bodyShape && ['Ô tô gầm thấp 4-5 chỗ', 'Xe 7 chỗ', 'Xe 9 chỗ', 'Xe 16 chỗ'].includes(v.bodyShape)) {
               sizeLabel = v.bodyShape;
             } else {
-              sizeLabel = sizeType === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
-                          sizeType === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
+              sizeLabel = sizeType === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' :
+                          sizeType === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' :
                           'Ô tô gầm thấp 4-5 chỗ';
             }
-            
+
             let regDate = '30/06/2026';
             if (v.createdAt) {
               try {
@@ -372,10 +379,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                 regDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
               } catch (err) {}
             }
-            
+
             // Tìm xe cục bộ hiện tại bằng cách dùng prevVehicles thay vì state vehicles bị dính closure
             const existingLocal = prevVehicles.find(lv => lv.plate === (v.licensePlate || v.plate));
-            
+
             // Lookup latest subscription status from localStorage
             const savedSubs = localStorage.getItem('urbanpark_vip_subscriptions');
             let activeSub = undefined;
@@ -400,8 +407,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                     const newStatus = v.subscriptionStatus === 'PENDING_APPROVAL' ? 'PENDING' : v.subscriptionStatus;
                     if (s.status !== newStatus) {
                       changed = true;
-                      return { 
-                        ...s, 
+                      return {
+                        ...s,
                         status: newStatus,
                         endDate: v.subscriptionExpiry ? new Date(v.subscriptionExpiry).toLocaleDateString('vi-VN') : s.endDate
                       };
@@ -450,6 +457,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
               isActive: v.isActive !== false && v.active !== false,
               image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
               isLocked: activeSub ? (v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false)) : false,
+              fuelType: v.fuelType || existingLocal?.fuelType || 'GASOLINE',
               activeSubscription: activeSub,
               subscriptionExpiry: expiry,
               subscriptionStatus: subStatus
@@ -505,7 +513,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
           console.error(e);
         }
       }
-      
+
       const mockHistory = [
         {
           id: 'txn-1783040011084',
@@ -544,6 +552,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [newPlate, setNewPlate] = useState('');
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState('Ô tô gầm thấp 4-5 chỗ');
+  const [newFuelType, setNewFuelType] = useState('GASOLINE');
 
   // Edit Vehicle Modal controls
   const [editVehicleModalOpen, setEditVehicleModalOpen] = useState(false);
@@ -583,11 +592,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   useEffect(() => {
     if (!selectedVehicleForVIP) return;
     if (selectedPackLabel.includes('Nạp tiền')) return;
-    
+
     const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
     const type = targetVeh ? targetVeh.type : 'Ô tô gầm thấp 4-5 chỗ';
     const pricing = VEHICLE_PRICING[type] || VEHICLE_PRICING['Ô tô gầm thấp 4-5 chỗ'];
-    
+
     if (selectedPackLabel.includes('1 Năm') || selectedPackLabel.includes('1 năm')) {
       setSelectedPackPrice(pricing.year);
     } else if (selectedPackLabel.includes('6 Tháng') || selectedPackLabel.includes('6 tháng')) {
@@ -617,7 +626,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [profileAddress, setProfileAddress] = useState(() => {
     return localStorage.getItem(`urbanpark_user_address_${user?.phone || 'default'}`) || '';
   });
-  
+
   // Extra settings states for absolute design fidelity
   const [is2faEnabled, setIs2faEnabled] = useState(true);
   const [emailNotifyGate, setEmailNotifyGate] = useState(true);
@@ -782,9 +791,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       return;
     }
     const validBrands = [
-      'TOYOTA', 'HONDA', 'VINFAST', 'MAZDA', 'MERCEDES', 'BMW', 'HYUNDAI', 'KIA', 'FORD', 
-      'AUDI', 'LEXUS', 'PORSCHE', 'MITSUBISHI', 'CHEVROLET', 'NISSAN', 'SUZUKI', 'PEUGEOT', 
-      'VOLVO', 'LAND ROVER', 'JAGUAR', 'TESLA', 'VOLKSWAGEN', 'SUBARU', 'MG', 'BYD', 'JEEP', 
+      'TOYOTA', 'HONDA', 'VINFAST', 'MAZDA', 'MERCEDES', 'BMW', 'HYUNDAI', 'KIA', 'FORD',
+      'AUDI', 'LEXUS', 'PORSCHE', 'MITSUBISHI', 'CHEVROLET', 'NISSAN', 'SUZUKI', 'PEUGEOT',
+      'VOLVO', 'LAND ROVER', 'JAGUAR', 'TESLA', 'VOLKSWAGEN', 'SUBARU', 'MG', 'BYD', 'JEEP',
       'ROLLS ROYCE', 'BENTLEY', 'MINI', 'FIAT', 'FERRARI', 'LAMBORGHINI', 'ASTON MARTIN', 'MASERATI'
     ];
     const upperInput = brandInput.toUpperCase();
@@ -840,7 +849,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       colorRgb: '#FFFFFF',
       bodyShape: bodyShapeDb,
       isActive: true,
-      fuelType: 'GASOLINE'
+      fuelType: newFuelType
     };
 
     try {
@@ -865,7 +874,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       }
 
       const savedVehicle = await response.json();
-      
+
       const modelItem: UserVehicle = {
         id: savedVehicle.id,
         plate: savedVehicle.licensePlate,
@@ -874,15 +883,17 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         regDate: new Date().toLocaleDateString('vi-VN'),
         isActive: true,
         image: '',
-        isLocked: false
+        isLocked: false,
+        fuelType: savedVehicle.fuelType || newFuelType
       };
 
       setVehicles(prev => [...prev, modelItem]);
       setNewPlate('');
       setNewName('');
+      setNewFuelType('GASOLINE');
       setAddVehicleModalOpen(false);
       triggerToast(`Đăng ký thêm phương tiện ${modelItem.plate} thành công!`, 'success');
-      
+
       fetchVehiclesFromApi();
     } catch (error: any) {
       triggerToast(error.message || 'Thêm xe thất bại, vui lòng kiểm tra lại!', 'error');
@@ -913,9 +924,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       return;
     }
     const validBrands = [
-      'TOYOTA', 'HONDA', 'VINFAST', 'MAZDA', 'MERCEDES', 'BMW', 'HYUNDAI', 'KIA', 'FORD', 
-      'AUDI', 'LEXUS', 'PORSCHE', 'MITSUBISHI', 'CHEVROLET', 'NISSAN', 'SUZUKI', 'PEUGEOT', 
-      'VOLVO', 'LAND ROVER', 'JAGUAR', 'TESLA', 'VOLKSWAGEN', 'SUBARU', 'MG', 'BYD', 'JEEP', 
+      'TOYOTA', 'HONDA', 'VINFAST', 'MAZDA', 'MERCEDES', 'BMW', 'HYUNDAI', 'KIA', 'FORD',
+      'AUDI', 'LEXUS', 'PORSCHE', 'MITSUBISHI', 'CHEVROLET', 'NISSAN', 'SUZUKI', 'PEUGEOT',
+      'VOLVO', 'LAND ROVER', 'JAGUAR', 'TESLA', 'VOLKSWAGEN', 'SUBARU', 'MG', 'BYD', 'JEEP',
       'ROLLS ROYCE', 'BENTLEY', 'MINI', 'FIAT', 'FERRARI', 'LAMBORGHINI', 'ASTON MARTIN', 'MASERATI'
     ];
     const upperInput = brandInput.toUpperCase();
@@ -966,7 +977,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       colorRgb: '#FFFFFF',
       bodyShape: bodyShapeDb,
       isActive: true,
-      fuelType: 'GASOLINE'
+      fuelType: vehicles.find(v => v.id === editingVehicleId)?.fuelType || 'GASOLINE'
     };
 
     if (isOffline) {
@@ -1033,9 +1044,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       if (v.id === id) {
         const nextState = !v.isLocked;
         triggerToast(
-          nextState 
+          nextState
             ? `🔒 Đã kích hoạt kẹp phanh & khóa radar chống trộm cho xe ${plate}!`
-            : `🔓 Đã mở khóa an ninh bảo vệ xe ${plate}.`, 
+            : `🔓 Đã mở khóa an ninh bảo vệ xe ${plate}.`,
           nextState ? 'success' : 'info'
         );
         return { ...v, isLocked: nextState };
@@ -1053,7 +1064,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     try {
       const response = await fetch('/api/vehicles/lock', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}`
         },
@@ -1096,7 +1107,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         status: 'Thành công'
       };
       setTransactions(prev => [newTx, ...prev]);
-      
+
       // Calculate expiry date by checking if they already have an active subscription
       const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
       let expiryDate = new Date();
@@ -1120,7 +1131,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       }
       const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
 
-      
+
       let subType = 'MONTHLY';
       if (selectedPackLabel.includes('Năm') || selectedPackLabel.includes('năm')) {
         subType = 'YEARLY';
@@ -1206,7 +1217,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         status: 'Thành công'
       };
       setTransactions(prev => [newTx, ...prev]);
-      
+
       // Calculate expiry date by checking if they already have an active subscription
       const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
       let expiryDate = new Date();
@@ -1230,7 +1241,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       }
       const expiryString = `${String(expiryDate.getDate()).padStart(2, '0')}/${String(expiryDate.getMonth() + 1).padStart(2, '0')}/${expiryDate.getFullYear()}`;
 
-      
+
       let subType = 'MONTHLY';
       if (selectedPackLabel.includes('Năm') || selectedPackLabel.includes('năm')) {
         subType = 'YEARLY';
@@ -1270,11 +1281,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const getBillingStats = () => {
     let sumThisMonth = 0;
     let sumLastMonth = 0;
-    
+
     const now = new Date();
     const currentMonth = now.getMonth(); // 0-11
     const currentYear = now.getFullYear();
-    
+
     // Last month calculations
     let lastMonth = currentMonth - 1;
     let lastMonthYear = currentYear;
@@ -1282,7 +1293,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       lastMonth = 11;
       lastMonthYear = currentYear - 1;
     }
-    
+
     transactions.forEach(tx => {
       if (tx.isEntry === false) {
         // Parse date DD/MM/YYYY HH:mm:ss
@@ -1291,7 +1302,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         if (parts.length === 3) {
           const dMonth = parseInt(parts[1], 10) - 1; // 0-11
           const dYear = parseInt(parts[2], 10);
-          
+
           const feeStr = tx.fee
             ? tx.fee.includes('$')
               ? tx.fee.replace(/[-+$₫]/g, '').replace(/,/g, '').trim()
@@ -1300,7 +1311,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
           const value = parseFloat(feeStr);
           if (!isNaN(value)) {
             const valVND = tx.fee && tx.fee.includes('$') ? value * 25000 : value;
-            
+
             if (dMonth === currentMonth && dYear === currentYear) {
               sumThisMonth += valVND;
             } else if (dMonth === lastMonth && dYear === lastMonthYear) {
@@ -1310,11 +1321,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         }
       }
     });
-    
+
     let percentText = "0% so với tháng trước";
     let isDecrease = false;
     let isIncrease = false;
-    
+
     if (sumLastMonth === 0) {
       if (sumThisMonth > 0) {
         percentText = "+100% so với tháng trước";
@@ -1335,7 +1346,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         percentText = "0% so với tháng trước";
       }
     }
-    
+
     return {
       sumThisMonth,
       percentText,
@@ -1374,20 +1385,78 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 relative overflow-hidden font-sans">
-      
+    <DriverContext.Provider value={{
+      vehicles, setVehicles,
+      balance, setBalance,
+      transactions, setTransactions,
+      activeTab, setActiveTab,
+      isOffline,
+      paymentMethod, setPaymentMethod,
+      selectedVehId, setSelectedVehId,
+      qrDirection, setQrDirection,
+      isTogglingLock, setIsTogglingLock,
+      handleToggleLockInPwa,
+      activeQrToken, setActiveQrToken,
+      qrExpiryTime, setQrExpiryTime,
+      isGeneratingQr, setIsGeneratingQr,
+      countdownSec, setCountdownSec,
+      isQrRequested, setIsQrRequested,
+      currentParked, setCurrentParked,
+      addVehicleModalOpen, setAddVehicleModalOpen,
+      newPlate, setNewPlate,
+      newName, setNewName,
+      newType, setNewType,
+      editVehicleModalOpen, setEditVehicleModalOpen,
+      editingVehicleId, setEditingVehicleId,
+      editPlate, setEditPlate,
+      editName, setEditName,
+      editType, setEditType,
+      regStep, setRegStep,
+      selectedVehicleForVIP, setSelectedVehicleForVIP,
+      selectedPackPrice, setSelectedPackPrice,
+      selectedPackLabel, setSelectedPackLabel,
+      vnpayBank, setVnpayBank,
+      vnpayCardNo, setVnpayCardNo,
+      vnpayCardHolder, setVnpayCardHolder,
+      vnpayOtp, setVnpayOtp,
+      vnpayModalOpen, setVnpayModalOpen,
+      vnpayStep, setVnpayStep,
+      isSirenMuted, setIsSirenMuted,
+      isAlertOverlayShown, setIsAlertOverlayShown,
+      profileName, setProfileName,
+      profilePhone, setProfilePhone,
+      isPhoneVerified, setIsPhoneVerified,
+      profileEmail, setProfileEmail,
+      profileAddress, setProfileAddress,
+      is2faEnabled, setIs2faEnabled,
+      emailNotifyGate, setEmailNotifyGate,
+      smsNotifyGate, setSmsNotifyGate,
+      emailNotifyReceipt, setEmailNotifyReceipt,
+      smsNotifyReceipt, setSmsNotifyReceipt,
+      billingTimeFilter, setBillingTimeFilter,
+      billingTypeFilter, setBillingTypeFilter,
+      searchSupportQuery, setSearchSupportQuery,
+      expandedFaq, setExpandedFaq,
+      getBillingStats,
+      getRemainingDays,
+      setSelectedSubForDetail,
+      triggerToast,
+      handleStartVnpay
+    }}>
+      <div className="min-h-screen bg-slate-50 relative overflow-hidden font-sans">
+
       {/* Dynamic Toast banner overlay */}
       <AnimatePresence>
         {toast && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             className={`fixed top-10 right-10 z-[9999] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 border ${
-              toast.type === 'error' 
-                ? 'bg-rose-500 text-white border-rose-400' 
-                : toast.type === 'info' 
-                ? 'bg-blue-600 text-white border-blue-500' 
+              toast.type === 'error'
+                ? 'bg-rose-500 text-white border-rose-400'
+                : toast.type === 'info'
+                ? 'bg-blue-600 text-white border-blue-500'
                 : 'bg-emerald-500 text-white border-emerald-400'
             }`}
           >
@@ -1399,13 +1468,13 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       {/* VIP Subscription Detail Modal */}
       <AnimatePresence>
         {selectedSubForDetail && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 15 }}
@@ -1421,7 +1490,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                     Xe {selectedSubForDetail.vehicle_plate}
                   </h3>
                 </div>
-                <button 
+                <button
                   onClick={() => setSelectedSubForDetail(null)}
                   className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full transition-all cursor-pointer"
                 >
@@ -1436,18 +1505,18 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                   <div className="space-y-0.5">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Trạng thái</span>
                     <strong className="text-sm font-black text-slate-700">
-                      {selectedSubForDetail.status === 'ACTIVE' ? 'Đã kích hoạt' : 
+                      {selectedSubForDetail.status === 'ACTIVE' ? 'Đã kích hoạt' :
                        selectedSubForDetail.status === 'REJECTED' ? 'Bị từ chối' : 'Chờ duyệt'}
                     </strong>
                   </div>
                   <span className={`px-3 py-1 text-xs font-black rounded-lg uppercase tracking-wider ${
-                    selectedSubForDetail.status === 'ACTIVE' 
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-500/10' 
+                    selectedSubForDetail.status === 'ACTIVE'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-500/10'
                       : selectedSubForDetail.status === 'REJECTED'
                       ? 'bg-rose-50 text-rose-700'
                       : 'bg-amber-100/80 text-amber-700 animate-pulse'
                   }`}>
-                    {selectedSubForDetail.status === 'ACTIVE' ? 'Hoạt động' : 
+                    {selectedSubForDetail.status === 'ACTIVE' ? 'Hoạt động' :
                      selectedSubForDetail.status === 'REJECTED' ? 'Từ chối' : 'Chờ duyệt'}
                   </span>
                 </div>
@@ -1501,9 +1570,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                     <div className="grid grid-cols-2 gap-3">
                       {selectedSubForDetail.regDoc && (
                         <div className="group relative h-28 bg-slate-100 rounded-xl overflow-hidden border border-slate-200/60">
-                          <img 
-                            src={selectedSubForDetail.regDoc} 
-                            alt="Cà vẹt xe" 
+                          <img
+                            src={selectedSubForDetail.regDoc}
+                            alt="Cà vẹt xe"
                             className="w-full h-full object-cover"
                           />
                           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -1513,9 +1582,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       )}
                       {selectedSubForDetail.regPhoto && (
                         <div className="group relative h-28 bg-slate-100 rounded-xl overflow-hidden border border-slate-200/60">
-                          <img 
-                            src={selectedSubForDetail.regPhoto} 
-                            alt="Ảnh thực tế" 
+                          <img
+                            src={selectedSubForDetail.regPhoto}
+                            alt="Ảnh thực tế"
                             className="w-full h-full object-cover"
                           />
                           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -1530,7 +1599,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
               {/* Footer */}
               <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
-                <button 
+                <button
                   onClick={() => setSelectedSubForDetail(null)}
                   className="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs rounded-xl transition-all cursor-pointer"
                 >
@@ -1545,7 +1614,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       {/* INTRUSION / ALARM POPUP */}
       <AnimatePresence>
         {isAlertOverlayShown && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1592,16 +1661,16 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       </AnimatePresence>
 
       {/* CORE DESKTOP EMBED CONTAINER CARD */}
-      <div 
-        id="driver-pwa-body-card" 
+      <div
+        id="driver-pwa-body-card"
         className="w-full min-h-screen bg-slate-50 text-slate-800 flex flex-col md:flex-row"
       >
-        
+
         {/* ==================================================== */}
         {/* 1. LEFT SIDEBAR (EXACT PIXEL REPLICATION IN BLUE) */}
         {/* ==================================================== */}
         <aside className="w-full md:w-[260px] bg-white border-r border-slate-100 flex flex-col justify-between shrink-0 p-6 min-h-[600px]">
-          
+
           <div className="space-y-8">
             {/* Header branding */}
             <div className="space-y-1">
@@ -1632,8 +1701,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       if (item.id === 'vip_reg') setRegStep(2); // reset layout step to 2
                     }}
                     className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-xs select-none transition-all active:scale-[0.98] ${
-                      isActive 
-                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10' 
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10'
                         : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                     }`}
                   >
@@ -1649,11 +1718,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
           </div>
 
           <div className="space-y-4 border-t border-slate-100 pt-5">
-            <button 
+            <button
               onClick={() => setActiveTab('support')}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs select-none transition-all active:scale-[0.98] ${
-                activeTab === 'support' 
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10' 
+                activeTab === 'support'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10'
                   : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
               }`}
             >
@@ -1663,8 +1732,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
               </div>
               {activeTab === 'support' && <ChevronRight className="w-3.5 h-3.5 stroke-[3]" />}
             </button>
-            
-            <button 
+
+            <button
               onClick={onLogout}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-red-500 hover:text-red-600 font-extrabold text-xs text-left cursor-pointer"
             >
@@ -1679,15 +1748,15 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         {/* 2. MAIN AREA WRAPPER */}
         {/* ==================================================== */}
         <main className="flex-1 flex flex-col bg-slate-50/50">
-          
+
           {/* TOP BAR / NAVIGATION HEADER */}
           <header className="px-8 py-5 border-b border-slate-200/60 bg-white flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
-            
+
             {/* Search segment mimicking placeholder */}
             <div className="relative w-full max-w-xs">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder={activeTab === 'vehicles' ? 'Tìm biển số xe...' : 'Tìm dịch vụ bãi đỗ...'}
                 value={searchSupportQuery}
                 onChange={(e) => setSearchSupportQuery(e.target.value)}
@@ -1704,15 +1773,15 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
               </div>
 
               {/* Action bells */}
-              <button 
-                onClick={() => triggerToast('Không có thông báo mới nào hôm nay.', 'info')} 
+              <button
+                onClick={() => triggerToast('Không có thông báo mới nào hôm nay.', 'info')}
                 className="p-2 text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-full relative"
               >
                 <Bell className="w-4.5 h-4.5" />
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
               </button>
 
-              <button 
+              <button
                 onClick={() => triggerToast('Chi tiết phiên bản UrbanPark Driver Portal v1.0.8', 'info')}
                 className="p-2 text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-full"
               >
@@ -1763,7 +1832,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                    
+
                     {/* LEFT PART: VEHICLE SELECTOR & SMART LOCK ENGINE */}
                     <div className="lg:col-span-6 bg-white border border-slate-200 rounded-3xl p-6 flex flex-col justify-between space-y-6 shadow-sm">
                       <div className="space-y-4">
@@ -1837,7 +1906,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           return (
                             <div className="p-6 bg-slate-50 rounded-2xl border border-slate-150 flex flex-col items-center justify-center text-center space-y-4 relative overflow-hidden">
                               <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${isLocked ? 'from-rose-500 to-red-600' : 'from-emerald-400 to-teal-500'}`} />
-                              
+
                               <div className={`w-16 h-16 rounded-full flex items-center justify-center relative z-10 transition-all ${
                                 isLocked ? 'bg-red-50 text-red-600 shadow-lg shadow-red-200' : 'bg-emerald-50 text-emerald-600 shadow-lg shadow-emerald-100'
                               }`}>
@@ -1858,7 +1927,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                               </div>
 
                               <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                                {isLocked 
+                                {isLocked
                                   ? "Ví bốt và Barrier của bãi đỗ sẽ giữ rào đóng cứng và kẹp phanh hơi bánh xe nếu phát hiện xe di chuyển ra ngoài bốt gác lúc này."
                                   : "Bốt an ninh sẽ cho phép xe ra vào thoải mái, tự động đối khớp thông tin từ camera LPR và QR số."
                                 }
@@ -1869,8 +1938,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 disabled={isTogglingLock === activeVeh.id}
                                 onClick={() => handleToggleLockInPwa(activeVeh.id, activeVeh.plate, isLocked)}
                                 className={`w-full py-3.5 rounded-xl font-extrabold text-xs uppercase tracking-wider text-white shadow-md active:scale-95 transition-all text-center cursor-pointer flex items-center justify-center gap-2 ${
-                                  isLocked 
-                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-200' 
+                                  isLocked
+                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-200'
                                     : 'bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 shadow-red-100'
                                 }`}
                               >
@@ -1921,8 +1990,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                               type="button"
                               onClick={() => setQrDirection('VÀO')}
                               className={`py-2 text-center text-xs font-extrabold rounded-lg select-none transition-all ${
-                                qrDirection === 'VÀO' 
-                                  ? 'bg-blue-600 text-white shadow-sm' 
+                                qrDirection === 'VÀO'
+                                  ? 'bg-blue-600 text-white shadow-sm'
                                   : 'text-slate-500 hover:text-slate-800'
                               }`}
                             >
@@ -1932,8 +2001,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                               type="button"
                               onClick={() => setQrDirection('RA')}
                               className={`py-2 text-center text-xs font-extrabold rounded-lg select-none transition-all ${
-                                qrDirection === 'RA' 
-                                  ? 'bg-blue-600 text-white shadow-sm' 
+                                qrDirection === 'RA'
+                                  ? 'bg-blue-600 text-white shadow-sm'
                                   : 'text-slate-500 hover:text-slate-800'
                               }`}
                             >
@@ -2050,7 +2119,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
               {/* TABS VIEW 1: HOME PAGE */}
               {activeTab === 'home' && (
-                <motion.div 
+                <motion.div
                   key="home"
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -2067,7 +2136,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                   </div>
 
                   {isOffline && (
-                    <motion.div 
+                    <motion.div
                       initial={{ scale: 0.95, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       className="bg-red-50 text-red-800 rounded-2xl border border-red-200/60 p-5 space-y-3.5"
@@ -2095,9 +2164,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           </span>
                         </div>
                         <div className="w-20 h-20 bg-slate-50 border border-slate-150 p-1 rounded-lg flex items-center justify-center shrink-0">
-                          <img 
-                            src="https://images.unsplash.com/photo-1543269865-cbf427effbad?w=120&auto=format&fit=crop&q=80" 
-                            alt="Offline qr code representation" 
+                          <img
+                            src="https://images.unsplash.com/photo-1543269865-cbf427effbad?w=120&auto=format&fit=crop&q=80"
+                            alt="Offline qr code representation"
                             className="w-16 h-16 object-cover select-none filter contrast-125 saturate-0"
                             referrerPolicy="no-referrer"
                           />
@@ -2108,11 +2177,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                   {/* Top segment grid columns */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                    
+
                     {/* Left Card: Trạng thái hiện tại */}
                     <div className="lg:col-span-7 bg-blue-500/5 hover:bg-blue-500/10 rounded-2xl border border-blue-100 flex flex-col justify-between p-6 transition-all relative overflow-hidden">
                       <div className="absolute right-0 top-0 w-48 h-48 bg-blue-300/10 rounded-full blur-2xl pointer-events-none" />
-                      
+
                       <div className="flex items-center justify-between">
                         <div className="space-y-1">
                           <span className="text-[10px] font-black uppercase text-slate-400">TRỌNG ĐIỂM GIÁM SÁT</span>
@@ -2153,9 +2222,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                     {/* Right Card: Quick billing operations & shortcuts */}
                     <div className="lg:col-span-5 flex flex-col gap-4">
-                      
+
                       {/* Large Blue payment trigger */}
-                      <button 
+                      <button
                         onClick={() => {
                           setActiveTab('vip_reg');
                           setRegStep(2);
@@ -2168,8 +2237,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                       {/* Beneath grid */}
                       <div className="grid grid-cols-2 gap-4 flex-1">
-                        
-                        <button 
+
+                        <button
                           onClick={handleFindCar}
                           className="p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center gap-2 select-none group cursor-pointer active:scale-95 transition-all"
                         >
@@ -2179,7 +2248,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           <span className="text-xs font-black text-slate-700 tracking-tight leading-none">Tìm Xe Của Tôi</span>
                         </button>
 
-                        <button 
+                        <button
                           onClick={() => {
                             setActiveTab('vip_reg');
                             setRegStep(2);
@@ -2204,7 +2273,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">
                         Hoạt Động Gần Đây
                       </h3>
-                      <button 
+                      <button
                         onClick={() => setActiveTab('billing')}
                         className="text-xs font-extrabold text-blue-600 hover:underline cursor-pointer"
                       >
@@ -2229,9 +2298,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                <td className="py-3.5 px-4 font-black">
                                 <span className={`inline-flex items-center gap-1.5 ${
                                   tx.type?.includes('Đăng kí') || tx.type?.includes('Thanh toán') || tx.type?.includes('Nạp tiền')
-                                    ? 'text-blue-600 font-semibold' 
-                                    : tx.isEntry 
-                                      ? 'text-emerald-600' 
+                                    ? 'text-blue-600 font-semibold'
+                                    : tx.isEntry
+                                      ? 'text-emerald-600'
                                       : 'text-rose-600'
                                 }`}>
                                   {tx.type?.includes('Đăng kí') || tx.type?.includes('Thanh toán') || tx.type?.includes('Nạp tiền') ? tx.type : (tx.isEntry ? '➔ Xe vào' : '➔ Xe ra')}
@@ -2241,8 +2310,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                               <td className={`py-3.5 px-4 text-right font-bold ${
                                 tx.type?.includes('Nạp tiền')
                                   ? 'text-emerald-600 font-mono'
-                                  : tx.isEntry 
-                                    ? 'text-slate-400' 
+                                  : tx.isEntry
+                                    ? 'text-slate-400'
                                     : 'text-rose-600 font-mono'
                               }`}>
                                 {tx.fee}
@@ -2260,834 +2329,22 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
               {/* TABS VIEW 2: VEHICLES COMPONENT */}
               {activeTab === 'vehicles' && (
-                <motion.div 
-                  key="vehicles"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  className="space-y-6 text-left"
-                >
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                    <div className="space-y-1">
-                      <h2 className="text-2xl font-black text-slate-950 tracking-tight">Phương tiện của tôi</h2>
-                      <p className="text-slate-400 text-xs">
-                        Quản lý các phương tiện đã đăng ký để ra vào hệ thống UrbanPark.
-                      </p>
-                    </div>
-                    
-                    <button 
-                      onClick={() => setAddVehicleModalOpen(true)}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer transition-all active:scale-95 shrink-0"
-                    >
-                      <Plus className="w-4 h-4 text-white" />
-                      <span>Thêm xe mới</span>
-                    </button>
-                  </div>
-
-                  {/* Registered Vehicle Listings list */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {vehicles.filter(v => {
-                      if (!searchSupportQuery) return true;
-                      return (v.plate || '').toLowerCase().includes(searchSupportQuery.toLowerCase()) ||
-                             (v.name || '').toLowerCase().includes(searchSupportQuery.toLowerCase()) ||
-                             (v.type || '').toLowerCase().includes(searchSupportQuery.toLowerCase());
-                    }).map(v => (
-                      <div 
-                        key={v.id} 
-                        className={`bg-white rounded-3xl border overflow-hidden flex flex-col justify-between transition-all hover:shadow-md ${
-                          v.isLocked ? 'border-rose-300 ring-2 ring-rose-500/10' : 'border-slate-200/60'
-                        }`}
-                      >
-                        
-                        {/* Vehicle Photo Block */}
-                        <div className="h-44 bg-slate-100 relative flex items-center justify-center overflow-hidden">
-                          {v.image ? (
-                            <img 
-                              src={v.image} 
-                              alt={v.name} 
-                              className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="flex flex-col items-center justify-center text-slate-300 gap-2">
-                              <Car className="w-16 h-16 stroke-[1]" />
-                              <span className="text-[10px] font-bold tracking-wider font-mono uppercase text-slate-400 bg-slate-200/40 px-2 py-0.5 rounded-md">BIKE NO REGCARD</span>
-                            </div>
-                          )}
-
-                          {/* Anti-theft live scanner badge */}
-                          <div className="absolute top-4 left-4 flex gap-1.5 z-10">
-                            <span className="px-2.5 py-1 bg-white/90 backdrop-blur-xs text-[#10b981] font-bold text-[9px] rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              HOẠT ĐỘNG
-                            </span>
-                            {v.isLocked && (
-                              <span className="px-2.5 py-1 bg-rose-500 text-white font-black text-[9px] rounded-full uppercase tracking-widest shadow-sm flex items-center gap-1">
-                                SHIELD LOCK ON
-                              </span>
-                            )}
-                          </div>
-
-                        </div>
-
-                        {/* Card metadata detail */}
-                        <div className="p-5 space-y-4">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <strong className="text-xl font-black text-slate-850 font-mono tracking-wide">{v.plate}</strong>
-                              <span className="text-xs text-slate-400 font-bold block mt-0.5">{v.name}</span>
-                              {v.activeSubscription && (
-                                <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 text-[9px] font-black text-emerald-700 bg-emerald-50 rounded-md uppercase tracking-wider">
-                                  ✨ {v.activeSubscription}
-                                </span>
-                              )}
-                            </div>
-                            <div className="p-2 bg-slate-50 border border-slate-100 rounded-lg text-slate-500">
-                              <Car className="w-4 h-4" />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4 border-t border-b border-slate-100 py-3.5 text-left leading-normal font-sans">
-                            <div>
-                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">LOẠI XE</span>
-                              <strong className="text-xs font-black text-slate-700 block mt-0.5">{v.type}</strong>
-                            </div>
-                            <div>
-                              {v.activeSubscription ? (
-                                <>
-                                  <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest block">HẠN SỬ DỤNG</span>
-                                  <strong className="text-xs font-black text-emerald-600 block mt-0.5">
-                                    {v.subscriptionExpiry}
-                                    <span className="text-[10px] ml-1.5 font-bold text-slate-500">
-                                      (Còn {getRemainingDays(v.subscriptionExpiry || '')} ngày)
-                                    </span>
-                                  </strong>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">NGÀY ĐĂNG KÝ</span>
-                                  <strong className="text-xs font-extrabold text-slate-700 block mt-0.5">{v.regDate}</strong>
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                           {/* Lock Trigger Controller */}
-                           <div className="flex items-center justify-between gap-3 pt-1">
-                             {v.activeSubscription ? (
-                                v.isLocked ? (
-                                  <div
-                                    className="flex-1 py-2 bg-rose-50 text-rose-600 border border-rose-200/50 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-default select-none"
-                                  >
-                                    <Lock className="w-4 h-4 text-rose-500" />
-                                    <span>Xe đang khoá bảo vệ</span>
-                                  </div>
-                                ) : (
-                                  <div
-                                    className="flex-1 py-2 bg-slate-50 text-slate-600 border border-slate-200/50 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-default select-none"
-                                  >
-                                    <Unlock className="w-4 h-4 text-slate-400" />
-                                    <span>Xe đang mở khoá</span>
-                                  </div>
-                                )
-                             ) : (
-                               <button
-                                 onClick={() => {
-                                   setSelectedVehicleForVIP(v.plate);
-                                   setActiveTab('vip_reg');
-                                 }}
-                                 className="flex-1 py-2 bg-slate-105 bg-slate-100 hover:bg-amber-100 hover:text-amber-700 text-slate-400 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer transition-all"
-                               >
-                                 <Lock className="w-3.5 h-3.5 text-slate-400" />
-                                 <span>Đăng ký VIP để khoá bánh</span>
-                               </button>
-                             )}
-
-                            <button 
-                              onClick={() => {
-                                setEditingVehicleId(v.id);
-                                setEditPlate(v.plate);
-                                setEditName(v.name);
-                                setEditType(v.type);
-                                setEditVehicleModalOpen(true);
-                              }}
-                              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold text-xs rounded-xl cursor-pointer transition-all"
-                            >
-                              Sửa
-                            </button>
-                          </div>
-
-                        </div>
-
-                      </div>
-                    ))}
-
-                    {/* Dotted empty slot widget */}
-                    <button 
-                      onClick={() => setAddVehicleModalOpen(true)}
-                      className="border-2 border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50/20 transition-all rounded-3xl p-8 flex flex-col items-center justify-center text-center gap-3 group select-none min-h-[300px] cursor-pointer"
-                    >
-                      <div className="p-3 bg-slate-100 group-hover:bg-blue-100 text-slate-400 group-hover:text-blue-600 rounded-full transition-all">
-                        <Plus className="w-6 h-6 stroke-[2.5]" />
-                      </div>
-                      <div>
-                        <strong className="text-xs font-black text-slate-800 tracking-tight group-hover:text-blue-600 block">Thêm xe mới</strong>
-                        <p className="text-[10px] text-slate-400 font-medium max-w-[200px] mx-auto mt-0.5">
-                          Đăng ký xe mới để sử dụng dịch vụ bãi đỗ tự động tiện lợi.
-                        </p>
-                      </div>
-                    </button>
-
-                  </div>
-
-                </motion.div>
+                <VehicleManagementList />
               )}
 
-              {/* TABS VIEW 3: DĂNG KÝ HÀNG THÁNG FORM */}
+{/* TABS VIEW 3: DĂNG KÝ HÀNG THÁNG FORM */}
               {activeTab === 'vip_reg' && (
-                <motion.div 
-                  key="vip_reg"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  className="space-y-6 text-left"
-                >
-                  <div className="space-y-1">
-                    <h2 className="text-2xl font-black text-slate-950 tracking-tight">Đăng ký dịch vụ</h2>
-                    <p className="text-slate-400 text-xs text-left">
-                      Thiết lập thẻ tháng hoặc thẻ ngày cho phương tiện của bạn.
-                    </p>
-                  </div>
-
-                  {vehicles.length === 0 ? (
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="bg-white p-8 rounded-3xl border border-slate-200/60 shadow-lg text-center max-w-xl mx-auto space-y-6 mt-8"
-                    >
-                      <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto animate-bounce">
-                        <Car className="w-10 h-10" />
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="text-lg font-black text-slate-800">Chưa có phương tiện đăng ký</h3>
-                        <p className="text-slate-400 text-sm leading-relaxed">
-                          Bạn cần thêm ít nhất một phương tiện vào tài khoản trước khi thực hiện mua vé tháng VIP hoặc đăng ký gói dịch vụ.
-                        </p>
-                      </div>
-                      <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNewType('Ô tô gầm thấp 4-5 chỗ');
-                            setAddVehicleModalOpen(true);
-                          }}
-                          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-2xl transition-all shadow-md cursor-pointer"
-                        >
-                          + Thêm xe mới ngay
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab('vehicles')}
-                          className="px-6 py-3 border border-slate-200 hover:bg-slate-50 text-slate-650 font-extrabold text-xs uppercase tracking-wider rounded-2xl transition-all cursor-pointer"
-                        >
-                          Quản lý xe của tôi
-                        </button>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <>
-
-                  {/* Progressive Horizontal steps */}
-                  <div className="bg-white px-8 py-5 rounded-2xl border border-slate-200/60 flex items-center justify-between gap-6 overflow-x-auto">
-                    {[
-                      { step: 1, label: 'Chọn xe', completed: regStep > 1, active: regStep === 1 },
-                      { step: 2, label: 'Chọn gói', completed: regStep > 2, active: regStep === 2 },
-                      { step: 3, label: 'Thanh toán', completed: regStep > 3, active: regStep === 3 }
-                    ].map((step, idx, arr) => (
-                      <React.Fragment key={step.step}>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black ${
-                            step.completed 
-                              ? 'bg-blue-600 text-white font-extrabold' 
-                              : step.active 
-                                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 font-black'
-                                : 'bg-slate-200 text-slate-500'
-                          }`}>
-                            {step.completed ? '✓' : step.step}
-                          </span>
-                          <span className={`text-xs font-extrabold uppercase ${step.active ? 'text-blue-600' : 'text-slate-400'}`}>
-                            {step.label}
-                          </span>
-                        </div>
-                        {idx !== arr.length - 1 && (
-                          <div className="h-[2px] bg-slate-200 max-w-[200px] flex-1" />
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </div>
-
-                  {/* Side-by-Side checkout workspace modules */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                    
-                    {/* LEFT WORKSPACE: FORM INPUTS */}
-                    <div className="lg:col-span-8 space-y-6">
-                      
-                      {/* Sub-section 1: Choose vehicle */}
-                      <div className="bg-white p-6 rounded-3xl border border-slate-200/60 space-y-4">
-                        <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block">
-                          🚙 Phương tiện áp dụng
-                        </strong>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {vehicles.length === 0 ? (
-                            <div className="col-span-full p-4 text-sm text-slate-500 text-center border border-dashed border-slate-300 rounded-2xl bg-slate-50">
-                              Chưa có phương tiện nào. Vui lòng quay lại tab "Xe của tôi" để thêm xe trước khi đăng ký dịch vụ!
-                            </div>
-                          ) : (
-                            vehicles.map(v => {
-                              const isChosen = selectedVehicleForVIP === v.plate;
-                              return (
-                                <button
-                                  key={v.id}
-                                  onClick={() => setSelectedVehicleForVIP(v.plate)}
-                                  className={`p-4 border rounded-2xl text-left flex items-center justify-between transition-all select-none cursor-pointer ${
-                                    isChosen 
-                                      ? 'border-blue-600 bg-blue-50/20 text-blue-800 font-extrabold ring-2 ring-blue-600/10' 
-                                      : 'border-slate-200 hover:bg-slate-50 text-slate-600'
-                                  }`}
-                                >
-                                  <div>
-                                    <span className="text-[10px] text-slate-400 font-semibold block">{v.type} - {v.name}</span>
-                                    <strong className="text-sm font-black font-mono tracking-wider">{v.plate}</strong>
-                                  </div>
-                                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                                    isChosen ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
-                                  }`}>
-                                    {isChosen && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                                  </div>
-                                </button>
-                              );
-                            })
-                          )}
-                        </div>
-
-                        <button 
-                          onClick={() => {
-                            setNewType('Ô tô gầm thấp 4-5 chỗ');
-                            setAddVehicleModalOpen(true);
-                          }}
-                          className="pt-2 text-xs font-black text-blue-600 hover:underline inline-block cursor-pointer"
-                        >
-                          + Thêm xe mới
-                        </button>
-                      </div>
-
-                      {/* Sub-section 2: Choose service package */}
-                      <div className="bg-white p-6 rounded-3xl border border-slate-200/60 space-y-4">
-                        <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block">
-                          ⭐ Gói dịch vụ
-                        </strong>
-
-                        <div className="space-y-3.5">
-                          {(() => {
-                            const selectedVehicleObj = vehicles.find(v => v.plate === selectedVehicleForVIP);
-                            const selectedVehicleType = selectedVehicleObj ? selectedVehicleObj.type : 'Ô tô gầm thấp 4-5 chỗ';
-                            const pricing = VEHICLE_PRICING[selectedVehicleType] || VEHICLE_PRICING['Ô tô gầm thấp 4-5 chỗ'];
-                            return [
-                              { 
-                                id: 'pkg-2', 
-                                label: 'Thẻ Tháng VIP', 
-                                price: pricing.month, 
-                                desc: 'Giải pháp tối ưu cho cư dân và nhân viên văn phòng.', 
-                                badge: 'PHỔ BIẾN', 
-                                features: [
-                                  'Chỗ đỗ xe cố định (Tầng B1)',
-                                  'Thanh toán bằng mã QR code lưu động',
-                                  'Hỗ trợ kỹ thuật 24/7 tức thì'
-                                ] 
-                              },
-                              { 
-                                id: 'pkg-3', 
-                                label: 'Thẻ 3 Tháng VIP', 
-                                price: pricing.month3, 
-                                desc: 'Gói tiết kiệm 3 tháng cho hội viên thân thiết.', 
-                                badge: 'TIẾT KIỆM', 
-                                features: [
-                                  'Chỗ đỗ xe cố định (Tầng B1)',
-                                  'Thanh toán bằng mã QR code lưu động',
-                                  'Hỗ trợ kỹ thuật 24/7 tức thì'
-                                ] 
-                              },
-                              { 
-                                id: 'pkg-4', 
-                                label: 'Thẻ 6 Tháng VIP', 
-                                price: pricing.month6, 
-                                desc: 'Gói nửa năm với nhiều ưu đãi đặc quyền.', 
-                                badge: 'ƯU ĐÃI LỚN', 
-                                features: [
-                                  'Chỗ đỗ xe cố định (Tầng B1)',
-                                  'Thanh toán bằng mã QR code lưu động',
-                                  'Hỗ trợ kỹ thuật 24/7 tức thì'
-                                ] 
-                              },
-                              { 
-                                id: 'pkg-5', 
-                                label: 'Thẻ 1 Năm VIP', 
-                                price: pricing.year, 
-                                desc: 'Gói trọn gói 1 năm - giải pháp đỗ xe hoàn hảo.', 
-                                badge: 'SIÊU TIẾT KIỆM', 
-                                features: [
-                                  'Chỗ đỗ xe cố định (Tầng B1)',
-                                  'Thanh toán bằng mã QR code lưu động',
-                                  'Hỗ trợ kỹ thuật 24/7 tức thì'
-                                ] 
-                              }
-                            ];
-                          })().map(pkg => {
-                            const isSelected = selectedPackLabel === pkg.label;
-                            return (
-                              <div
-                                key={pkg.id}
-                                onClick={() => {
-                                  setSelectedPackPrice(pkg.price);
-                                  setSelectedPackLabel(pkg.label);
-                                }}
-                                className={`p-5 border rounded-2xl transition-all cursor-pointer relative overflow-hidden select-none ${
-                                  isSelected 
-                                    ? 'border-blue-600 bg-blue-50/10 ring-2 ring-blue-600/10' 
-                                    : 'border-slate-200 hover:bg-slate-50'
-                                }`}
-                              >
-                                {pkg.badge && (
-                                  <span className={`absolute right-0 top-0 text-[9px] font-black uppercase px-3 py-1 rounded-bl-xl tracking-wider ${
-                                    isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'
-                                  }`}>
-                                    {pkg.badge}
-                                  </span>
-                                )}
-
-                                <div className="flex justify-between items-start">
-                                  <div className="flex gap-3">
-                                    <div className={`mt-1 w-5 h-5 rounded-full border flex items-center justify-center ${
-                                      isSelected ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
-                                    }`}>
-                                      {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                                    </div>
-                                    <div>
-                                      <strong className="text-sm font-black text-slate-900 block">{pkg.label}</strong>
-                                      <p className="text-slate-400 text-xs mt-1 leading-normal max-w-md">{pkg.desc}</p>
-                                    </div>
-                                  </div>
-                                  
-                                  <span className="text-base font-black text-blue-600 font-mono">
-                                    {pkg.price.toLocaleString('vi-VN')}đ
-                                  </span>
-                                </div>
-
-                                {pkg.features.length > 0 && (
-                                  <div className="mt-4 pt-3 border-t border-slate-100 text-slate-600 text-xs space-y-1.5 leading-none">
-                                    {pkg.features.map(f => (
-                                      <div key={f} className="flex items-center gap-2">
-                                        <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                                        <span>{f}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                    </div>
-
-                    {/* RIGHT WORKSPACE: ORDER BILLING PANEL */}
-                    <div className="lg:col-span-4 space-y-6">
-                      
-                      <div className="bg-white p-6 rounded-3xl border border-slate-200/60 space-y-6 text-left">
-                        <strong className="text-xs font-black text-slate-800 uppercase tracking-widest block">
-                          Tổng quan đơn hàng
-                        </strong>
-
-                        <div className="text-xs text-slate-500 space-y-3 leading-normal border-b border-slate-100 pb-5">
-                          <div className="flex justify-between">
-                            <span>Phương tiện:</span>
-                            <strong className="text-slate-800 font-mono">{selectedVehicleForVIP}</strong>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Gói dịch vụ:</span>
-                            <strong className="text-slate-800">{selectedPackLabel}</strong>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Thời hạn:</span>
-                            <strong className="text-slate-800">01/11 - 30/11</strong>
-                          </div>
-                        </div>
-
-                        <div className="flex justify-between items-center leading-none">
-                          <span className="text-xs font-black text-slate-400">TỔNG THANH TOÁN:</span>
-                          <strong className="text-2xl font-black text-blue-600 font-mono">
-                            {selectedPackPrice.toLocaleString('vi-VN')}đ
-                          </strong>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block leading-none mb-1.5">
-                            Phương thức thanh toán
-                          </label>
-                          <select 
-                            value={paymentMethod}
-                            onChange={(e) => setPaymentMethod(e.target.value as 'wallet' | 'vnpay')}
-                            className="w-full p-2.5 bg-slate-50 hover:bg-slate-100 text-xs font-bold rounded-lg border border-slate-200 text-slate-850"
-                          >
-                            <option value="wallet">Ví UrbanPark (Số dư: {balance.toLocaleString('vi-VN')}₫)</option>
-                            <option value="vnpay">Thẻ thanh toán nội địa VNPAY Sandbox</option>
-                          </select>
-                        </div>
-
-                        <button 
-                          onClick={handleStartVnpay}
-                          className="w-full py-4 bg-slate-900 border border-slate-800 hover:bg-black text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-md active:scale-98 cursor-pointer flex items-center justify-center gap-2"
-                        >
-                          <Lock className="w-4 h-4 text-white" />
-                          <span>Xác nhận & Thanh toán</span>
-                        </button>
-
-                        <p className="text-[11px] text-slate-400 text-center leading-normal max-w-[200px] mx-auto pt-1">
-                          Bằng việc xác nhận, bạn đồng ý với <strong className="text-blue-500 hover:underline cursor-pointer">Điều khoản dịch vụ</strong>.
-                        </p>
-                      </div>
-
-                    </div>
-
-                  </div>
-                    </>
-                  )}
-
-                </motion.div>
+                <VipRegistrationModal />
               )}
 
-              {/* TABS VIEW 4: BILLING HISTORY */}
+{/* TABS VIEW 4: BILLING HISTORY */}
               {activeTab === 'billing' && (
-                <motion.div 
-                  key="billing"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  className="space-y-6 text-left"
-                >
-                  <div className="space-y-1">
-                    <h2 className="text-2xl font-black text-slate-950 tracking-tight">Lịch sử thanh toán</h2>
-                    <p className="text-slate-400 text-xs font-semibold">
-                      Xem lịch sử thanh toán và đăng ký gói tháng.
-                    </p>
-                  </div>
-
-                  {/* Summary amount and Quick filter cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    
-                    {/* Amount card */}
-                    <div className="bg-white p-5 rounded-[24px] border border-slate-200/60 flex flex-col justify-between shadow-xs">
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-black tracking-wider uppercase text-slate-400 block font-sans">
-                          SỐ TIỀN THANH TOÁN THÁNG NÀY
-                        </span>
-                        <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
-                          {(() => {
-                            const { sumThisMonth } = getBillingStats();
-                            return sumThisMonth.toLocaleString('vi-VN') + '₫';
-                          })()}
-                        </div>
-                      </div>
-                      <div className="mt-3">
-                        {(() => {
-                          const { percentText, isDecrease, isIncrease } = getBillingStats();
-                          let textColor = "text-slate-600 bg-slate-50 border border-slate-100";
-                          let dotColor = "bg-slate-400";
-                          if (isDecrease) {
-                            textColor = "text-emerald-600 bg-emerald-50 border border-emerald-500/15";
-                            dotColor = "bg-emerald-500";
-                          } else if (isIncrease) {
-                            textColor = "text-red-600 bg-red-50 border border-red-500/15";
-                            dotColor = "bg-red-500";
-                          }
-                          return (
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-extrabold rounded-full ${textColor}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${dotColor} ${isDecrease || isIncrease ? 'animate-pulse' : ''}`} />
-                              {percentText}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    </div>
-
-                    {/* Filter controls cards (Span 2) */}
-                    <div className="md:col-span-2 bg-white p-5 rounded-[24px] border border-slate-200/60 space-y-4">
-                      <div className="flex items-center gap-2">
-                        <strong className="text-xs font-black text-slate-800 uppercase tracking-widest block font-sans">
-                          Bộ Lọc Hoá Đơn
-                        </strong>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block leading-none">
-                            Thời gian
-                          </label>
-                          <select 
-                            value={billingTimeFilter}
-                            onChange={(e) => setBillingTimeFilter(e.target.value)}
-                            className="w-full p-2.5 bg-slate-50 hover:bg-slate-100 text-xs font-bold rounded-xl border border-slate-200 text-slate-850 outline-none transition-all cursor-pointer"
-                          >
-                            <option value="Tất cả">Tất cả thời gian</option>
-                            <optgroup label="Gần đây">
-                              <option value="Hôm nay">Hôm nay</option>
-                              <option value="Hôm qua">Hôm qua</option>
-                              <option value="7 ngày qua">7 ngày qua</option>
-                            </optgroup>
-                            <optgroup label="Theo tháng">
-                              <option value="Tháng này">Tháng này</option>
-                              <option value="Tháng trước">Tháng trước</option>
-                              <option value="3 tháng trước">3 tháng trước</option>
-                            </optgroup>
-                            <optgroup label="Theo năm">
-                              <option value="Năm nay">Năm nay</option>
-                              <option value="Năm ngoái">Năm ngoái</option>
-                              <option value="Các năm trước">Các năm trước</option>
-                            </optgroup>
-                          </select>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block leading-none">
-                            Loại giao dịch
-                          </label>
-                          <select 
-                            value={billingTypeFilter}
-                            onChange={(e) => setBillingTypeFilter(e.target.value as any)}
-                            className="w-full p-2.5 bg-slate-50 hover:bg-slate-100 text-xs font-bold rounded-xl border border-slate-200 text-slate-800 outline-none transition-all"
-                          >
-                            <option value="Tất cả">Tất cả</option>
-                            <option value="Vé ngày">Vé ngày</option>
-                            <option value="Vé tháng">Vé tháng</option>
-                            <option value="Nạp ví">Nạp ví</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* VIP Subscriptions status and expiry card */}
-                  {(() => {
-                    const savedSubsStr = localStorage.getItem('urbanpark_vip_subscriptions');
-                    let mySubs: any[] = [];
-                    if (savedSubsStr) {
-                      try {
-                        mySubs = JSON.parse(savedSubsStr);
-                      } catch (e) {}
-                    }
-                    
-                    const activeOrPendingSubs = mySubs.filter((s: any) => 
-                      s.status === 'ACTIVE' || s.status === 'PENDING' || s.status === 'PENDING_APPROVAL'
-                    );
-                    
-                    if (activeOrPendingSubs.length === 0) return null;
-                    
-                    return (
-                      <div className="space-y-3">
-                        <strong className="text-xs font-black text-slate-800 uppercase tracking-widest block font-sans">
-                          Gói VIP đang sử dụng & Đang chờ duyệt
-                        </strong>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {activeOrPendingSubs.map((sub: any) => {
-                            const isPending = sub.status === 'PENDING' || sub.status === 'PENDING_APPROVAL';
-                            const remainingDays = isPending ? 0 : getRemainingDays(sub.endDate);
-                            
-                            return (
-                              <div 
-                                onClick={() => setSelectedSubForDetail(sub)}
-                                key={sub.id} 
-                                className={`p-4 rounded-[22px] border transition-all cursor-pointer hover:shadow-md ${
-                                  isPending 
-                                    ? 'bg-amber-50/50 border-amber-200/60 hover:border-amber-300' 
-                                    : 'bg-white border-slate-200/60 shadow-xs hover:border-slate-300'
-                                } flex items-start gap-3.5`}
-                              >
-                                <div className={`p-2.5 rounded-xl shrink-0 ${
-                                  isPending ? 'bg-amber-100 text-amber-600' : 'bg-blue-50 text-blue-600'
-                                }`}>
-                                  <Award className="w-5 h-5" />
-                                </div>
-                                <div className="flex-1 space-y-1 font-sans">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <strong className="text-xs font-black text-slate-800 uppercase">
-                                      {sub.vehicle_plate}
-                                    </strong>
-                                    <span className={`inline-flex items-center px-2 py-0.5 text-[9px] font-black rounded-md uppercase tracking-wider ${
-                                      isPending 
-                                        ? 'bg-amber-100/80 text-amber-700' 
-                                        : 'bg-emerald-50 text-emerald-700 border border-emerald-500/10'
-                                    }`}>
-                                      {isPending ? 'Chờ duyệt' : 'Hoạt động'}
-                                    </span>
-                                  </div>
-                                  
-                                  <p className="text-[11px] text-slate-500 font-bold leading-normal">
-                                    Gói đăng ký: <span className="text-slate-800">{sub.type}</span>
-                                  </p>
-                                  
-                                  {isPending ? (
-                                    <p className="text-[10px] text-amber-600 font-bold leading-normal animate-pulse">
-                                      ⏱️ Hồ sơ đang được Manager xác thực...
-                                    </p>
-                                  ) : (
-                                    <div className="space-y-1 pt-0.5">
-                                      <div className="flex justify-between items-center text-[10px]">
-                                        <span className="text-slate-400 font-bold">Hạn dùng: {sub.endDate}</span>
-                                        <span className={`font-black uppercase ${
-                                          remainingDays <= 5 ? 'text-rose-600 animate-pulse' : 'text-blue-600'
-                                        }`}>
-                                          Còn {remainingDays} ngày
-                                        </span>
-                                      </div>
-                                      
-                                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                        <div 
-                                          className={`h-full rounded-full ${
-                                            remainingDays <= 5 ? 'bg-rose-500' : 'bg-blue-500'
-                                          }`} 
-                                          style={{ width: `${Math.min(100, (remainingDays / 30) * 100)}%` }}
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Main Grid Data Table */}
-                  <div className="bg-white rounded-[24px] border border-slate-250/60 overflow-hidden shadow-xs">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs text-slate-600">
-                        <thead>
-                          <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 bg-slate-50/60">
-                            <th className="py-4 px-5">Mã GD</th>
-                            <th className="py-4 px-5">Ngày thực hiện</th>
-                            <th className="py-4 px-5">Loại dịch vụ</th>
-                            <th className="py-4 px-5">Biển số xe</th>
-                            <th className="py-4 px-5">Số tiền</th>
-                            <th className="py-4 px-5">Trạng thái</th>
-                            <th className="py-4 px-5 text-right">Hành động</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100/70 text-slate-700 font-sans">
-                          {transactions
-                            .filter(tx => {
-                              // Filter by date range
-                              if (!isTxDateInFilter(tx.date, billingTimeFilter)) return false;
-                              
-                              // Filter by type
-                              if (billingTypeFilter === 'Tất cả') return true;
-                              const typeLower = tx.type.toLowerCase();
-                              if (billingTypeFilter === 'Vé ngày') {
-                                return typeLower.includes('vé ngày') || typeLower.includes('ngày') || typeLower.includes('daily');
-                              }
-                              if (billingTypeFilter === 'Vé tháng') {
-                                return typeLower.includes('vé tháng') || typeLower.includes('tháng') || typeLower.includes('vip') || typeLower.includes('monthly');
-                              }
-                              if (billingTypeFilter === 'Nạp tiền') {
-                                return typeLower.includes('nạp') || typeLower.includes('topup') || typeLower.includes('top up');
-                              }
-                              return typeLower.includes(billingTypeFilter.toLowerCase().trim());
-                            })
-                            .map(tx => {
-                              const statusStyle = 
-                                tx.status === 'Thành công' 
-                                  ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/10' 
-                                  : tx.status === 'Đang xử lý' 
-                                    ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-500/10' 
-                                    : 'bg-rose-50 text-rose-700 ring-1 ring-rose-500/10';
-
-                              return (
-                                <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors">
-                                  <td className="py-4 px-5 font-bold font-mono text-slate-900">{tx.id}</td>
-                                  <td className="py-4 px-5 font-semibold text-slate-500">{tx.date}</td>
-                                  <td className="py-4 px-5 font-bold">
-                                    <span className="text-slate-800">{tx.type}</span>
-                                  </td>
-                                  <td className="py-4 px-5 font-mono font-bold text-slate-500">
-                                    {tx.plate === '-' ? <span className="text-slate-350">—</span> : tx.plate}
-                                  </td>
-                                  <td className="py-4 px-5 font-bold font-mono text-slate-900">{tx.fee}</td>
-                                  <td className="py-4 px-5">
-                                    <span className={`inline-flex items-center px-2.5 py-1 text-[10px] font-black rounded-full uppercase leading-none ${statusStyle}`}>
-                                      {tx.status}
-                                    </span>
-                                  </td>
-                                  <td className="py-4 px-5 text-right font-bold">
-                                    {tx.status === 'Thành công' ? (
-                                      <button 
-                                        onClick={() => triggerToast(`Đang chuẩn bị tải hoá đơn ${tx.id}...`, 'info')}
-                                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-[11px] cursor-pointer"
-                                      >
-                                        <Download className="w-3.5 h-3.5" />
-                                        <span>Tải HĐ</span>
-                                      </button>
-                                    ) : tx.status === 'Thất bại' ? (
-                                      <button 
-                                        onClick={() => triggerToast('Đang kết nối lại tới cổng thanh toán...', 'info')}
-                                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-[11px] cursor-pointer"
-                                      >
-                                        <RefreshCw className="w-3 h-3 animate-spin" />
-                                        <span>Thử lại</span>
-                                      </button>
-                                    ) : (
-                                      <span className="text-slate-450">Đang chờ</span>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Pagination area */}
-                    <div className="px-6 py-4 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
-                      <span className="text-[11px] text-slate-400 font-semibold uppercase font-mono">
-                        Hiển thị 1-4 trong số 42 giao dịch
-                      </span>
-                      <div className="flex gap-2 font-black">
-                        <button 
-                          type="button"
-                          onClick={() => triggerToast('Tính năng chuyển trang đang được xây dựng!', 'info')}
-                          className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-[10px] uppercase tracking-wider text-slate-600 rounded-lg bg-white cursor-pointer"
-                        >
-                          Trang trước
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => triggerToast('Tính năng chuyển trang đang được xây dựng!', 'info')}
-                          className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-[10px] uppercase tracking-wider text-slate-600 rounded-lg bg-white cursor-pointer"
-                        >
-                          Trang sau
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
+                <BillingHistoryTable />
               )}
 
-              {/* TABS VIEW 5: SETTINGS */}
+{/* TABS VIEW 5: SETTINGS */}
               {activeTab === 'settings' && (
-                <motion.div 
+                <motion.div
                   key="settings"
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -3100,13 +2357,13 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       <p className="text-slate-400 text-xs font-semibold">
                         Quản lý thông tin cá nhân, bảo mật và tùy chọn thanh toán.
                       </p>
-                    </div>                    <button 
+                    </div>                    <button
                       onClick={() => {
                         localStorage.setItem(`urbanpark_user_name_${user?.phone || 'default'}`, profileName);
                         localStorage.setItem(`urbanpark_user_phone_${user?.phone || 'default'}`, profilePhone);
                         localStorage.setItem(`urbanpark_user_email_${user?.phone || 'default'}`, profileEmail);
                         localStorage.setItem(`urbanpark_user_address_${user?.phone || 'default'}`, profileAddress);
-                        
+
                         const savedUserStr = localStorage.getItem('user');
                         if (savedUserStr) {
                           try {
@@ -3119,7 +2376,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             console.error(e);
                           }
                         }
-                        
+
                         triggerToast('Đã lưu mọi thay đổi thiết lập tài khoản thành công!', 'success');
                       }}
                       className="px-5 py-2.5 bg-slate-900 border border-slate-800 hover:bg-black text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer self-stretch sm:self-auto"
@@ -3129,10 +2386,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                    
+
                     {/* LEFT / CENTER: ACCOUNT PROFILE & PREFERENCES */}
                     <div className="lg:col-span-2 space-y-6">
-                      
+
                       {/* Personal Info Card */}
                       <div className="bg-white p-6 rounded-[24px] border border-slate-200/60 space-y-5">
                         <div className="flex items-center gap-4 border-b border-slate-100 pb-4">
@@ -3228,20 +2485,20 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             </div>
                             <div className="flex gap-4 font-black text-[11px]">
                               <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input 
-                                  type="checkbox" 
-                                  checked={emailNotifyGate} 
+                                <input
+                                  type="checkbox"
+                                  checked={emailNotifyGate}
                                   onChange={(e) => setEmailNotifyGate(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                 />
                                 <span>Email</span>
                               </label>
                               <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input 
-                                  type="checkbox" 
-                                  checked={smsNotifyGate} 
+                                <input
+                                  type="checkbox"
+                                  checked={smsNotifyGate}
                                   onChange={(e) => setSmsNotifyGate(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                 />
                                 <span>SMS</span>
                               </label>
@@ -3258,20 +2515,20 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             </div>
                             <div className="flex gap-4 font-black text-[11px]">
                               <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input 
-                                  type="checkbox" 
-                                  checked={emailNotifyReceipt} 
+                                <input
+                                  type="checkbox"
+                                  checked={emailNotifyReceipt}
                                   onChange={(e) => setEmailNotifyReceipt(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                 />
                                 <span>Email</span>
                               </label>
                               <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input 
-                                  type="checkbox" 
-                                  checked={smsNotifyReceipt} 
+                                <input
+                                  type="checkbox"
+                                  checked={smsNotifyReceipt}
                                   onChange={(e) => setSmsNotifyReceipt(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                 />
                                 <span>SMS</span>
                               </label>
@@ -3284,7 +2541,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                     {/* RIGHT COLUMN: WALLET CARD AND SECURITY */}
                     <div className="space-y-6">
-                      
+
                       {/* UrbanPark Wallet Card */}
                       <div className="bg-white p-6 rounded-[24px] border border-slate-200/60 space-y-5 text-left">
                         <strong className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans leading-none">
@@ -3296,7 +2553,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           <div className="absolute right-[-15px] bottom-[-15px] opacity-10">
                             <QrCode className="w-28 h-28" />
                           </div>
-                          
+
                           <span className="text-[10px] text-slate-300 uppercase tracking-wider block font-semibold">
                             Số dư khả dụng
                           </span>
@@ -3312,7 +2569,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           </span>
                           <div className="space-y-2">
                             <div className="relative">
-                              <input 
+                              <input
                                 type="number"
                                 value={topupAmount}
                                 onChange={(e) => setTopupAmount(Math.max(10000, parseInt(e.target.value) || 0))}
@@ -3332,8 +2589,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                   type="button"
                                   onClick={() => setTopupAmount(amt)}
                                   className={`py-2 px-1 border rounded-lg font-mono font-black text-[11px] text-center cursor-pointer transition-all ${
-                                    topupAmount === amt 
-                                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs' 
+                                    topupAmount === amt
+                                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                                       : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                                   }`}
                                 >
@@ -3343,7 +2600,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             </div>
                           </div>
 
-                          <button 
+                          <button
                             type="button"
                             onClick={() => {
                               if (isOffline) {
@@ -3381,7 +2638,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 </span>
                               </div>
                             </div>
-                            <button 
+                            <button
                               type="button"
                               onClick={() => triggerToast('Đã huỷ liên kết tài khoản Vietcombank thành công.', 'info')}
                               className="text-[11px] font-black text-slate-400 hover:text-red-500 cursor-pointer"
@@ -3390,7 +2647,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             </button>
                           </div>
 
-                          <button 
+                          <button
                             type="button"
                             onClick={() => triggerToast('Chức năng liên kết ngân hàng mở rộng đang chuẩn bị ra mắt!', 'info')}
                             className="w-full py-2.5 border border-dashed border-slate-350 hover:border-blue-400 text-slate-500 hover:text-blue-600 font-bold text-xs rounded-xl cursor-pointer text-center select-none"
@@ -3415,7 +2672,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 Xác minh mã OTP thứ cấp bảo vệ truy cập từ thiết bị mới.
                               </span>
                             </div>
-                            <button 
+                            <button
                               type="button"
                               onClick={() => {
                                 setIs2faEnabled(!is2faEnabled);
@@ -3434,21 +2691,21 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           {/* Quick Password inputs */}
                           <div className="space-y-2">
                             <strong className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Đổi mật khẩu tài khoản</strong>
-                            
+
                             <div className="space-y-1.5">
-                              <input 
-                                type="password" 
+                              <input
+                                type="password"
                                 placeholder="Mật khẩu hiện tại..."
                                 className="w-full p-2.5 border rounded-lg bg-slate-50 border-slate-200 focus:bg-white text-xs outline-none"
                               />
-                              <input 
-                                type="password" 
+                              <input
+                                type="password"
                                 placeholder="Mật khẩu mới..."
                                 className="w-full p-2.5 border rounded-lg bg-slate-50 border-slate-200 focus:bg-white text-xs outline-none"
                               />
                             </div>
-                            
-                            <button 
+
+                            <button
                               type="button"
                               onClick={() => triggerToast('Mật khẩu tài khoản đã được thay đổi an toàn!', 'success')}
                               className="pt-1.5 text-[10.5px] font-black text-blue-600 hover:underline cursor-pointer inline-block"
@@ -3468,7 +2725,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
               {/* TABS VIEW 6: SUPPORT CENTER */}
               {activeTab === 'support' && (
-                <motion.div 
+                <motion.div
                   key="support"
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -3487,8 +2744,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                   <div className="bg-white p-5 rounded-[24px] border border-slate-200/60 shadow-xs">
                     <div className="relative">
                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         value={searchSupportQuery}
                         onChange={(e) => setSearchSupportQuery(e.target.value)}
                         placeholder="Bạn cần giúp đỡ điều gì? (Ví dụ: nạp tiền vào ví, đổi vé tháng...)"
@@ -3511,8 +2768,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         { icon: <MapPin className="w-5 h-5 text-amber-600" />, title: 'Hướng dẫn vào/ra bãi xe', bColor: 'bg-amber-50 border-amber-100', desc: 'Quy trình sử dụng thẻ, nhận diện biển số (LPR), và barrier.' },
                         { icon: <Wrench className="w-5 h-5 text-rose-600" />, title: 'Sự cố kỹ thuật', bColor: 'bg-rose-50 border-rose-100', desc: 'Báo cáo lỗi hệ thống, mất kết nối, hoặc barrier không mở.' },
                       ].map((cat, idx) => (
-                        <div 
-                          key={idx} 
+                        <div
+                          key={idx}
                           onClick={() => {
                             setSearchSupportQuery(cat.title);
                             triggerToast(`Đã lọc câu hỏi theo chủ đề "${cat.title}"`, 'info');
@@ -3547,14 +2804,14 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       ]
                       .filter(item => {
                         if (!searchSupportQuery) return true;
-                        return item.q.toLowerCase().includes(searchSupportQuery.toLowerCase()) || 
+                        return item.q.toLowerCase().includes(searchSupportQuery.toLowerCase()) ||
                                item.a.toLowerCase().includes(searchSupportQuery.toLowerCase());
                       })
                       .map((faq, index) => {
                         const isOpen = expandedFaq === index;
                         return (
                           <div key={index} className="py-3">
-                            <button 
+                            <button
                               type="button"
                               onClick={() => setExpandedFaq(isOpen ? null : index)}
                               className="w-full flex items-center justify-between gap-3 text-left font-extrabold text-slate-800 hover:text-blue-600 transition-colors py-1 cursor-pointer select-none"
@@ -3564,7 +2821,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             </button>
                             <AnimatePresence initial={false}>
                               {isOpen && (
-                                <motion.div 
+                                <motion.div
                                   initial={{ height: 0, opacity: 0 }}
                                   animate={{ height: 'auto', opacity: 1, marginTop: 8 }}
                                   exit={{ height: 0, opacity: 0 }}
@@ -3584,14 +2841,14 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                   {/* Ticket creation and telephone sidebar widgets */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                    
+
                     {/* Support Form */}
                     <div className="lg:col-span-2 bg-white p-6 rounded-[24px] border border-slate-200/60 space-y-4">
                       <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block font-sans">
                         Gửi yêu cầu hỗ trợ (Support Ticket)
                       </strong>
 
-                      <form 
+                      <form
                         onSubmit={e => {
                           e.preventDefault();
                           if (isOffline) {
@@ -3611,7 +2868,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       >
                         <div className="space-y-1">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Chủ đề hỗ trợ</label>
-                          <select 
+                          <select
                             value={ticketTopic}
                             onChange={(e) => setTicketTopic(e.target.value)}
                             className="w-full p-3 border rounded-xl font-bold bg-slate-50 border-slate-200 focus:bg-white text-slate-850 outline-none transition-colors"
@@ -3627,7 +2884,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                         <div className="space-y-1">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Nội dung chi tiết</label>
-                          <textarea 
+                          <textarea
                             value={ticketMessage}
                             onChange={(e) => setTicketMessage(e.target.value)}
                             rows={4}
@@ -3639,8 +2896,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         {/* File upload drag area */}
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Đính kèm ảnh hiện trường (Tùy chọn)</label>
-                          
-                          <div 
+
+                          <div
                             onClick={() => {
                               // Simulate selecting a file
                               const simulatedFiles = [
@@ -3664,8 +2921,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                                 <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50/50 text-blue-700 text-[10.5px] font-extrabold rounded-lg border border-blue-100 uppercase">
                                   <span>{file.name}</span>
                                   <span className="text-[9px] text-blue-400 font-semibold">({file.size})</span>
-                                  <button 
-                                    type="button" 
+                                  <button
+                                    type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setTicketAttachedFiles(prev => prev.filter((_, idx) => idx !== i));
@@ -3680,7 +2937,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           )}
                         </div>
 
-                        <button 
+                        <button
                           type="submit"
                           className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-[0.98] cursor-pointer"
                         >
@@ -3722,7 +2979,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                         {/* Live chat */}
                         <div className="pt-2 border-t border-slate-100 space-y-3.5">
-                          <button 
+                          <button
                             type="button"
                             onClick={() => triggerToast('Trò chuyện trực tuyến đang kết nối tư vấn viên...', 'success')}
                             className="w-full py-3 bg-slate-900 border border-slate-800 hover:bg-black text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-98 cursor-pointer flex items-center justify-center gap-1.5"
@@ -3769,19 +3026,19 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       {/* ==================================================== */}
       <AnimatePresence>
         {addVehicleModalOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 15 }}
               className="bg-white rounded-3xl w-full max-w-md border border-slate-200/80 shadow-2xl p-6 relative overflow-hidden"
             >
-              <button 
+              <button
                 onClick={() => setAddVehicleModalOpen(false)}
                 className="absolute top-5 right-5 p-1 text-slate-400 hover:text-slate-650 bg-slate-50 hover:bg-slate-100 rounded-full"
               >
@@ -3795,7 +3052,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                 </div>
 
                 <form onSubmit={handleAddVehicle} className="space-y-4 text-xs font-sans">
-                  
+
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Biển số xe (Ví dụ: 30G-123.45)</label>
                     <input
@@ -3833,6 +3090,18 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                     </select>
                   </div>
 
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Loại động cơ</label>
+                    <select
+                      value={newFuelType}
+                      onChange={e => setNewFuelType(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 border rounded-lg font-bold border-slate-200 text-slate-850 outline-hidden"
+                    >
+                      <option value="GASOLINE">Xe Xăng</option>
+                      <option value="ELECTRIC">Xe Điện</option>
+                    </select>
+                  </div>
+
                   <div className="flex gap-2.5 pt-2">
                     <button
                       type="button"
@@ -3862,19 +3131,19 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       {/* ==================================================== */}
       <AnimatePresence>
         {editVehicleModalOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, y: 15 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 15 }}
               className="bg-white rounded-3xl w-full max-w-md border border-slate-200/80 shadow-2xl p-6 relative overflow-hidden"
             >
-              <button 
+              <button
                 onClick={() => setEditVehicleModalOpen(false)}
                 className="absolute top-5 right-5 p-1 text-slate-400 hover:text-slate-650 bg-slate-50 hover:bg-slate-100 rounded-full"
               >
@@ -3888,7 +3157,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                 </div>
 
                 <form onSubmit={handleEditVehicle} className="space-y-4 text-xs font-sans">
-                  
+
                   <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Biển số xe (Ví dụ: 30G-123.45)</label>
                     <input
@@ -3955,26 +3224,26 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       {/* ==================================================== */}
       <AnimatePresence>
         {vnpayModalOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 font-sans"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 20 }}
               className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden relative border border-slate-100"
             >
-              
+
               {/* Branding banner background color */}
               <div className="bg-[#e02020] px-6 py-5 text-white flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0">
-                    <img 
-                      src="https://images.unsplash.com/photo-1616077168079-7e09a677fb2c?w=100&auto=format&fit=crop&q=80" 
-                      alt="vnpay logo" 
+                    <img
+                      src="https://images.unsplash.com/photo-1616077168079-7e09a677fb2c?w=100&auto=format&fit=crop&q=80"
+                      alt="vnpay logo"
                       className="w-7 h-7 object-contain opacity-0" // layout space
                     />
                     <span className="text-[#e12020] font-black text-xs font-mono tracking-tight">VNPay</span>
@@ -3984,8 +3253,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                     <strong className="text-sm font-black leading-none block mt-0.5">VNPAY SANDBOX KERNEL</strong>
                   </div>
                 </div>
-                
-                <button 
+
+                <button
                   onClick={handleCloseVnpay}
                   className="p-1 text-red-100 hover:text-white bg-white/10 hover:bg-white/20 rounded-full cursor-pointer"
                 >
@@ -3995,7 +3264,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
               {vnpayStep === 'info' && (
                 <div className="p-6 space-y-5 text-xs text-left font-sans">
-                  
+
                   {/* Summary card details */}
                   <div className="bg-slate-50 border border-slate-200/50 rounded-2xl p-4 space-y-2.5">
                     <div className="flex justify-between">
@@ -4023,8 +3292,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           key={bank}
                           onClick={() => setVnpayBank(bank)}
                           className={`p-2 border rounded-xl font-bold text-[10.5px] cursor-pointer text-center transition-all ${
-                            vnpayBank === bank 
-                              ? 'border-red-500 bg-red-50 text-red-600 font-black' 
+                            vnpayBank === bank
+                              ? 'border-red-500 bg-red-50 text-red-600 font-black'
                               : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                           }`}
                         >
@@ -4146,5 +3415,6 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       </AnimatePresence>
 
     </div>
+    </DriverContext.Provider>
   );
 }
