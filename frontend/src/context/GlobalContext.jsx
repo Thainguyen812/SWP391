@@ -188,13 +188,17 @@ export const GlobalProvider = ({ children }) => {
                 return c;
               };
 
+              const isPendingSession = session.isPending === true;
+              const sessionIsVip = session.isVip || session.vip;
+
               return {
                 id: session.id,
                 plate: session.licensePlate || "Không rõ",
-                type: (session.isVip || session.vip) ? "VIP" : "Vãng lai",
+                type: sessionIsVip ? "VIP" : "Vãng lai",
+                isVip: sessionIsVip,
                 confidence: "99%",
-                status: (session.isSuspicious || session.suspicious) ? "Lỗi thẻ" : (session.exitGate && !(session.isVip || session.vip) ? "Chờ thanh toán" : "Hợp lệ"),
-                gate: session.exitGate || session.entryGate || null,
+                status: (session.isSuspicious || session.suspicious) ? "Lỗi thẻ" : (session.exitGate && !sessionIsVip ? "Chờ thanh toán" : "Hợp lệ"),
+                gate: isPendingSession ? (session.exitGate || session.entryGate || null) : (session.exitGate || null),
                 inTime: checkInTime && !isNaN(checkInTime.getTime()) ? checkInTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
                 timestamp: checkInTime ? checkInTime.getTime() : 0,
                 outTime: "--:--",
@@ -202,7 +206,9 @@ export const GlobalProvider = ({ children }) => {
                 model: session.vehicleModel || session.vehicleBrand || "Chưa xác định",
                 duration: durationStr,
                 assignedZoneCode: zoneCode,
-                floorName: mapZoneToFloor(zoneCode)
+                floorName: mapZoneToFloor(zoneCode),
+                vehicleType: session.vehicleType || session.vehicleSize || null,
+                cardCode: session.cardCode
               };
             });
 
@@ -394,7 +400,13 @@ export const GlobalProvider = ({ children }) => {
       
       if (activeVehicles && activeVehicles.length > 0) {
         activeVehicles.filter(v => v.gate).forEach(v => {
-          let gateId = v.gate.toUpperCase().replace(/CỔNG\s*[-]?\s*/g, 'L-');
+          let rawGate = v.gate.toUpperCase();
+          let gateId = rawGate;
+          if (rawGate.includes('BỐT GÁC') || rawGate.includes('TRỰC 1')) {
+            gateId = 'L-VÀO 1';
+          } else {
+            gateId = rawGate.replace(/CỔNG\s*[-]?\s*/g, 'L-');
+          }
           let gateIndex = newGates.findIndex(g => g.id === gateId);
           if (gateIndex === -1) {
             newGates.push({ id: gateId, mode: 'Tự động' });
@@ -415,7 +427,8 @@ export const GlobalProvider = ({ children }) => {
             g.barrier = 'ĐANG CHỜ';
             g.barrierColor = 'text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded';
             g.actions = ["approve", "reject"];
-          } else if (v.status === 'Chờ thanh toán') {
+          } else if (isExitGate) {
+            // Exit gate always waits for the staff payment/review flow.
             g.mode = 'Thủ công';
             g.barrier = 'ĐANG CHỜ';
             g.barrierColor = 'text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded';

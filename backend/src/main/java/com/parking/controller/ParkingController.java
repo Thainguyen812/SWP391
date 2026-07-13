@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import com.parking.dto.VisitorCheckInRequest;// TASK 5
 import com.parking.dto.FloorEntryVerificationRequest;
 import com.parking.dto.FloorEntryVerificationResponse;
+import com.parking.dto.SlotOccupancyRequest;
 
 // phần 1 / check out task 5
 import java.util.UUID;
@@ -127,19 +128,25 @@ public class ParkingController {
         return ResponseEntity.ok(parkingService.getParkingFeeByPlate(plate));
     }
 
-    // 7. Tìm xe: Đã được cấu hình .permitAll() ở SecurityConfig nên không cần đặt
-    // @PreAuthorize tại đây
-    @GetMapping("/find-car")
-    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> findCarByDigits(@RequestParam String digits) {
-        return ResponseEntity.ok(parkingService.findCarByDigits(digits));
-    }
-
     // 8. Bản đồ bãi xe: chỉ dành cho Staff và Manager vận hành,Thêm ADMIN để cấp kỹ
     // thuật cao nhất
     @GetMapping("/monitoring/map")
     @PreAuthorize("hasAnyRole('STAFF', 'MANAGER', 'ADMIN')")
     public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getMonitoringMap() {
         return ResponseEntity.ok(parkingService.getMonitoringMap());
+    }
+
+    @GetMapping("/zones/overview")
+    @PreAuthorize("hasAnyRole('STAFF', 'MANAGER', 'ADMIN')")
+    public ResponseEntity<java.util.List<java.util.Map<String, Object>>> getZoneOverview() {
+        return ResponseEntity.ok(parkingService.getZoneOverview());
+    }
+
+    @PostMapping("/slots/sensor-occupancy")
+    @PreAuthorize("hasAnyRole('STAFF', 'MANAGER', 'ADMIN')")
+    public ResponseEntity<java.util.Map<String, Object>> recordSlotOccupancy(
+            @RequestBody SlotOccupancyRequest request) {
+        return ResponseEntity.ok(parkingService.recordSlotOccupancy(request));
     }
 
     // 9. Xác thực xe lên tầng: Chỉ nhân viên trực tầng hoặc điều phối
@@ -151,6 +158,7 @@ public class ParkingController {
     }
 
     @PostMapping("/verify-floor-exit")
+    @PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
     public FloorEntryVerificationResponse verifyFloorExit(
             @RequestBody FloorEntryVerificationRequest request) {
 

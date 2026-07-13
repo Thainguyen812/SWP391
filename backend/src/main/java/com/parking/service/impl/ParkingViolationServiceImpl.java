@@ -23,7 +23,6 @@ public class ParkingViolationServiceImpl implements ParkingViolationService {
 
     private static final Set<String> ALLOWED_VIOLATION_TYPES = Set.of(
             "EV_ZONE_MISUSE",
-            "DISABLED_ZONE_MISUSE",
             "DOUBLE_PARKING"
     );
 

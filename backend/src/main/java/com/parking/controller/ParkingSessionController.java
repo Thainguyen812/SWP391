@@ -8,6 +8,7 @@ import com.parking.repository.ParkingSessionRepository;
 import com.parking.repository.VehicleRepository;
 import com.parking.repository.TransactionRepository;
 import com.parking.repository.ZoneRepository;
+import com.parking.repository.CardRepository;
 import com.parking.service.PendingGateVehicleService;
 import com.parking.service.ParkingService;
 import com.parking.dto.ParkingSessionDto;
@@ -28,16 +29,18 @@ public class ParkingSessionController {
     private final ParkingSessionRepository repo;
     private final VehicleRepository vehicleRepo;
     private final ZoneRepository zoneRepo;
+    private final CardRepository cardRepo;
     private final TransactionRepository transactionRepo;
     private final ParkingService parkingService;
     private final PendingGateVehicleService pendingGateVehicleService;
 
     public ParkingSessionController(ParkingSessionRepository repo, VehicleRepository vehicleRepo,
-            ZoneRepository zoneRepo, TransactionRepository transactionRepo, ParkingService parkingService,
+            ZoneRepository zoneRepo, CardRepository cardRepo, TransactionRepository transactionRepo, ParkingService parkingService,
             PendingGateVehicleService pendingGateVehicleService) {
         this.repo = repo;
         this.vehicleRepo = vehicleRepo;
         this.zoneRepo = zoneRepo;
+        this.cardRepo = cardRepo;
         this.transactionRepo = transactionRepo;
         this.parkingService = parkingService;
         this.pendingGateVehicleService = pendingGateVehicleService;
@@ -53,6 +56,9 @@ public class ParkingSessionController {
             zoneRepo.findById(session.getAssignedZoneId()).ifPresent(z -> {
                 dto.setAssignedZoneCode(z.getCode());
             });
+        }
+        if (session.getCardId() != null) {
+            cardRepo.findById(session.getCardId()).ifPresent(card -> dto.setCardCode(card.getCardCode()));
         }
         return dto;
     }
@@ -89,6 +95,9 @@ public class ParkingSessionController {
                     dto.setAssignedZoneCode(z.getCode());
                 }
             }
+            if (session.getCardId() != null) {
+                cardRepo.findById(session.getCardId()).ifPresent(card -> dto.setCardCode(card.getCardCode()));
+            }
             return dto;
         }).collect(Collectors.toList());
 
@@ -103,6 +112,7 @@ public class ParkingSessionController {
                     pending.isSuspicious(),
                     pending.getSuspiciousReason()
             );
+            dto.setVehicleType(pending.getVehicleType());
             List<Zone> candidates = zoneRepo.findByAllowedSizesContaining(pending.getVehicleType());
             if (!candidates.isEmpty()) {
                 Zone chosen = candidates.stream()
