@@ -30,6 +30,9 @@ public class EmailService {
     @Value("${spring.mail.host:smtp.gmail.com}")
     private String mailHost;
 
+    @Value("${BREVO_API_KEY:}")
+    private String brevoApiKey;
+
     @Value("${RESEND_API_KEY:}")
     private String resendApiKey;
 
@@ -53,7 +56,13 @@ public class EmailService {
         System.out.println("🔑 [MÃ OTP ĐƯỢC PHÁT HÀNH]: " + otpCode + " gửi tới " + toEmail);
         System.out.println("=================================================");
 
-        // 1. Nếu có cấu hình Resend API Key, ưu tiên gửi qua Web API (Bypass SMTP port block của Railway)
+        // 1. Ưu tiên gửi qua Brevo API nếu có cấu hình (Gửi được tới mọi hòm thư không cần domain riêng)
+        if (brevoApiKey != null && !brevoApiKey.trim().isEmpty()) {
+            sendViaBrevo(toEmail, subject, htmlContent);
+            return;
+        }
+
+        // 2. Tiếp theo gửi qua Resend API nếu có cấu hình (Chỉ gửi được tới email chính chủ tài khoản free)
         if (resendApiKey != null && !resendApiKey.trim().isEmpty()) {
             sendViaResend(toEmail, subject, htmlContent);
             return;
@@ -82,6 +91,46 @@ public class EmailService {
             System.out.println("✅ Đã gửi email xác thực OTP thành công tới " + toEmail);
         } catch (Exception e) {
             System.err.println("❌ LỖI GỬI EMAIL: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private void sendViaBrevo(String toEmail, String subject, String htmlContent) {
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("accept", "application/json");
+            headers.set("api-key", brevoApiKey.trim());
+
+            Map<String, Object> body = new HashMap<>();
+            
+            // Sender info
+            Map<String, String> sender = new HashMap<>();
+            sender.put("name", "UrbanPark System");
+            sender.put("email", (mailFrom != null && !mailFrom.trim().isEmpty()) ? mailFrom.trim() : "thai050812@gmail.com");
+            body.put("sender", sender);
+
+            // Recipients list
+            java.util.List<Map<String, String>> toList = new java.util.ArrayList<>();
+            Map<String, String> to = new HashMap<>();
+            to.put("email", toEmail);
+            toList.add(to);
+            body.put("to", toList);
+
+            body.put("subject", subject);
+            body.put("htmlContent", htmlContent);
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+            ResponseEntity<String> response = restTemplate.postForEntity("https://api.brevo.com/v3/smtp/email", entity, String.class);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                System.out.println("✅ Đã gửi email xác thực OTP thành công qua Brevo API tới " + toEmail);
+            } else {
+                System.err.println("❌ LỖI GỬI EMAIL QUA BREVO: " + response.getBody());
+            }
+        } catch (Exception e) {
+            System.err.println("❌ LỖI KẾT NỐI API BREVO: " + e.getMessage());
             e.printStackTrace();
         }
     }
