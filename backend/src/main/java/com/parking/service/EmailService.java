@@ -58,17 +58,23 @@ public class EmailService {
 
         // 1. Ưu tiên gửi qua Brevo API nếu có cấu hình (Gửi được tới mọi hòm thư không cần domain riêng)
         if (brevoApiKey != null && !brevoApiKey.trim().isEmpty()) {
-            sendViaBrevo(toEmail, subject, htmlContent);
-            return;
+            boolean success = sendViaBrevo(toEmail, subject, htmlContent);
+            if (success) return;
+            System.out.println("⚠️ Brevo gửi lỗi (ví dụ tài khoản chưa kích hoạt), tự động chuyển sang kênh dự phòng Resend...");
         }
 
         // 2. Tiếp theo gửi qua Resend API nếu có cấu hình (Chỉ gửi được tới email chính chủ tài khoản free)
         if (resendApiKey != null && !resendApiKey.trim().isEmpty()) {
-            sendViaResend(toEmail, subject, htmlContent);
-            return;
+            boolean success = sendViaResend(toEmail, subject, htmlContent);
+            if (success) return;
+            System.out.println("⚠️ Resend gửi lỗi, tự động chuyển sang kênh dự phòng SMTP...");
         }
 
-        // 2. Ngược lại, fallback về JavaMailSender (MailDev local hoặc SMTP thông thường)
+        // 3. Ngược lại, fallback về JavaMailSender (MailDev local hoặc SMTP thông thường)
+        sendViaSmtp(toEmail, subject, htmlContent);
+    }
+
+    private void sendViaSmtp(String toEmail, String subject, String htmlContent) {
         boolean isLocalDev = "maildev".equalsIgnoreCase(mailHost) || "localhost".equalsIgnoreCase(mailHost) || "127.0.0.1".equals(mailHost);
 
         if (!isLocalDev && (mailSender == null || mailFrom == null || mailFrom.trim().isEmpty() || mailPassword == null || mailPassword.trim().isEmpty() || "DIEN_MAT_KHAU_UNG_DUNG_TAI_DAY".equals(mailPassword.trim()))) {
@@ -95,7 +101,7 @@ public class EmailService {
         }
     }
 
-    private void sendViaBrevo(String toEmail, String subject, String htmlContent) {
+    private boolean sendViaBrevo(String toEmail, String subject, String htmlContent) {
         try {
             RestTemplate restTemplate = new RestTemplate();
             HttpHeaders headers = new HttpHeaders();
@@ -126,16 +132,17 @@ public class EmailService {
 
             if (response.getStatusCode().is2xxSuccessful()) {
                 System.out.println("✅ Đã gửi email xác thực OTP thành công qua Brevo API tới " + toEmail);
+                return true;
             } else {
                 System.err.println("❌ LỖI GỬI EMAIL QUA BREVO: " + response.getBody());
             }
         } catch (Exception e) {
             System.err.println("❌ LỖI KẾT NỐI API BREVO: " + e.getMessage());
-            e.printStackTrace();
         }
+        return false;
     }
 
-    private void sendViaResend(String toEmail, String subject, String htmlContent) {
+    private boolean sendViaResend(String toEmail, String subject, String htmlContent) {
         try {
             RestTemplate restTemplate = new RestTemplate();
             HttpHeaders headers = new HttpHeaders();
@@ -154,12 +161,13 @@ public class EmailService {
 
             if (response.getStatusCode().is2xxSuccessful()) {
                 System.out.println("✅ Đã gửi email xác thực OTP thành công qua Resend API tới " + toEmail);
+                return true;
             } else {
                 System.err.println("❌ LỖI GỬI EMAIL QUA RESEND: " + response.getBody());
             }
         } catch (Exception e) {
             System.err.println("❌ LỖI KẾT NỐI API RESEND: " + e.getMessage());
-            e.printStackTrace();
         }
+        return false;
     }
 }
