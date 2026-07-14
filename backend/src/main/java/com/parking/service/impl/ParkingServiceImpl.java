@@ -1524,10 +1524,19 @@ public class ParkingServiceImpl implements ParkingService {
 
     @Override
     @Transactional
-    public Transaction checkoutCardByCode(String cardCode) {
-        Card card = cardRepository.findByCardCode(cardCode)
-                .orElseThrow(() -> new ApiExceptions.NotFoundException("Thẻ không tồn tại"));
-        return this.checkoutCard(card.getId());
+    public Transaction checkoutCardByCode(String inputCode) {
+        Optional<Card> cardOpt = cardRepository.findByCardCode(inputCode);
+        if (cardOpt.isPresent()) {
+            return this.checkoutCard(cardOpt.get().getId());
+        }
+
+        // Fallback: If not found, perhaps the staff typed the License Plate instead of the Card Code
+        Optional<ParkingSession> sessionOpt = parkingSessionRepository.findByLicensePlateAndSessionStatus(inputCode, ParkingSession.SessionStatus.ACTIVE);
+        if (sessionOpt.isPresent() && sessionOpt.get().getCardId() != null) {
+            return this.checkoutCard(sessionOpt.get().getCardId());
+        }
+
+        throw new ApiExceptions.NotFoundException("Thẻ hoặc xe không tồn tại");
     }
 
     @Override
