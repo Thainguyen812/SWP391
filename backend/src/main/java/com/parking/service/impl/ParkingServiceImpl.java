@@ -842,7 +842,11 @@ public class ParkingServiceImpl implements ParkingService {
         }
 
         Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
-                .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin xe để tính phí"));
+                .orElseGet(() -> {
+                    Vehicle dummy = new Vehicle();
+                    dummy.setVehicleSize("SEDAN_HATCHBACK");
+                    return dummy;
+                });
 
         Instant checkOutTime = Instant.now();
 
@@ -1160,7 +1164,11 @@ public class ParkingServiceImpl implements ParkingService {
                 .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy phiên gửi xe hợp lệ"));
 
         Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
-                .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin xe để tính phí"));
+                .orElseGet(() -> {
+                    Vehicle dummy = new Vehicle();
+                    dummy.setVehicleSize("SEDAN_HATCHBACK");
+                    return dummy;
+                });
 
         Instant checkOutTime = Instant.now();
         BigDecimal parkingFee = BigDecimal.ZERO;
@@ -1190,7 +1198,11 @@ public class ParkingServiceImpl implements ParkingService {
                 .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy phiên gửi xe hợp lệ cho biển số này"));
 
         Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
-                .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin xe để tính phí"));
+                .orElseGet(() -> {
+                    Vehicle dummy = new Vehicle();
+                    dummy.setVehicleSize("SEDAN_HATCHBACK");
+                    return dummy;
+                });
 
         Instant checkOutTime = Instant.now();
         BigDecimal parkingFee = BigDecimal.ZERO;
