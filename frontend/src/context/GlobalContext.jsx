@@ -199,6 +199,8 @@ export const GlobalProvider = ({ children }) => {
                 confidence: "99%",
                 status: (session.isSuspicious || session.suspicious) ? "Lỗi thẻ" : (session.exitGate && !sessionIsVip ? "Chờ thanh toán" : "Hợp lệ"),
                 gate: isPendingSession ? (session.exitGate || session.entryGate || null) : (session.exitGate || null),
+                entryGate: session.entryGate || null,
+                exitGate: session.exitGate || null,
                 inTime: checkInTime && !isNaN(checkInTime.getTime()) ? checkInTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
                 timestamp: checkInTime ? checkInTime.getTime() : 0,
                 outTime: "--:--",

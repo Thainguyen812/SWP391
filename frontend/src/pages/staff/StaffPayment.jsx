@@ -289,6 +289,7 @@ export const StaffPayment = () => {
                 // Send mock transaction to backend so it saves in DB
                 await apiClient.post('/revenue/transactions/mock', {
                   amount: totalAmount,
+                  lostCardPenalty: penaltyAmount,
                   plate: lpr
                 });
               } else {
@@ -299,7 +300,18 @@ export const StaffPayment = () => {
           // Refresh global context to pull latest transactions and remove from active
           if (fetchAllDataFromBackend) fetchAllDataFromBackend();
         } catch (e) {
-          console.error("Failed to mock transaction", e);
+          console.error("Checkout failed", e);
+          const backendMessage = e.response?.data?.message
+            || e.response?.data?.error
+            || (typeof e.response?.data === 'string' ? e.response.data : null)
+            || e.message
+            || 'Không thể hoàn tất checkout. Vui lòng kiểm tra lại session/mã thẻ.';
+          notification.error({
+            message: 'Lỗi thanh toán',
+            description: backendMessage,
+            placement: 'topRight'
+          });
+          return;
         }
 
         notification.success({message: 'Thanh toán thành công', description: 'Đã gửi lệnh mở cổng ra.', placement: 'topRight'});

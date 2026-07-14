@@ -289,7 +289,11 @@ public class ParkingServiceImpl implements ParkingService {
         parkingSessionRepository.save(session);
 
         Transaction transaction = new Transaction();
+        transaction.setId(UUID.randomUUID());
         transaction.setSessionId(session.getId());
+        transaction.setParkingFee(BigDecimal.ZERO);
+        transaction.setLostCardPenalty(BigDecimal.ZERO);
+        transaction.setViolationPenalty(BigDecimal.ZERO);
         transaction.setTotalAmount(java.math.BigDecimal.ZERO);
         transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
         transaction.setPaymentStatus(Transaction.PaymentStatus.SUCCESS);
@@ -561,7 +565,7 @@ public class ParkingServiceImpl implements ParkingService {
 
         if (existing.isPresent()) {
             ParkingSession session = existing.get();
-            if (session.getEntryGate() != null) {
+            if (session.getEntryGate() != null && session.getCardId() == null) {
                 // If the vehicle is currently waiting at the entry gate, update this session during check-in
                 sessionToUpdate = session;
             } else {
@@ -678,6 +682,7 @@ public class ParkingServiceImpl implements ParkingService {
             session.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
             session.setIsVip(false);
             session.setMobileCheckoutPhoto(request.getImage_url());
+            session.setEntryGate(request.getGate());
         }
 
         session.setAssignedZoneId(chosen.getId());
@@ -688,7 +693,6 @@ public class ParkingServiceImpl implements ParkingService {
         if (sessionToUpdate != null) {
             session.setIsSuspicious(false);
             session.setSuspiciousReason(null);
-            session.setEntryGate(null); // Clear entry gate to let it inside
             session.setCheckInTime(Instant.now());
         }
 

@@ -96,10 +96,6 @@ public class TrafficSimulatorTask {
             List<String> occupiedInGates = processingIns.stream()
                 .map(PendingGateVehicleService.PendingEntry::getEntryGate)
                 .collect(Collectors.toList());
-            occupiedInGates.addAll(allSessions.stream()
-                .filter(s -> s.getSessionStatus() == ParkingSession.SessionStatus.ACTIVE && s.getEntryGate() != null)
-                .map(ParkingSession::getEntryGate)
-                .collect(Collectors.toList()));
             List<String> emptyInGates = IN_GATES.stream().filter(g -> !occupiedInGates.contains(g)).collect(Collectors.toList());
 
             if (!emptyInGates.isEmpty()) {
