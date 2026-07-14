@@ -1064,8 +1064,8 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
           licensePlate: selectedVehicleForVIP,
           subscriptionType: subType,
           documentPhotos: JSON.stringify(docPhotos)
-        }).then(response => {
-          const data = response.data;
+        }).then((response: any) => {
+          const data = response?.data ?? response;
           if (data && data.id) {
             const currentSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
             const updated = currentSubs.map(s => s.id === tempId ? { ...s, id: data.id } : s);
@@ -1206,8 +1206,8 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
           licensePlate: selectedVehicleForVIP,
           subscriptionType: subType,
           documentPhotos: JSON.stringify(docPhotos)
-        }).then(response => {
-          const data = response.data;
+        }).then((response: any) => {
+          const data = response?.data ?? response;
           if (data && data.id) {
             const currentSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
             const updated = currentSubs.map(s => s.id === tempId ? { ...s, id: data.id } : s);
@@ -1228,23 +1228,6 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       );
       }
 
-      const docPhotos = (window as any).lastUploadedPhotos || {
-        registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-        identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-        frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
-      };
-
-      try {
-        await apiClient.post('/vip/register', {
-          vehicleId: targetVeh ? targetVeh.id : null,
-          subscriptionType: subType,
-          documentPhotos: JSON.stringify(docPhotos)
-        });
-      } catch (err) {
-        console.error("Lỗi khi đăng ký VIP:", err);
-      }
-
-      triggerToast(`✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe ${selectedVehicleForVIP}.`, 'success');
     }
   };
 

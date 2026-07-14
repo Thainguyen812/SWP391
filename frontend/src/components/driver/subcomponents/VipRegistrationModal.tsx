@@ -1,6 +1,6 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { motion } from 'motion/react';
-import { Car, CheckCircle, Lock } from 'lucide-react';
+import { AlertTriangle, Car, CheckCircle, Lock, Plus, RefreshCw, X } from 'lucide-react';
 import { DriverContext, VEHICLE_PRICING } from '../DriverPwa';
  
 export const VipRegistrationModal: React.FC = () => {
@@ -21,10 +21,46 @@ export const VipRegistrationModal: React.FC = () => {
     setPaymentMethod,
     balance,
     handleStartVnpay,
+    triggerToast,
     setAddVehicleModalOpen,
     setNewType,
     setActiveTab
   } = context;
+
+  const [photoCavet, setPhotoCavet] = useState<string | null>(null);
+  const [photoCccd, setPhotoCccd] = useState<string | null>(null);
+  const [photoXe, setPhotoXe] = useState<string | null>(null);
+  const [isOcrLoading, setIsOcrLoading] = useState(false);
+  const [extractedPlate, setExtractedPlate] = useState<string | null>(null);
+  const [explanation, setExplanation] = useState('');
+
+  const handleCheckoutValidation = () => {
+    if (!photoCavet) {
+      triggerToast('Vui lòng tải lên ảnh cà vẹt / đăng ký xe.', 'error');
+      return;
+    }
+    if (!photoCccd) {
+      triggerToast('Vui lòng tải lên ảnh CMND / CCCD chủ xe.', 'error');
+      return;
+    }
+    if (!photoXe) {
+      triggerToast('Vui lòng tải lên ảnh thực tế đầu xe.', 'error');
+      return;
+    }
+    if (extractedPlate && extractedPlate !== selectedVehicleForVIP && !explanation.trim()) {
+      triggerToast('Biển số OCR không khớp. Vui lòng nhập lý do giải trình.', 'error');
+      return;
+    }
+
+    (window as any).lastUploadedPhotos = {
+      registrationPaper: photoCavet,
+      identityCard: photoCccd,
+      frontPhoto: photoXe,
+      explanation
+    };
+
+    handleStartVnpay();
+  };
  
   return (
     <motion.div 
@@ -159,6 +195,162 @@ export const VipRegistrationModal: React.FC = () => {
                 </button>
               </div>
  
+              <div className="bg-white p-6 rounded-3xl border border-slate-200/60 space-y-5 text-left">
+                <div className="space-y-1">
+                  <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+                    Tài liệu xác thực VIP
+                  </strong>
+                  <p className="text-[11px] text-slate-400 font-semibold leading-relaxed">
+                    Tài xế cần cung cấp cà vẹt, CCCD và ảnh đầu xe. OCR mô phỏng sẽ đối chiếu biển số trên cà vẹt với xe đang đăng ký.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">1. Cà vẹt / Đăng ký xe</span>
+                    {photoCavet ? (
+                      <div className="relative h-28 rounded-xl overflow-hidden border border-slate-200 group">
+                        <img src={photoCavet} alt="Cà vẹt" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => { setPhotoCavet(null); setExtractedPlate(null); }}
+                          className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-slate-200 rounded-xl p-3 text-center space-y-2 bg-slate-50">
+                        <p className="text-[10px] text-slate-400">Chọn ảnh mẫu để chạy OCR:</p>
+                        <div className="flex flex-col gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsOcrLoading(true);
+                              setPhotoCavet('https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80');
+                              setTimeout(() => {
+                                setExtractedPlate(selectedVehicleForVIP || '30F-999.78');
+                                setIsOcrLoading(false);
+                                triggerToast('OCR đã trích xuất biển số khớp hồ sơ.', 'success');
+                              }, 900);
+                            }}
+                            className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                          >
+                            Ảnh khớp biển số
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsOcrLoading(true);
+                              setPhotoCavet('https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80');
+                              setTimeout(() => {
+                                setExtractedPlate('29A-888.88');
+                                setIsOcrLoading(false);
+                                triggerToast('OCR phát hiện biển số cà vẹt không khớp.', 'error');
+                              }, 900);
+                            }}
+                            className="w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                          >
+                            Ảnh khác biển số
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">2. CMND / CCCD chủ xe</span>
+                    {photoCccd ? (
+                      <div className="relative h-28 rounded-xl overflow-hidden border border-slate-200 group">
+                        <img src={photoCccd} alt="CCCD" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setPhotoCccd(null)}
+                          className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setPhotoCccd('https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80')}
+                        className="w-full h-28 border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer transition-colors"
+                      >
+                        <Plus className="w-5 h-5 mb-1" />
+                        <span className="text-[9px] font-bold uppercase tracking-wider">Tải lên CCCD</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">3. Ảnh thực tế đầu xe</span>
+                    {photoXe ? (
+                      <div className="relative h-28 rounded-xl overflow-hidden border border-slate-200 group">
+                        <img src={photoXe} alt="Ảnh đầu xe" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setPhotoXe(null)}
+                          className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setPhotoXe('https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80')}
+                        className="w-full h-28 border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer transition-colors"
+                      >
+                        <Plus className="w-5 h-5 mb-1" />
+                        <span className="text-[9px] font-bold uppercase tracking-wider">Tải ảnh đầu xe</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {isOcrLoading && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2.5 text-xs text-blue-700 font-extrabold animate-pulse">
+                    <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
+                    <span>AI OCR đang quét biển số trên cà vẹt...</span>
+                  </div>
+                )}
+
+                {!isOcrLoading && extractedPlate && (
+                  <div className="space-y-3">
+                    {extractedPlate === selectedVehicleForVIP ? (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-xs text-emerald-700 font-black">
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
+                        <span>AI OCR trích xuất: {extractedPlate}. Biển số khớp với xe đang đăng ký.</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2 text-xs text-amber-700 font-extrabold leading-relaxed">
+                          <AlertTriangle className="w-4.5 h-4.5 text-amber-600 shrink-0" />
+                          <div>
+                            <span className="block font-black">AI OCR trích xuất: {extractedPlate}. Không khớp với {selectedVehicleForVIP}.</span>
+                            <span className="text-[10.5px] font-semibold text-slate-500 block">Cần nhập lý do giải trình trước khi gửi hồ sơ duyệt VIP.</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                            Lý do giải trình khác biệt biển số
+                          </label>
+                          <textarea
+                            value={explanation}
+                            onChange={(e) => setExplanation(e.target.value)}
+                            placeholder="Ví dụ: xe đang chờ sang tên, xe mượn của thành viên gia đình..."
+                            className="w-full p-3 bg-slate-50 hover:bg-slate-100/50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-blue-500 text-slate-800"
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Choose service package */}
               <div className="bg-white p-6 rounded-3xl border border-slate-200/60 space-y-4">
                 <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block">
@@ -324,7 +516,7 @@ export const VipRegistrationModal: React.FC = () => {
                 </div>
  
                 <button 
-                  onClick={handleStartVnpay}
+                  onClick={handleCheckoutValidation}
                   className="w-full py-4 bg-slate-900 border border-slate-800 hover:bg-black text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-md active:scale-98 cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Lock className="w-4 h-4 text-white" />
