@@ -69,6 +69,9 @@ import {
 
 import { VipApprovalPanel } from './VipApprovalPanel';
 import { ParkingMonitorView } from './ParkingMonitorView';
+import { adminService } from '../../services/adminService';
+import { parkingService } from '../../services/parkingService';
+import { apiClient } from '../../api/apiClient';
 
 interface DashboardProps {
   user: {
@@ -475,40 +478,55 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     }
   }, [activeFacility]);
 
-  // HR Staff List and live performance metrics (Screenshot 5 Replication)
-  const [staff, setStaff] = useState<StaffMember[]>([
-    { id: 'STF-01', name: 'Trần Thị Bé', avatar: 'B', role: 'Giám sát Cổng vào 1', gate: 'Cổng Vào 01', swipes: 342, status: 'ONLINE', leaveHours: '06:00 - 14:00', keyLabel: '8892' },
-    { id: 'STF-02', name: 'Lê Văn Cường', avatar: 'C', role: 'Nhân viên Cổng ra 2', gate: 'Cổng Ra 02', swipes: 315, status: 'ONLINE', leaveHours: '06:00 - 14:00', keyLabel: '4415' },
-    { id: 'STF-03', name: 'Phạm Đức Duy', avatar: 'D', role: 'Đội trưởng Tuần tra', gate: 'Tuần tra hầm B1', swipes: 289, status: 'OFFLINE', leaveHours: 'Ca tiếp: 14:00', keyLabel: '1188', reason: 'Nghỉ ca' },
-    { id: 'STF-04', name: 'Hoàng Yến', avatar: 'Y', role: 'Hỗ trợ Khách hàng', gate: 'Bốt Trung Tâm', swipes: 154, status: 'OFFLINE', leaveHours: 'Ốm (1 ngày)', reason: 'Ốm (1 ngày)' }
-  ]);
+  // HR Staff List – populated from API
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [isStaffLoading, setIsStaffLoading] = useState(false);
 
-  // System Notices in the right-bottom box
-  const [notices, setNotices] = useState<SystemNotice[]>([
-    { 
-      id: 'NTC-01', 
-      type: 'ERROR', 
-      title: 'Mất kết nối Camera LPR Cổng 03', 
-      desc: 'Hệ thống không nhận được tín hiệu từ Camera C03 trong 5 phút qua. Yêu cầu kiểm tra kỹ thuật ngay lập tức.', 
-      time: '10 phút trước', 
-      actionText: 'Chỉ định kỹ thuật',
-      actionState: 'IDLE'
-    },
-    { 
-      id: 'NTC-02', 
-      type: 'WARNING', 
-      title: 'Cảnh báo đầy bãi - Khu vực Tầng hầm 1', 
-      desc: 'Công suất hiện tại đạt 95%. Hệ thống tự động chuyển hướng xe mới xuống Tầng hầm 2.', 
-      time: '45 phút trước' 
-    },
-    { 
-      id: 'NTC-03', 
-      type: 'SUCCESS', 
-      title: 'Cập nhật phần mềm Barrier v2.1 hoàn tất', 
-      desc: 'Tất cả các cổng kiểm soát đã được đồng bộ phiên bản mới nhất.', 
-      time: '2 giờ trước' 
-    }
-  ]);
+  useEffect(() => {
+    setIsStaffLoading(true);
+    adminService.getPersonnelList()
+      .then(res => {
+        const items = Array.isArray(res.data) ? res.data : [];
+        const mapped: StaffMember[] = items.map((p: any, idx: number) => ({
+          id: p.id || `STF-${String(idx + 1).padStart(2, '0')}`,
+          name: p.name || p.username || 'Nhân viên',
+          avatar: (p.name || p.username || 'N').charAt(0).toUpperCase(),
+          role: p.role || 'Nhân viên',
+          gate: p.location || 'Chưa phân công',
+          swipes: p.count || 0,
+          status: (p.status === 'ONLINE' || p.status === 'ACTIVE') ? 'ONLINE' : 'OFFLINE',
+          leaveHours: p.time || '',
+          keyLabel: p.phone ? p.phone.slice(-4) : '',
+          reason: p.status === 'OFFLINE' ? (p.reason || '') : undefined
+        }));
+        setStaff(mapped);
+      })
+      .catch(() => {
+        // Keep empty on error, UI will show empty state
+      })
+      .finally(() => setIsStaffLoading(false));
+  }, []);
+
+  // System Notices – populated from API
+  const [notices, setNotices] = useState<SystemNotice[]>([]);
+
+  useEffect(() => {
+    adminService.getDashboardAlerts()
+      .then(res => {
+        const items = Array.isArray(res.data) ? res.data : [];
+        const mapped: SystemNotice[] = items.map((a: any) => ({
+          id: String(a.id),
+          type: (a.type === 'ERROR' || a.type === 'WARNING' || a.type === 'SUCCESS') ? a.type : 'WARNING',
+          title: a.title || 'Thông báo hệ thống',
+          desc: a.description || a.desc || '',
+          time: a.time || 'Vừa xong',
+          actionText: a.actionText,
+          actionState: 'IDLE' as const
+        }));
+        if (mapped.length > 0) setNotices(mapped);
+      })
+      .catch(() => {/* Keep empty */});
+  }, []);
 
   // Hardware switches status for Technical Config
   const [gateBarriers, setGateBarriers] = useState([
@@ -527,13 +545,35 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     { plate: '30F-443.12', reason: 'Nghi ngờ giả mạo phôi thẻ từ VIP tháng nhiều lần', dateAdded: '20/10/2023' }
   ]);
 
-  // Simulated live billing ledger for Revenue tab
-  const [transactions, setTransactions] = useState([
-    { id: '#TRX-8924', time: '14:32:05 Hôm nay', plate: '30G-123.45', type: 'Ô tô - Vãng lai', cost: '25,000đ', paymentMethod: 'VNPAY', status: 'THÀNH CÔNG', invoiceNo: 'VAT-8924', note: '' },
-    { id: '#TRX-8923', time: '14:28:11 Hôm nay', plate: '29A-999.99', type: 'Vé tháng (VIP)', cost: '0đ', paymentMethod: 'Thẻ từ Auto', status: 'ĐÃ GHI NHẬN', invoiceNo: 'VAT-8923', note: '' },
-    { id: '#TRX-8922', time: '14:15:00 Hôm nay', plate: '15B-678.90', type: 'Xe máy', cost: '5,000đ', paymentMethod: 'Lỗi kết nối', status: 'CẦN XỬ LÝ', invoiceNo: 'VAT-8922', note: 'Lỗi kết nối' },
-    { id: '#TRX-8921', time: '14:10:22 Hôm nay', plate: '30E-555.22', type: 'Ô tô - Vãng lai', cost: '35,000đ', paymentMethod: 'Tiền mặt', status: 'THÀNH CÔNG', invoiceNo: 'VAT-8921', note: '' }
-  ]);
+  // Revenue transactions – populated from API
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [isTransactionsLoading, setIsTransactionsLoading] = useState(false);
+
+  const fetchTransactions = (page = 1) => {
+    setIsTransactionsLoading(true);
+    adminService.getRevenueTransactions(page)
+      .then(res => {
+        const data = res.data;
+        const items = Array.isArray(data?.items) ? data.items
+          : Array.isArray(data) ? data : [];
+        const mapped = items.map((t: any) => ({
+          id: t.id ? `#TRX-${String(t.id).slice(-4).toUpperCase()}` : `#TRX-${Math.random().toString(36).slice(2,6).toUpperCase()}`,
+          time: t.time || t.createdAt || 'N/A',
+          plate: t.plate || t.licensePlate || '-',
+          type: t.type || t.vehicleType || 'Vãng lai',
+          cost: t.cost || t.fee || t.amount ? `${(t.cost || t.fee || t.amount || 0).toLocaleString('vi-VN')}đ` : '0đ',
+          paymentMethod: t.paymentMethod || t.payment_method || 'Tiền mặt',
+          status: t.status || 'THÀNH CÔNG',
+          invoiceNo: t.invoiceNo || t.invoice_no || '-',
+          note: t.note || ''
+        }));
+        setTransactions(mapped);
+      })
+      .catch(() => {/* Keep empty */})
+      .finally(() => setIsTransactionsLoading(false));
+  };
+
+  useEffect(() => { fetchTransactions(); }, []);
 
   // Customer Management Database
   interface Customer {
@@ -546,37 +586,32 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     expiryDate: string;
   }
 
-  const [customerList, setCustomerList] = useState<Customer[]>(() => {
-    const saved = localStorage.getItem('urbanpark_customers_list');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.some((c: any) => c.expiryDate === '31/12/2024' || c.expiryDate === '15/11/2023' || c.expiryDate === '01/10/2023')) {
-          localStorage.removeItem('urbanpark_customers_list');
-        } else {
-          return parsed;
-        }
-      } catch (err) {
-        console.error("Failed parsing custom customers list:", err);
-      }
-    }
-    const dFuture1 = new Date(); dFuture1.setMonth(dFuture1.getMonth() + 6);
-    const dFuture2 = new Date(); dFuture2.setMonth(dFuture2.getMonth() + 3);
-    const dPast = new Date(); dPast.setMonth(dPast.getMonth() - 2);
-    
-    const fmt = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-    
-    return [
-      { id: 'CUST-001', name: 'Nguyễn Văn An', phone: '090 123 4567', plate: '51F-123.45', cardType: 'VIP', status: 'ACTIVE', expiryDate: fmt(dFuture1) },
-      { id: 'CUST-002', name: 'Trần Thị Bích', phone: '091 987 6543', plate: '30A-987.65', cardType: 'Tháng', status: 'ACTIVE', expiryDate: fmt(dFuture2) },
-      { id: 'CUST-003', name: 'Lê Hữu Trí', phone: '093 765 4321', plate: '43C-112.22', cardType: 'Tháng', status: 'EXPIRED', expiryDate: fmt(dPast) },
-      { id: 'CUST-004', name: 'Vãng lai (Ticket #99281)', phone: '-', plate: '60B-555.44', cardType: 'Guest', status: 'IN_PARK', expiryDate: 'N/A' }
-    ];
-  });
+  const [customerList, setCustomerList] = useState<Customer[]>([]);
+  const [isCustomersLoading, setIsCustomersLoading] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem('urbanpark_customers_list', JSON.stringify(customerList));
-  }, [customerList]);
+  const fetchCustomers = () => {
+    setIsCustomersLoading(true);
+    adminService.getCustomers()
+      .then(res => {
+        const items = Array.isArray(res.data) ? res.data : [];
+        const mapped: Customer[] = items.map((c: any) => ({
+          id: c.id ? `CUST-${String(c.id).slice(0, 8).toUpperCase()}` : 'CUST-???',
+          name: c.name || c.username || 'Khách hàng',
+          phone: c.phone || '-',
+          plate: c.plate || c.licensePlate || '-',
+          cardType: (c.type === 'VIP' || c.type === 'Tháng' || c.type === 'Guest') ? c.type : 'Guest',
+          status: (c.status === 'ACTIVE' || c.status === 'EXPIRED' || c.status === 'IN_PARK') ? c.status : 'ACTIVE',
+          expiryDate: c.expireDate || c.expiryDate || 'N/A'
+        }));
+        setCustomerList(mapped);
+      })
+      .catch(() => {/* Keep empty */})
+      .finally(() => setIsCustomersLoading(false));
+  };
+
+  useEffect(() => { fetchCustomers(); }, []);
+
+  // Removed: no longer syncing customers to localStorage (using real API)
 
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerFilter, setCustomerFilter] = useState<'Tất cả' | 'Tháng' | 'VIP'>('Tất cả');
@@ -597,14 +632,71 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   const [auditSearch, setAuditSearch] = useState('');
   const [auditModuleFilter, setAuditModuleFilter] = useState('Tất cả');
   const [auditStatusFilter, setAuditStatusFilter] = useState('Tất cả');
-  const [selectedLogId, setSelectedLogId] = useState<string | null>('AUD-003');
+  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [isAuditLoading, setIsAuditLoading] = useState(false);
+
+  const fetchAuditLogs = () => {
+    setIsAuditLoading(true);
+    adminService.getLogs()
+      .then(res => {
+        const data = res.data;
+        const items = Array.isArray(data?.items) ? data.items
+          : Array.isArray(data) ? data : [];
+        const mapped = items.map((log: any, idx: number) => {
+          const ts = log.time || log.createdAt || new Date().toISOString();
+          const dt = new Date(ts);
+          const isValidDate = !isNaN(dt.getTime());
+          const timeStr = isValidDate
+            ? dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            : (typeof ts === 'string' && ts.includes(':') ? ts : 'N/A');
+          const dateStr = isValidDate
+            ? dt.toLocaleDateString('vi-VN')
+            : new Date().toLocaleDateString('vi-VN');
+          const actor = log.actor || log.staffName || log.plate || 'System';
+          return {
+            id: log.id ? `AUD-${String(log.id).slice(0,8)}` : `AUD-${String(idx + 1).padStart(3, '0')}`,
+            time: timeStr,
+            date: dateStr,
+            actor: actor,
+            actorId: log.actorId || log.staffId || log.id || `ID-${idx}`,
+            avatar: String(actor).charAt(0).toUpperCase(),
+            action: log.action || log.message || log.gate || 'Sự kiện hệ thống',
+            desc: log.desc || log.model || log.type || '',
+            ip: log.ip || log.device || 'N/A',
+            device: log.device || log.ip || 'N/A',
+            status: log.status === 'FAILED' || log.statusColor === 'red' ? 'FAILED'
+              : log.status === 'WARNING' || log.statusColor === 'yellow' ? 'WARNING'
+              : 'SUCCESS',
+            payload: log.payload || null
+          };
+        });
+        setAuditLogs(mapped);
+        if (mapped.length > 0) setSelectedLogId(mapped[0].id);
+      })
+      .catch(() => {/* Keep empty */})
+      .finally(() => setIsAuditLoading(false));
+  };
+
+  // Dashboard summary stats from API
+  const [dashboardSummary, setDashboardSummary] = useState<any>(null);
+
+  useEffect(() => {
+    adminService.getDashboardSummary()
+      .then(res => setDashboardSummary(res.data))
+      .catch(() => {/* Use hardcoded fallbacks */});
+  }, []);
 
   // Facilities data filter multipliers (for total responsiveness when tabs are clicked)
   const statsMultiplier = activeFacility === 'cs1' ? 0.45 : activeFacility === 'cs2' ? 0.55 : 1.0;
-  
-  const formattedRevenue = (45.2 * statsMultiplier).toFixed(1);
-  const formattedCarsCount = Math.round(1248 * statsMultiplier).toLocaleString();
-  const formattedFullCapacityPercent = activeFacility === 'cs1' ? 78 : activeFacility === 'cs2' ? 91 : 85;
+
+  // Stats from API (fallback to computed values if API not available)
+  const rawRevenue = dashboardSummary?.totalRevenue ?? 45.2;
+  const rawOccupancy = dashboardSummary?.occupancyRate ?? 85;
+  const rawSessions = dashboardSummary?.activeSessions ?? 1248;
+  const formattedRevenue = (rawRevenue * statsMultiplier).toFixed(1);
+  const formattedCarsCount = Math.round(rawSessions * statsMultiplier).toLocaleString();
+  const formattedFullCapacityPercent = Math.round(rawOccupancy * (activeFacility === 'cs1' ? 0.91 : activeFacility === 'cs2' ? 1.07 : 1.0));
 
   const filteredBranches = branches.filter(branch => {
     if (activeFacility === 'cs1') {
@@ -783,25 +875,41 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     }, 1500);
   };
 
-  // Recharts Chart Mock Data
-  const chartRevenueData = [
-    { name: 'T2', amount: 35 },
-    { name: 'T3', amount: 50 },
-    { name: 'T4', amount: 45 },
-    { name: 'T5', amount: 58 },
-    { name: 'T6', amount: 40 },
-    { name: 'T7', amount: 52 },
+  // Revenue chart data – populated from API
+  const [apiRevenueCharts, setApiRevenueCharts] = useState<any>(null);
+
+  useEffect(() => {
+    if (activeMenu === 'revenue') {
+      adminService.getRevenueCharts()
+        .then(res => setApiRevenueCharts(res.data))
+        .catch(() => {/* Keep null, will use fallback */});
+    }
+  }, [activeMenu]);
+
+  // Fallback data when API not available
+  const fallbackBarData = [
+    { name: 'T2', amount: 35 }, { name: 'T3', amount: 50 }, { name: 'T4', amount: 45 },
+    { name: 'T5', amount: 58 }, { name: 'T6', amount: 40 }, { name: 'T7', amount: 52 },
     { name: 'CN', amount: 62 }
-  ].map(item => ({
-    ...item,
-    amount: Math.round(item.amount * statsMultiplier)
+  ];
+  const fallbackPieData = [
+    { name: 'Ô tô', value: 748, color: '#0f172a' },
+    { name: 'Xe vãng lai', value: 312, color: '#3b82f6' },
+    { name: 'Xe VIP', value: 188, color: '#10b981' }
+  ];
+
+  const rawBarData = apiRevenueCharts?.barData || fallbackBarData;
+  const chartRevenueData = rawBarData.map((item: any) => ({
+    name: item.name || item.day || item.label,
+    amount: Math.round((item.amount || item.value || 0) * statsMultiplier)
   }));
 
-  const pieVehicleData = [
-    { name: 'Ô tô', value: Math.round(748 * statsMultiplier), color: '#0f172a' },
-    { name: 'Xe vãng lai', value: Math.round(312 * statsMultiplier), color: '#3b82f6' },
-    { name: 'Xe VIP', value: Math.round(188 * statsMultiplier), color: '#10b981' }
-  ];
+  const rawPieData = apiRevenueCharts?.pieData || fallbackPieData;
+  const pieVehicleData = rawPieData.map((item: any, idx: number) => ({
+    name: item.name || item.label,
+    value: Math.round((item.value || 0) * statsMultiplier),
+    color: item.color || ['#0f172a', '#3b82f6', '#10b981'][idx % 3]
+  }));
 
   return (
     <div id="manager-urbanpark-root" className={`min-h-screen font-sans antialiased text-slate-800 dark:text-slate-100 transition-colors ${isDarkMode ? 'bg-[#030712] text-slate-150' : 'bg-[#f1f5f9] text-slate-850'}`}>
@@ -3760,11 +3868,12 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
               </div>
             )}
 
-            {/* SUB-VIEW 8: NHẬT KÝ TELEMETRY AUDIT LOGS (Screenshot 2 Replication) */}
+            {/* SUB-VIEW 8: NHẬT KÝ TELEMETRY AUDIT LOGS */}
             {activeMenu === 'system_log' && (() => {
-              
-              {/* STATIC LOGS POOL CORRESPONDING TO SCREENSHOT 2 REPLICATION */}
-              const mockAuditLogs = [
+              // Load audit logs when this tab becomes active
+              if (auditLogs.length === 0 && !isAuditLoading) fetchAuditLogs();
+
+              const mockAuditLogs = auditLogs.length > 0 ? auditLogs : [
                 {
                   id: 'AUD-001',
                   time: '14:23:05',
