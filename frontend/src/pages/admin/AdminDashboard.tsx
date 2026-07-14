@@ -1381,7 +1381,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
                             // Record Audit Log via API (Step 5 of Flow 6)
                             try {
                               await apiClient.post('/logs', {
