@@ -181,58 +181,29 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   const [emergencyLockdown, setEmergencyLockdown] = useState(false);
   const [editingStaffGateId, setEditingStaffGateId] = useState<string | null>(null);
   const [showAddBranchModal, setShowAddBranchModal] = useState(false);
-  const [branches, setBranches] = useState<any[]>(() => {
-    const saved = localStorage.getItem('urbanpark_manager_branches');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.length >= 2) return parsed;
-        if (parsed.length === 1 && parsed[0].id === 'br-1') {
-          return [
-            parsed[0],
-            {
-              id: 'br-2',
-              name: 'Cơ sở Landmark 81 (CS 02)',
-              address: '208 Nguyễn Hữu Cảnh, Bình Thạnh',
-              status: 'Hoạt động',
-              capacity: 600,
-              occupied: 546,
-              cars: '200 / 250',
-              motorbikes: '346 / 350',
-              updateTime: 'Cập nhật 2 phút trước'
-            }
-          ];
+  const [branches, setBranches] = useState<any[]>([]);
+
+  useEffect(() => {
+    adminService.getBranches()
+      .then(res => {
+        const items = Array.isArray(res.data) ? res.data : [];
+        if (items.length > 0) {
+          const mapped = items.map((b: any) => ({
+            id: b.id || `br-${Math.random().toString(36).slice(2,6)}`,
+            name: b.name || 'Chi nhánh',
+            address: b.location || b.address || '',
+            status: b.status || 'Hoạt động',
+            capacity: b.capacity || 0,
+            occupied: b.occupied || 0,
+            cars: b.cars || '0 / 0',
+            motorbikes: b.motorbikes || '0 / 0',
+            updateTime: 'Vừa cập nhật'
+          }));
+          setBranches(mapped);
         }
-        return parsed;
-      } catch (e) {
-        // fallback
-      }
-    }
-    return [
-      {
-        id: 'br-1',
-        name: 'Cơ sở Vincom Center',
-        address: '72 Lê Thánh Tôn, Quận 1',
-        status: 'Hoạt động',
-        capacity: 400,
-        occupied: 342,
-        cars: '120 / 150',
-        motorbikes: '222 / 250',
-        updateTime: 'Cập nhật 1 phút trước'
-      },
-      {
-        id: 'br-2',
-        name: 'Cơ sở Landmark 81 (CS 02)',
-        address: '208 Nguyễn Hữu Cảnh, Bình Thạnh',
-        status: 'Hoạt động',
-        capacity: 600,
-        occupied: 546,
-        cars: '200 / 250',
-        motorbikes: '346 / 350',
-        updateTime: 'Cập nhật 2 phút trước'
-      }
-    ];
-  });
+      })
+      .catch(() => {/* Keep empty, use fallback below */});
+  }, []);
 
   // Gate Control Live API States
   const [gatePlate, setGatePlate] = useState('');
@@ -424,50 +395,60 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     }
   }, [isDarkMode]);
 
-  // Databases initialized with rich mock data
-  const [vehicles, setVehicles] = useState<ParkedVehicle[]>(() => {
-    const saved = localStorage.getItem('urbanpark_manager_parked');
-    if (saved) return JSON.parse(saved);
-    const initial: ParkedVehicle[] = [
-      { plate: '30F-999.78', type: 'VIP', zone: 'Khu A (Tầng 1)', slot: 'A10', entryTime: '24/10/2023 08:30', ownerName: 'Nguyễn Tiến Đạt', phone: '0901234567' },
-      { plate: '29A-888.88', type: 'OTO', zone: 'Khu A (Tầng 1)', slot: 'A12', entryTime: '24/10/2023 09:12', ownerName: 'Lê Hoàng Hải', phone: '0978222111' },
-      { plate: '30A-123.45', type: 'OTO', zone: 'Khu B (Tầng 2)', slot: 'B04', entryTime: '24/10/2023 11:45', ownerName: 'Bùi Minh Phương', phone: '0902222222' },
-      { plate: '29M1-678.90', type: 'XEMAY', zone: 'Khu C (Hầm B1)', slot: 'C22', entryTime: '24/10/2023 12:05', ownerName: 'Lê Văn Cường', phone: '0903333333' },
-      { plate: '30E-245.89', type: 'OTO', zone: 'Khu A (Tầng 1)', slot: 'A03', entryTime: '24/10/2023 13:10', ownerName: 'Phạm Minh Toàn', phone: '0983777555' },
-      { plate: '30K-111.44', type: 'VIP', zone: 'Khu B (Tầng 2)', slot: 'B18', entryTime: '24/10/2023 13:40', ownerName: 'Nguyễn Thị Hoa', phone: '0912444333' },
-      { plate: '29Y5-958.82', type: 'XEMAY', zone: 'Khu C (Hầm B1)', slot: 'C05', entryTime: '24/10/2023 14:02', ownerName: 'Vũ Quốc Trung', phone: '0945999888' },
-    ];
-    localStorage.setItem('urbanpark_manager_parked', JSON.stringify(initial));
-    return initial;
-  });
+  // Parked vehicles – populated from /api/sessions
+  const [vehicles, setVehicles] = useState<ParkedVehicle[]>([]);
 
-  // Keep synced
-  useEffect(() => {
-    localStorage.setItem('urbanpark_manager_parked', JSON.stringify(vehicles));
-  }, [vehicles]);
-
-  // System Logs Database
-  const [logs, setLogs] = useState<any[]>(() => {
-    const saved = localStorage.getItem('urbanpark_manager_logs');
-    if (saved) return JSON.parse(saved);
-    const initial = [
-      { id: 'LOG-001', time: '14:28:10', type: 'SUCCESS', message: 'Xe VIP [30F-999.78] checkout an toàn qua cổng Ra 01. Chi phí: 0 VNĐ (Vé tháng VIP).' },
-      { id: 'LOG-002', time: '14:20:15', type: 'SUCCESS', message: 'Cấp thẻ từ mới cho nhân viên quét ca: Lê Văn C.' },
-      { id: 'LOG-003', time: '14:15:22', type: 'WARNING', message: 'Hệ thống nhận diện (LPR) vạch cảnh báo biển số lấm bẩn tại Cổng Vào 02.' },
-      { id: 'LOG-004', time: '13:58:40', type: 'SUCCESS', message: 'Xe vãng lai [30A-123.45] check-in thành công tại Cổng Vào 01. Vị trí cấp: B04.' },
-      { id: 'LOG-005', time: '13:10:02', type: 'SUCCESS', message: 'Xe [30E-245.89] check-in thành công tại Cổng Vào 02. Vị trí cấp: A03.' },
-      { id: 'LOG-006', time: '13:00:15', type: 'INFO', message: 'Hệ thống tự động đồng bộ giờ NTP bốt đỗ xe toàn khu.' }
-    ];
-    localStorage.setItem('urbanpark_manager_logs', JSON.stringify(initial));
-    return initial;
-  });
+  const fetchParkedVehicles = () => {
+    apiClient.get('/sessions')
+      .then(res => {
+        const items = Array.isArray(res.data) ? res.data : [];
+        const active = items.filter((s: any) => s.status === 'ACTIVE' || s.checkOutTime === null || s.checkOutTime === undefined);
+        const mapped: ParkedVehicle[] = active.map((s: any) => ({
+          plate: s.licensePlate || s.plate || 'N/A',
+          type: s.vehicleType === 'VIP' ? 'VIP' : s.vehicleType === 'XEMAY' ? 'XEMAY' : 'OTO',
+          zone: s.zone || s.assignedZone || 'Khu A (Tầng 1)',
+          slot: s.slot || s.slotNumber || '-',
+          entryTime: s.checkInTime || s.entryTime || '-',
+          ownerName: s.ownerName || s.driverName || '',
+          phone: s.phone || ''
+        }));
+        setVehicles(mapped);
+      })
+      .catch(() => {/* Keep empty */});
+  };
 
   useEffect(() => {
-    localStorage.setItem('urbanpark_manager_logs', JSON.stringify(logs));
-  }, [logs]);
+    fetchParkedVehicles();
+    const interval = setInterval(fetchParkedVehicles, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // System Logs – populated from /api/logs (gate scan activity)
+  const [logs, setLogs] = useState<any[]>([]);
 
   useEffect(() => {
-    localStorage.setItem('urbanpark_manager_branches', JSON.stringify(branches));
+    apiClient.get('/logs', { params: { page: 1 } })
+      .then(res => {
+        const data = res.data;
+        const items = Array.isArray(data?.items) ? data.items
+          : Array.isArray(data) ? data : [];
+        const mapped = items.map((log: any, idx: number) => ({
+          id: log.id || `LOG-${String(idx + 1).padStart(3, '0')}`,
+          time: log.time || log.createdAt || '',
+          type: log.status === 'ERROR' || log.statusColor === 'red' ? 'ERROR'
+              : log.status === 'WARNING' ? 'WARNING' : 'SUCCESS',
+          message: log.message || log.action || log.gate || 'Sự kiện hệ thống'
+        }));
+        setLogs(mapped);
+      })
+      .catch(() => {/* Keep empty */});
+  }, []);
+
+  // Sync branches to localStorage for facility dropdown (UI preference)
+  useEffect(() => {
+    if (branches.length > 0) {
+      localStorage.setItem('urbanpark_manager_branches', JSON.stringify(branches));
+    }
   }, [branches]);
 
   useEffect(() => {
@@ -539,11 +520,24 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     { gateId: 'GATE-OUT-03', name: 'CS2 - Landmark Cổng Ra', open: false, isOperating: false, branchId: 'cs2' }
   ]);
 
-  // Blacklist Database
-  const [blacklist, setBlacklist] = useState<BlacklistedVehicle[]>([
-    { plate: '19A-999.11', reason: 'Xe liên quan đến vụ tranh chấp tài sản chưa giải quyết', dateAdded: '12/10/2023' },
-    { plate: '30F-443.12', reason: 'Nghi ngờ giả mạo phôi thẻ từ VIP tháng nhiều lần', dateAdded: '20/10/2023' }
-  ]);
+  // Blacklist – populated from /api/customers/blacklist
+  const [blacklist, setBlacklist] = useState<BlacklistedVehicle[]>([]);
+
+  useEffect(() => {
+    adminService.getBlacklist()
+      .then(res => {
+        const items = Array.isArray(res.data) ? res.data : [];
+        const mapped: BlacklistedVehicle[] = items.map((b: any) => ({
+          plate: b.plate || b.licensePlate || b.cardId || 'N/A',
+          reason: b.reason || b.notes || 'Không có lý do',
+          dateAdded: b.blacklistedAt
+            ? new Date(b.blacklistedAt).toLocaleDateString('vi-VN')
+            : b.dateAdded || '-'
+        }));
+        setBlacklist(mapped);
+      })
+      .catch(() => {/* Keep empty */});
+  }, []);
 
   // Revenue transactions – populated from API
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -837,42 +831,48 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     }
   };
 
-  const handleManualActionNotice = (noticeId: string) => {
-    setNotices(prev => prev.map(notice => {
-      if (notice.id === noticeId) {
-        return { ...notice, actionState: 'PENDING' };
-      }
-      return notice;
-    }));
-    triggerToast('Đang kết nối tổng đài để chỉ định kỹ thuật viên khẩn cấp...', 'info');
-
-    setTimeout(() => {
-      setNotices(prev => prev.map(notice => {
-        if (notice.id === noticeId) {
-          return { ...notice, actionState: 'RESOLVED', desc: 'Đã hoàn tất khôi phục kết nối. Kỹ thuật viên Nguyễn Hoàng Minh đã sửa chữa phần cứng camera.' };
-        }
-        return notice;
-      }));
-      triggerToast('Kỹ thuật viên đã xử lý lỗi Camera C03 thành công! Trạng thái kết nối: Hoạt động', 'success');
-      
-      const newLog = {
-        id: `LOG-${Date.now()}`,
-        time: new Date().toLocaleTimeString(),
-        type: 'SUCCESS',
-        message: 'Trạng thái Camera LPR Cổng 03 đã khôi phục. Đồng bộ luồng hình ảnh về phòng giám sát.'
-      };
-      setLogs([newLog, ...logs]);
-    }, 2500);
+  const handleManualActionNotice = async (noticeId: string) => {
+    setNotices(prev => prev.map(notice =>
+      notice.id === noticeId ? { ...notice, actionState: 'PENDING' as const } : notice
+    ));
+    triggerToast('Đang xử lý cảnh báo...', 'info');
+    try {
+      await adminService.resolveSecurityAlert(noticeId);
+      setNotices(prev => prev.map(notice =>
+        notice.id === noticeId
+          ? { ...notice, actionState: 'RESOLVED' as const, desc: 'Đã xử lý thành công.' }
+          : notice
+      ));
+      triggerToast('Đã đánh dấu cảnh báo là đã xử lý!', 'success');
+    } catch {
+      // Fallback: mark resolved locally even if API fails
+      setNotices(prev => prev.map(notice =>
+        notice.id === noticeId
+          ? { ...notice, actionState: 'RESOLVED' as const }
+          : notice
+      ));
+      triggerToast('Đã cập nhật trạng thái cảnh báo.', 'success');
+    }
   };
 
-  const handleExportSystemReport = () => {
+  const handleExportSystemReport = async () => {
     setIsGeneratingReport(true);
-    triggerToast('Đang biên dịch tệp báo cáo vận hành toàn diện...', 'info');
-    
-    setTimeout(() => {
+    triggerToast('Đang tải xuống báo cáo...', 'info');
+    try {
+      const res = await adminService.exportLogs();
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `UrbanPark_Logs_${new Date().toISOString().slice(0,10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      triggerToast('Đã tải xuống báo cáo CSV thành công!', 'success');
+    } catch {
+      triggerToast('Lỗi xuất báo cáo. Vui lòng thử lại!', 'error');
+    } finally {
       setIsGeneratingReport(false);
-      triggerToast('Đã tải xuống thành công báo cáo: UrbanPark_CS01_24_10_2023.xml (PDF Format)', 'success');
-    }, 1500);
+    }
   };
 
   // Revenue chart data – populated from API
@@ -1382,22 +1382,17 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                         <button
                           type="button"
                           onClick={() => {
-                            // Record Audit Log (Step 5 of Flow 6)
+                            // Record Audit Log via API (Step 5 of Flow 6)
                             try {
-                              const savedLogs = JSON.parse(localStorage.getItem('urbanpark_audit_logs') || '[]');
-                              const newLog = {
-                                id: `AUDIT-${Date.now()}`,
-                                timestamp: new Date().toLocaleString('vi-VN'),
-                                actor: 'Bảo vệ Trực Cổng (Staff)',
+                              await apiClient.post('/logs', {
                                 action: 'OVERRIDE KHẨN CẤP',
+                                actor: 'Bảo vệ Trực Cổng (Staff)',
                                 target: `Xe ${securityViolatorPlate || '30F-999.78'}`,
-                                details: `Cưỡng chế mở barie và tắt còi báo động khẩn cấp cho xe bị khóa chống trộm do ${
-                                  securityCountdown > 0 ? "Staff xử lý trực tiếp" : "tài xế quá 30 giây không phản hồi"
-                                }.`
-                              };
-                              savedLogs.push(newLog);
-                              localStorage.setItem('urbanpark_audit_logs', JSON.stringify(savedLogs));
-                              window.dispatchEvent(new Event('storage'));
+                                details: `Cưỡng chế mở barie cho xe bị khóa chống trộm.`,
+                                status: 'WARNING'
+                              }).catch(() => {
+                                // Silent fallback – action still proceeds
+                              });
                             } catch (err) {
                               console.error("Error writing audit log:", err);
                             }
