@@ -425,7 +425,7 @@ export const StaffPayment = () => {
                 <div className={`border rounded-lg p-3 ${canReviewVehicle ? 'border-emerald-200 bg-emerald-50/70' : 'border-blue-200 bg-blue-50/70'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">
-                      {isVip ? 'Xác nhận định danh VIP' : 'Quét mã thẻ / ID thẻ'}
+                      {isVip ? 'Xác nhận định danh VIP' : 'Quét mã thẻ / Nhập biển số'}
                     </h4>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${canReviewVehicle ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
                       {canReviewVehicle ? 'ĐÃ XÁC NHẬN' : 'BẮT BUỘC'}
@@ -439,7 +439,7 @@ export const StaffPayment = () => {
                         setIdentityVerified(false);
                         if (!isVip) setBackendTxn(null);
                       }}
-                      placeholder={isVip ? 'Mã VIP tự động' : 'Nhấn vào đây và dùng máy quét thẻ...'}
+                      placeholder={isVip ? 'Mã VIP tự động' : 'Quét mã thẻ hoặc nhập biển số xe...'}
                       className="font-mono font-bold"
                     />
                     <Button
