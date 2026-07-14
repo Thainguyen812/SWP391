@@ -12,7 +12,7 @@ import {
   CarOutlined,
   WalletOutlined
 } from '@ant-design/icons';
-import { notification, Input, Button, Modal, Spin } from 'antd';
+import { notification, Input, Button, Modal, Spin, QRCode } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
 import { apiClient } from '../../api/apiClient';
 import { parkingService } from '../../services/parkingService';
@@ -22,7 +22,8 @@ export const StaffPayment = () => {
   const location = useLocation();
   const { transactions, fetchAllDataFromBackend, addTransaction, updateShiftStats, shiftStats, addActivityLog, currentVehicle, activeVehicles, removeActiveVehicle, isEmergency, currentUser, getVehicleFines, clearVehicleFines } = useGlobalContext();
   
-  const totalSlots = 400; // Static capacity for now until API provides it
+
+  const totalSlots = 500; // Static capacity for now until API provides it
   const activeCount = activeVehicles ? activeVehicles.filter(v => !v.gate).length : 0;
   const emptyCount = Math.max(0, totalSlots - activeCount);
   const occupancyPercent = totalSlots > 0 ? Math.round((activeCount / totalSlots) * 100) : 0;
@@ -45,6 +46,8 @@ export const StaffPayment = () => {
   const [isPaid, setIsPaid] = useState(false);
   const [backendTxn, setBackendTxn] = useState(null);
   const [identityVerified, setIdentityVerified] = useState(isLostCard ? true : false);
+  const [vnpayUrl, setVnpayUrl] = useState('');
+  const [isPollingVnpay, setIsPollingVnpay] = useState(false);
 
   const calculateVisitorFee = (durationStr) => {
     if (!durationStr || durationStr === 'Đang vào') return 30000; // Default minimum fee
@@ -88,6 +91,38 @@ export const StaffPayment = () => {
   }, [isLostCard, vehicleToPay?.cardCode, location.state?.cardCode, isVehicleVip, lpr]);
   const canReviewVehicle = identityVerified || isLostCard;
   const displayAmount = canReviewVehicle ? totalAmount : 0;
+  
+  useEffect(() => {
+    let interval;
+    if (paymentMethod === 'vnpay' && backendTxn?.id && canReviewVehicle && !isPaid) {
+      if (!vnpayUrl) {
+        apiClient.get(`/v1/payment/vnpay-url?transactionId=${backendTxn.id}`)
+          .then(res => setVnpayUrl((res.data || res).paymentUrl))
+          .catch(err => console.error("Error fetching VNPay URL", err));
+      }
+        
+      setIsPollingVnpay(true);
+      interval = setInterval(() => {
+        apiClient.get(`/v1/payment/transaction/${backendTxn.id}/status`)
+          .then(res => {
+            if ((res.data || res).paymentStatus === 'SUCCESS') {
+              clearInterval(interval);
+              setIsPollingVnpay(false);
+              notification.success({message: 'Khách đã thanh toán VNPay thành công!'});
+              setIsPaid(true);
+              setLan1Status('free');
+              if (fetchAllDataFromBackend) fetchAllDataFromBackend();
+              setTimeout(() => handleCancel(), 2000);
+            }
+          });
+      }, 3000);
+    } else {
+      setIsPollingVnpay(false);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [paymentMethod, backendTxn, canReviewVehicle, isPaid, vnpayUrl]);
   const ticketNumber = useMemo(() => {
     if (!lpr) return 1000;
     let hash = 0;
@@ -362,30 +397,7 @@ export const StaffPayment = () => {
 
   return (
     <div className="p-6 w-full">
-      {/* Header Tags */}
-      <div className="flex justify-end items-center mb-6">
-        <div className="flex gap-3">
-          <button 
-            onClick={() => setLan1Status(lan1Status === 'free' ? 'busy' : 'free')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer border ${
-              lan1Status === 'free' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full ${lan1Status === 'free' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
-            Làn ra 1: {lan1Status === 'free' ? 'Đang rảnh' : 'Đang bận'}
-          </button>
-          <button 
-            onClick={() => setLan2Status(lan2Status === 'free' ? 'busy' : 'free')}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer border ${
-              lan2Status === 'free' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full ${lan2Status === 'free' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
-            Làn ra 2: {lan2Status === 'free' ? 'Đang rảnh' : 'Đang bận'}
-          </button>
-        </div>
-      </div>
-
+      {/* Header Tags removed as requested */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column */}
         <div className="lg:col-span-8 flex flex-col gap-6">
@@ -533,30 +545,35 @@ export const StaffPayment = () => {
                         }
                         setPaymentMethod('cash');
                       }}
-                      className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all cursor-pointer ${
-                        isVip ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400' :
-                        paymentMethod === 'cash' ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-slate-200 text-slate-500 hover:border-blue-300'
+                      className={`relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer overflow-hidden group ${
+                        isVip ? 'opacity-40 cursor-not-allowed bg-slate-50 border-slate-100 text-slate-400' :
+                        paymentMethod === 'cash' ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50/50 shadow-sm text-blue-700 scale-[1.02]' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-300 hover:shadow-sm hover:-translate-y-0.5'
                       }`}
                     >
-                      <BankOutlined className="text-2xl mb-1" />
-                      <span className="text-[11px] font-bold">Tiền mặt</span>
+                      {paymentMethod === 'cash' && <div className="absolute top-0 right-0 w-8 h-8 bg-blue-500 rounded-bl-xl flex items-center justify-center"><CheckCircleFilled className="text-white text-xs" /></div>}
+                      <BankOutlined className="text-3xl mb-2 transition-transform group-hover:scale-110" />
+                      <span className="text-xs font-black tracking-wide">TIỀN MẶT</span>
                     </button>
+
                     <button 
                       onClick={() => {
                         if (isVip) {
                           notification.warning({ message: 'Không khả dụng', description: 'Khách VIP bắt buộc thanh toán bằng QR Động theo quy trình.' });
                           return;
                         }
-                        setPaymentMethod('qr');
+                        setPaymentMethod('vnpay');
+                        setVnpayUrl('');
                       }}
-                      className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all cursor-pointer ${
-                        isVip ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400' :
-                        paymentMethod === 'qr' ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-slate-200 text-slate-500 hover:border-blue-300'
+                      className={`relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer overflow-hidden group ${
+                        isVip ? 'opacity-40 cursor-not-allowed bg-slate-50 border-slate-100 text-slate-400' :
+                        paymentMethod === 'vnpay' ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50/50 shadow-sm text-blue-700 scale-[1.02]' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-300 hover:shadow-sm hover:-translate-y-0.5'
                       }`}
                     >
-                      <QrcodeOutlined className="text-2xl mb-1" />
-                      <span className="text-[11px] font-bold">VietQR</span>
+                      {paymentMethod === 'vnpay' && <div className="absolute top-0 right-0 w-8 h-8 bg-blue-500 rounded-bl-xl flex items-center justify-center"><CheckCircleFilled className="text-white text-xs" /></div>}
+                      <WalletOutlined className="text-3xl mb-2 transition-transform group-hover:scale-110" />
+                      <span className="text-xs font-black tracking-wide">VNPAY</span>
                     </button>
+                    
                     <button 
                       onClick={() => {
                         if (!isVip) {
@@ -565,55 +582,67 @@ export const StaffPayment = () => {
                         }
                         setPaymentMethod('card');
                       }}
-                      className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
-                        !isVip ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400' :
-                        paymentMethod === 'card' ? 'border-blue-500 bg-blue-50 text-blue-600 cursor-pointer' : 'border-slate-200 text-slate-500 hover:border-blue-300 cursor-pointer'
+                      className={`relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-300 overflow-hidden group ${
+                        !isVip ? 'opacity-40 cursor-not-allowed bg-slate-50 border-slate-100 text-slate-400' :
+                        paymentMethod === 'card' ? 'border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50/50 shadow-sm text-amber-700 cursor-pointer scale-[1.02]' : 'border-slate-200 bg-white text-slate-500 hover:border-amber-300 hover:shadow-sm hover:-translate-y-0.5 cursor-pointer'
                       }`}
                     >
-                      <QrcodeOutlined className="text-2xl mb-1" />
-                      <span className="text-[11px] font-bold">QR VIP</span>
+                      {paymentMethod === 'card' && <div className="absolute top-0 right-0 w-8 h-8 bg-amber-500 rounded-bl-xl flex items-center justify-center"><CheckCircleFilled className="text-white text-xs" /></div>}
+                      <QrcodeOutlined className="text-3xl mb-2 transition-transform group-hover:scale-110" />
+                      <span className="text-xs font-black tracking-wide">QR VIP</span>
                     </button>
                   </div>
                 </div>
 
                 <div className="mb-6 flex-1 flex flex-col justify-center">
                   {paymentMethod === 'cash' && (
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 animate-fadeIn">
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-sm font-medium text-slate-600">Tiền khách đưa:</span>
+                    <div className="bg-slate-50/80 border border-slate-200/60 rounded-xl p-5 shadow-inner backdrop-blur-sm animate-fadeIn">
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="text-sm font-semibold text-slate-600">Tiền khách đưa:</span>
                         <Input 
-                          className="w-32 text-right font-bold" 
+                          className="w-40 text-right font-black text-lg bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all rounded-lg" 
                           disabled={!canReviewVehicle}
                           value={canReviewVehicle && cashGiven ? parseInt(cashGiven).toLocaleString('en-US') : ''}
                           onChange={(e) => setCashGiven(e.target.value.replace(/\D/g, ''))}
+                          suffix={<span className="text-slate-400 font-medium text-sm">₫</span>}
                         />
                       </div>
-                      <div className="h-px w-full bg-slate-200 mb-3"></div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-slate-600">Tiền thối lại:</span>
-                        <span className="text-lg font-black text-slate-800">
-                          {Math.max(0, parseInt(cashGiven || 0) - displayAmount).toLocaleString('en-US')} <span className="text-xs font-bold text-slate-500">VND</span>
-                        </span>
+                      <div className="h-0 w-full border-b-[2px] border-dashed border-slate-300/70 mb-4"></div>
+                      <div className="flex justify-between items-end">
+                        <span className="text-sm font-semibold text-slate-600 mb-1">Tiền thối lại:</span>
+                        <div className="text-right">
+                          <span className="text-3xl font-black text-slate-800 tracking-tight">
+                            {Math.max(0, parseInt(cashGiven || 0) - displayAmount).toLocaleString('en-US')}
+                          </span>
+                          <span className="text-sm font-bold text-slate-500 ml-1">VND</span>
+                        </div>
                       </div>
                     </div>
                   )}
-                  {paymentMethod === 'qr' && (
+
+                  {paymentMethod === 'vnpay' && (
                     <div className="bg-white border border-blue-200 rounded-lg p-4 flex flex-col items-center justify-center animate-fadeIn shadow-sm relative overflow-hidden">
-                      <div className="w-28 h-28 bg-slate-50 rounded-lg flex items-center justify-center mb-3 border border-slate-200 overflow-hidden relative">
-                        <img src={`https://vietqr.app/img?acc=0818756569&bank=VietinBank&amount=${displayAmount}&des=${lpr}&template=compact&holder=DUONG PHUOC HUNG&store=Urban Park System`}
-                          alt='QR thanh toán VietQR' className="w-24 h-24 object-contain" />
+                      <div className="w-32 h-32 bg-slate-50 rounded-lg flex items-center justify-center mb-3 border border-slate-200 overflow-hidden relative p-2">
+                        {!canReviewVehicle ? (
+                          <div className="text-center">
+                            <span className="text-[10px] font-bold text-slate-400 block px-2">CHỜ XÁC NHẬN</span>
+                          </div>
+                        ) : vnpayUrl ? (
+                          <QRCode value={vnpayUrl} size={150} bordered={false} />
+                        ) : (
+                          <Spin />
+                        )}
                         <div className="absolute inset-0 bg-blue-500/10 animate-pulse pointer-events-none"></div>
                       </div>
-                      <span className="text-xs font-medium text-slate-500 text-center mb-3">Vui lòng yêu cầu khách hàng quét mã QR<br/>bằng ứng dụng Ngân hàng</span>
-                      <button onClick={handlePayment} disabled={!canReviewVehicle} className={`w-full border text-xs font-bold py-2 rounded transition-colors ${canReviewVehicle ? 'bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200 cursor-pointer' : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'}`}>
-                        Giả lập khách đã thanh toán thành công
-                      </button>
+                      <span className="text-xs font-medium text-slate-500 text-center mb-3">
+                        {!canReviewVehicle ? "Vui lòng 'Xác nhận thẻ' trước để lấy mã QR" : isPollingVnpay ? "Đang đợi thanh toán VNPay Sandbox..." : "Yêu cầu khách quét mã VNPay Sandbox"}
+                      </span>
                     </div>
                   )}
                   {paymentMethod === 'card' && (
                     <div className="bg-white border border-blue-200 rounded-lg p-4 flex flex-col items-center justify-center animate-fadeIn shadow-sm relative overflow-hidden">
                       <div className="w-28 h-28 bg-slate-50 rounded-lg flex items-center justify-center mb-3 border border-slate-200 overflow-hidden relative">
-                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=VIP_Checkout_${lpr || 'Unknown'}`} alt="QR Code VIP" className="w-24 h-24 object-contain" />
+                        <QRCode value={`VIP_Checkout_${lpr || 'Unknown'}`} size={100} bordered={false} />
                         <div className="absolute inset-0 bg-amber-500/10 animate-pulse pointer-events-none"></div>
                       </div>
                       <span className="text-xs font-medium text-slate-500 text-center mb-3">Mã QR dành cho Thành viên VIP<br/>(Dùng app hệ thống để quét)</span>
@@ -624,19 +653,21 @@ export const StaffPayment = () => {
                   )}
                 </div>
 
-                <div className="flex gap-3 mt-auto">
-                  <button onClick={handleCancel} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-lg transition-colors cursor-pointer">
+                <div className="flex gap-4 mt-auto">
+                  <button onClick={handleCancel} className="flex-[0.8] bg-white border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-600 font-bold py-3.5 rounded-xl transition-all duration-300 cursor-pointer shadow-sm hover:shadow active:scale-95">
                     Huỷ bỏ
                   </button>
                   <button 
                     onClick={handlePayment} 
                     disabled={isPaid || isCheckingOut || !canReviewVehicle}
-                    className={`flex-[2] text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md ${
-                      isPaid || isCheckingOut || !canReviewVehicle ? 'bg-slate-400 cursor-not-allowed shadow-none' : 'bg-[#1677ff] hover:bg-blue-600 shadow-blue-500/20 cursor-pointer'
+                    className={`flex-[2] text-white font-bold py-3.5 rounded-xl transition-all duration-300 flex items-center justify-center gap-3 text-sm tracking-wide ${
+                      isPaid || isCheckingOut || !canReviewVehicle 
+                        ? 'bg-slate-300 text-slate-100 cursor-not-allowed shadow-none' 
+                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] hover:-translate-y-0.5 cursor-pointer active:scale-95'
                     }`}
                   >
-                    <CheckCircleFilled />
-                    {!canReviewVehicle ? 'Cần xác nhận thẻ' : (displayAmount === 0 ? 'Xác nhận & Mở Cổng' : 'Thanh Toán & Mở Cổng')}
+                    <CheckCircleFilled className="text-lg" />
+                    {!canReviewVehicle ? 'CẦN XÁC NHẬN THẺ' : (displayAmount === 0 ? 'XÁC NHẬN & MỞ CỔNG' : 'THANH TOÁN & MỞ CỔNG')}
                   </button>
                 </div>
               </div>

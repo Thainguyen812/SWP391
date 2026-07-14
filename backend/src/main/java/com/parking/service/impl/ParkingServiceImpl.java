@@ -837,8 +837,13 @@ public class ParkingServiceImpl implements ParkingService {
             throw new ApiExceptions.ForbiddenException("Thẻ này đang nằm trong blacklist, không thể checkout");
         }
 
-        if (transactionRepository.findBySessionId(session.getId()).isPresent()) {
-            throw new ApiExceptions.ConflictException("Phiên gửi xe này đã có transaction");
+        Optional<Transaction> existingTxnOpt = transactionRepository.findBySessionId(session.getId());
+        if (existingTxnOpt.isPresent()) {
+            Transaction existingTxn = existingTxnOpt.get();
+            if (existingTxn.getPaymentStatus() == Transaction.PaymentStatus.SUCCESS) {
+                throw new ApiExceptions.ConflictException("Phiên gửi xe này đã hoàn tất thanh toán");
+            }
+            return existingTxn;
         }
 
         Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
@@ -1028,11 +1033,13 @@ public class ParkingServiceImpl implements ParkingService {
                     "Xe VIP không thuộc luồng congestion checkout");
         }
 
-        if (transactionRepository.findBySessionId(
-                session.getId()).isPresent()) {
-
-            throw new ApiExceptions.ConflictException(
-                    "Phiên gửi xe này đã có transaction");
+        Optional<Transaction> existingTxnOpt = transactionRepository.findBySessionId(session.getId());
+        if (existingTxnOpt.isPresent()) {
+            Transaction existingTxn = existingTxnOpt.get();
+            if (existingTxn.getPaymentStatus() == Transaction.PaymentStatus.SUCCESS) {
+                throw new ApiExceptions.ConflictException("Phiên gửi xe này đã hoàn tất thanh toán");
+            }
+            return existingTxn;
         }
 
         Vehicle vehicle = vehicleRepository
