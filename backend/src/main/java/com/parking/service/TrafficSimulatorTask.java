@@ -189,8 +189,10 @@ public class TrafficSimulatorTask {
             if (!emptyOutGates.isEmpty()) {
                 List<ParkingSession> insideVehicles = allSessions.stream()
                     .filter(s -> s.getSessionStatus() == ParkingSession.SessionStatus.ACTIVE
-                              && s.getEntryGate() == null
                               && s.getExitGate() == null)
+                    .filter(s -> s.getEntryGate() == null
+                              || s.getCardId() != null
+                              || Boolean.TRUE.equals(s.getIsVip()))
                     .filter(s -> s.getCheckInTime() != null && s.getCheckInTime().isBefore(exitEligibilityThreshold))
                     .filter(s -> processingIns.stream()
                             .noneMatch(p -> p.getLicensePlate().equalsIgnoreCase(s.getLicensePlate())))
