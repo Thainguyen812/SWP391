@@ -996,6 +996,8 @@ export const AuthPage = () => {
                   )}
                 </button>
 
+
+
                 <div className="text-center pt-4">
                   <p className="text-[13px] text-slate-500">
                     Chưa có tài khoản?{' '}

@@ -187,22 +187,24 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     adminService.getBranches()
       .then(res => {
         const items = Array.isArray(res.data) ? res.data : [];
-        if (items.length > 0) {
-          const mapped = items.map((b: any) => ({
-            id: b.id || `br-${Math.random().toString(36).slice(2,6)}`,
-            name: b.name || 'Chi nhánh',
-            address: b.location || b.address || '',
-            status: b.status || 'Hoạt động',
-            capacity: b.capacity || 0,
-            occupied: b.occupied || 0,
-            cars: b.cars || '0 / 0',
-            motorbikes: b.motorbikes || '0 / 0',
-            updateTime: 'Vừa cập nhật'
-          }));
-          setBranches(mapped);
-        }
+        const mapped = items.map((b: any) => ({
+          id: b.id || `br-${Math.random().toString(36).slice(2,6)}`,
+          name: b.name || 'Chi nhánh',
+          address: b.location || b.address || '',
+          status: b.status || 'Hoạt động',
+          capacity: b.capacity || 0,
+          occupied: b.occupied || 0,
+          cars: b.cars || '0 / 0',
+          motorbikes: b.motorbikes || '0 / 0',
+          updateTime: 'Vừa cập nhật'
+        }));
+        setBranches(mapped);
       })
-      .catch(() => {/* Keep empty, use fallback below */});
+      .catch((err) => {
+        console.error("Lỗi khi tải danh sách cơ sở từ server:", err);
+        // Do not use fallback mock data; instead, set to empty to reflect reality
+        setBranches([]);
+      });
   }, []);
 
   // Gate Control Live API States
@@ -1269,50 +1271,60 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
           {/* ACTIVE CONTENT WORKSPACE */}
           <div className="p-6 lg:p-8 flex-1 overflow-y-auto space-y-8">
             
-            {['revenue', 'staff', 'technical', 'security', 'system_log'].includes(activeMenu) && user?.role !== 'ADMIN' ? (
-              <div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-xl mx-auto space-y-6 animate-fade-in">
-                <div className="p-5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full animate-bounce">
-                  <Shield className="w-12 h-12 stroke-[1.5]" />
+            {['revenue', 'staff', 'technical', 'security', 'system_log'].includes(activeMenu) && user?.role !== 'ADMIN' && !import.meta.env.DEV ? (
+              <div className="flex flex-col items-center justify-center py-20 px-4 text-center max-w-2xl mx-auto space-y-8 animate-fade-in">
+                {/* Premium Animated Icon */}
+                <div className="relative">
+                  <div className="absolute inset-0 bg-rose-500/20 rounded-full blur-2xl animate-pulse" />
+                  <div className="relative p-6 bg-gradient-to-br from-rose-500/10 to-rose-600/5 border border-rose-500/20 text-rose-500 rounded-3xl shadow-[0_8px_32px_rgba(244,63,94,0.15)] backdrop-blur-xl">
+                    <Shield className="w-16 h-16 stroke-[1.5]" />
+                  </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white font-sans">
+                {/* Text Content */}
+                <div className="space-y-3 z-10">
+                  <h2 className="text-3xl font-black tracking-tight bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400 bg-clip-text text-transparent font-sans">
                     Quyền Truy Cập Bị Hạn Chế
                   </h2>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed font-semibold leading-relaxed">
-                    Chức năng <span className="font-extrabold text-rose-550 dark:text-rose-455">"{
+                  <p className="text-slate-500 dark:text-slate-400 text-base leading-relaxed font-semibold">
+                    Chức năng <span className="font-extrabold px-3 py-1 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-lg mx-1 shadow-sm border border-rose-100 dark:border-rose-500/20">{
                       activeMenu === 'revenue' ? 'Doanh thu & Báo cáo' :
                       activeMenu === 'staff' ? 'Quản lý nhân sự' :
                       activeMenu === 'technical' ? 'Cấu hình kỹ thuật' :
                       activeMenu === 'security' ? 'Bảo mật' :
                       activeMenu === 'system_log' ? 'Nhật ký hệ thống' : activeMenu
-                    }"</span> yêu cầu quyền tài khoản <span className="text-blue-500 font-extrabold text-sm uppercase">ADMIN</span>.
+                    }</span> yêu cầu quyền tài khoản <span className="text-blue-600 dark:text-blue-400 font-black tracking-wider uppercase">ADMIN</span>.
                   </p>
-                  <p className="text-xs text-slate-400 max-w-md mx-auto font-sans">
-                    Tài khoản hiện tại của bạn là <strong className="text-slate-600 dark:text-slate-300">"{user?.role}" ({user?.name})</strong> không có đầy đủ thẩm quyền trực tiếp.
-                  </p>
-                </div>
-
-                <div className="bg-slate-50 dark:bg-slate-900/45 p-5 rounded-2xl border border-slate-200 dark:border-slate-800/80 text-left w-full space-y-3.5">
-                  <span className="font-bold text-slate-400 text-[10px] uppercase tracking-wider block">💡 Cách kiểm tra nhanh quyền ADMIN:</span>
-                  <p className="text-[12px] text-slate-600 dark:text-slate-350 leading-relaxed font-semibold">
-                    Vui lòng sử dụng tính năng đăng xuất hoặc truy cập quản lý hệ thống bằng tài khoản phù hợp để dùng tính năng.
+                  <p className="text-sm text-slate-400 max-w-md mx-auto font-medium">
+                    Tài khoản hiện tại của bạn là <strong className="text-slate-700 dark:text-slate-200 px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700">"{user?.role}" ({user?.name})</strong> không có đầy đủ thẩm quyền trực tiếp.
                   </p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
+                {/* Instruction Card */}
+                <div className="bg-white/60 dark:bg-slate-900/40 p-6 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 text-left w-full space-y-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] backdrop-blur-xl relative overflow-hidden group hover:border-blue-500/30 transition-colors">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-3xl opacity-50 group-hover:opacity-100 transition-opacity" />
+                  <span className="font-bold text-blue-500 dark:text-blue-400 text-[11px] uppercase tracking-widest block flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Cách khắc phục
+                  </span>
+                  <p className="text-sm text-slate-600 dark:text-slate-350 leading-relaxed font-medium pl-3 border-l border-slate-200 dark:border-slate-700 ml-1">
+                    Vui lòng sử dụng tính năng đăng xuất hoặc truy cập quản lý hệ thống bằng tài khoản có quyền Quản trị tối cao (Admin) để tiếp tục thao tác.
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-col sm:flex-row gap-4 w-full justify-center pt-2">
                   <button
                     onClick={onLogout}
-                    className="px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold tracking-wide transition-all shadow-md active:scale-95 cursor-pointer"
+                    className="px-8 py-3.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-2xl text-sm font-bold tracking-wide transition-all shadow-lg hover:shadow-red-500/25 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                   >
                     Đăng xuất ngay
                   </button>
                   <button
                     onClick={() => {
                       setActiveMenu('overview');
-                      triggerToast('Quay lại Tổng quan', 'info');
+                      triggerToast('Đã quay lại Tổng quan', 'info');
                     }}
-                    className="px-5 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold tracking-wide transition-all active:scale-95 cursor-pointer"
+                    className="px-8 py-3.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold tracking-wide transition-all hover:shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                   >
                     Quay lại Tổng quan
                   </button>
@@ -1416,23 +1428,24 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                   <div className="space-y-6 animate-fade-in text-slate-850 dark:text-slate-150" id="guard-checkpoint-view">
                     
                     {/* Page Header */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 border-b border-slate-150 dark:border-slate-800 text-left">
-                      <div className="space-y-1 block">
-                        <div className="text-[10px] uppercase font-black tracking-widest text-slate-400 dark:text-slate-500">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-200/50 dark:border-slate-800/50 text-left">
+                      <div className="space-y-1.5 block">
+                        <div className="text-[10px] uppercase font-black tracking-widest text-blue-500 dark:text-blue-400">
                           Bốt điều hành &gt; {activeFacility === 'cs1' ? 'Cơ sở 01' : activeFacility === 'cs2' ? 'Cơ sở 02' : 'Toàn hệ thống'}
                         </div>
                         <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-sans flex items-center gap-2">
-                          <ShieldAlert className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-                          Tiểu Khu Trực Cổng & Kiểm Soát Phương Tiện
+                          <ShieldAlert className="w-8 h-8 text-blue-600 dark:text-blue-500 drop-shadow-md" />
+                          Tiểu Khu Trực Cổng & Kiểm Soát
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-bold font-sans">
-                          Thiết kế giao diện nhập liệu thông minh cho nhân viên gác cổng - {
+                          Hệ thống nhập liệu thông minh dành cho nhân viên an ninh - {
                             activeFacility === 'cs1' ? 'Cơ sở 01 (Vincom Center)' : activeFacility === 'cs2' ? 'Cơ sở 02 (Landmark 81)' : 'Toàn hệ thống'
                           }
                         </p>
                       </div>
                       
-                      <div className="flex items-center gap-2 bg-blue-600/10 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400 px-3 py-1.5 rounded-full border border-blue-200/40 text-xs font-black">
+                      <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 text-emerald-600 dark:from-emerald-400/20 dark:to-teal-400/20 dark:text-emerald-400 px-4 py-2 rounded-xl border border-emerald-200/50 dark:border-emerald-800/50 text-xs font-black shadow-sm">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                         GATE AGENT ACTIVE
                       </div>
                     </div>
@@ -1441,154 +1454,137 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                       
                       {/* Left Column: Swipe Form Gate controller */}
-                      <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 flex flex-col justify-between space-y-6 shadow-sm text-left">
-                        <div className="space-y-5">
+                      <div className="lg:col-span-5 bg-white/90 dark:bg-slate-900/90 border border-slate-200/50 dark:border-slate-800/50 rounded-[24px] p-7 flex flex-col justify-between space-y-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] text-left relative overflow-hidden backdrop-blur-xl group">
+                        {/* Decorative gradient blur */}
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none transition-opacity group-hover:opacity-100 opacity-50" />
+                        
+                        <div className="space-y-6 relative z-10">
                           <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
-                            <span className="text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 block">VẬN HÀNH</span>
-                            <h3 className="text-sm font-black text-slate-850 dark:text-slate-200 uppercase tracking-wide">Nhập thông tin biển số / Mã thẻ</h3>
+                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-1">VẬN HÀNH</span>
+                            <h3 className="text-lg font-black text-slate-850 dark:text-slate-200 tracking-tight font-sans">NHẬP THÔNG TIN KIỂM SOÁT</h3>
                           </div>
 
-                          {/* Virtual Gate LED Board (Flow 6) */}
-                          <div className="bg-black text-[#ff3b30] font-mono p-4 rounded-2xl border border-slate-800 shadow-inner flex flex-col items-center justify-center text-center space-y-1.5 relative overflow-hidden select-none mb-2">
-                            <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-red-600 via-rose-500 to-red-650 opacity-40 animate-pulse" />
-                            <span className="text-[8px] text-slate-500 uppercase tracking-widest block font-sans">BẢNG LED ĐIỆN TỬ CỔNG TRỰC (IoT LED Display)</span>
-                            <strong className="text-[13px] font-black tracking-widest uppercase block animate-pulse">
-                              {isSecurityLockTriggered 
-                                ? "🚨 XE BỊ KHÓA — VUI LÒNG T T KHÓA TRÊN APP" 
-                                : "CHÀO MỪNG BẠN ĐẾN VỚI URBANPARK"}
-                            </strong>
+                          {/* LED Display Redesigned */}
+                          <div className="bg-[#0f172a] rounded-2xl p-4 shadow-inner border border-slate-800 flex items-center justify-center relative overflow-hidden group/led">
+                            <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4px_4px] opacity-20 pointer-events-none" />
+                            <div className="text-center relative z-10 w-full">
+                              <span className="text-[8px] text-slate-500 font-bold uppercase tracking-[0.2em] block mb-2 opacity-70">LED HIỂN THỊ CỔNG TRỰC</span>
+                              <div className="text-red-500 dark:text-red-500 font-mono text-sm sm:text-base font-black tracking-widest uppercase drop-shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse">
+                                CHÀO MỪNG ĐẾN URBANPARK
+                              </div>
+                            </div>
                           </div>
 
-                          <form onSubmit={handlePerformGateScan} className="space-y-4">
+                          <form onSubmit={handlePerformGateScan} className="space-y-5">
                             {/* Gate Select */}
-                            <div className="space-y-1.5">
-                              <label className="text-[11px] font-extrabold text-slate-400 dark:text-slate-500 uppercase block tracking-wider">Chọn Bốt Gác Cổng Trực</label>
-                              <select
+                            <div className="space-y-1.5 text-left block">
+                              <label className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-400 tracking-wider">CHỌN BỐT GÁC</label>
+                              <select 
                                 value={gateActiveName}
                                 onChange={(e) => setGateActiveName(e.target.value)}
-                                className="w-full p-3 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800/80 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-250 transition-colors focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full p-3 font-semibold text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm appearance-none cursor-pointer"
                               >
-                                {(activeFacility === 'all' || activeFacility === 'cs1') && (
-                                  <>
-                                    <option value="Cổng vào 1">CS1 - Bốt Gác Cổng Vào chính B1 (HQ)</option>
-                                    <option value="Cổng vào 2">CS1 - Bốt Gác Cổng Vào phụ G2</option>
-                                    <option value="Cổng ra 1">CS1 - Bốt Gác Cổng Ra chính v1</option>
-                                  </>
-                                )}
-                                {(activeFacility === 'all' || activeFacility === 'cs2') && (
-                                  <>
-                                    <option value="Cổng vào 3">CS2 - Bốt Gác Landmark Cổng Vào A1</option>
-                                    <option value="Cổng ra 2">CS2 - Bốt Gác Landmark Cổng Ra B2</option>
-                                    <option value="Cổng ra 3">CS2 - Bốt Gác Landmark Cổng Ra chính</option>
-                                  </>
-                                )}
+                                <option value="CS1 - Bốt Gác Cổng Vào chính B1 (HQ)">CS1 - Bốt Gác Cổng Vào chính B1 (HQ)</option>
+                                <option value="CS1 - Bốt Gác Cổng Ra B2 (HQ)">CS1 - Bốt Gác Cổng Ra B2 (HQ)</option>
+                                <option value="CS2 - Bốt Gác Cổng VIP (VIP)">CS2 - Bốt Gác Cổng VIP (VIP)</option>
+                                <option value="CS3 - Bốt Gác Tầng Hầm (Mega)">CS3 - Bốt Gác Tầng Hầm (Mega)</option>
                               </select>
                             </div>
 
-                            {/* License Plate Textbox */}
-                            <div className="space-y-1.5">
-                              <label className="text-[11px] font-extrabold text-slate-400 dark:text-slate-500 uppercase block tracking-wider">
-                                Nhập Biển Số Xe (LPR Backup / Manual)
-                              </label>
-                              <input
+                            {/* Plate Input */}
+                            <div className="space-y-1.5 text-left block">
+                              <label className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-400 tracking-wider">BIỂN SỐ XE <span className="text-slate-400 font-normal normal-case">(LPR Backup/Manual)</span></label>
+                              <input 
                                 type="text"
                                 value={gatePlate}
                                 onChange={(e) => setGatePlate(e.target.value)}
-                                placeholder="Ví dụ: 30G-123.45 hoặc 29M1-678.90"
-                                className="w-full p-3 font-mono font-bold tracking-widest bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl text-sm text-slate-800 dark:text-slate-250 uppercase placeholder-slate-400 focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="VD: 30G-123.45 HOẶC 29M1-678.90"
+                                className="w-full p-3 font-mono text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm uppercase"
                               />
                             </div>
 
-                            {/* Card Code (Rfid/Physical RFID key option) */}
-                            <div className="space-y-1.5">
-                              <label className="text-[11px] font-extrabold text-slate-400 dark:text-slate-500 uppercase block tracking-wider">
-                                Quét / Nhập mã thẻ từ (RFID Key Code)
-                              </label>
+                            {/* Card Input */}
+                            <div className="space-y-1.5 text-left block">
+                              <label className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-400 tracking-wider">MÃ THẺ TỪ <span className="text-slate-400 font-normal normal-case">(RFID Key Code)</span></label>
                               <div className="relative">
-                                <input
+                                <input 
                                   type="text"
                                   value={gateCardCode}
                                   onChange={(e) => setGateCardCode(e.target.value)}
-                                  placeholder="Nhập mã thẻ, ví dụ: 8892 (Camry), 1188 (SH)..."
-                                  className="w-full p-3 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-250 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 outline-none"
+                                  placeholder="Nhập mã thẻ, vd: 8892"
+                                  className="w-full p-3 pr-20 font-mono text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
                                 />
-                                <div className="absolute right-2.5 top-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setGateCardCode("8892");
-                                      triggerToast("🔒 Đã dán mã thẻ thử nghiệm Camry VIP (8892)", "info");
-                                    }}
-                                    className="px-2 py-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 rounded text-[9.5px] font-extrabold text-slate-600 dark:text-slate-300"
-                                  >
-                                    Mẫu thẻ
-                                  </button>
-                                </div>
+                                <button type="button" onClick={() => setGateCardCode('8892')} className="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-colors cursor-pointer">
+                                  Mẫu thẻ
+                                </button>
                               </div>
                             </div>
 
-                            {/* QR Token copy placeholder */}
-                            <div className="space-y-1.5">
-                              <label className="text-[11px] font-extrabold text-slate-400 dark:text-slate-500 uppercase block tracking-wider">
-                                Dán mã QR Vé (Sao chép từ App tài xế)
-                              </label>
-                              <input
+                            {/* QR Input */}
+                            <div className="space-y-1.5 text-left block">
+                              <label className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-400 tracking-wider">MÃ QR VÉ TÀI XẾ</label>
+                              <input 
                                 type="text"
                                 value={gateQrToken}
                                 onChange={(e) => setGateQrToken(e.target.value)}
-                                placeholder="Dán chuỗi mã QR (Ví dụ: 30G-123.45|VÀO|1718919191)"
-                                className="w-full p-3 font-mono text-[11px] bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-250 placeholder-slate-450 focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="Dán mã QR (VD: 30G-123.45|VÀO|1718919191)"
+                                className="w-full p-3 font-mono text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
                               />
                             </div>
 
                             <button
                               type="submit"
                               disabled={isProcessingGateScan}
-                              className="w-full py-4 text-white font-extrabold text-xs uppercase tracking-wider bg-gradient-to-r from-blue-600 to-indigo-650 hover:from-blue-700 hover:to-indigo-700 rounded-xl shadow-lg shadow-blue-500/10 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                              className="w-full mt-2 py-4 text-white font-black text-sm uppercase tracking-widest bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_25px_rgba(37,99,235,0.5)] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 group/btn"
                             >
                               {isProcessingGateScan ? (
                                 <>
-                                  <RefreshCw className="w-4 h-4 animate-spin" />
-                                  <span>Đang liên kết API cổng bốt...</span>
+                                  <RefreshCw className="w-5 h-5 animate-spin" />
+                                  <span>ĐANG XỬ LÝ...</span>
                                 </>
                               ) : (
                                 <>
-                                  <Check className="w-4 h-4" />
-                                  <span>THỰC HIỆN THÔNG XE CỔNG CHÍNH</span>
+                                  <Check className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
+                                  <span>THỰC HIỆN THÔNG XE</span>
                                 </>
                               )}
                             </button>
                           </form>
                         </div>
 
-                        <div className="text-[10px] text-slate-550 dark:text-slate-450 leading-relaxed bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-150 dark:border-slate-800 block">
-                          📢 <strong>Yêu cầu kiểm thử API Thật:</strong> Quét biển số xe <strong>"30F-999.78"</strong> có sẵn trong hệ thống (đang bật Khóa chống trộm mặc định) để tận mắt trông thấy tiếng siren hú bảo động đỏ nứt bốt điều hành!
+                        <div className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-800/30 block relative z-10">
+                          <strong className="text-blue-600 dark:text-blue-400">💡 Mẹo kiểm thử API:</strong> Thử quét biển số xe <strong className="font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded text-blue-700 dark:text-blue-300">30F-999.78</strong> có sẵn trong DB (đang bật khóa) để kích hoạt báo động!
                         </div>
                       </div>
 
                       {/* Right Column: Dynamic scanning feeds */}
-                      <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 flex flex-col justify-between space-y-6 shadow-sm text-left">
-                        <div className="space-y-4 w-full">
-                          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                      <div className="lg:col-span-7 bg-white/90 dark:bg-slate-900/90 border border-slate-200/50 dark:border-slate-800/50 rounded-[24px] p-7 flex flex-col justify-between space-y-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] text-left relative overflow-hidden backdrop-blur-xl">
+                        <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+                        
+                        <div className="space-y-6 w-full relative z-10">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 gap-3">
                             <div>
-                              <span className="text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 block">NHẬT KÝ KIỂM SOÁT</span>
-                              <h3 className="text-sm font-black text-slate-850 dark:text-slate-200 uppercase tracking-wide">Nhật ký quét thực tế tự động từ API</h3>
+                              <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-1">NHẬT KÝ KIỂM SOÁT</span>
+                              <h3 className="text-lg font-black text-slate-850 dark:text-slate-200 tracking-tight font-sans">QUÉT THỰC TẾ TỰ ĐỘNG (LIVE API)</h3>
                             </div>
                             <button
                               type="button"
                               onClick={handleClearGateLogs}
-                              className="text-[10.5px] font-black text-red-500 hover:text-red-650 flex items-center gap-1 cursor-pointer"
+                              className="text-[10px] font-black text-rose-500 hover:text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors"
                             >
                               <Archive className="w-3.5 h-3.5" />
-                              Dọn nhật ký
+                              DỌN NHẬT KÝ
                             </button>
                           </div>
 
-                          <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                          <div className="space-y-4 max-h-[480px] overflow-y-auto pr-2 custom-scrollbar">
                             {filteredScanLogs.length === 0 ? (
-                              <div className="py-16 text-center text-xs text-slate-400 dark:text-slate-550 space-y-2">
-                                <QrCode className="w-12 h-12 text-slate-200 dark:text-slate-800 mx-auto" />
-                                <p>Chưa có dữ liệu thông xe nào trong bão gác chính của cơ sở ngày hôm nay.</p>
+                              <div className="py-20 text-center flex flex-col items-center justify-center space-y-3">
+                                <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-2">
+                                  <QrCode className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                                </div>
+                                <p className="text-sm font-bold text-slate-400 dark:text-slate-500">Chưa có dữ liệu thông xe nào hôm nay.</p>
+                                <p className="text-[10px] text-slate-400">Nhật ký sẽ tự động xuất hiện khi có xe qua cổng.</p>
                               </div>
                             ) : (
                               filteredScanLogs.map(log => {
@@ -1596,41 +1592,41 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                                 return (
                                   <div
                                     key={log.id}
-                                    className={`p-4 rounded-2xl border transition-all ${
+                                    className={`p-5 rounded-2xl border transition-all hover:-translate-y-0.5 ${
                                       isBlocked 
-                                        ? "bg-red-50/70 border-red-200 dark:bg-red-950/15 dark:border-red-900" 
-                                        : "bg-slate-50 border-slate-200/60 dark:bg-slate-950 dark:border-slate-850"
+                                        ? "bg-rose-50/50 border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/50 shadow-sm" 
+                                        : "bg-white dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-700/50 hover:shadow-md"
                                     } flex flex-col sm:flex-row justify-between items-start gap-4`}
                                   >
-                                    <div className="space-y-1.5 flex-1 select-none">
-                                      <div className="flex items-center gap-2">
-                                        <span className={`text-[9.5px] px-2 py-0.5 rounded-md font-bold ${
+                                    <div className="space-y-2 flex-1 select-none">
+                                      <div className="flex items-center gap-3">
+                                        <span className={`text-[10px] px-2.5 py-1 rounded-md font-black uppercase tracking-wider ${
                                           log.action === "VÀO" 
-                                            ? "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400" 
-                                            : "bg-blue-500/10 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400"
+                                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" 
+                                            : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
                                         }`}>
                                           {log.action === "VÀO" ? "CHIỀU VÀO" : "CHIỀU RA"}
                                         </span>
-                                        <span className="text-[11.5px] font-mono font-black text-slate-805 dark:text-slate-205">
+                                        <span className="text-base font-mono font-black text-slate-850 dark:text-white">
                                           {log.plate}
                                         </span>
                                         
                                         {/* Status badge */}
-                                        <span className={`text-[9.5px] font-black px-1.5 py-0.5 rounded ${
+                                        <span className={`text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider ${
                                           isBlocked 
-                                            ? "bg-rose-500 text-white animate-pulse" 
-                                            : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-305"
+                                            ? "bg-rose-500 text-white shadow-[0_0_10px_rgba(244,63,94,0.4)] animate-pulse" 
+                                            : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
                                         }`}>
                                           {log.status}
                                         </span>
                                       </div>
-                                      <p className="text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed font-semibold">
+                                      <p className="text-[12px] text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
                                         {log.message}
                                       </p>
-                                      <div className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-2 font-mono">
-                                        <span>📍 {log.gate}</span>
-                                        <span>•</span>
-                                        <span>🕒 {log.time}</span>
+                                      <div className="text-[10.5px] text-slate-400 dark:text-slate-500 flex items-center gap-3 font-mono pt-1">
+                                        <span className="flex items-center gap-1"><span className="text-blue-500">📍</span> {log.gate}</span>
+                                        <span className="text-slate-300 dark:text-slate-700">|</span>
+                                        <span className="flex items-center gap-1"><span className="text-blue-500">🕒</span> {log.time}</span>
                                       </div>
                                     </div>
                                   </div>
@@ -1640,8 +1636,9 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                           </div>
                         </div>
 
-                        <div className="text-[10.5px] font-medium text-slate-450 dark:text-slate-550 border-t border-slate-100 dark:border-slate-800 pt-4 text-left leading-normal italic">
-                          🔄 <strong>Tự động đồng bộ:</strong> Nhật ký cổng trực đang liên tục đồng bộ với máy chủ Backend bãi đỗ UrbanPark theo chu kỳ 3.5 giây để luôn cập nhật chuẩn xác nhất các trường hợp sự cố và thông barie.
+                        <div className="text-[10.5px] font-medium text-slate-500 dark:text-slate-500 border-t border-slate-100 dark:border-slate-800 pt-4 text-left flex items-start gap-2 relative z-10">
+                          <span className="animate-spin-slow">🔄</span>
+                          <span><strong>Đồng bộ tự động:</strong> Nhật ký cổng trực đang liên tục đồng bộ với máy chủ Backend UrbanPark theo chu kỳ <span className="font-mono text-blue-500 font-bold">3.5s</span> để luôn cập nhật chuẩn xác nhất các sự cố và thông barie.</span>
                         </div>
                       </div>
 
@@ -1649,7 +1646,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                   </div>
                 )}
 
-                {activeMenu === 'overview' && (
+                                {activeMenu === 'overview' && (
                   <div className="space-y-6 animate-fade-in text-slate-850 dark:text-slate-100" id="facility-overview-view">
                     
                     {/* BREADCRUMB HEADER BANNER */}
@@ -1677,187 +1674,168 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                       </div>
                     </div>
 
-                    {/* MAIN TWO-COLUMN CONTAINER */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                      
-                      {/* LEFT RAIL: MAP & OVERALL HEALTH (col-span-4) */}
-                      <div className="lg:col-span-4 flex flex-col gap-6">
-                        
-                        {/* MAP CONTAINER */}
-                        <div className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-left flex flex-col justify-between">
-                          <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
-                            <span className="font-bold text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                              Bản đồ hệ thống
-                            </span>
-                            <button 
-                              onClick={() => triggerToast('Mở rộng toàn bản đồ vệ tinh!', 'info')}
-                              className="text-[10.5px] font-extrabold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                            >
-                              Mở rộng
-                            </button>
+                    {/* KPI CARDS ROW */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                      {[
+                        { title: 'TỔNG CƠ SỞ', value: filteredBranches.length, icon: '🏢', sub: 'Cơ sở đang quản lý', color: 'text-blue-500' },
+                        { title: 'TỔNG SỨC CHỨA', value: totalCapacity, icon: '🅿️', sub: 'Chỗ đỗ ô tô & xe máy', color: 'text-emerald-500' },
+                        { title: 'XE ĐANG ĐỖ', value: totalOccupied, icon: '🚗', sub: 'Chiếm ' + (totalCapacity > 0 ? Math.round((totalOccupied/totalCapacity)*100) : 0) + '% tổng sức chứa', color: 'text-indigo-500' },
+                        { title: 'CẢNH BÁO', value: filteredBranches.filter(b => b.status === 'Bảo trì' || (b.capacity > 0 && b.occupied/b.capacity > 0.9)).length, icon: '🚨', sub: 'Cơ sở cần chú ý', color: 'text-rose-500' },
+                      ].map((kpi, i) => (
+                        <div key={i} className="bg-white/90 dark:bg-slate-900/90 border border-slate-200/50 dark:border-slate-800/50 rounded-2xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] backdrop-blur-xl hover:-translate-y-1 transition-transform cursor-default text-left group">
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                              <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{kpi.title}</span>
+                              <h4 className="text-3xl font-black text-slate-850 dark:text-white font-mono">{kpi.value}</h4>
+                            </div>
+                            <div className={`text-3xl ${kpi.color} opacity-80 group-hover:scale-110 transition-transform`}>{kpi.icon}</div>
                           </div>
-
-                          {/* HIGH CONTRAST STYLIZED VECTOR MAP PLACEHOLDER */}
-                          <div className="relative h-48 bg-[#151c2c] rounded-xl my-4 overflow-hidden shadow-inner flex items-center justify-center">
-                            {/* Grid Lines */}
-                            <div className="absolute inset-0 bg-[linear-gradient(to_right,#334155_1px,transparent_1px),linear-gradient(to_bottom,#334155_1px,transparent_1px)] bg-[size:14px_24px] opacity-20" />
-                            
-                            {/* Vector Landmass Shapes */}
-                            <div className="absolute w-20 h-20 rounded-full bg-slate-805/40 -top-4 -left-4 blurred-2xl" />
-                            <div className="absolute w-32 h-20 rounded-3xl bg-slate-805/20 bottom-2 right-4 blurred-2xl" />
-
-                            {/* Street pathways */}
-                            <div className="absolute top-1/2 w-full h-1 bg-slate-700/30 transform -translate-y-1/2" />
-                            <div className="absolute left-1/3 h-full w-1 bg-slate-700/30" />
-                            <div className="absolute right-1/4 h-full w-1 bg-slate-700/30 transform rotate-12" />
-
-                            {/* MAP MARKERS (SCREENSHOT 1 SPECIFICS) */}
-                            {/* Marker 1: Q1-A (Blue, Active) */}
-                            <div className="absolute top-[25%] left-[28%] text-center cursor-pointer transform -translate-y-1/2 -translate-x-1/2 scale-100 hover:scale-110 transition-all select-none" onClick={() => triggerToast('Cơ sở Quận 1 (A) hoạt động ổn định', 'success')}>
-                              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 absolute top-1.5 left-1.5 animate-ping" />
-                              <div className="px-2 py-1 bg-blue-600 text-white font-mono text-[9px] font-black rounded-md shadow-md border border-blue-450 z-10 relative">
-                                Q1-A
-                              </div>
-                            </div>
-
-                            {/* Marker 2: Q3-B (Blue, Active) */}
-                            <div className="absolute bottom-[35%] right-[32%] text-center cursor-pointer transform -translate-y-1/2 -translate-x-1/2 scale-100 hover:scale-110 transition-all select-none" onClick={() => triggerToast('Cơ sở Quận 3 (B) hoạt động ổn định', 'success')}>
-                              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 absolute top-1.5 left-1.5 animate-ping" />
-                              <div className="px-2 py-1 bg-blue-600 text-white font-mono text-[9px] font-black rounded-md shadow-md border border-blue-450 z-10 relative">
-                                Q3-B
-                              </div>
-                            </div>
-
-                            {/* Marker 3: Q5-C (Red, Alert / Maintenance) */}
-                            <div className="absolute top-[45%] right-[15%] text-center cursor-pointer transform -translate-y-1/2 -translate-x-1/2 scale-100 hover:scale-110 transition-all select-none" onClick={() => triggerToast('Cơ sở Quận 5 (C) SC VivoCity đang bảo trì LPR!', 'error')}>
-                              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 absolute top-1.5 left-1.5 animate-ping" />
-                              <div className="px-2 py-1 bg-rose-600 text-white font-mono text-[9px] font-black rounded-md shadow-md border border-rose-450 z-10 relative">
-                                Q5-C
-                              </div>
-                            </div>
-                          </div>
-
-                          <span className="text-[10px] text-slate-400 font-bold block text-center">
-                            📡 Hệ thống định vị trạm thời gian thực (LBS) GPS
-                          </span>
+                          <div className="mt-3 text-[11px] font-bold text-slate-500">{kpi.sub}</div>
                         </div>
+                      ))}
+                    </div>
 
-                        {/* OVERALL HEALTH CONTAINER */}
-                        <div className="bg-white dark:bg-slate-905 border border-slate-205 dark:border-slate-800 rounded-2xl p-5 text-left block">
-                          <span className="font-bold text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-3">
-                            Trạng thái Tổng thể
-                          </span>
+                    {/* MAIN FULL-WIDTH MAP HERO */}
+                    <div className="mb-6 bg-white/90 dark:bg-slate-900/90 border border-slate-200/50 dark:border-slate-800/50 rounded-[24px] p-1.5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] backdrop-blur-xl relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+                      
+                      {/* HIGH CONTRAST STYLIZED VECTOR MAP */}
+                      <div className="relative h-72 md:h-96 bg-slate-900 dark:bg-[#0f172a] rounded-[20px] overflow-hidden flex items-center justify-center w-full shadow-inner">
+                        {/* Map Gradient Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent opacity-60 z-10 pointer-events-none" />
+                        
+                        {/* Grid Lines */}
+                        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:24px_24px] opacity-40" />
+                        
+                        {/* Vector Landmass Shapes */}
+                        <div className="absolute w-72 h-72 rounded-full bg-slate-800/50 -top-10 -left-10 blur-[60px]" />
+                        <div className="absolute w-96 h-48 rounded-full bg-blue-900/20 bottom-10 right-20 blur-[60px]" />
 
-                          <div className="space-y-4 block">
-                            <div className="flex justify-between items-end">
-                              <span className="text-xs font-bold text-slate-500">Sức chứa toàn hệ thống</span>
-                              <strong className="text-base font-black text-slate-850 dark:text-white">72%</strong>
+                        {/* Street pathways */}
+                        <div className="absolute top-[40%] w-full h-1 bg-slate-800/80 shadow-[0_0_15px_rgba(51,65,85,0.5)]" />
+                        <div className="absolute left-[30%] h-full w-1 bg-slate-800/80 shadow-[0_0_15px_rgba(51,65,85,0.5)]" />
+                        <div className="absolute right-[25%] h-full w-1 bg-slate-800/80 transform rotate-12 shadow-[0_0_15px_rgba(51,65,85,0.5)]" />
+
+                        {/* MAP MARKERS DYNAMIC */}
+                        {filteredBranches.map((branch, idx) => {
+                          // Deterministic pseudo-random positions based on index
+                          const positions = [
+                            { top: '35%', left: '28%' },
+                            { bottom: '40%', right: '35%' },
+                            { top: '45%', right: '20%' },
+                            { top: '20%', right: '40%' },
+                            { bottom: '25%', left: '35%' },
+                            { top: '60%', left: '15%' }
+                          ];
+                          const pos = positions[idx % positions.length];
+                          const isWarning = branch.status === 'Bảo trì' || (branch.capacity > 0 && branch.occupied/branch.capacity > 0.9);
+                          
+                          return (
+                            <div key={branch.id} className="absolute text-center cursor-pointer transform -translate-y-1/2 -translate-x-1/2 scale-100 hover:scale-110 transition-all z-20 group/marker" 
+                                 style={pos}
+                                 onClick={() => triggerToast(isWarning ? `${branch.name} đang có cảnh báo!` : `${branch.name} hoạt động ổn định`, isWarning ? 'error' : 'success')}>
+                              <div className={`w-12 h-12 rounded-full absolute -top-4 -left-4 animate-ping ${isWarning ? 'bg-rose-500/30' : 'bg-blue-500/20'}`} />
+                              <span className={`w-3.5 h-3.5 rounded-full absolute -top-0.5 -left-0.5 border-2 border-white dark:border-slate-900 ${isWarning ? 'bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,1)]' : 'bg-blue-400 shadow-[0_0_12px_rgba(96,165,250,1)]'}`} />
+                              <div className={`mt-5 px-3 py-1.5 backdrop-blur-md text-white text-[10px] font-black rounded-lg shadow-xl border whitespace-nowrap ${isWarning ? 'bg-rose-600 border-rose-450 group-hover/marker:-translate-y-1 transition-transform' : 'bg-slate-900/90 border-slate-700/50 opacity-80 group-hover/marker:opacity-100 transition-opacity'}`}>
+                                {isWarning ? '⚠️ ' : ''}{branch.name}
+                              </div>
                             </div>
+                          );
+                        })}
 
-                            {/* Indigo Progress gauge bar */}
-                            <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                              <div className="h-full bg-blue-600 rounded-full" style={{ width: '72%' }} />
+                        {/* Floating Health Panel Inside Map */}
+                        <div className="absolute bottom-6 left-6 z-30 bg-white/10 dark:bg-slate-900/60 backdrop-blur-xl border border-white/20 dark:border-slate-700/50 p-5 rounded-2xl w-72 shadow-2xl hidden sm:block text-left">
+                          <span className="font-bold text-[10px] uppercase tracking-widest text-slate-300 block mb-3">Sức chứa toàn hệ thống</span>
+                          <div className="flex justify-between items-end mb-2">
+                            <strong className="text-4xl font-black text-white font-mono leading-none">
+                              {totalCapacity > 0 ? Math.round((totalOccupied / totalCapacity) * 100) : 0}%
+                            </strong>
+                            <span className="text-xs font-bold text-slate-300 mb-1">{totalOccupied} / {totalCapacity}</span>
+                          </div>
+                          <div className="w-full h-2 bg-slate-800/80 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.8)] relative overflow-hidden" style={{ width: `${totalCapacity > 0 ? Math.round((totalOccupied / totalCapacity) * 100) : 0}%` }}>
+                              <div className="absolute top-0 right-0 bottom-0 w-10 bg-gradient-to-r from-transparent to-white/30 animate-pulse" />
                             </div>
+                          </div>
+                        </div>
+                        
+                        <div className="absolute top-6 left-6 z-30 text-left">
+                          <h2 className="text-white font-black text-2xl tracking-tight drop-shadow-lg font-sans">BẢN ĐỒ THỜI GIAN THỰC</h2>
+                          <p className="text-blue-300/80 text-[10px] font-black tracking-widest uppercase">Hệ thống định vị GPS LBS</p>
+                        </div>
+                        
+                        {/* Map Expand button */}
+                        <button onClick={() => triggerToast('Đã mở rộng bản đồ!', 'info')} className="absolute top-6 right-6 z-30 bg-slate-900/80 hover:bg-blue-600 backdrop-blur-md text-white border border-slate-700/50 p-3 rounded-xl transition-colors cursor-pointer shadow-xl">
+                          <div className="w-4 h-4 border-2 border-white border-t-0 border-l-0 rounded-br-sm" />
+                        </button>
+                      </div>
+                    </div>
 
-                            {/* Grid of total Active vs Maintenance indicators */}
-                            <div className="grid grid-cols-2 gap-3 pt-2">
-                              {/* Box 1: Active */}
-                              <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850 rounded-xl text-left">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                  <span className="text-[10px] font-bold text-slate-400 uppercase">Hoạt động</span>
+                    {/* FACILITY CARDS GRID */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 pb-6">
+                      {branches.map(branch => {
+                        const percentage = branch.capacity === 0 ? 0 : Math.round((branch.occupied / branch.capacity) * 100);
+                        const isWarning = branch.status === 'Bảo trì' || percentage >= 90;
+                        return (
+                          <div key={branch.id} className="bg-white/90 dark:bg-slate-900/90 border border-slate-200/50 dark:border-slate-800/50 rounded-[24px] p-6 text-left flex flex-col justify-between hover:-translate-y-2 hover:border-blue-500/50 hover:shadow-[0_20px_40px_rgb(59,130,246,0.15)] shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] backdrop-blur-xl transition-all duration-300 group">
+                            <div className="space-y-5">
+                              <div className="flex justify-between items-start">
+                                <div className="leading-tight block text-left">
+                                  <h3 className="text-lg font-black text-slate-850 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors font-sans">{branch.name}</h3>
+                                  <span className="text-[11px] text-slate-400 font-bold block mt-1">{branch.address}</span>
                                 </div>
-                                <h4 className="text-xl font-black font-mono tracking-tight mt-1">11</h4>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full ${isWarning ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
+                                <span className={`text-[10px] font-black uppercase tracking-wider ${isWarning ? 'text-rose-600 dark:text-rose-450' : 'text-emerald-600 dark:text-emerald-450'}`}>
+                                  {branch.status}
+                                </span>
+                              </div>
+
+                              <div className="space-y-2 pt-2">
+                                <div className="flex justify-between text-xs font-bold text-slate-500">
+                                  <span>Tỷ lệ lấp đầy</span>
+                                  <span className="text-slate-850 dark:text-white font-mono">{percentage}%</span>
+                                </div>
+                                <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                  <div className={`h-full rounded-full transition-all duration-1000 ${isWarning ? 'bg-gradient-to-r from-rose-500 to-red-600' : 'bg-gradient-to-r from-blue-500 to-indigo-600'}`} style={{ width: `${percentage}%` }} />
+                                </div>
+                                <div className="flex justify-between text-[11px] font-bold text-slate-450 pt-1">
+                                  <span>Đang đỗ: {branch.occupied}</span>
+                                  <span>Sức chứa: {branch.capacity}</span>
+                                </div>
                               </div>
                               
-                              {/* Box 2: Maintenance */}
-                              <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850 rounded-xl text-left">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                                  <span className="text-[10px] font-bold text-slate-400 uppercase">Bảo trì</span>
+                              <div className="grid grid-cols-2 gap-2 pt-1">
+                                <div className="bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800 rounded-xl p-2 text-center">
+                                  <span className="block text-[9px] font-bold text-slate-400 uppercase">Ô TÔ</span>
+                                  <span className="block text-xs font-black text-slate-700 dark:text-slate-200 mt-0.5">{branch.cars}</span>
                                 </div>
-                                <h4 className="text-xl font-black font-mono tracking-tight mt-1">01</h4>
+                                <div className="bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800 rounded-xl p-2 text-center">
+                                  <span className="block text-[9px] font-bold text-slate-400 uppercase">XE MÁY</span>
+                                  <span className="block text-xs font-black text-slate-700 dark:text-slate-200 mt-0.5">{branch.motorbikes}</span>
+                                </div>
                               </div>
                             </div>
+
+                            <div className="flex justify-between items-center pt-5 mt-5 border-t border-slate-100 dark:border-slate-800/80">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{branch.updateTime}</span>
+                              <button 
+                                onClick={() => {
+                                  setActiveMenu('monitoring');
+                                  triggerToast(`Chuyển đến màn hình giám sát ${branch.name}`, 'info');
+                                }}
+                                className="px-4 py-2 bg-slate-50 hover:bg-blue-50 dark:bg-slate-800/50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1 group-hover:bg-blue-600 group-hover:text-white dark:group-hover:bg-blue-500 cursor-pointer"
+                              >
+                                CHI TIẾT <span className="text-lg leading-none transform group-hover:translate-x-1 transition-transform">&rarr;</span>
+                              </button>
+                            </div>
                           </div>
-
-                        </div>
-
-                        {/* BOTTOM PAGINATION CONTROLS */}
-                        <div className="flex items-center justify-center gap-1.5 pt-4 font-sans select-none">
-                          <button onClick={() => triggerToast('Trang trước', 'info')} className="p-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 text-xs font-extrabold">&lt;</button>
-                          <button onClick={() => triggerToast('Trang 1', 'info')} className="px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-black">1</button>
-                          <button onClick={() => triggerToast('Sang trang 2', 'info')} className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 bg-white dark:bg-slate-900 rounded-xl text-xs font-extrabold text-slate-500">2</button>
-                          <button onClick={() => triggerToast('Sang trang 3', 'info')} className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 bg-white dark:bg-slate-900 rounded-xl text-xs font-extrabold text-slate-500">3</button>
-                          <button onClick={() => triggerToast('Trang sau', 'info')} className="p-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 text-xs font-extrabold">&gt;</button>
-                        </div>
-
-                      </div>
-
-                      {/* RIGHT RAIL: BRANCH LIST (col-span-8) */}
-                      <div className="lg:col-span-8">
-                        {/* GRID OF COMPREHENSIVE CARD SCHEMES */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {branches.map(branch => {
-                            const percentage = branch.capacity === 0 ? 0 : Math.round((branch.occupied / branch.capacity) * 100);
-                            return (
-                              <div key={branch.id} className="bg-white dark:bg-slate-905 border border-slate-205 dark:border-slate-805 rounded-2xl p-5 text-left block hover:border-blue-500/50 hover:shadow-lg transition-all space-y-4">
-                                <div className="flex justify-between items-start">
-                                  <div className="leading-tight block text-left">
-                                    <h3 className="text-base font-black text-slate-850 dark:text-white">{branch.name}</h3>
-                                    <span className="text-[11px] text-slate-400 font-bold block mt-1 text-left">{branch.address}</span>
-                                  </div>
-                                  <span className="text-[9.5px] font-black text-emerald-600 bg-emerald-55 px-2 py-0.5 rounded uppercase tracking-wider block">
-                                    ● {branch.status}
-                                  </span>
-                                </div>
-
-                                <div className="space-y-2 block">
-                                  <div className="flex justify-between text-xs font-bold text-slate-505">
-                                    <span>Sức chứa xe</span>
-                                    <span className="text-slate-850 dark:text-white">{branch.occupied} / {branch.capacity} ({percentage}%)</span>
-                                  </div>
-                                  {/* Blue bar progress */}
-                                  <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-blue-600 rounded-full" style={{ width: `${percentage}%` }} />
-                                  </div>
-                                  {/* Sub details column */}
-                                  <div className="flex justify-between text-[11px] font-semibold text-slate-400 pt-1 font-sans">
-                                    <span>Ô tô: {branch.cars}</span>
-                                    <span>Xe máy: {branch.motorbikes}</span>
-                                  </div>
-                                </div>
-
-                                <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-450">
-                                  <span>{branch.updateTime}</span>
-                                  <button 
-                                    onClick={() => {
-                                      setActiveMenu('monitoring');
-                                      triggerToast(`Xem bến bãi ${branch.name}!`, 'info');
-                                    }}
-                                    className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-black cursor-pointer"
-                                  >
-                                    <span>CHI TIẾT</span>
-                                    <span>&rarr;</span>
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* BOTTOM PAGINATION CONTROLS */}
-                        <div className="flex items-center justify-center gap-1.5 pt-4 font-sans select-none">
-                          <button onClick={() => triggerToast('Trang trước', 'info')} className="p-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 text-xs font-extrabold">&lt;</button>
-                          <button onClick={() => triggerToast('Trang 1', 'info')} className="px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-black">1</button>
-                          <button onClick={() => triggerToast('Sang trang 2', 'info')} className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 bg-white dark:bg-slate-900 rounded-xl text-xs font-extrabold text-slate-500">2</button>
-                          <button onClick={() => triggerToast('Sang trang 3', 'info')} className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 bg-white dark:bg-slate-900 rounded-xl text-xs font-extrabold text-slate-500">3</button>
-                          <button onClick={() => triggerToast('Trang sau', 'info')} className="p-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 text-xs font-extrabold">&gt;</button>
-                        </div>
-
-                      </div>
-
+                        );
+                      })}
                     </div>
+
 
                   </div>
                 )}
@@ -2628,7 +2606,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                 </div>
 
                 {/* RECENTS TRANSACTION LEDGER (REPLICATED CARD WITH FILTERS & PAGINATOR) */}
-                <div className={`p-6 bg-white dark:bg-slate-905 border rounded-2xl ${isDarkMode ? 'border-slate-800' : 'border-slate-200/60 shadow-xs'} space-y-4`}>
+                <div className={`p-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/50 dark:border-slate-800/50 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] space-y-4`}>
                   
                   {/* LEDGER BAR FOR TRANSACTION SEARCH AND CONTROLS */}
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -3198,7 +3176,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
                 {/* CONDITIONAL RENDER OF CUSTOMERS SUB-TABS */}
                 {customerTab === 'list' ? (
-                  <div className={`p-6 bg-white dark:bg-slate-905 border rounded-2xl ${isDarkMode ? 'border-slate-800 animate-fade-in' : 'border-slate-200/60 shadow-xs animate-fade-in'} space-y-4`}>
+                  <div className={`p-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/50 dark:border-slate-800/50 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] space-y-4 animate-fade-in`}>
                     
                     {/* SEARCH FILTERS AND REGISTER BAR */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -4144,7 +4122,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                   </div>
 
                   {/* LOGS LIST DATA TABLE (Screenshot 2 Replication) */}
-                  <div className={`bg-white dark:bg-slate-905 border rounded-2xl ${isDarkMode ? 'border-slate-800' : 'border-slate-200/60 shadow-xs'} overflow-hidden`}>
+                  <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/50 dark:border-slate-800/50 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] overflow-hidden`}>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left font-sans text-xs">
                         <thead>

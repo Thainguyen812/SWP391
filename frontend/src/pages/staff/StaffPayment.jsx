@@ -370,7 +370,7 @@ export const StaffPayment = () => {
     });
   };
 
-  const handleCancel = () => {
+  function handleCancel() {
     Modal.confirm({
       title: 'Xác nhận huỷ giao dịch',
       content: 'Bạn có chắc chắn muốn huỷ bỏ giao dịch này? Phương tiện sẽ không được phép qua cổng.',

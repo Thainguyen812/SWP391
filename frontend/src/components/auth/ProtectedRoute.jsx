@@ -6,11 +6,19 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
   const user = authService.getUser();
 
   if (!isAuthenticated) {
+    // Nếu đang chạy local (Dev Mode), cho phép vào thẳng để test Giao diện
+    if (import.meta.env.DEV) {
+      return children;
+    }
     // Nếu chưa đăng nhập, đá về trang /login
     return <Navigate to="/login" replace />;
   }
 
   if (allowedRoles && (!user || !authService.hasRole(allowedRoles))) {
+    // Nếu đang chạy local (Dev Mode), cho phép vào thẳng để test Giao diện
+    if (import.meta.env.DEV) {
+      return children;
+    }
     // Nếu đã đăng nhập nhưng không có quyền truy cập trang này
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">

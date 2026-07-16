@@ -44,7 +44,7 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('refreshToken');
         
         // Tránh reload liên tục nếu đang ở trang login
-        if (window.location.pathname !== '/login') {
+        if (window.location.pathname !== '/login' && !import.meta.env.DEV) {
           window.location.href = '/login';
         }
       }
