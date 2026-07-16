@@ -57,7 +57,11 @@ const CameraCaptureModal = ({ visible, onCancel, onCapture, title, captureTarget
     }
   }, [stream]);
 
-  const takePhoto = () => {
+  const takePhoto = (e) => {
+    let overrideStatus = 'good';
+    if (e && e.shiftKey) overrideStatus = 'invalid';
+    else if (e && e.altKey) overrideStatus = 'bad';
+
     if (videoRef.current) {
       const canvas = document.createElement('canvas');
       canvas.width = videoRef.current.videoWidth;
@@ -65,7 +69,7 @@ const CameraCaptureModal = ({ visible, onCancel, onCapture, title, captureTarget
       const ctx = canvas.getContext('2d');
       ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg');
-      onCapture(dataUrl);
+      onCapture(dataUrl, overrideStatus);
     }
   };
 
@@ -73,7 +77,8 @@ const CameraCaptureModal = ({ visible, onCancel, onCapture, title, captureTarget
     const file = e.target.files[0];
     if (file) {
       const url = URL.createObjectURL(file);
-      onCapture(url);
+      // Default to good for file upload unless we want to complicate it
+      onCapture(url, 'good');
     }
   };
 
@@ -238,7 +243,7 @@ export const StaffLostCard = () => {
     setCameraModalVisible(true);
   };
 
-  const handleCaptureResult = (imgUrl) => {
+  const handleCaptureResult = (imgUrl, overrideStatus = 'good') => {
     setCameraModalVisible(false);
     
     if (currentCaptureTarget === 'cccdFront') setCccdImage(imgUrl);
@@ -251,12 +256,9 @@ export const StaffLostCard = () => {
     if (['cccdFront', 'cccdBack', 'reg'].includes(currentCaptureTarget)) {
       setImageQuality(prev => ({ ...prev, [currentCaptureTarget]: 'checking' }));
       
-      // Simulate AI quality check
+      // Simulate AI quality check with controlled outcome
       setTimeout(() => {
-        const rand = Math.random();
-        let status = 'good';
-        if (rand < 0.2) status = 'bad';
-        else if (rand < 0.4) status = 'invalid';
+        const status = overrideStatus;
         
         setImageQuality(prev => ({ ...prev, [currentCaptureTarget]: status }));
         
