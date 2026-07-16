@@ -1094,18 +1094,6 @@ public class ParkingServiceImpl implements ParkingService {
                         () -> new ApiExceptions.NotFoundException(
                                 "Không tìm thấy phiên gửi xe ACTIVE"));
 
-        if (session.getIsLocked() != null && session.getIsLocked()) {
-            SecurityAlert alert = new SecurityAlert();
-            alert.setAlertType("NGHI NGỜ TRỘM CẮP");
-            alert.setLicensePlate(session.getLicensePlate() != null ? session.getLicensePlate() : "N/A");
-            alert.setReason("Phát hiện cố tình xuất bãi khi xe đang bật Khóa chống trộm.");
-            alert.setIsActionable(true);
-            securityAlertRepository.save(alert);
-
-            throw new ApiExceptions.ForbiddenException(
-                    "Xe đang ở trạng thái KHÓA AN TOÀN chống trộm! Không thể xuất bãi.");
-        }
-
         if (session.getIsVip() != null
                 && session.getIsVip()) {
 

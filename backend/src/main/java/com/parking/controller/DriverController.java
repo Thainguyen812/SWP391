@@ -101,26 +101,6 @@ public class DriverController {
         vehicle.setLocked(isLocked);
         vehicleRepository.save(vehicle);
 
-        // 2. Tạo hoặc giải quyết cảnh báo an ninh KHÓA CHỐNG TRỘM
-        if (isLocked) {
-            SecurityAlert alert = new SecurityAlert();
-            alert.setAlertType("KHÓA CHỐNG TRỘM");
-            alert.setLicensePlate(vehicle.getLicensePlate());
-            alert.setReason("Tài xế vừa bật khóa an ninh từ xa qua App");
-            alert.setIsActionable(false);
-            securityAlertRepository.save(alert);
-        } else {
-            List<SecurityAlert> activeAlerts = securityAlertRepository.findByIsResolvedFalseOrderByCreatedAtDesc().stream()
-                    .filter(a -> "KHÓA CHỐNG TRỘM".equals(a.getAlertType()) 
-                            && vehicle.getLicensePlate().equals(a.getLicensePlate()))
-                    .toList();
-            for (SecurityAlert a : activeAlerts) {
-                a.setIsResolved(true);
-                a.setResolvedAt(java.time.LocalDateTime.now());
-                securityAlertRepository.save(a);
-            }
-        }
-
         // 3. Cập nhật các phiên gửi xe đang hoạt động (active)
         List<ParkingSession> activeSessions = sessionRepo.findByVehicleIdAndSessionStatusIn(
                 req.getVehicleId(),

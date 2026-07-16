@@ -208,20 +208,6 @@ this.securityAlertRepository = securityAlertRepository;
 
     Vehicle saved = repo.save(vehicle);
 
-    // Auto-create pending VIP subscription to submit documents for manager approval
-    VipSubscription vip = new VipSubscription();
-    vip.setId(UUID.randomUUID());
-    vip.setVehicleId(saved.getId());
-    vip.setSubscriptionType("MONTHLY");
-    vip.setStatus(VipSubscription.Status.PENDING_APPROVAL);
-    vip.setStartDate(java.time.LocalDate.now());
-    vip.setEndDate(java.time.LocalDate.now().plusMonths(1));
-    vip.setFeeAmount(java.math.BigDecimal.ZERO);
-    vip.setPaymentMethod("BANK_TRANSFER");
-    vip.setPaymentStatus("SUCCESS");
-    vipSubscriptionRepository.save(vip);
-
-
     return saved;
 }
 

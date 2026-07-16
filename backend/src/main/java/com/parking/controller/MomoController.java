@@ -45,10 +45,9 @@ public class MomoController {
                 if (vipOpt.isPresent()) {
                     VipSubscription vip = vipOpt.get();
 
-                    // Đảm bảo không ghi đè lại nếu đơn hàng đã được cập nhật xử lý thành công trước đó
                     if (vip.getStatus() != VipSubscription.Status.PENDING_APPROVAL) {
                         if (resultCode != null && resultCode == 0) {
-                            vip.setPaymentStatus("PAID");
+                            vip.setPaymentStatus("SUCCESS");
                             vip.setStatus(VipSubscription.Status.PENDING_APPROVAL); // Đẩy qua trạng thái chờ Admin duyệt
                         } else {
                             vip.setPaymentStatus("FAILED");

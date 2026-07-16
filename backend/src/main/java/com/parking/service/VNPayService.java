@@ -11,10 +11,17 @@ import org.springframework.stereotype.Service;
 @Service
 public class VNPayService {
 
-    private final String vnp_PayUrl = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
-    private final String vnp_ReturnUrl = "http://localhost:5173/payment-success"; // FE nhận kết quả
-    private final String vnp_TmnCode = "3WFSAH6C";
-    private final String vnp_HashSecret = "W5QQCZ0C958UEDBFXCA439X0ET0XKM5A";
+    @org.springframework.beans.factory.annotation.Value("${vnp.payurl:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}")
+    private String vnp_PayUrl;
+
+    @org.springframework.beans.factory.annotation.Value("${vnp.returnurl:http://localhost:5173/payment-success}")
+    private String vnp_ReturnUrl;
+
+    @org.springframework.beans.factory.annotation.Value("${vnp.tmncode:3WFSAH6C}")
+    private String vnp_TmnCode;
+
+    @org.springframework.beans.factory.annotation.Value("${vnp.hashsecret:W5QQCZ0C958UEDBFXCA439X0ET0XKM5A}")
+    private String vnp_HashSecret;
 
     public String createPaymentUrl(String orderId, long amount, String ipAddress) throws UnsupportedEncodingException {
         return createPaymentUrl(orderId, amount, ipAddress, null);
@@ -76,13 +83,6 @@ public class VNPayService {
         }
         String queryUrl = query.toString();
         String vnp_SecureHash = hmacSHA512(vnp_HashSecret, hashData.toString());
-        
-        System.out.println("=== VNPAY DEBUG ===");
-        System.out.println("vnp_HashSecret: " + vnp_HashSecret);
-        System.out.println("hashData string: " + hashData.toString());
-        System.out.println("vnp_SecureHash: " + vnp_SecureHash);
-        System.out.println("queryUrl: " + queryUrl);
-        System.out.println("===================");
 
         queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
         return vnp_PayUrl + "?" + queryUrl;
