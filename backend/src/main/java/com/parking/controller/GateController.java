@@ -176,6 +176,7 @@ public class GateController {
                     visitorReq.setImage_url("https://camera-storage.com/live/gate_scan.jpg");
                     visitorReq.setVehicle_type(resolvedVehicleType);
                     visitorReq.setFuel_type(request.fuelType);
+                    visitorReq.setGate(request.gate);
 
                     com.parking.dto.CheckInResponse checkInResponse = parkingService.visitorCheckIn(visitorReq);
                     pendingGateVehicleService.removeByPlate(plateStr);

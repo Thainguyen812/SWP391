@@ -12,6 +12,7 @@ import {
   UserCheck,
   AlertCircle
 } from 'lucide-react';
+import { apiClient } from '../../api/apiClient';
 
 interface VipSubscription {
   id: string;
@@ -39,6 +40,8 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING' | 'ACTIVE' | 'REJECTED'>('PENDING');
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const normalizedRole = (userRole || '').replace(/^ROLE_/, '').toUpperCase();
+  const canApproveVip = normalizedRole === 'MANAGER' || normalizedRole === 'ADMIN';
 
   useEffect(() => {
     try {
@@ -56,38 +59,44 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
   const loadSubscriptions = async () => {
     try {
       const response = await apiClient.get('/vip/all');
-      if (response.data) {
-        const backendAll = response.data;
-        if (Array.isArray(backendAll)) {
-          const mappedAll = backendAll.map((bp: any) => {
-            let docPhotos = {
-              registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-              identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-              frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
-            };
-            if (bp.documentPhotos) {
-              try {
-                docPhotos = JSON.parse(bp.documentPhotos);
-              } catch (e) {}
-            }
-            return {
-              id: bp.id,
-              vehicle_plate: bp.licensePlate || `XE-${bp.vehicleId}`,
-              type: bp.subscriptionType === 'YEARLY' ? 'Thẻ Năm VIP' : bp.subscriptionType === 'QUARTERLY' ? 'Thẻ 3 Tháng VIP' : bp.subscriptionType === 'HALF_YEARLY' ? 'Thẻ 6 Tháng VIP' : bp.subscriptionType === 'DAILY' ? 'Vé Ngày' : 'Thẻ Tháng VIP',
-              startDate: bp.startDate ? new Date(bp.startDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
-              endDate: bp.endDate ? new Date(bp.endDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
-              status: bp.status === 'PENDING_APPROVAL' ? 'PENDING' : bp.status,
-              document_photos: docPhotos,
-              approved_by: bp.approvedBy ? 'Bùi Phương (Manager)' : null
-            };
-          });
+      const backendAll = Array.isArray(response) ? response : response?.data;
 
-          localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(mappedAll));
-          setSubscriptions(mappedAll);
-        }
+      if (!Array.isArray(backendAll)) {
+        throw new Error('VIP API did not return an array');
       }
+
+      const mappedAll = backendAll.map((bp: any) => {
+        let docPhotos = {
+          registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+          identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+          frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+        };
+        if (bp.documentPhotos) {
+          if (typeof bp.documentPhotos === 'string') {
+            try {
+              docPhotos = JSON.parse(bp.documentPhotos);
+            } catch (e) {}
+          } else {
+            docPhotos = bp.documentPhotos;
+          }
+        }
+        return {
+          id: bp.id,
+          vehicle_plate: bp.licensePlate || bp.vehicle_plate || `XE-${bp.vehicleId}`,
+          type: bp.subscriptionType === 'YEARLY' ? 'Thẻ Năm VIP' : bp.subscriptionType === 'QUARTERLY' ? 'Thẻ 3 Tháng VIP' : bp.subscriptionType === 'HALF_YEARLY' ? 'Thẻ 6 Tháng VIP' : bp.subscriptionType === 'DAILY' ? 'Vé Ngày' : 'Thẻ Tháng VIP',
+          startDate: bp.startDate ? new Date(bp.startDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+          endDate: bp.endDate ? new Date(bp.endDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+          status: bp.status === 'PENDING_APPROVAL' ? 'PENDING' : bp.status,
+          document_photos: docPhotos,
+          approved_by: bp.approvedBy ? 'Bùi Phương (Manager)' : null
+        };
+      });
+
+      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(mappedAll));
+      setSubscriptions(mappedAll);
     } catch (e) {
       console.warn("Failed to fetch VIP list from backend API:", e);
+      triggerToast('Không tải được danh sách hồ sơ VIP từ backend. Kiểm tra quyền đăng nhập hoặc API /vip/all.', 'error');
     }
   };
 
@@ -111,13 +120,14 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
     if (id.length === 36) {
       const endpoint = nextStatus === 'ACTIVE' ? `/vip/${id}/approve` : `/vip/${id}/reject`;
       const body = nextStatus === 'REJECTED' ? { reason: 'Không đủ điều kiện phê duyệt' } : undefined;
-      apiClient.post(endpoint, body)
-      .then(res => {
-        if (res.data) {
-          loadSubscriptions();
-        }
-      })
-      .catch(err => console.warn("Backend action call failed:", err));
+      try {
+        await apiClient.post(endpoint, body);
+        await loadSubscriptions();
+      } catch (err) {
+        console.warn("Backend action call failed:", err);
+        triggerToast('Backend chưa cập nhật được trạng thái hồ sơ VIP. Vui lòng thử lại.', 'error');
+        return;
+      }
     }
 
     const updated = subscriptions.map(sub => {
@@ -347,7 +357,7 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
 
                 {/* Decision controls */}
                 {(sub.status === 'PENDING' || sub.status === 'PENDING_APPROVAL') ? (
-                  userRole === 'MANAGER' ? (
+                  canApproveVip ? (
                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
                       <button
                         onClick={() => handleAction(sub.id, 'REJECTED')}
@@ -379,7 +389,7 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
                     </div>
                     
                     {/* Reset decision capability */}
-                    {userRole === 'MANAGER' ? (
+                    {canApproveVip ? (
                       <button 
                         onClick={() => handleAction(sub.id, sub.status === 'ACTIVE' ? 'REJECTED' : 'ACTIVE')}
                         className="text-[10px] text-blue-500 hover:underline cursor-pointer font-bold"

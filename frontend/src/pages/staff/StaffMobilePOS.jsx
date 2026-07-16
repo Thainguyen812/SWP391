@@ -13,7 +13,7 @@ import { useGlobalContext } from '../../context/GlobalContext';
 
 export const StaffMobilePOS = () => {
   const navigate = useNavigate();
-  const { activeVehicles, currentUser, getVehicleFines, clearVehicleFines, currentVehicle, removeActiveVehicle } = useGlobalContext();
+  const { activeVehicles, currentUser, getVehicleFines, clearVehicleFines, fetchAllDataFromBackend } = useGlobalContext();
   const [plate, setPlate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [vehicle, setVehicle] = useState(null);
@@ -25,14 +25,62 @@ export const StaffMobilePOS = () => {
   const [auditData, setAuditData] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
   const scannerRef = React.useRef(null);
+  const scannerStartTimeoutRef = React.useRef(null);
 
-  const stopScanner = () => {
-    if (scannerRef.current) {
-      scannerRef.current.stop().then(() => {
-        scannerRef.current.clear();
-        scannerRef.current = null;
-      }).catch(err => console.log('Error stopping scanner', err));
+  const isVipVehicle = (targetVehicle) => {
+    const normalizedType = (targetVehicle?.type || '').toUpperCase();
+    return Boolean(targetVehicle?.isVip)
+      || normalizedType.includes('VIP')
+      || normalizedType.includes('VE THANG')
+      || normalizedType.includes('VÉ THÁNG')
+      || normalizedType.includes('VÃ‰ THÃNG');
+  };
+
+  const normalizePlate = (value) => (value || '').trim().toUpperCase();
+
+  const findLocalVehicles = (value) => {
+    const normalized = normalizePlate(value);
+    if (!normalized || !activeVehicles) return [];
+
+    return activeVehicles.filter((v) => {
+      const localPlate = normalizePlate(v.plate);
+      return localPlate === normalized || localPlate.includes(normalized);
+    });
+  };
+
+  const isActiveMobilePosCandidate = (candidate) =>
+    candidate
+    && !isVipVehicle(candidate)
+    && candidate.sessionStatus === 'ACTIVE'
+    && candidate.isPending !== true
+    && !candidate.gate;
+
+  const stopScanner = async () => {
+    if (scannerStartTimeoutRef.current) {
+      clearTimeout(scannerStartTimeoutRef.current);
+      scannerStartTimeoutRef.current = null;
     }
+
+    const scanner = scannerRef.current;
+    scannerRef.current = null;
+
+    if (scanner) {
+      try {
+        await scanner.stop();
+      } catch (err) {
+        const message = err?.message || String(err);
+        if (!message.includes('not running') && !message.includes('paused')) {
+          console.warn('Scanner stop skipped:', err);
+        }
+      }
+
+      try {
+        scanner.clear();
+      } catch (err) {
+        console.warn('Scanner clear skipped:', err);
+      }
+    }
+
     setIsScanning(false);
   };
 
@@ -42,10 +90,16 @@ export const StaffMobilePOS = () => {
     };
   }, []);
 
+  React.useEffect(() => {
+    fetchAllDataFromBackend?.();
+  }, [fetchAllDataFromBackend]);
+
   const startScanner = async () => {
+    await stopScanner();
     setIsScanning(true);
     // Wait for React to render the <div id="reader">
-    setTimeout(async () => {
+    scannerStartTimeoutRef.current = setTimeout(async () => {
+      scannerStartTimeoutRef.current = null;
       try {
         const { Html5Qrcode } = await import('html5-qrcode');
         scannerRef.current = new Html5Qrcode("reader");
@@ -82,43 +136,67 @@ export const StaffMobilePOS = () => {
   // Function calculateFee is removed as we now fetch from backend
 
   const handleSearchWithPlate = async (searchPlate) => {
-    const p = searchPlate || plate;
-    if (!p) {
+    const normalizedPlate = normalizePlate(searchPlate || plate);
+    if (!normalizedPlate) {
       notification.warning({ message: 'Vui lòng nhập biển số xe' });
       return;
     }
-    
+
     setIsLoading(true);
     try {
-      const found = activeVehicles?.find(v => v.plate === p.toUpperCase() || v.plate.includes(p.toUpperCase()));
-      
-      if (found) {
-        setVehicle(found);
-        setPlate(found.plate);
-        
-        // Nếu là vé tháng/VIP
-        let baseFee = 0;
-        if (found.type === 'VIP' || found.type === 'Vé tháng' || found.type === 'Khách VIP') {
-          baseFee = 0;
-          setPaymentMethod('card'); // VIP bắt buộc QR động (card)
-        } else {
-          try {
-            const feeResponse = await apiClient.get(`/v1/parking/fee-by-plate/${found.plate}`);
-            baseFee = feeResponse.parkingFee || 0;
-          } catch (feeError) {
-            console.error("Failed to fetch fee from backend:", feeError);
-            baseFee = 10000; // fallback
-          }
-          setPaymentMethod('cash');
-        }
-        
-        // Cộng dồn tiền phạt
-        const accumulatedFines = getVehicleFines(found.plate).reduce((sum, fine) => sum + fine.amount, 0);
-        setFee(baseFee + accumulatedFines);
-      } else {
-        notification.error({ message: 'Không tìm thấy xe', description: 'Xe không có trong bãi hoặc đã ra khỏi bãi.' });
+      await fetchAllDataFromBackend?.();
+
+      const localMatches = findLocalVehicles(normalizedPlate);
+      const activeCandidate = localMatches.find(isActiveMobilePosCandidate);
+      const prepaidCandidate = localMatches.find((v) => v.sessionStatus === 'PASSED_CONFIRMED');
+      const vipCandidate = localMatches.find(isVipVehicle);
+
+      if (vipCandidate && !activeCandidate) {
         setVehicle(null);
+        notification.warning({
+          message: 'Mobile POS chỉ dùng cho khách vãng lai',
+          description: 'Xe VIP/vé tháng cần checkout bằng luồng QR VIP tại cổng ra.'
+        });
+        return;
       }
+
+      try {
+        const feeResponse = await apiClient.get(`/v1/parking/fee-by-plate/${encodeURIComponent(normalizedPlate)}`);
+        const resolvedPlate = feeResponse.licensePlate || activeCandidate?.plate || normalizedPlate;
+        const resolvedVehicle = {
+          ...(activeCandidate || {}),
+          plate: resolvedPlate,
+          type: activeCandidate?.type || 'Vãng lai',
+          gate: activeCandidate?.gate || activeCandidate?.entryGate || 'Cổng vào',
+          inTime: activeCandidate?.inTime,
+          sessionStatus: 'ACTIVE'
+        };
+        const baseFee = Number(feeResponse.parkingFee || 0);
+        const accumulatedFines = getVehicleFines(resolvedPlate).reduce((sum, fine) => sum + fine.amount, 0);
+
+        setVehicle(resolvedVehicle);
+        setPlate(resolvedPlate);
+        setFee(baseFee + accumulatedFines);
+        setPaymentMethod('cash');
+        return;
+      } catch (feeError) {
+        console.warn('Mobile POS fee lookup failed:', feeError);
+      }
+
+      if (prepaidCandidate) {
+        setVehicle(null);
+        notification.info({
+          message: 'Xe đã thanh toán lưu động',
+          description: 'Xe này đã được thu Mobile POS. Khách giữ thẻ tạm và ra cổng quẹt thẻ để staff xác nhận mở barrier.'
+        });
+        return;
+      }
+
+      notification.error({
+        message: 'Không tìm thấy xe ACTIVE',
+        description: 'Không có phiên gửi xe đang hoạt động cho biển số này, hoặc xe đã ra khỏi bãi.'
+      });
+      setVehicle(null);
     } catch (error) {
       console.error(error);
       notification.error({ message: 'Lỗi kết nối', description: 'Không thể tải dữ liệu từ máy chủ.' });
@@ -129,29 +207,50 @@ export const StaffMobilePOS = () => {
 
   const handleSimulateScan = () => {
     setShowScanner(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       setShowScanner(false);
-      // Try to use currentVehicle if it exists in activeVehicles
-      let selectedVehicle = null;
-      if (currentVehicle && activeVehicles && activeVehicles.find(v => v.plate === currentVehicle.plate)) {
-        selectedVehicle = activeVehicles.find(v => v.plate === currentVehicle.plate);
-      } else if (activeVehicles && activeVehicles.length > 0) {
-        // Ưu tiên khách vãng lai để hiện tính phí
-        const guests = activeVehicles.filter(v => v.type === 'Khách Vãng Lai' || v.type === 'Vãng lai' || !v.type);
-        const listToPick = guests.length > 0 ? guests : activeVehicles;
-        selectedVehicle = listToPick[Math.floor(Math.random() * listToPick.length)];
-      }
-      
-      if (selectedVehicle) {
-        setPlate(selectedVehicle.plate);
-        notification.success({message: `Đã nhận diện biển số: ${selectedVehicle.plate}`});
-        
-        // Auto trigger search with the found vehicle
-        handleSearchWithPlate(selectedVehicle.plate);
-      } else {
-        const fallback = '30A-12345';
-        setPlate(fallback);
-        handleSearchWithPlate(fallback);
+      try {
+        const sessionData = await apiClient.get('/sessions');
+        const sessionList = Array.isArray(sessionData)
+          ? sessionData
+          : (Array.isArray(sessionData?.content)
+            ? sessionData.content
+            : (Array.isArray(sessionData?.items)
+              ? sessionData.items
+              : (Array.isArray(sessionData?.data) ? sessionData.data : [])));
+
+        const guestsInLot = sessionList.filter((session) =>
+          session?.sessionStatus === 'ACTIVE'
+          && session?.isPending !== true
+          && !session?.isVip
+          && !session?.vip
+          && !session?.exitGate
+          && session?.licensePlate
+        );
+
+        const selectedSession = guestsInLot.length > 0
+          ? guestsInLot[Math.floor(Math.random() * guestsInLot.length)]
+          : null;
+
+        if (!selectedSession) {
+          notification.warning({
+            message: 'Không có xe vãng lai cần thu phí',
+            description: 'Mobile POS chỉ quét xe đã có phiên ACTIVE thật trong bãi, không lấy xe đang chờ ở cổng.'
+          });
+          return;
+        }
+
+        setPlate(selectedSession.licensePlate);
+        notification.success({ message: `Đã nhận diện biển số: ${selectedSession.licensePlate}` });
+        handleSearchWithPlate(selectedSession.licensePlate);
+        return;
+      } catch (error) {
+        console.error('Failed to simulate Mobile POS scan:', error);
+        notification.warning({
+          message: 'Không thể lấy danh sách xe trong bãi',
+          description: 'Vui lòng thử lại hoặc nhập thủ công biển số xe đang có phiên ACTIVE.'
+        });
+        return;
       }
     }, 2000);
   };
@@ -179,12 +278,12 @@ export const StaffMobilePOS = () => {
       setIsSuccess(true);
       notification.success({ 
         message: 'Thanh toán thành công', 
-        description: `Xe ${vehicle.plate} đã thanh toán và có thể ra thẳng qua cổng.` 
+        description: `Xe ${vehicle.plate} đã thanh toán lưu động. Khách vẫn giữ thẻ tạm và có 30 phút để ra cổng quẹt thẻ xác nhận mở barrier.`
       });
       if (vehicle?.plate) {
         clearVehicleFines(vehicle.plate);
-        removeActiveVehicle(vehicle.plate);
       }
+      await fetchAllDataFromBackend?.();
       
     } catch (error) {
       const errorMsg = error.response?.data?.message || error.message || 'Đã có lỗi xảy ra.';
@@ -298,19 +397,19 @@ export const StaffMobilePOS = () => {
                     <span className="bg-slate-50 px-4 text-xs font-bold text-slate-400 relative z-10 uppercase">Hoặc nhập thủ công</span>
                   </div>
 
-                  <div className="w-full bg-white rounded-2xl p-2 shadow-sm border border-slate-100 flex gap-2">
+                  <div className="w-full bg-white rounded-2xl p-2 shadow-sm border border-slate-100 flex items-center gap-2 overflow-hidden">
                     <input 
                       type="text" 
                       value={plate}
                       onChange={(e) => setPlate(e.target.value.toUpperCase())}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearchWithPlate(null)}
                       placeholder="VD: 51A-12345"
-                      className="flex-1 bg-transparent border-none py-3 px-4 font-bold text-slate-700 focus:outline-none focus:ring-0 uppercase text-lg"
+                      className="min-w-0 flex-1 bg-transparent border-none py-3 px-3 font-bold text-slate-700 focus:outline-none focus:ring-0 uppercase text-base"
                     />
                     <button 
                       onClick={startScanner}
                       disabled={isLoading}
-                      className="text-slate-400 hover:text-blue-600 px-3 cursor-pointer transition-colors"
+                      className="hidden"
                       title="Quét mã QR bằng Camera"
                     >
                       <CameraOutlined className="text-xl" />
@@ -318,7 +417,7 @@ export const StaffMobilePOS = () => {
                     <button 
                       onClick={() => handleSearchWithPlate(null)}
                       disabled={isLoading}
-                      className="bg-slate-800 text-white px-6 rounded-xl font-bold active:scale-95 transition-transform cursor-pointer"
+                      className="shrink-0 bg-slate-800 text-white w-14 h-10 rounded-xl font-bold text-xs active:scale-95 transition-transform cursor-pointer flex items-center justify-center"
                     >
                       {isLoading ? <Spin size="small" /> : 'TÌM'}
                     </button>
@@ -457,7 +556,7 @@ export const StaffMobilePOS = () => {
                     setIsSuccess(true);
                     notification.success({ 
                       message: 'Hoàn tất kiểm tra', 
-                      description: `Xe ${vehicle.plate} là xe ưu tiên. Mời khách ra thẳng cổng tự động.` 
+                      description: `Xe ${vehicle.plate} là xe ưu tiên. Vui lòng xử lý bằng luồng QR VIP tại cổng ra.`
                     });
                   } else {
                     handleCheckout();

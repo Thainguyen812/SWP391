@@ -7,6 +7,9 @@ import com.parking.repository.ParkingSessionRepository;
 
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -121,46 +124,72 @@ public class RevenueController {
 
     @PostMapping("/transactions/mock")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
+    @Transactional
     public Map<String, Object> mockTransaction(@RequestBody Map<String, Object> payload) {
-        Transaction t = new Transaction();
-        t.setPaymentMethod(Transaction.PaymentMethod.CASH);
-        t.setPaymentStatus(Transaction.PaymentStatus.SUCCESS);
-        t.setProcessedAt(java.time.Instant.now());
-        t.setIsMobileCheckout(false);
-        try {
-            if (payload.get("amount") != null) {
-                t.setTotalAmount(
-                        new java.math.BigDecimal(payload.get("amount").toString().replace(",", "").replace(".", "")));
+        String plate = Optional.ofNullable(payload.get("plate"))
+                .map(Object::toString)
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Thiếu biển số xe cần thanh toán"));
+
+        ParkingSession session = sessionRepo
+                .findByLicensePlateAndSessionStatus(plate, ParkingSession.SessionStatus.ACTIVE)
+                .or(() -> sessionRepo.findByLicensePlateAndSessionStatus(plate, ParkingSession.SessionStatus.LOST_CARD))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Không tìm thấy phiên ACTIVE/LOST_CARD của xe " + plate));
+
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        if (payload.get("amount") != null) {
+            String amountText = payload.get("amount").toString()
+                    .replace("VND", "")
+                    .replace("vnd", "")
+                    .replace("đ", "")
+                    .replace(",", "")
+                    .trim();
+            if (!amountText.isEmpty()) {
+                totalAmount = new BigDecimal(amountText);
             }
-            if (payload.get("plate") != null) {
-                String plate = payload.get("plate").toString();
-                // Find session and check it out
-                Optional<ParkingSession> activeSession = sessionRepo.findByLicensePlateAndSessionStatus(plate,
-                        ParkingSession.SessionStatus.ACTIVE);
-                if (activeSession.isPresent()) {
-                    ParkingSession s = activeSession.get();
-                    s.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
-                    s.setCheckOutTime(java.time.Instant.now());
-                    sessionRepo.save(s);
-                    t.setSessionId(s.getId());
-                } else {
-                    // Create dummy session so transaction has a valid session_id
-                    ParkingSession dummy = new ParkingSession();
-                    dummy.setId(java.util.UUID.randomUUID());
-                    dummy.setLicensePlate(plate);
-                    dummy.setCheckInTime(java.time.Instant.now().minusSeconds(3600));
-                    dummy.setCheckOutTime(java.time.Instant.now());
-                    dummy.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
-                    sessionRepo.save(dummy);
-                    t.setSessionId(dummy.getId());
-                }
-            }
-            t.setId(java.util.UUID.randomUUID());
-        } catch (Exception e) {
-            e.printStackTrace();
         }
-        transactionRepo.save(t);
-        return Map.of("success", true);
+        BigDecimal lostCardPenalty = BigDecimal.ZERO;
+        if (payload.get("lostCardPenalty") != null) {
+            String penaltyText = payload.get("lostCardPenalty").toString()
+                    .replace("VND", "")
+                    .replace("vnd", "")
+                    .replace("đ", "")
+                    .replace(",", "")
+                    .trim();
+            if (!penaltyText.isEmpty()) {
+                lostCardPenalty = new BigDecimal(penaltyText);
+            }
+        }
+        BigDecimal parkingFee = totalAmount.subtract(lostCardPenalty);
+        if (parkingFee.signum() < 0) {
+            parkingFee = BigDecimal.ZERO;
+        }
+
+        session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
+        session.setCheckOutTime(java.time.Instant.now());
+        sessionRepo.save(session);
+
+        Transaction transaction = transactionRepo.findBySessionId(session.getId())
+                .orElseGet(() -> {
+                    Transaction created = new Transaction();
+                    created.setId(UUID.randomUUID());
+                    created.setSessionId(session.getId());
+                    return created;
+                });
+
+        transaction.setParkingFee(parkingFee);
+        transaction.setLostCardPenalty(lostCardPenalty);
+        transaction.setViolationPenalty(BigDecimal.ZERO);
+        transaction.setTotalAmount(totalAmount);
+        transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
+        transaction.setPaymentStatus(Transaction.PaymentStatus.SUCCESS);
+        transaction.setProcessedAt(java.time.Instant.now());
+        transaction.setIsMobileCheckout(false);
+
+        Transaction saved = transactionRepo.save(transaction);
+        return Map.of("success", true, "transactionId", saved.getId());
     }
 
     @GetMapping("/shift-stats")
