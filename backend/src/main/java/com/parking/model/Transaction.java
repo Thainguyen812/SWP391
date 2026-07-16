@@ -66,6 +66,17 @@ public class Transaction {
     @Transient
     private BigDecimal mobileCheckoutOverstayPenalty = BigDecimal.ZERO;
 
+    @Transient
+    private Integer violationCount = 0;
+
+    public Integer getViolationCount() {
+        return violationCount;
+    }
+
+    public void setViolationCount(Integer violationCount) {
+        this.violationCount = violationCount;
+    }
+
     public enum PaymentMethod {
         CASH, VNPAY_SANDBOX, MOMO_SANDBOX, QR_BANK
     }

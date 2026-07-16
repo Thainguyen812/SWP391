@@ -258,7 +258,7 @@ export const StaffPayment = () => {
     const isError = vehicleToPay?.status === 'Lỗi thẻ';
 
     let amount;
-    let evPenalty = backendTxn?.violationPenalty || (lpr && lpr.includes('EV') ? 500000 : 0);
+    let evPenalty = backendTxn?.violationPenalty || (lpr && lpr.includes('EV') ? 100000 : 0);
     
     // Calculate accumulated fines
     const accumulatedFines = lpr ? getVehicleFines(lpr).reduce((sum, fine) => sum + fine.amount, 0) : 0;
@@ -366,8 +366,24 @@ export const StaffPayment = () => {
           ? (scannedMobilePenalty > 0
             ? `Xe đã quá hạn 30 phút. Cần thu phí phát sinh ${scannedMobilePenalty.toLocaleString()} VND trước khi mở cổng.`
             : `Đã xác nhận thẻ xe ${matchedByCard?.plate || lpr}. Staff chỉ cần đối chiếu ảnh và mở cổng, không thu thêm tiền.`)
-          : `Đã mở ảnh đối chiếu và tính phí: ${txn.totalAmount} VND.`
+          : `Đã mở ảnh đối chiếu và tính phí: ${txn.totalAmount.toLocaleString()} VND.`
       });
+
+      if (txn?.violationCount > 0) {
+        if (txn.violationCount === 1) {
+          notification.warning({
+            message: '🚨 Phát hiện vi phạm',
+            description: `Xe ${matchedByCard?.plate || lpr || txn.licensePlate} đã đỗ sai vị trí 1 lần (đã nhắc nhở). Vui lòng nhắc nhở trực tiếp tài xế!`,
+            duration: 10
+          });
+        } else {
+          notification.warning({
+            message: '🚨 Phát hiện vi phạm',
+            description: `Xe ${matchedByCard?.plate || lpr || txn.licensePlate} đã đỗ sai vị trí ${txn.violationCount} lần. Đã áp dụng mức phạt +${(txn.violationPenalty || 100000).toLocaleString()}đ vào tổng tiền thu!`,
+            duration: 10
+          });
+        }
+      }
     } catch (error) {
         notification.error({message: 'Lỗi Check-out', description: error.response?.data?.message || 'Không thể check-out bằng thẻ này'});
         setHasVehicle(false);
@@ -757,7 +773,23 @@ export const StaffPayment = () => {
                     )}
                     {!canReviewVehicle && <div className="text-[10px] text-blue-600 mt-1 font-bold">Chưa tính phí do chưa xác nhận thẻ</div>}
                     {isLostCard && <div className="text-[10px] text-red-500 mt-1">Đã bao gồm 200k tiền phạt thẻ</div>}
-                    {(backendTxn?.violationPenalty > 0 || (lpr && lpr.includes('EV'))) && <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">⚠️ Bị phạt Đỗ sai vị trí EV (+500k)</div>}
+                    {backendTxn ? (
+                      backendTxn.violationCount > 0 && (
+                        <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">
+                          {backendTxn.violationCount === 1 ? (
+                            <span>⚠️ Đỗ sai vị trí 1 lần (đã nhắc nhở)</span>
+                          ) : (
+                            <span>⚠️ Đỗ sai vị trí {backendTxn.violationCount} lần (phạt +{(backendTxn.violationPenalty || 100000).toLocaleString()}đ)</span>
+                          )}
+                        </div>
+                      )
+                    ) : (
+                      (lpr && lpr.includes('EV')) && (
+                        <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">
+                          ⚠️ Bị phạt Đỗ sai vị trí (+100k)
+                        </div>
+                      )
+                    )}
                     {lpr && getVehicleFines(lpr).length > 0 && <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">⚠️ Đã bao gồm phạt cộng dồn (+{getVehicleFines(lpr).reduce((sum, f) => sum + f.amount, 0).toLocaleString()}đ)</div>}
                   </div>
                 </div>
@@ -977,12 +1009,11 @@ export const StaffPayment = () => {
                   const statusColor = txn.statusColor || 'bg-emerald-100 text-emerald-600';
                   const textColor = statusColor.split(' ')[1] || 'text-emerald-600';
                   
-                  let amountDisplay = txn.amount || (txn.totalAmount ? txn.totalAmount.toLocaleString('vi-VN') + 'đ' : '0đ');
-                  if (typeof amountDisplay === 'string') {
-                    amountDisplay = amountDisplay.replace('.00', '').replace('đ', '') + 'đ';
-                    if (!amountDisplay.includes(',') && !amountDisplay.includes('.')) {
-                      amountDisplay = parseInt(amountDisplay).toLocaleString('vi-VN') + 'đ';
-                    }
+                  let amountDisplay = '0đ';
+                  if (txn.amount) {
+                    amountDisplay = txn.amount;
+                  } else if (txn.totalAmount !== undefined && txn.totalAmount !== null) {
+                    amountDisplay = Number(txn.totalAmount).toLocaleString('vi-VN') + 'đ';
                   }
 
                   const formatTime = (isoString) => {

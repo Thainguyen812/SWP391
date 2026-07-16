@@ -159,7 +159,7 @@ public class VipServiceImpl implements VipService {
                                 } else if ("YEARLY".equals(type) || "YEAR".equals(type)) {
                                         fallbackFee = 12500000;
                                 }
-                        } else if ("LARGE_VAN_MINIBUS".equals(size)) {
+                        } else if ("LARGE_VAN_MINIBUS".equals(size) || "VAN_TRUCK".equals(size) || "MINIBUS_16".equals(size)) {
                                 if ("DAILY".equals(type) || "DAY".equals(type)) {
                                         fallbackFee = 100000;
                                 } else if ("MONTHLY".equals(type)) {

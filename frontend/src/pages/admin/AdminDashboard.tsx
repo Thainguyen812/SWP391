@@ -285,6 +285,9 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
       const data = response.data;
       if (data.success) {
         triggerToast(data.message, "success");
+        const plateText = data.data?.vehicle?.plate || gatePlate.trim().toUpperCase() || 'UNKNOWN';
+        const zoneText = data.data?.assignedZoneCode ? ` -> TẦNG ${data.data.assignedZoneCode}` : '';
+        setLedText(`THÔNG XE: ${plateText}${zoneText}`);
         // Reset local gate values
         setGatePlate('');
         setGateCardCode('');
@@ -294,15 +297,19 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
         if (data.error === "VEHICLE_LOCKED") {
           setIsSecurityLockTriggered(true);
           setSecurityViolatorPlate(data.data?.vehicle?.plate || gatePlate);
+          setLedText(`🚨 XE BỊ KHÓA: ${(data.data?.vehicle?.plate || gatePlate).toUpperCase()}`);
           triggerToast("🚨 BẢO ĐỘNG AN NINH: PHÁT HIỆN ĐỘT NHẬP XE ĐANG KHÓA!", "error");
         } else if (data.error === "QR_FALLBACK_REQUIRED") {
+          setLedText(`🚨 YÊU CẦU QR DỰ PHÒNG`);
           triggerToast("Vui lòng xuất trình mã QR dự phòng để ra cổng!", "warning");
         } else {
+          setLedText(`🚨 TỪ CHỐI: ${data.message || data.error}`);
           triggerToast(`Không thành công: ${data.message || data.error}`, "error");
         }
         fetchGateScanLogs();
       }
     } catch (err: any) {
+      setLedText(`🚨 LỖI HỆ THỐNG`);
       triggerToast("Lỗi kết nối API cổng trực Backend!", "error");
     } finally {
       setIsProcessingGateScan(false);
@@ -377,8 +384,9 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   const [selectedSlotForCheckIn, setSelectedSlotForCheckIn] = useState<any | null>(null);
   const [checkInPlate, setCheckInPlate] = useState('');
   const [checkInCardCode, setCheckInCardCode] = useState('');
-  const [checkInVehicleType, setCheckInVehicleType] = useState<'Sedan' | 'SUV' | 'Hatchback' | 'Sang trọng'>('Sedan');
+  const [checkInVehicleType, setCheckInVehicleType] = useState<'Sedan' | 'SUV' | 'Van' | 'Minibus' | 'Sang trọng'>('Sedan');
   const [checkInIsVip, setCheckInIsVip] = useState(false);
+  const [ledText, setLedText] = useState("CHÀO MỪNG BẠN ĐẾN VỚI URBANPARK");
 
   // Detailed selected slot state info card overlay
   const [selectedSlotDetails, setSelectedSlotDetails] = useState<any | null>(null);
@@ -692,18 +700,23 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
       return;
     }
     try {
-      await parkingService.visitorCheckIn({
+      const response = await parkingService.visitorCheckIn({
         plate: checkInPlate.trim().toUpperCase(),
         vehicle_type: checkInVehicleType,
         card_code: checkInCardCode.trim(),
         image_url: 'https://example.com/fake-lpr.jpg' // Fake image
       });
+      const data = response?.data ?? response;
+      const zoneCode = data?.assigned_zone_code || 'F1';
+      setLedText(`THÔNG XE: ${checkInPlate.toUpperCase()} -> TẦNG ${zoneCode}`);
       triggerToast(`Đã gọi API Check-in xe ${checkInPlate.toUpperCase()} thành công!`, 'success');
       setSelectedSlotForCheckIn(null);
       setCheckInPlate('');
       setCheckInCardCode('');
     } catch (error: any) {
-      triggerToast(error?.response?.data?.message || 'Lỗi khi gọi API Check-in', 'error');
+      const errMsg = error?.response?.data?.message || 'Lỗi khi gọi API Check-in';
+      setLedText(`🚨 TỪ CHỐI: ${checkInPlate.toUpperCase()}`);
+      triggerToast(errMsg, 'error');
     }
   };
 
@@ -1350,8 +1363,8 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                             <span className="text-[8px] text-slate-500 uppercase tracking-widest block font-sans">BẢNG LED ĐIỆN TỬ CỔNG TRỰC (IoT LED Display)</span>
                             <strong className="text-[13px] font-black tracking-widest uppercase block animate-pulse">
                               {isSecurityLockTriggered 
-                                ? "🚨 XE BỊ KHÓA — VUI LÒNG T T KHÓA TRÊN APP" 
-                                : "CHÀO MỪNG BẠN ĐẾN VỚI URBANPARK"}
+                                ? "🚨 XE BỊ KHÓA — VUI LÒNG TẮT KHÓA TRÊN APP" 
+                                : ledText}
                             </strong>
                           </div>
 
@@ -2096,19 +2109,25 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
                                 <div className="space-y-1">
                                   <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Hạng mục dòng xe</label>
-                                  <div className="flex bg-white dark:bg-slate-950 rounded-xl border border-slate-205 dark:border-slate-850 p-0.5">
-                                    {(['Sedan', 'SUV', 'Sang trọng'] as const).map(type => (
+                                  <div className="flex flex-wrap bg-white dark:bg-slate-950 rounded-xl border border-slate-205 dark:border-slate-850 p-0.5 gap-1">
+                                    {[
+                                      { id: 'Sedan', label: 'Xe 4-5 chỗ' },
+                                      { id: 'SUV', label: 'Xe 7-9 chỗ' },
+                                      { id: 'Van', label: 'Xe van / xe tải' },
+                                      { id: 'Minibus', label: 'Xe 12-16 chỗ' },
+                                      { id: 'Sang trọng', label: 'Sang trọng' }
+                                    ].map(item => (
                                       <button
-                                        key={type}
+                                        key={item.id}
                                         type="button"
-                                        onClick={() => setCheckInVehicleType(type)}
-                                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-extrabold transition-all ${
-                                          checkInVehicleType === type 
+                                        onClick={() => setCheckInVehicleType(item.id as any)}
+                                        className={`flex-1 min-w-[75px] py-1.5 rounded-lg text-[10px] font-extrabold transition-all ${
+                                          checkInVehicleType === item.id 
                                             ? 'bg-blue-600 text-white shadow-xs' 
                                             : 'text-slate-500 hover:text-slate-800'
                                         }`}
                                       >
-                                        {type}
+                                        {item.label}
                                       </button>
                                     ))}
                                   </div>

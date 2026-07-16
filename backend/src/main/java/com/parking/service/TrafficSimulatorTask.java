@@ -141,7 +141,7 @@ public class TrafficSimulatorTask {
                         generatedVipCount++;
                     }
 
-                    String[] vehicleTypes = {"SEDAN_HATCHBACK", "SUV_CUV_MPV", "LARGE_VAN_MINIBUS"};
+                    String[] vehicleTypes = {"SEDAN_HATCHBACK", "SUV_CUV_MPV", "VAN_TRUCK", "MINIBUS_16"};
                     String resolvedVehicleType = vehicleTypes[(int)(Math.random() * vehicleTypes.length)];
 
                     List<Zone> candidates = zoneRepo.findByAllowedSizesContaining(resolvedVehicleType);
