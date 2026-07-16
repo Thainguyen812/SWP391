@@ -10,7 +10,8 @@ import {
   ArrowRightOutlined,
   WarningFilled,
   CarOutlined,
-  WalletOutlined
+  WalletOutlined,
+  SafetyCertificateOutlined
 } from '@ant-design/icons';
 import { notification, Input, Button, Modal, Spin } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
@@ -46,6 +47,46 @@ export const StaffPayment = () => {
   const [backendTxn, setBackendTxn] = useState(null);
   const [identityVerified, setIdentityVerified] = useState(isLostCard ? true : false);
   const [nowTick, setNowTick] = useState(Date.now());
+  const [cccdImage, setCccdImage] = useState(null);
+  const [regImage, setRegImage] = useState(null);
+
+  const getIdImages = (plate) => {
+    const cccdImages = [
+      "https://images.unsplash.com/photo-1633265486064-086b219458ce?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1621252179027-94459d278660?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1614064641913-6b110b47ce56?auto=format&fit=crop&w=600&q=80"
+    ];
+    const regImages = [
+      "https://images.unsplash.com/photo-1588681664899-f142ff2dc9b1?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=600&q=80",
+      "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=600&q=80"
+    ];
+    let sum = 0;
+    const str = plate || "default";
+    for(let i=0; i<str.length; i++) sum += str.charCodeAt(i);
+    return {
+      cccd: cccdImages[sum % cccdImages.length],
+      reg: regImages[sum % regImages.length]
+    };
+  };
+
+  const idImgs = useMemo(() => getIdImages(lpr), [lpr]);
+
+  const handleCaptureCccd = () => {
+    notification.info({ message: 'Đang mở camera...', duration: 1 });
+    setTimeout(() => {
+      setCccdImage(idImgs.cccd);
+      notification.success({ message: 'Đã chụp CCCD/CMND', placement: 'topRight' });
+    }, 1000);
+  };
+
+  const handleCaptureReg = () => {
+    notification.info({ message: 'Đang mở camera...', duration: 1 });
+    setTimeout(() => {
+      setRegImage(idImgs.reg);
+      notification.success({ message: 'Đã chụp Giấy Đăng ký', placement: 'topRight' });
+    }, 1000);
+  };
 
   const calculateVisitorFee = (durationStr) => {
     if (!durationStr || durationStr === 'Đang vào') return 30000; // Default minimum fee
@@ -343,6 +384,14 @@ export const StaffPayment = () => {
       notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể thanh toán và mở cổng lúc này.' });
       return;
     }
+    if (vehicleToPay?.isLocked && (!cccdImage || !regImage)) {
+      notification.warning({
+        message: 'Chưa xác minh hồ sơ chống trộm',
+        description: 'Vui lòng thực hiện chụp ảnh CCCD của người lái và Cà vẹt xe để xác minh trùng khớp thông tin trước khi thanh toán và mở cổng xuất bãi!',
+        placement: 'topRight'
+      });
+      return;
+    }
     if (!canReviewVehicle) {
       notification.warning({
         message: 'Chưa xác nhận đối chiếu',
@@ -383,6 +432,9 @@ export const StaffPayment = () => {
       async onOk() {
         let checkoutAlreadyConfirmed = false;
         try {
+          if (vehicleToPay?.isLocked) {
+            await apiClient.post('/vehicles/lock', { plate: lpr, isLocked: false });
+          }
           if (isVip && !isLostCard) {
             await apiClient.post('/sessions/approve-exit', { plate: lpr });
           } else if (backendTxn && backendTxn.id) {
@@ -538,6 +590,19 @@ export const StaffPayment = () => {
           </button>
         </div>
       </div>
+
+      {vehicleToPay?.isLocked && (
+        <div className="bg-red-55 p-4 rounded-xl mb-6 border-l-4 border-red-600 shadow-sm flex items-start gap-3">
+          <WarningFilled className="text-red-600 text-lg mt-0.5" />
+          <div>
+            <h4 className="font-black text-sm text-red-800 uppercase tracking-wide m-0">⚠️ XE ĐANG KHÓA CHỐNG TRỘM / BÁO MẤT</h4>
+            <p className="text-xs text-red-700 mt-1 mb-0 font-bold">
+              Phương tiện mang biển số <span className="font-mono font-black text-red-900 bg-red-100 px-1.5 py-0.5 rounded">{lpr}</span> đang kích hoạt chế độ khóa an toàn từ xa. 
+              CẤM MỞ CỔNG XUẤT BÃI cho đến khi đối chiếu đầy đủ giấy tờ tùy thân (CCCD) và Cà vẹt chính chủ trùng khớp.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column */}
@@ -819,6 +884,75 @@ export const StaffPayment = () => {
               </div>
             </div>
           </div>
+
+          {vehicleToPay?.isLocked && (
+            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 flex flex-col gap-4">
+              <h3 className="text-base font-bold text-slate-800 m-0 flex items-center gap-2 text-red-600">
+                <SafetyCertificateOutlined /> Hồ sơ Xác minh chống trộm
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed m-0">
+                Yêu cầu nhân viên chụp ảnh CCCD của người lái và Cà vẹt xe để lưu hồ sơ xác minh trùng khớp thông tin xe VIP.
+              </p>
+              
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">CCCD / CMND người lái <span className="text-red-500">*</span></label>
+                  <button 
+                    type="button" 
+                    onClick={handleCaptureCccd} 
+                    className="w-full bg-slate-50 hover:bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg aspect-[2.2/1] flex flex-col items-center justify-center text-slate-400 hover:text-blue-500 hover:border-blue-300 transition-all cursor-pointer group overflow-hidden relative"
+                  >
+                    {cccdImage ? (
+                      <>
+                        <img src={cccdImage} alt="CCCD" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity font-bold text-xs gap-1.5">
+                          Thay đổi
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <CarOutlined className="text-xl mb-0.5 group-hover:scale-110 transition-transform" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Chụp CCCD</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-slate-555 uppercase tracking-wider">Cà vẹt xe chính chủ <span className="text-red-500">*</span></label>
+                  <button 
+                    type="button" 
+                    onClick={handleCaptureReg} 
+                    className="w-full bg-slate-50 hover:bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg aspect-[2.2/1] flex flex-col items-center justify-center text-slate-400 hover:text-blue-500 hover:border-blue-300 transition-all cursor-pointer group overflow-hidden relative"
+                  >
+                    {regImage ? (
+                      <>
+                        <img src={regImage} alt="Cà vẹt" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity font-bold text-xs gap-1.5">
+                          Thay đổi
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <CarOutlined className="text-xl mb-0.5 group-hover:scale-110 transition-transform" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Chụp Cà vẹt</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+              
+              {cccdImage && regImage ? (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-2 mt-1">
+                  ✓ Giấy tờ hợp lệ. Sẵn sàng cho phép thanh toán và mở cổng xuất bãi.
+                </div>
+              ) : (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold px-3 py-2 rounded-lg mt-1">
+                  ⚠️ Chưa hoàn thành chụp ảnh CCCD & Cà vẹt xe để xác minh danh tính.
+                </div>
+              )}
+            </div>
+          )}
+
           {/* History Table */}
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center">

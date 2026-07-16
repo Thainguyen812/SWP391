@@ -200,6 +200,7 @@ public class ParkingServiceImpl implements ParkingService {
 
         if (vehicleOpt.isPresent()) {
             ps.setVehicleId(vehicleOpt.get().getId());
+            ps.setIsLocked(vehicleOpt.get().isLocked());
         }
 
         zoneRepository.increaseOccupied(chosen.getId());
@@ -234,6 +235,7 @@ public class ParkingServiceImpl implements ParkingService {
             if (session.getVehicleId() == null) {
                 session.setVehicleId(vehicle.getId());
             }
+            session.setIsLocked(vehicle.isLocked());
         }
 
         Zone zone = ensureApprovedZone(session, vehicleType);
@@ -334,7 +336,11 @@ public class ParkingServiceImpl implements ParkingService {
         session.setIsSuspicious(pendingEntry.isSuspicious());
         session.setSuspiciousReason(pendingEntry.getSuspiciousReason());
         session.setEntryGate(null);
-        vehicleOpt.ifPresent(vehicle -> session.setVehicleId(vehicle.getId()));
+        if (vehicleOpt.isPresent()) {
+            Vehicle vehicle = vehicleOpt.get();
+            session.setVehicleId(vehicle.getId());
+            session.setIsLocked(vehicle.isLocked());
+        }
 
         Zone zone = ensureApprovedZone(session, vehicleType);
         parkingSessionRepository.save(session);
@@ -677,6 +683,7 @@ public class ParkingServiceImpl implements ParkingService {
             session.setId(UUID.randomUUID());
             session.setLicensePlate(plate);
             session.setVehicleId(vehicle.getId());
+            session.setIsLocked(vehicle.isLocked());
             session.setCheckInTime(Instant.now());
             session.setCreatedAt(Instant.now());
             session.setAssignedZoneId(chosen.getId());

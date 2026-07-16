@@ -439,25 +439,25 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
-        const response = await fetch('/api/logs', {
-          headers: { 'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}` }
+        const response = await fetch('/api/v1/driver/billing-history', {
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}` 
+          }
         });
         if (response.ok) {
           const data = await response.json();
-          if (data && data.items && data.items.length > 0) {
-            const mapped = data.items.map((item: any, index: number) => ({
-              id: `#TRX-${9000 + index}`,
-              date: item.time,
-              type: 'Gửi xe',
+          if (Array.isArray(data)) {
+            const mapped = data.map((item: any) => ({
+              id: item.id.startsWith('#') ? item.id : `#${item.id}`,
+              date: item.date,
+              type: item.type,
               plate: item.plate,
-              fee: item.action === 'Vào bãi' ? '0 đ' : '15,000 đ',
-              isEntry: item.action === 'Vào bãi',
-              status: item.status === 'Thành Công' ? 'Thành công' : 'Đang xử lý'
+              fee: item.fee,
+              isEntry: item.isEntry || false,
+              status: item.status
             }));
-            setTransactions(prev => {
-              const localPayments = prev.filter(tx => !tx.id.startsWith('#TRX-'));
-              return [...localPayments, ...mapped];
-            });
+            setTransactions(mapped);
           }
         }
       } catch (err) {
@@ -465,6 +465,8 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       }
     };
     fetchTransactions();
+    const timer = setInterval(fetchTransactions, 5000);
+    return () => clearInterval(timer);
   }, [user]);
 
   // Current parked vehicle mock details

@@ -121,9 +121,11 @@ const getVehicleImage = (plate: string, type: string) => {
   const t = (type || '').toLowerCase();
   if (t.includes('16') || t.includes('minibus')) {
     return images16[hash % images16.length];
-  } else if (t.includes('9') || t.includes('van')) {
+  } else if (t.includes('tải') || t.includes('truck')) {
+    return images16[hash % images16.length];
+  } else if (t.includes('van')) {
     return images9[hash % images9.length];
-  } else if (t.includes('7') || t.includes('suv')) {
+  } else if (t.includes('7-9') || t.includes('7') || t.includes('9') || t.includes('suv')) {
     return images7[hash % images7.length];
   } else {
     return images5[hash % images5.length];
@@ -187,19 +189,26 @@ export const VEHICLE_PRICING: Record<string, { day: number; month: number; month
     month6: 5000000,
     year: 9000000
   },
-  'Xe 7 chỗ': {
+  'Xe 7-9 chỗ': {
     day: 70000,
     month: 1400000,
     month3: 3800000,
     month6: 7000000,
     year: 12500000
   },
-  'Xe 9 chỗ': {
+  'Xe van': {
     day: 70000,
     month: 1400000,
     month3: 3800000,
     month6: 7000000,
     year: 12500000
+  },
+  'Xe tải nhỏ': {
+    day: 100000,
+    month: 2000000,
+    month3: 5400000,
+    month6: 10000000,
+    year: 18000000
   },
   'Xe 16 chỗ': {
     day: 100000,
@@ -412,15 +421,17 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
             if (v.bodyShape === 'SEDAN') {
               sizeLabel = 'Ô tô gầm thấp 4-5 chỗ';
             } else if (v.bodyShape === 'SUV') {
-              sizeLabel = 'Xe 7 chỗ';
+              sizeLabel = 'Xe 7-9 chỗ';
             } else if (v.bodyShape === 'VAN') {
-              sizeLabel = 'Xe 9 chỗ';
+              sizeLabel = 'Xe van';
+            } else if (v.bodyShape === 'TRUCK') {
+              sizeLabel = 'Xe tải nhỏ';
             } else if (v.bodyShape === 'MINIBUS') {
               sizeLabel = 'Xe 16 chỗ';
-            } else if (v.bodyShape && ['Ô tô gầm thấp 4-5 chỗ', 'Xe 7 chỗ', 'Xe 9 chỗ', 'Xe 16 chỗ'].includes(v.bodyShape)) {
+            } else if (v.bodyShape && ['Ô tô gầm thấp 4-5 chỗ', 'Xe 7-9 chỗ', 'Xe 16 chỗ', 'Xe van', 'Xe tải nhỏ'].includes(v.bodyShape)) {
               sizeLabel = v.bodyShape;
             } else {
-              sizeLabel = sizeType === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' :
+              sizeLabel = sizeType === 'SUV_CUV_MPV' ? 'Xe 7-9 chỗ' :
                           sizeType === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' :
                           'Ô tô gầm thấp 4-5 chỗ';
             }
@@ -592,6 +603,40 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     }
   }, [user]);
 
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      if (isOffline) return;
+      try {
+        const response = await fetch('/api/v1/driver/billing-history', {
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}` 
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data)) {
+            const mapped = data.map((item: any) => ({
+              id: item.id.startsWith('#') ? item.id : `#${item.id}`,
+              date: item.date,
+              type: item.type,
+              plate: item.plate,
+              fee: item.fee,
+              isEntry: item.isEntry || false,
+              status: item.status
+            }));
+            setTransactions(mapped);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch driver transactions", err);
+      }
+    };
+    fetchTransactions();
+    const timer = setInterval(fetchTransactions, 5000);
+    return () => clearInterval(timer);
+  }, [user, accessToken, isOffline]);
+
   // Current parked vehicle mock details
   const [currentParked, setCurrentParked] = useState<{
     plate: string;
@@ -613,6 +658,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [editPlate, setEditPlate] = useState('');
   const [editName, setEditName] = useState('');
   const [editType, setEditType] = useState('Ô tô gầm thấp 4-5 chỗ');
+  const [editFuelType, setEditFuelType] = useState('GASOLINE');
 
   // VIP Step Subscription State
   const [regStep, setRegStep] = useState<1 | 2 | 3>(2); // Default on select package for full mockup fidelity
@@ -911,17 +957,19 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     }
 
     let sizeType = 'SEDAN_HATCHBACK';
-    if (newType === 'Xe 7 chỗ' || newType === 'Xe 9 chỗ') {
+    if (newType === 'Xe 7-9 chỗ' || newType === 'Xe van') {
       sizeType = 'SUV_CUV_MPV';
-    } else if (newType === 'Xe 16 chỗ') {
+    } else if (newType === 'Xe 16 chỗ' || newType === 'Xe tải nhỏ') {
       sizeType = 'LARGE_VAN_MINIBUS';
     }
 
     let bodyShapeDb = 'SEDAN';
-    if (newType === 'Xe 7 chỗ') {
+    if (newType === 'Xe 7-9 chỗ') {
       bodyShapeDb = 'SUV';
-    } else if (newType === 'Xe 9 chỗ') {
+    } else if (newType === 'Xe van') {
       bodyShapeDb = 'VAN';
+    } else if (newType === 'Xe tải nhỏ') {
+      bodyShapeDb = 'TRUCK';
     } else if (newType === 'Xe 16 chỗ') {
       bodyShapeDb = 'MINIBUS';
     }
@@ -1044,17 +1092,19 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     }
 
     let sizeType = 'SEDAN_HATCHBACK';
-    if (editType === 'Xe 7 chỗ' || editType === 'Xe 9 chỗ') {
+    if (editType === 'Xe 7-9 chỗ' || editType === 'Xe van') {
       sizeType = 'SUV_CUV_MPV';
-    } else if (editType === 'Xe 16 chỗ') {
+    } else if (editType === 'Xe 16 chỗ' || editType === 'Xe tải nhỏ') {
       sizeType = 'LARGE_VAN_MINIBUS';
     }
 
     let bodyShapeDb = 'SEDAN';
-    if (editType === 'Xe 7 chỗ') {
+    if (editType === 'Xe 7-9 chỗ') {
       bodyShapeDb = 'SUV';
-    } else if (editType === 'Xe 9 chỗ') {
+    } else if (editType === 'Xe van') {
       bodyShapeDb = 'VAN';
+    } else if (editType === 'Xe tải nhỏ') {
+      bodyShapeDb = 'TRUCK';
     } else if (editType === 'Xe 16 chỗ') {
       bodyShapeDb = 'MINIBUS';
     }
@@ -1069,7 +1119,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       colorRgb: '#FFFFFF',
       bodyShape: bodyShapeDb,
       isActive: true,
-      fuelType: vehicles.find(v => v.id === editingVehicleId)?.fuelType || 'GASOLINE'
+      fuelType: editFuelType
     };
 
     if (isOffline) {
@@ -1079,7 +1129,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
             ...v,
             plate: editPlate.toUpperCase().trim(),
             name: editName.trim() || 'Phương tiện',
-            type: editType
+            type: editType,
+            fuelType: editFuelType
           };
         }
         return v;
@@ -1600,6 +1651,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       editPlate, setEditPlate,
       editName, setEditName,
       editType, setEditType,
+      editFuelType, setEditFuelType,
       regStep, setRegStep,
       selectedVehicleForVIP, setSelectedVehicleForVIP,
       selectedPackPrice, setSelectedPackPrice,
@@ -1630,7 +1682,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       getRemainingDays,
       setSelectedSubForDetail,
       triggerToast,
-      handleStartVnpay
+      handleStartVnpay,
+      photoCavet, setPhotoCavet,
+      photoCccd, setPhotoCccd,
+      photoXe, setPhotoXe,
+      extractedPlate, setExtractedPlate
     }}>
       <div className="min-h-screen bg-slate-50 relative overflow-hidden font-sans">
 
@@ -3175,8 +3231,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       className="w-full p-2.5 bg-slate-50 border rounded-lg font-bold border-slate-200 text-slate-850 outline-hidden"
                     >
                       <option value="Ô tô gầm thấp 4-5 chỗ">🚗 Ô tô gầm thấp 4-5 chỗ</option>
-                      <option value="Xe 7 chỗ">🚙 Xe 7 chỗ</option>
-                      <option value="Xe 9 chỗ">🚐 Xe 9 chỗ</option>
+                      <option value="Xe 7-9 chỗ">🚙 Xe 7-9 chỗ</option>
+                      <option value="Xe van">🚐 Xe van</option>
+                      <option value="Xe tải nhỏ">🚚 Xe tải nhỏ</option>
                       <option value="Xe 16 chỗ">🚌 Xe 16 chỗ</option>
                     </select>
                   </div>
@@ -3280,9 +3337,22 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       className="w-full p-2.5 bg-slate-50 border rounded-lg font-bold border-slate-200 text-slate-850 outline-hidden"
                     >
                       <option value="Ô tô gầm thấp 4-5 chỗ">🚗 Ô tô gầm thấp 4-5 chỗ</option>
-                      <option value="Xe 7 chỗ">🚙 Xe 7 chỗ</option>
-                      <option value="Xe 9 chỗ">🚐 Xe 9 chỗ</option>
+                      <option value="Xe 7-9 chỗ">🚙 Xe 7-9 chỗ</option>
+                      <option value="Xe van">🚐 Xe van</option>
+                      <option value="Xe tải nhỏ">🚚 Xe tải nhỏ</option>
                       <option value="Xe 16 chỗ">🚌 Xe 16 chỗ</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Loại động cơ</label>
+                    <select
+                      value={editFuelType}
+                      onChange={e => setEditFuelType(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 border rounded-lg font-bold border-slate-200 text-slate-850 outline-hidden"
+                    >
+                      <option value="GASOLINE">Xe Xăng</option>
+                      <option value="ELECTRIC">Xe Điện</option>
                     </select>
                   </div>
 
