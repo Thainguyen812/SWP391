@@ -1538,10 +1538,9 @@ public class ParkingServiceImpl implements ParkingService {
             violation.setSessionId(session.getId());
             violation.setViolationType("EV_ZONE_MISUSE");
             
-            java.util.UUID detectedById = userRepository.findAll().stream()
-                .findFirst()
+            java.util.UUID detectedById = userRepository.findByUsername("manager")
                 .map(com.parking.model.User::getId)
-                .orElse(java.util.UUID.randomUUID());
+                .orElse(java.util.UUID.fromString("a0000000-0000-0000-0000-000000000002"));
             violation.setDetectedBy(detectedById);
             
             violation.setDetectedAt(Instant.now());
