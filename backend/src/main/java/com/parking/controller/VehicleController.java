@@ -218,7 +218,7 @@ this.securityAlertRepository = securityAlertRepository;
     vip.setEndDate(java.time.LocalDate.now().plusMonths(1));
     vip.setFeeAmount(java.math.BigDecimal.ZERO);
     vip.setPaymentMethod("BANK_TRANSFER");
-    vip.setPaymentStatus("PAID");
+    vip.setPaymentStatus("SUCCESS");
 
     String regDoc = saved.getRegistrationDocUrl() != null ? saved.getRegistrationDocUrl() : "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80";
     String regPhoto = saved.getRegistrationPhotoUrl() != null ? saved.getRegistrationPhotoUrl() : "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80";

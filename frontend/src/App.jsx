@@ -25,6 +25,7 @@ import { StaffSettings } from './pages/staff/StaffSettings';
 import { StaffSupport } from './pages/staff/StaffSupport';
 import StaffLayout from './components/layout/StaffLayout';
 import { DriverPwa } from './components/driver/DriverPwa';
+import { PaymentSuccess } from './pages/driver/PaymentSuccess';
 
 import { Dashboard as LegacyDashboard } from './pages/admin/AdminDashboard';
 import { GlobalProvider } from './context/GlobalContext';
@@ -198,6 +199,7 @@ function App() {
 
         {/* Nhóm Khách hàng (Driver) */}
         <Route path="/driver" element={<DriverPage><DriverAppWrapper /></DriverPage>} />
+        <Route path="/payment-success" element={<PaymentSuccess />} />
 
         {/* Catch-all */}
         <Route path="*" element={

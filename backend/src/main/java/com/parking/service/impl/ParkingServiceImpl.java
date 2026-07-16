@@ -1320,8 +1320,18 @@ public class ParkingServiceImpl implements ParkingService {
         } else {
             subscription.setRejectionReason(null);
 
-            // Cập nhật ngày gia hạn bắt đầu và kết thúc dựa trên thời gian thực lúc duyệt
+            // Cập nhật ngày gia hạn bắt đầu và kết thúc dựa trên thời gian thực lúc duyệt, có cộng dồn/xếp chồng
             java.time.LocalDate startDate = java.time.LocalDate.now();
+            List<VipSubscription> existingSubs = vipSubscriptionRepository.findByVehicleId(subscription.getVehicleId());
+            for (VipSubscription sub : existingSubs) {
+                // Chỉ so sánh với các gói ACTIVE khác hoặc PENDING_APPROVAL khác không trùng với gói hiện tại đang duyệt
+                if (!sub.getId().equals(subscription.getId()) &&
+                    (sub.getStatus() == VipSubscription.Status.ACTIVE || sub.getStatus() == VipSubscription.Status.PENDING_APPROVAL)) {
+                    if (sub.getEndDate() != null && sub.getEndDate().isAfter(startDate)) {
+                        startDate = sub.getEndDate();
+                    }
+                }
+            }
             subscription.setStartDate(startDate);
             String type = subscription.getSubscriptionType() != null ? subscription.getSubscriptionType().toUpperCase()
                     : "MONTHLY";

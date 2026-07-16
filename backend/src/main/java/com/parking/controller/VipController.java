@@ -66,11 +66,33 @@ public class VipController {
             String ipAddress = servletRequest.getRemoteAddr();
             long amount = subscription.getFeeAmount() != null ? subscription.getFeeAmount().longValue() : 500000;
             
+            // Resolve dynamic return URL from client headers (Origin / Referer)
+            String origin = servletRequest.getHeader("Origin");
+            if (origin == null || origin.isEmpty()) {
+                origin = servletRequest.getHeader("Referer");
+            }
+            String customReturnUrl = null;
+            if (origin != null && !origin.isEmpty()) {
+                // Remove trailing slash if exists
+                if (origin.endsWith("/")) {
+                    origin = origin.substring(0, origin.length() - 1);
+                }
+                // If it contains paths (like Referer), strip down to domain + port
+                if (origin.startsWith("http://") || origin.startsWith("https://")) {
+                    int firstSlashAfterProto = origin.indexOf("/", 8);
+                    if (firstSlashAfterProto != -1) {
+                        origin = origin.substring(0, firstSlashAfterProto);
+                    }
+                }
+                customReturnUrl = origin + "/payment-success";
+            }
+
             // Bước D: Gọi VNPayService để tạo Link thanh toán
             String paymentUrl = vnpayService.createPaymentUrl(
                 subscription.getId().toString(), 
                 amount, 
-                ipAddress
+                ipAddress,
+                customReturnUrl
             );
             
             // Bước E: Trả link về cho Frontend

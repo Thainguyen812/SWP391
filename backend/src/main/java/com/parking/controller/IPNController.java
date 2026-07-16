@@ -14,11 +14,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/v1/payment")
+@RequestMapping({"/api/v1/payment", "/api/payment"})
 public class IPNController {
 
     private final VipSubscriptionRepository vipRepo;
-    private final String vnp_HashSecret = "GR97B6X3H8X1Z2C3V4B5N6M7K8L9Q0W1"; // Trùng với Service nhé
+    private final String vnp_HashSecret = "W5QQCZ0C958UEDBFXCA439X0ET0XKM5A"; // Trùng với Service nhé
 
     public IPNController(VipSubscriptionRepository vipRepo) {
         this.vipRepo = vipRepo;
@@ -42,13 +42,12 @@ public class IPNController {
                 if ((fieldValue != null) && (fieldValue.length() > 0)) {
                     hashData.append(fieldName);
                     hashData.append('=');
-                    hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                    hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8.toString()));
                     if (itr.hasNext()) {
                         hashData.append('&');
                     }
                 }
             }
-
             String calculatedHash = hmacSHA512(vnp_HashSecret, hashData.toString());
 
             // Kiểm tra xem chữ ký trùng khớp không
@@ -57,8 +56,12 @@ public class IPNController {
             }
 
             // 2. Lấy thông tin đơn hàng từ VNPay gửi về
-            String orderIdStr = requestParams.get("vnp_TxnRef"); // Đây chính là ID của VipSubscription
+            String orderIdStr = requestParams.get("vnp_TxnRef"); // Đây chính là ID của VipSubscription hoặc TOPUP
             String vnp_ResponseCode = requestParams.get("vnp_ResponseCode"); // Mã trạng thái thanh toán
+
+            if (orderIdStr != null && orderIdStr.startsWith("TOPUP-")) {
+                return ResponseEntity.ok("{\"RspCode\":\"00\",\"Message\":\"Confirm Success\"}");
+            }
 
             UUID subscriptionId = UUID.fromString(orderIdStr);
             Optional<VipSubscription> vipOpt = vipRepo.findById(subscriptionId);
@@ -66,12 +69,11 @@ public class IPNController {
             if (vipOpt.isPresent()) {
                 VipSubscription vip = vipOpt.get();
 
-                // Kiểm tra xem đơn này đã được cập nhật trước đó chưa (tránh xử lý trùng lặp)
-                if (vip.getStatus() != VipSubscription.Status.PENDING_APPROVAL) {
+                if (!"SUCCESS".equals(vip.getPaymentStatus())) {
                     
                     if ("00".equals(vnp_ResponseCode)) {
                         // "00" có nghĩa là người dùng đã thanh toán thành công tiền cho VNPay
-                        vip.setPaymentStatus("PAID");
+                        vip.setPaymentStatus("SUCCESS");
                         // Chuyển trạng thái gói VIP sang PENDING_APPROVAL (Chờ Admin duyệt cà vẹt)
                         vip.setStatus(VipSubscription.Status.PENDING_APPROVAL); 
                     } else {

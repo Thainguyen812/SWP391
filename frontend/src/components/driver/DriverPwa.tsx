@@ -38,7 +38,8 @@ import {
   KeyRound,
   Coins,
   Sliders,
-  Award
+  Award,
+  Trash2
 } from 'lucide-react';
 
 interface DriverPwaProps {
@@ -76,7 +77,53 @@ interface TransactionItem {
   status: 'Thành công' | 'Đang xử lý' | 'Thất bại';
 }
 
+const getVehicleImage = (plate: string, type: string) => {
+  const cleanPlate = (plate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  let hash = 0;
+  for (let i = 0; i < cleanPlate.length; i++) {
+    hash = cleanPlate.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  hash = Math.abs(hash);
+
+  const images5 = [
+    '/images/raize.png',
+    'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=500&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=500&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=500&auto=format&fit=crop&q=80'
+  ];
+
+  const images7 = [
+    '/images/santafe.png',
+    'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=500&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?w=500&auto=format&fit=crop&q=80'
+  ];
+
+  const images9 = [
+    '/images/granvia.png',
+    'https://images.unsplash.com/photo-1616422285623-13ff0162193c?w=500&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=500&auto=format&fit=crop&q=80'
+  ];
+
+  const images16 = [
+    '/images/transit.png',
+    'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=500&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=500&auto=format&fit=crop&q=80'
+  ];
+
+  const t = (type || '').toLowerCase();
+  if (t.includes('16') || t.includes('minibus')) {
+    return images16[hash % images16.length];
+  } else if (t.includes('9') || t.includes('van')) {
+    return images9[hash % images9.length];
+  } else if (t.includes('7') || t.includes('suv')) {
+    return images7[hash % images7.length];
+  } else {
+    return images5[hash % images5.length];
+  }
+};
+
 const isTxDateInFilter = (txDateStr: string, filter: string) => {
+
   if (!txDateStr || filter === 'Tất cả') return true;
   
   const now = new Date();
@@ -216,6 +263,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   // ----------------------------------------------------
   const [activeTab, setActiveTab] = useState<'home' | 'driver_pnl' | 'vehicles' | 'vip_reg' | 'billing' | 'settings' | 'support'>('driver_pnl');
   const [isOffline, setIsOffline] = useState(false);
+  const [photoCavet, setPhotoCavet] = useState<string | null>(null);
+  const [photoCccd, setPhotoCccd] = useState<string | null>(null);
+  const [photoXe, setPhotoXe] = useState<string | null>(null);
+  const [isOcrLoading, setIsOcrLoading] = useState<boolean>(false);
+  const [extractedPlate, setExtractedPlate] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'vnpay'>('wallet');
   const [balance, setBalance] = useState<number>(() => {
     const saved = localStorage.getItem(`urbanpark_user_balance_${user?.phone || 'default'}`);
@@ -448,7 +500,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
               type: sizeLabel,
               regDate: regDate,
               isActive: v.isActive !== false && v.active !== false,
-              image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
+              image: getVehicleImage(v.licensePlate || v.plate, sizeLabel),
               isLocked: activeSub ? (v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false)) : false,
               activeSubscription: activeSub,
               subscriptionExpiry: expiry,
@@ -1027,6 +1079,46 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     }
   };
 
+  const handleDeleteVehicle = async () => {
+    if (!editingVehicleId) return;
+    
+    if (window.confirm("Bạn có chắc chắn muốn xóa phương tiện này không? Hành động này không thể hoàn tác.")) {
+      if (isOffline) {
+        setVehicles(prev => prev.filter(v => v.id !== editingVehicleId));
+        setEditVehicleModalOpen(false);
+        triggerToast('Đã xóa phương tiện thành công (Chế độ Ngoại tuyến)!', 'success');
+        return;
+      }
+      
+      try {
+        const token = accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'));
+        const response = await fetch(`/api/vehicles/${editingVehicleId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          triggerToast('Xóa phương tiện thành công!', 'success');
+          setEditVehicleModalOpen(false);
+          fetchVehiclesFromApi();
+        } else {
+          let errMsg = 'Xóa phương tiện thất bại!';
+          try {
+            const errData = await response.json();
+            if (errData && errData.message) {
+              errMsg = errData.message;
+            }
+          } catch (e) {}
+          triggerToast(errMsg, 'error');
+        }
+      } catch (error: any) {
+        triggerToast(error.message || 'Đã xảy ra lỗi khi kết nối tới máy chủ!', 'error');
+      }
+    }
+  };
+
   // Lock/Unlock Anti-theft vehicle
   const toggleVehicleLock = (id: string, plate: string) => {
     setVehicles(prev => prev.map(v => {
@@ -1079,6 +1171,25 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       triggerToast('Lỗi: Không thể đăng ký Thẻ Tháng VIP ở chế độ Ngoại tuyến!', 'error');
       return;
     }
+    
+    // VIP Validation Checks
+    if (!photoCavet) {
+      triggerToast('Vui lòng cung cấp ảnh Cà vẹt xe để xác thực OCR!', 'warning');
+      return;
+    }
+    if (extractedPlate !== selectedVehicleForVIP) {
+      triggerToast('Lỗi OCR: Biển số trên cà vẹt không trùng khớp với phương tiện đã chọn!', 'error');
+      return;
+    }
+    if (!photoCccd) {
+      triggerToast('Vui lòng tải lên ảnh CMND/CCCD để xác thực!', 'warning');
+      return;
+    }
+    if (!photoXe) {
+      triggerToast('Vui lòng tải lên ảnh đầu xe thực tế để xác thực!', 'warning');
+      return;
+    }
+
     if (paymentMethod === 'wallet') {
       if (balance < selectedPackPrice) {
         triggerToast(`⚠️ Thất bại: Số dư ví không đủ! Cần ${selectedPackPrice.toLocaleString('vi-VN')}₫, Số dư hiện tại: ${balance.toLocaleString('vi-VN')}₫`, 'error');
@@ -1130,10 +1241,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         subType = 'HALF_YEARLY';
       }
 
-      const docPhotos = (window as any).lastUploadedPhotos || {
-        registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-        identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-        frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+      const docPhotos = {
+        registrationPaper: photoCavet || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+        identityCard: photoCccd || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+        frontPhoto: photoXe || 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
       };
 
       try {
@@ -1149,8 +1260,46 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       setRegStep(3); // success step!
       triggerToast(`✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe ${selectedVehicleForVIP}.`, 'success');
     } else {
-      setVnpayStep('info');
-      setVnpayModalOpen(true);
+      try {
+        let subType = 'MONTHLY';
+        if (selectedPackLabel.includes('1 Năm') || selectedPackLabel.includes('1 năm') || selectedPackLabel.includes('Năm')) {
+          subType = 'YEARLY';
+        } else if (selectedPackLabel.includes('3 Tháng') || selectedPackLabel.includes('3 tháng') || selectedPackLabel.includes('Quý')) {
+          subType = 'QUARTERLY';
+        } else if (selectedPackLabel.includes('6 Tháng') || selectedPackLabel.includes('6 tháng') || selectedPackLabel.includes('Nửa')) {
+          subType = 'HALF_YEARLY';
+        }
+
+        const docPhotos = {
+          registrationPaper: photoCavet || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
+          identityCard: photoCccd || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
+          frontPhoto: photoXe || 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+        };
+
+        const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
+        
+        // Save pending payment info to distinguish success message
+        localStorage.setItem('pending_vnpay_tx', JSON.stringify({
+          type: 'vip',
+          amount: selectedPackPrice
+        }));
+
+        const response = await apiClient.post('/vip/register', {
+          licensePlate: targetVeh ? targetVeh.plate : selectedVehicleForVIP,
+          subscriptionType: subType,
+          documentPhotos: JSON.stringify(docPhotos)
+        });
+
+        if (response && response.paymentUrl) {
+          window.location.href = response.paymentUrl;
+          return;
+        } else {
+          triggerToast('Lỗi: Backend không trả về link thanh toán VNPay!', 'error');
+        }
+      } catch (err) {
+        console.error("Lỗi khi tạo liên kết thanh toán VNPay:", err);
+        triggerToast('Lỗi khi kết nối đến cổng thanh toán VNPay!', 'error');
+      }
     }
   };
 
@@ -2107,94 +2256,30 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                   )}
 
                   {/* Top segment grid columns */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                  <div className="grid grid-cols-1 gap-6">
                     
-                    {/* Left Card: Trạng thái hiện tại */}
-                    <div className="lg:col-span-7 bg-blue-500/5 hover:bg-blue-500/10 rounded-2xl border border-blue-100 flex flex-col justify-between p-6 transition-all relative overflow-hidden">
-                      <div className="absolute right-0 top-0 w-48 h-48 bg-blue-300/10 rounded-full blur-2xl pointer-events-none" />
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <span className="text-[10px] font-black uppercase text-slate-400">TRỌNG ĐIỂM GIÁM SÁT</span>
-                          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Trạng Thái Hiện Tại</h3>
+                    <button 
+                      onClick={() => {
+                        setActiveTab('vip_reg');
+                        setRegStep(2);
+                      }}
+                      className="w-full p-6 bg-white hover:bg-slate-50 border border-slate-200 rounded-3xl flex items-center justify-between gap-4 cursor-pointer active:scale-[0.99] transition-all"
+                    >
+                      <div className="flex items-center gap-4 text-left">
+                        <div className="p-4 bg-sky-50 text-sky-600 rounded-2xl">
+                          <Calendar className="w-6 h-6" />
                         </div>
-                        {currentParked ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 text-[#10b981] font-bold text-xs rounded-full uppercase tracking-wide">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            ĐANG ĐỖ
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 border border-slate-200 text-slate-500 font-bold text-xs rounded-full uppercase tracking-wide">
-                            TRỐNG
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-slate-500 text-xs mt-3">
-                        {currentParked ? "Xe đang đỗ trong cơ sở bãi đỗ thông minh" : "Hiện tại không có xe nào đang đỗ trong bãi"}
-                      </p>
-
-                      <div className="grid grid-cols-2 gap-4 mt-6">
-                        <div className="p-4 bg-white border border-slate-200/60 rounded-xl leading-snug">
-                          <span className="text-[9px] font-extrabold text-slate-400 uppercase block tracking-wider">BIỂN SỐ NHẬN DIỆN</span>
-                          <strong className="text-sm sm:text-base font-black text-slate-800 font-mono italic tracking-wide">{currentParked?.plate || 'Chưa ghi nhận'}</strong>
-                        </div>
-                        <div className="p-4 bg-white border border-slate-200/60 rounded-xl leading-snug flex items-center gap-3">
-                          <div className="p-2 bg-red-50 text-red-500 rounded-lg">
-                            <MapPin className="w-4.5 h-4.5" />
-                          </div>
-                          <div>
-                            <span className="text-[9px] font-extrabold text-slate-400 uppercase block tracking-wider">VỊ TRÍ ƯỚC TÍNH</span>
-                            <strong className="text-xs sm:text-sm font-extrabold text-slate-850 block">{currentParked?.location || 'Chưa ghi nhận'}</strong>
-                          </div>
+                        <div>
+                          <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">Gia Hạn Vé Tháng / VIP</h4>
+                          <p className="text-xs text-slate-400 font-semibold leading-normal">
+                            Đăng ký hoặc gia hạn gói giữ xe tháng/năm tiện lợi cho phương tiện của bạn.
+                          </p>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Right Card: Quick billing operations & shortcuts */}
-                    <div className="lg:col-span-5 flex flex-col gap-4">
-                      
-                      {/* Large Blue payment trigger */}
-                      <button 
-                        onClick={() => {
-                          setActiveTab('vip_reg');
-                          setRegStep(2);
-                        }}
-                        className="w-full p-5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-base rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-blue-600/10 cursor-pointer active:scale-[0.99] transition-all"
-                      >
-                        <CreditCard className="w-5 h-5 text-white" />
-                        <span>Thanh Toán Ngay</span>
-                      </button>
-
-                      {/* Beneath grid */}
-                      <div className="grid grid-cols-2 gap-4 flex-1">
-                        
-                        <button 
-                          onClick={handleFindCar}
-                          className="p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center gap-2 select-none group cursor-pointer active:scale-95 transition-all"
-                        >
-                          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-full group-hover:scale-110 transition-transform">
-                            <MapPin className="w-5 h-5" />
-                          </div>
-                          <span className="text-xs font-black text-slate-700 tracking-tight leading-none">Tìm Xe Của Tôi</span>
-                        </button>
-
-                        <button 
-                          onClick={() => {
-                            setActiveTab('vip_reg');
-                            setRegStep(2);
-                          }}
-                          className="p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center gap-2 select-none group cursor-pointer active:scale-95 transition-all"
-                        >
-                          <div className="p-2.5 bg-sky-50 text-sky-600 rounded-full group-hover:scale-110 transition-transform">
-                            <Calendar className="w-5 h-5" />
-                          </div>
-                          <span className="text-xs font-black text-slate-700 tracking-tight leading-none">Gia Hạn Vé Tháng</span>
-                        </button>
-
+                      <div className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 font-black text-xs rounded-xl uppercase tracking-wider">
+                        Tiếp Tục
                       </div>
-
-                    </div>
+                    </button>
 
                   </div>
 
@@ -2582,6 +2667,120 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         </button>
                       </div>
 
+                      {/* Sub-section 1.5: Minh chứng & OCR Xác thực */}
+                      <div className="bg-white p-6 rounded-3xl border border-slate-200/60 space-y-5 text-left">
+                        <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+                          TÀI LIỆU XÁC THỰC VIP
+                        </strong>
+                        <p className="text-[11px] text-slate-400 font-semibold leading-relaxed">
+                          Tài xế cần cung cấp cà vẹt, CCCD và ảnh đầu xe. OCR mô phỏng sẽ đối chiếu biển số trên cà vẹt với xe đang đăng ký.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* 1. Ảnh Cà vẹt */}
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">1. CẢ VẸT / ĐĂNG KÝ XE</span>
+                            {photoCavet ? (
+                              <div className="relative h-28 rounded-xl overflow-hidden border border-slate-200 group">
+                                <img src={photoCavet} alt="Cà vẹt" className="w-full h-full object-cover" />
+                                <button 
+                                  onClick={() => { setPhotoCavet(null); setExtractedPlate(null); }}
+                                  className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="border-2 border-dashed border-slate-200 rounded-xl p-3 text-center space-y-2 bg-slate-50">
+                                <p className="text-[10px] text-slate-400">Chọn ảnh mẫu để chạy OCR:</p>
+                                <div className="flex flex-col gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setIsOcrLoading(true);
+                                      setPhotoCavet('https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80');
+                                      setTimeout(() => {
+                                        setExtractedPlate(selectedVehicleForVIP || '30H-12312');
+                                        setIsOcrLoading(false);
+                                        triggerToast("🤖 OCR: Đã trích xuất biển số trùng khớp thành công!", "success");
+                                      }, 1500);
+                                    }}
+                                    className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                                  >
+                                    ẢNH KHỚP BIỂN SỐ
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setIsOcrLoading(true);
+                                      setPhotoCavet('https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80');
+                                      setTimeout(() => {
+                                        setExtractedPlate('29A-888.88');
+                                        setIsOcrLoading(false);
+                                        triggerToast("🤖 OCR: Phát hiện biển số Cà vẹt không trùng khớp!", "error");
+                                      }, 1500);
+                                    }}
+                                    className="w-full py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                                  >
+                                    ẢNH KHÁC BIỂN SỐ
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 2. Ảnh CMND/CCCD */}
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">2. CMND / CCCD CHỦ XE</span>
+                            {photoCccd ? (
+                              <div className="relative h-28 rounded-xl overflow-hidden border border-slate-200 group">
+                                <img src={photoCccd} alt="CCCD" className="w-full h-full object-cover" />
+                                <button 
+                                  onClick={() => setPhotoCccd(null)}
+                                  className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setPhotoCccd('https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80')}
+                                className="w-full h-28 border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer transition-colors"
+                              >
+                                <Plus className="w-5 h-5 mb-1" />
+                                <span className="text-[9px] font-bold uppercase tracking-wider">TẢI LÊN CCCD</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* 3. Ảnh Xe Thực Tế */}
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">3. ẢNH THỰC TẾ ĐẦU XE</span>
+                            {photoXe ? (
+                              <div className="relative h-28 rounded-xl overflow-hidden border border-slate-200 group">
+                                <img src={photoXe} alt="Ảnh xe" className="w-full h-full object-cover" />
+                                <button 
+                                  onClick={() => setPhotoXe(null)}
+                                  className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setPhotoXe('https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80')}
+                                className="w-full h-28 border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer transition-colors"
+                              >
+                                <Plus className="w-5 h-5 mb-1" />
+                                <span className="text-[9px] font-bold uppercase tracking-wider">TẢI ẢNH ĐẦU XE</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Sub-section 2: Choose service package */}
                       <div className="bg-white p-6 rounded-3xl border border-slate-200/60 space-y-4">
                         <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block">
@@ -2889,9 +3088,38 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       } catch (e) {}
                     }
                     
-                    const activeOrPendingSubs = mySubs.filter((s: any) => 
-                      s.status === 'ACTIVE' || s.status === 'PENDING' || s.status === 'PENDING_APPROVAL'
+                    const activeOrPendingSubsRaw = mySubs.filter((s: any) => 
+                      (s.status === 'ACTIVE' || s.status === 'PENDING' || s.status === 'PENDING_APPROVAL') &&
+                      vehicles.some((v: any) => (v.licensePlate || v.plate) === s.vehicle_plate)
                     );
+                    
+                    const groupedSubsMap: { [plate: string]: any } = {};
+                    activeOrPendingSubsRaw.forEach((sub: any) => {
+                      const plate = sub.vehicle_plate;
+                      if (!groupedSubsMap[plate]) {
+                        groupedSubsMap[plate] = { ...sub };
+                      } else {
+                        const existing = groupedSubsMap[plate];
+                        if (sub.status === 'ACTIVE') {
+                          existing.status = 'ACTIVE';
+                        }
+                        if (sub.endDate && existing.endDate) {
+                          const parseDate = (dStr: string) => {
+                            const parts = dStr.split('/');
+                            return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                          };
+                          try {
+                            const dSub = parseDate(sub.endDate);
+                            const dExt = parseDate(existing.endDate);
+                            if (dSub > dExt) {
+                              existing.endDate = sub.endDate;
+                            }
+                          } catch (e) {}
+                        }
+                      }
+                    });
+                    
+                    const activeOrPendingSubs = Object.values(groupedSubsMap);
                     
                     if (activeOrPendingSubs.length === 0) return null;
                     
@@ -3211,74 +3439,6 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         </div>
                       </div>
 
-                      {/* Notifications settings */}
-                      <div className="bg-white p-6 rounded-[24px] border border-slate-200/60 space-y-4">
-                        <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block">
-                          Tùy chọn thông báo
-                        </strong>
-
-                        <div className="divide-y divide-slate-100 font-sans text-xs">
-                          {/* Row 1 */}
-                          <div className="py-3 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                            <div className="space-y-0.5">
-                              <strong className="text-slate-800 font-extrabold">Sự kiện vào/ra bãi xe</strong>
-                              <p className="text-slate-400 text-[11px] font-semibold leading-normal">
-                                Nhận thông báo thời gian thực khi xe đi qua trạm kiểm soát rào chắn.
-                              </p>
-                            </div>
-                            <div className="flex gap-4 font-black text-[11px]">
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input 
-                                  type="checkbox" 
-                                  checked={emailNotifyGate} 
-                                  onChange={(e) => setEmailNotifyGate(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
-                                />
-                                <span>Email</span>
-                              </label>
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input 
-                                  type="checkbox" 
-                                  checked={smsNotifyGate} 
-                                  onChange={(e) => setSmsNotifyGate(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
-                                />
-                                <span>SMS</span>
-                              </label>
-                            </div>
-                          </div>
-
-                          {/* Row 2 */}
-                          <div className="py-3.5 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                            <div className="space-y-0.5">
-                              <strong className="text-slate-800 font-extrabold">Biên lai thanh toán</strong>
-                              <p className="text-slate-400 text-[11px] font-semibold leading-normal">
-                                Tự động gửi biên lai hóa đơn thuế điện tử về tài khoản sau hành trình.
-                              </p>
-                            </div>
-                            <div className="flex gap-4 font-black text-[11px]">
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input 
-                                  type="checkbox" 
-                                  checked={emailNotifyReceipt} 
-                                  onChange={(e) => setEmailNotifyReceipt(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
-                                />
-                                <span>Email</span>
-                              </label>
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input 
-                                  type="checkbox" 
-                                  checked={smsNotifyReceipt} 
-                                  onChange={(e) => setSmsNotifyReceipt(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
-                                />
-                                <span>SMS</span>
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
 
                     </div>
 
@@ -3345,15 +3505,32 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                           <button 
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                               if (isOffline) {
                                 triggerToast('Lỗi: Không thể nạp tiền vào ví ở chế độ Ngoại tuyến!', 'error');
                                 return;
                               }
-                              setSelectedPackPrice(topupAmount);
-                              setSelectedPackLabel('Nạp tiền vào ví điện tử UrbanPark');
-                              setVnpayStep('info');
-                              setVnpayModalOpen(true);
+                              try {
+                                // Save topup metadata to localStorage so when they return, we credit the balance!
+                                localStorage.setItem('pending_vnpay_tx', JSON.stringify({
+                                  type: 'topup',
+                                  amount: topupAmount
+                                }));
+
+                                const response = await apiClient.post('/payment/create-url', {
+                                  amount: topupAmount
+                                });
+
+                                if (response && response.paymentUrl) {
+                                  window.location.href = response.paymentUrl;
+                                  return;
+                                } else {
+                                  triggerToast('Lỗi: Backend không trả về link thanh toán VNPay!', 'error');
+                                }
+                              } catch (err) {
+                                console.error("Lỗi tạo link thanh toán nạp tiền:", err);
+                                triggerToast('Không thể kết nối đến cổng thanh toán VNPay!', 'error');
+                              }
                             }}
                             className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.98]"
                           >
@@ -3927,6 +4104,14 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                   </div>
 
                   <div className="flex gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleDeleteVehicle}
+                      className="px-4 py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl transition-all cursor-pointer border border-rose-100 flex items-center justify-center gap-1.5"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Xoá xe
+                    </button>
                     <button
                       type="button"
                       onClick={() => setEditVehicleModalOpen(false)}
