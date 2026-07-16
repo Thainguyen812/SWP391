@@ -880,6 +880,12 @@ public class ParkingServiceImpl implements ParkingService {
             return BigDecimal.ZERO;
         }
 
+        PricingRule pricingRule = pricingRuleRepository
+                .findFirstByVehicleSizeAndIsActiveTrueOrderByEffectiveFromDesc(
+                        vehicle.getVehicleSize())
+                .orElseThrow(() -> new ApiExceptions.NotFoundException(
+                        "Khong tim thay cau hinh bang gia"));
+
         BigDecimal evPenaltyRate = pricingRule.getEvViolationPenalty() != null
                 ? pricingRule.getEvViolationPenalty()
                 : BigDecimal.ZERO;
