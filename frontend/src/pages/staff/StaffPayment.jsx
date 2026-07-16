@@ -140,6 +140,7 @@ export const StaffPayment = () => {
   const [isPaid, setIsPaid] = useState(false);
   const [backendTxn, setBackendTxn] = useState(null);
   const [identityVerified, setIdentityVerified] = useState(isLostCard ? true : false);
+  const [nowTick, setNowTick] = useState(Date.now());
   const [vnpayUrl, setVnpayUrl] = useState('');
   const [isPollingVnpay, setIsPollingVnpay] = useState(false);
 
@@ -184,8 +185,80 @@ export const StaffPayment = () => {
     return '';
   }, [isLostCard, vehicleToPay?.cardCode, location.state?.cardCode, isVehicleVip, lpr]);
   const canReviewVehicle = identityVerified || isLostCard;
-  const displayAmount = canReviewVehicle ? totalAmount : 0;
+  const backendPaymentStatus = backendTxn?.paymentStatus || backendTxn?.status;
+  const backendAlreadyPaid = backendPaymentStatus === 'SUCCESS';
+  const isMobileCheckoutTxn = Boolean(backendTxn) && (backendTxn?.isMobileCheckout === true || backendTxn?.mobileCheckout === true || backendTxn?.sessionStatus === 'PASSED_CONFIRMED');
+  const isMobilePrepaidCheckout = backendAlreadyPaid && isMobileCheckoutTxn;
+  const mobileOverstayPenalty = Number(backendTxn?.mobileCheckoutOverstayPenalty || 0);
+  const hasMobileOverstayPenalty = isMobileCheckoutTxn && mobileOverstayPenalty > 0;
+  const mobilePrepaidAmount = Number(backendTxn?.totalAmount || 0);
+  const mobileCheckoutExpiresAt = useMemo(() => {
+    const explicitExpiry = backendTxn?.mobileCheckoutExpiresAt;
+    if (explicitExpiry) {
+      const expiryMs = new Date(explicitExpiry).getTime();
+      return Number.isNaN(expiryMs) ? null : expiryMs;
+    }
+
+    if (isMobileCheckoutTxn && backendTxn?.processedAt) {
+      const processedMs = new Date(backendTxn.processedAt).getTime();
+      return Number.isNaN(processedMs) ? null : processedMs + 30 * 60 * 1000;
+    }
+
+    return null;
+  }, [backendTxn, isMobileCheckoutTxn]);
+  const mobileRemainingMs = mobileCheckoutExpiresAt ? mobileCheckoutExpiresAt - nowTick : null;
+  const mobileGraceExpired = isMobileCheckoutTxn && (backendTxn?.mobileCheckoutGraceExpired === true || (mobileRemainingMs !== null && mobileRemainingMs <= 0));
+  const mobileCountdownLabel = useMemo(() => {
+    if (!isMobileCheckoutTxn || mobileRemainingMs === null) return '30 phút';
+    if (mobileRemainingMs <= 0) return 'đã quá hạn';
+
+    const totalSeconds = Math.ceil(mobileRemainingMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes} phút ${seconds.toString().padStart(2, '0')} giây`;
+  }, [isMobileCheckoutTxn, mobileRemainingMs]);
+  const mobileCheckoutPaidAt = useMemo(() => {
+    if (!isMobileCheckoutTxn || !backendTxn?.processedAt) return null;
+
+    const paidAtMs = new Date(backendTxn.processedAt).getTime();
+    return Number.isNaN(paidAtMs) ? null : paidAtMs;
+  }, [backendTxn, isMobileCheckoutTxn]);
+  const formatMobileClock = (timestampMs) => {
+    if (!timestampMs) return '--:--';
+
+    return new Date(timestampMs).toLocaleString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit'
+    });
+  };
+  const mobileOverstayLabel = useMemo(() => {
+    if (!mobileGraceExpired || mobileRemainingMs === null) return '';
+
+    const totalMinutes = Math.max(1, Math.ceil(Math.abs(mobileRemainingMs) / 60000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours <= 0) return `${minutes} phút`;
+    if (minutes === 0) return `${hours} giờ`;
+    return `${hours} giờ ${minutes} phút`;
+  }, [mobileGraceExpired, mobileRemainingMs]);
+  const displayAmount = canReviewVehicle ? (isMobileCheckoutTxn ? mobileOverstayPenalty : totalAmount) : 0;
   
+  useEffect(() => {
+    if (!isMobileCheckoutTxn || !mobileCheckoutExpiresAt || !canReviewVehicle) {
+      return undefined;
+    }
+
+    setNowTick(Date.now());
+    const timer = window.setInterval(() => {
+      setNowTick(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [isMobileCheckoutTxn, mobileCheckoutExpiresAt, canReviewVehicle]);
+
   useEffect(() => {
     let interval;
     if (paymentMethod === 'vnpay' && backendTxn?.id && canReviewVehicle && !isPaid) {
