@@ -40,7 +40,7 @@ public class TrafficSimulatorTask {
     private final List<String> IN_GATES = Arrays.asList("CỔNG VÀO 1", "CỔNG VÀO 2", "CỔNG VÀO 3");
     private final List<String> OUT_GATES = Arrays.asList("CỔNG RA 1", "CỔNG RA 2", "CỔNG RA 3");
 
-    // @Scheduled(fixedDelay = 45000) // Đã tắt giả lập tự động để demo bằng tay
+    @Scheduled(fixedDelay = 45000) // Đã bật lại giả lập tự động
     public void simulateTraffic() {
         try {
             // Logic Check-in: Clear entry gates that have been occupied for > 90s

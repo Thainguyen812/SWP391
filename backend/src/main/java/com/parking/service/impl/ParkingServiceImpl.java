@@ -765,6 +765,10 @@ public class ParkingServiceImpl implements ParkingService {
                         () -> new ApiExceptions.NotFoundException(
                                 "Không tìm thấy phiên gửi xe hợp lệ"));
 
+        return this.checkoutSession(session);
+    }
+
+    private Transaction checkoutSession(ParkingSession session) {
         if (session.getIsLocked() != null && session.getIsLocked()) {
             SecurityAlert alert = new SecurityAlert();
             alert.setAlertType("NGHI NGỜ TRỘM CẮP");
@@ -809,7 +813,7 @@ public class ParkingServiceImpl implements ParkingService {
             throw new ApiExceptions.BadRequestException("Xe VIP không checkout bằng thẻ vãng lai");
         }
 
-        if (blacklistRepository.existsByCardId(cardId)) {
+        if (session.getCardId() != null && blacklistRepository.existsByCardId(session.getCardId())) {
             throw new ApiExceptions.ForbiddenException("Thẻ này đang nằm trong blacklist, không thể checkout");
         }
 
@@ -1057,6 +1061,16 @@ public class ParkingServiceImpl implements ParkingService {
                 slot.setSlotStatus("AVAILABLE");
                 slot.setLastUpdated(Instant.now());
                 slotRepository.save(slot);
+            });
+            session.setParkedSlotId(null);
+        }
+
+        if (session.getAssignedZoneId() != null) {
+            zoneRepository.findById(session.getAssignedZoneId()).ifPresent(zone -> {
+                if (zone.getCurrentOccupied() > 0) {
+                    zone.setCurrentOccupied(zone.getCurrentOccupied() - 1);
+                    zoneRepository.save(zone);
+                }
             });
         }
 
@@ -1511,11 +1525,36 @@ public class ParkingServiceImpl implements ParkingService {
         parkingSessionRepository.save(session);
 
         boolean zoneMismatch = session.getAssignedZoneId() != null && !session.getAssignedZoneId().equals(slot.getZoneId());
+        
+        boolean isEvSlot = "EV_CHARGING".equalsIgnoreCase(slot.getSlotType());
+        boolean isGasCar = false;
+        java.util.Optional<Vehicle> vehicleOpt = vehicleRepository.findByLicensePlate(session.getLicensePlate());
+        if (vehicleOpt.isPresent() && "GASOLINE".equalsIgnoreCase(vehicleOpt.get().getFuelType())) {
+            isGasCar = true;
+        }
+
+        if (zoneMismatch || (isEvSlot && isGasCar)) {
+            ParkingViolation violation = new ParkingViolation();
+            violation.setSessionId(session.getId());
+            violation.setViolationType("EV_ZONE_MISUSE");
+            violation.setDetectedBy(java.util.UUID.randomUUID());
+            violation.setDetectedAt(Instant.now());
+            violation.setPenaltyAmount(new java.math.BigDecimal("100000"));
+            violation.setSlotId(slot.getId());
+            violation.setStatus("PENDING");
+            if (isEvSlot && isGasCar) {
+                violation.setNotes("Xe xăng đỗ vào ô dành riêng cho xe điện");
+            } else {
+                violation.setNotes("Xe đỗ sai khu vực được chỉ định");
+            }
+            parkingViolationRepository.save(violation);
+        }
+
         response.put("sessionId", session.getId());
         response.put("licensePlate", session.getLicensePlate());
         response.put("slotStatus", slot.getSlotStatus());
         response.put("zoneMismatch", zoneMismatch);
-        response.put("message", zoneMismatch ? "SENSOR_SLOT_RECORDED_ZONE_MISMATCH" : "SENSOR_SLOT_RECORDED");
+        response.put("message", zoneMismatch || (isEvSlot && isGasCar) ? "SENSOR_SLOT_RECORDED_WITH_VIOLATION" : "SENSOR_SLOT_RECORDED");
         return response;
     }
 
@@ -1633,8 +1672,8 @@ public class ParkingServiceImpl implements ParkingService {
 
         // Fallback: If not found, perhaps the staff typed the License Plate instead of the Card Code
         Optional<ParkingSession> sessionOpt = parkingSessionRepository.findByLicensePlateAndSessionStatus(inputCode, ParkingSession.SessionStatus.ACTIVE);
-        if (sessionOpt.isPresent() && sessionOpt.get().getCardId() != null) {
-            return this.checkoutCard(sessionOpt.get().getCardId());
+        if (sessionOpt.isPresent()) {
+            return this.checkoutSession(sessionOpt.get());
         }
 
         throw new ApiExceptions.NotFoundException("Thẻ hoặc xe không tồn tại");
