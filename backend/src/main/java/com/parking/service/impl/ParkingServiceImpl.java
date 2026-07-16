@@ -887,7 +887,9 @@ public class ParkingServiceImpl implements ParkingService {
         
         for (ParkingViolation violation : pendingViolations) {
             if (violation.isFirstViolation()) {
-                violation.setPenaltyAmount(BigDecimal.ZERO);
+                BigDecimal firstTimePenalty = evPenaltyRate.divide(new java.math.BigDecimal("2"));
+                violation.setPenaltyAmount(firstTimePenalty);
+                totalFines = totalFines.add(firstTimePenalty);
             } else {
                 violation.setPenaltyAmount(evPenaltyRate);
                 totalFines = totalFines.add(evPenaltyRate);
