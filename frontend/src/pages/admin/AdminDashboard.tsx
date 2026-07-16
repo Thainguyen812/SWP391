@@ -69,6 +69,10 @@ import {
 
 import { VipApprovalPanel } from './VipApprovalPanel';
 import { ParkingMonitorView } from './ParkingMonitorView';
+import { RevenuePage } from '../manager/revenue/Revenue_Main';
+import { PersonnelMain } from '../manager/personnel/Personnel_Main';
+import { CustomerPage } from '../manager/customers/Customer_Main';
+import { apiClient } from '../../api/apiClient';
 
 interface DashboardProps {
   user: {
@@ -178,21 +182,43 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   const [emergencyLockdown, setEmergencyLockdown] = useState(false);
   const [editingStaffGateId, setEditingStaffGateId] = useState<string | null>(null);
   const [showAddBranchModal, setShowAddBranchModal] = useState(false);
-  const [branches, setBranches] = useState<any[]>(() => {
-    return [
-      {
-        id: 'br-1',
-        name: 'Cơ sở Vincom Center',
-        address: '72 Lê Thánh Tôn, Quận 1',
-        status: 'Hoạt động',
-        capacity: 400,
-        occupied: 342,
-        cars: '120 / 150',
-        motorbikes: '222 / 250',
-        updateTime: 'Cập nhật 1 phút trước'
-      }
-    ];
-  });
+  const [branches, setBranches] = useState<any[]>([{
+      id: 'br-1',
+      name: 'Hệ thống tòa nhà gửi xe',
+      address: 'Bãi đỗ xe thông minh UrbanPark',
+      status: 'Hoạt động',
+      capacity: 0,
+      occupied: 0,
+      cars: '0 / 0',
+      updateTime: 'Đang tải...'
+    }]);
+
+  // Fetch real zone data for overview tab
+  useEffect(() => {
+    if (activeMenu === 'overview') {
+      const fetchZoneOverview = async () => {
+        try {
+          const zoneData = await apiClient.get('/v1/parking/zones/overview');
+          const zones = Array.isArray(zoneData) ? zoneData : [];
+          const totalSlots = zones.reduce((s: number, z: any) => s + (z.totalSlots || 0), 0);
+          const totalOccupied = zones.reduce((s: number, z: any) => s + (z.currentOccupied || 0), 0);
+          setBranches([{
+            id: 'br-1',
+            name: 'Hệ thống tòa nhà gửi xe',
+            address: 'Bãi đỗ xe thông minh UrbanPark',
+            status: 'Hoạt động',
+            capacity: totalSlots,
+            occupied: totalOccupied,
+            cars: `${totalOccupied} / ${totalSlots}`,
+            updateTime: `Cập nhật lúc ${new Date().toLocaleTimeString('vi-VN')}`
+          }]);
+        } catch (err) {
+          console.error('Lỗi tải dữ liệu zone overview:', err);
+        }
+      };
+      fetchZoneOverview();
+    }
+  }, [activeMenu]);
 
   // Gate Control Live API States
   const [gatePlate, setGatePlate] = useState('');
@@ -571,7 +597,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
   const filteredBranches = branches.filter(branch => {
     if (activeFacility === 'cs1') {
-      return branch.id === 'br-1' || branch.name.toLowerCase().includes('vincom') || branch.name.toLowerCase().includes('cs 01') || branch.name.toLowerCase().includes('cs1') || branch.name.toLowerCase().includes('cơ sở 01') || branch.name.toLowerCase().includes('cơ sở 1');
+      return branch.id === 'br-1';
     } else if (activeFacility === 'cs2') {
       return branch.id === 'br-2' || branch.name.toLowerCase().includes('landmark') || branch.name.toLowerCase().includes('cs 02') || branch.name.toLowerCase().includes('cs2') || branch.name.toLowerCase().includes('cơ sở 02') || branch.name.toLowerCase().includes('cơ sở 2');
     }
@@ -877,6 +903,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
           {/* BOTTOM RAIL BUTTONS */}
           <div className="space-y-3 pt-6 border-t border-[#14233c] mt-8">
             {/* Added facility trigger */}
+            {false && (
             <button 
               onClick={() => {
                 const name = `Bãi Xe Phụ ${Math.floor(Math.random() * 100)}`;
@@ -889,6 +916,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
               <Plus className="w-4 h-4 stroke-[3]" />
               <span>Thêm cơ sở mới</span>
             </button>
+            )}
 
             <button 
               onClick={() => {
@@ -1017,6 +1045,12 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                 </div>
 
                 {/* SEGMENT BRANCH TABS ("Cơ sở 01", "Cơ sở 02", "Toàn hệ thống") */}
+                <div className="flex items-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-300">
+                  <MapPin className="h-4 w-4" />
+                  <span>Hệ thống tòa nhà gửi xe</span>
+                </div>
+
+                {false && (
                 <div className="flex bg-slate-100 dark:bg-[#030712] p-1 rounded-2xl gap-1 items-center shrink-0">
                   {[
                     { id: 'cs1', label: 'Cơ sở 01' },
@@ -1042,6 +1076,8 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                     );
                   })}
                 </div>
+
+                )}
 
                 {/* RIGHT BUTTONS GROUP */}
                 <div className="flex items-center gap-4 ml-auto">
@@ -1124,7 +1160,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
           {/* ACTIVE CONTENT WORKSPACE */}
           <div className="p-6 lg:p-8 flex-1 overflow-y-auto space-y-8">
             
-            {['revenue', 'staff', 'technical', 'security', 'system_log'].includes(activeMenu) && user?.role !== 'ADMIN' ? (
+            {['technical', 'security', 'system_log'].includes(activeMenu) && user?.role !== 'ADMIN' ? (
               <div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-xl mx-auto space-y-6 animate-fade-in">
                 <div className="p-5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full animate-bounce">
                   <Shield className="w-12 h-12 stroke-[1.5]" />
@@ -1287,7 +1323,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-bold font-sans">
                           Thiết kế giao diện nhập liệu thông minh cho nhân viên gác cổng - {
-                            activeFacility === 'cs1' ? 'Cơ sở 01 (Vincom Center)' : activeFacility === 'cs2' ? 'Cơ sở 02 (Landmark 81)' : 'Toàn hệ thống'
+                            'Hệ thống tòa nhà gửi xe'
                           }
                         </p>
                       </div>
@@ -1541,13 +1577,13 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
                           <div className="space-y-4 block">
                             <div className="flex justify-between items-end">
-                              <span className="text-xs font-bold text-slate-500">Sức chứa bãi xe</span>
-                              <strong className="text-base font-black text-slate-850 dark:text-white">85%</strong>
+                            <span className="text-xs font-bold text-slate-500">Sức chứa bãi xe</span>
+                              <strong className="text-base font-black text-slate-850 dark:text-white">{branches[0]?.capacity ? Math.round((branches[0].occupied / branches[0].capacity) * 100) : 0}%</strong>
                             </div>
 
                             {/* Indigo Progress gauge bar */}
                             <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                              <div className="h-full bg-blue-600 rounded-full" style={{ width: '85%' }} />
+                              <div className="h-full bg-blue-600 rounded-full" style={{ width: `${branches[0]?.capacity ? Math.round((branches[0].occupied / branches[0].capacity) * 100) : 0}%` }} />
                             </div>
 
                             {/* Grid of total Active vs Maintenance indicators */}
@@ -1606,7 +1642,6 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                                   {/* Sub details column */}
                                   <div className="flex justify-between text-[11px] font-semibold text-slate-400 pt-1 font-sans">
                                     <span>Ô tô: {branch.cars}</span>
-                                    <span>Xe máy: {branch.motorbikes}</span>
                                   </div>
                                 </div>
 
@@ -1667,6 +1702,9 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                 setShowFloorDropdown={setShowFloorDropdown}
               />
             )}
+            {activeMenu === 'revenue' && <RevenuePage />}
+            {activeMenu === 'staff' && <PersonnelMain />}
+            {activeMenu === 'customers' && <CustomerPage />}
             {(activeMenu as string) === 'monitoring_DEPRECATED' && (
               <div className="space-y-6 animate-fade-in" id="monitoring-sub-view">
                 
@@ -2299,7 +2337,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
             )}
 
             {/* SUB-VIEW 3: DOANH THU & VAT DIGITAL E-RECEIPTS (Screenshot 3 Replication) */}
-            {activeMenu === 'revenue' && (
+            {(activeMenu as string) === 'revenue_DEPRECATED' && (
               <div className="space-y-6 animate-fade-in" id="revenue-sub-view">
                 
                 {/* HEADER ROW WITH FACILITIES AND SELECTORS */}
@@ -2544,7 +2582,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
             )}
 
             {/* SUB-VIEW 4: QUAN LY NHAN SỰ RASTER (Screenshot 5 Replication) */}
-            {activeMenu === 'staff' && (
+            {(activeMenu as string) === 'staff_DEPRECATED' && (
               <div className="space-y-6 animate-fade-in text-left" id="staff-sub-view">
                 
                 {/* HEADER SUBTITLE AND CONTROLS */}
@@ -2554,7 +2592,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                       Quản lý Nhân sự & Ca trực
                     </h2>
                     <p className="text-slate-550 dark:text-slate-400 text-xs font-bold font-sans">
-                      Cơ sở: Trung tâm thương mại Vincom Center (Cơ sở 01)
+                      Hệ thống tòa nhà gửi xe
                     </p>
                   </div>
 
@@ -2927,7 +2965,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
             )}
 
             {/* SUB-VIEW 5: VIP VERIFICATION PANEL INTEGRATION & CUSTOMER MANAGEMENT TABLE (Screenshot 4 Replication) */}
-            {activeMenu === 'customers' && (
+            {(activeMenu as string) === 'customers_DEPRECATED' && (
               <div className="space-y-6 animate-fade-in text-left" id="customers-sub-view">
                 
                 {/* DUAL-TAB SEGMENT HEADERS */}
@@ -4194,7 +4232,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
         {/* MODAL ADD BRANCH DIALOG */}
         <AnimatePresence>
-          {showAddBranchModal && (
+          {false && showAddBranchModal && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
               <div className={`w-full max-w-sm rounded-[24px] p-6 border text-slate-850 ${isDarkMode ? 'bg-[#0f172a] border-slate-850 text-white' : 'bg-white border-slate-200'}`}>
                 <div className="space-y-4 block text-left font-sans text-xs">
@@ -4203,7 +4241,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                   <div className="space-y-3">
                     <div className="space-y-1 block">
                       <label className="text-[10px] font-extrabold uppercase text-slate-455">Tên cơ sở</label>
-                      <input id="branch-name-input" type="text" placeholder="Bãi xe ngầm Vincom" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                      <input id="branch-name-input" type="text" placeholder="Bãi xe UrbanPark" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
                     </div>
                     <div className="space-y-1 block">
                       <label className="text-[10px] font-extrabold uppercase text-slate-455">Địa chỉ</label>

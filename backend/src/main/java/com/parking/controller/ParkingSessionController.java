@@ -46,6 +46,25 @@ public class ParkingSessionController {
         this.pendingGateVehicleService = pendingGateVehicleService;
     }
 
+    private Zone choosePendingZone(String vehicleType, String seed) {
+        String resolvedType = vehicleType != null && !vehicleType.isBlank() ? vehicleType : "SEDAN_HATCHBACK";
+        List<Zone> candidates = zoneRepo.findByAllowedSizesContaining(resolvedType);
+        List<Zone> availableCandidates = candidates.stream()
+                .filter(z -> z.getTotalSlots() - z.getCurrentOccupied() > 0)
+                .collect(Collectors.toList());
+        List<Zone> selectableZones = !availableCandidates.isEmpty() ? availableCandidates : candidates;
+
+        if (selectableZones.isEmpty()) {
+            selectableZones = zoneRepo.findAll();
+        }
+        if (selectableZones.isEmpty()) {
+            return null;
+        }
+
+        int index = Math.floorMod((seed != null ? seed : resolvedType).hashCode(), selectableZones.size());
+        return selectableZones.get(index);
+    }
+
     private ParkingSessionDto convertToDto(ParkingSession session) {
         Vehicle vehicle = null;
         if (session.getLicensePlate() != null) {
@@ -113,16 +132,17 @@ public class ParkingSessionController {
                     pending.getSuspiciousReason()
             );
             dto.setVehicleType(pending.getVehicleType());
-            List<Zone> candidates = zoneRepo.findByAllowedSizesContaining(pending.getVehicleType());
-            if (!candidates.isEmpty()) {
-                Zone chosen = candidates.stream()
-                        .filter(z -> z.getTotalSlots() - z.getCurrentOccupied() > 0)
-                        .findFirst()
-                        .orElse(candidates.get(0));
-                dto.setAssignedZoneCode(chosen.getCode());
-                dto.setAssignedZoneId(chosen.getId());
+            if (pending.getAssignedZoneId() != null || pending.getAssignedZoneCode() != null) {
+                dto.setAssignedZoneId(pending.getAssignedZoneId());
+                dto.setAssignedZoneCode(pending.getAssignedZoneCode());
             } else {
-                dto.setAssignedZoneCode("F1");
+                Zone chosen = choosePendingZone(pending.getVehicleType(), pending.getLicensePlate());
+                if (chosen != null) {
+                    dto.setAssignedZoneCode(chosen.getCode());
+                    dto.setAssignedZoneId(chosen.getId());
+                } else {
+                    dto.setAssignedZoneCode("F1");
+                }
             }
             result.add(dto);
         });

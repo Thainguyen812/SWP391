@@ -51,9 +51,17 @@ public class PendingGateVehicleService {
         private final String suspiciousReason;
         private final String vehicleType;
         private final Instant detectedAt;
+        private final UUID assignedZoneId;
+        private final String assignedZoneCode;
 
         public PendingEntry(UUID id, String licensePlate, String entryGate, boolean vip,
                 boolean suspicious, String suspiciousReason, String vehicleType, Instant detectedAt) {
+            this(id, licensePlate, entryGate, vip, suspicious, suspiciousReason, vehicleType, detectedAt, null, null);
+        }
+
+        public PendingEntry(UUID id, String licensePlate, String entryGate, boolean vip,
+                boolean suspicious, String suspiciousReason, String vehicleType, Instant detectedAt,
+                UUID assignedZoneId, String assignedZoneCode) {
             this.id = id;
             this.licensePlate = licensePlate;
             this.entryGate = entryGate;
@@ -62,6 +70,8 @@ public class PendingGateVehicleService {
             this.suspiciousReason = suspiciousReason;
             this.vehicleType = vehicleType;
             this.detectedAt = detectedAt;
+            this.assignedZoneId = assignedZoneId;
+            this.assignedZoneCode = assignedZoneCode;
         }
 
         public UUID getId() { return id; }
@@ -72,5 +82,7 @@ public class PendingGateVehicleService {
         public String getSuspiciousReason() { return suspiciousReason; }
         public String getVehicleType() { return vehicleType; }
         public Instant getDetectedAt() { return detectedAt; }
+        public UUID getAssignedZoneId() { return assignedZoneId; }
+        public String getAssignedZoneCode() { return assignedZoneCode; }
     }
 }

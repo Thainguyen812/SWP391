@@ -40,6 +40,8 @@ public class TrafficSimulatorTask {
     private final List<String> IN_GATES = Arrays.asList("CỔNG VÀO 1", "CỔNG VÀO 2", "CỔNG VÀO 3");
     private final List<String> OUT_GATES = Arrays.asList("CỔNG RA 1", "CỔNG RA 2", "CỔNG RA 3");
 
+    private static final double VIP_ENTRY_RATIO = 0.40;
+
     @Scheduled(fixedDelay = 45000)
     public void simulateTraffic() {
         try {
@@ -100,6 +102,11 @@ public class TrafficSimulatorTask {
 
             if (!emptyInGates.isEmpty()) {
                 List<String> generatedThisTick = new java.util.ArrayList<>();
+                java.util.Collections.shuffle(emptyInGates);
+                int vipQuota = emptyInGates.size() == 1
+                        ? (Math.random() < VIP_ENTRY_RATIO ? 1 : 0)
+                        : Math.max(1, (int) Math.round(emptyInGates.size() * VIP_ENTRY_RATIO));
+                int generatedVipCount = 0;
                 for (String selectedGate : emptyInGates) {
                     ParkingSession session = new ParkingSession();
                     session.setId(UUID.randomUUID());
@@ -128,22 +135,27 @@ public class TrafficSimulatorTask {
                     session.setCheckInTime(Instant.now());
                     session.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
                     session.setEntryGate(selectedGate);
-                    session.setIsVip(Math.random() < 0.25);
+                    boolean shouldGenerateVip = generatedVipCount < vipQuota;
+                    session.setIsVip(shouldGenerateVip);
+                    if (shouldGenerateVip) {
+                        generatedVipCount++;
+                    }
 
-                    String[] vehicleTypes = {"SEDAN_HATCHBACK", "SUV_CUV_MPV", "LARGE_VAN_MINIBUS", "EV_CAR"};
+                    String[] vehicleTypes = {"SEDAN_HATCHBACK", "SUV_CUV_MPV", "LARGE_VAN_MINIBUS"};
                     String resolvedVehicleType = vehicleTypes[(int)(Math.random() * vehicleTypes.length)];
 
                     List<Zone> candidates = zoneRepo.findByAllowedSizesContaining(resolvedVehicleType);
                     Zone chosen = null;
                     if (!candidates.isEmpty()) {
-                        chosen = candidates.stream()
+                        List<Zone> availableCandidates = candidates.stream()
                                 .filter(z -> z.getTotalSlots() - z.getCurrentOccupied() > 0)
-                                .findFirst()
-                                .orElse(candidates.get(0));
+                                .collect(Collectors.toList());
+                        List<Zone> selectableZones = !availableCandidates.isEmpty() ? availableCandidates : candidates;
+                        chosen = selectableZones.get((int) (Math.random() * selectableZones.size()));
                     } else {
                         List<Zone> allZones = zoneRepo.findAll();
                         if (!allZones.isEmpty()) {
-                            chosen = allZones.get(0);
+                            chosen = allZones.get((int) (Math.random() * allZones.size()));
                         }
                     }
 
@@ -173,7 +185,9 @@ public class TrafficSimulatorTask {
                         Boolean.TRUE.equals(session.getIsSuspicious()),
                         session.getSuspiciousReason(),
                         resolvedVehicleType,
-                        session.getCheckInTime()
+                        session.getCheckInTime(),
+                        chosen.getId(),
+                        chosen.getCode()
                     ));
                     if (added) {
                         generatedThisTick.add(session.getLicensePlate());

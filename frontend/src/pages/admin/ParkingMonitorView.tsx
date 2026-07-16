@@ -32,24 +32,35 @@ interface SlotMap {
   slotType: string;
   slotStatus: string;
   sensorMockId?: string;
+  evChargerId?: string;
   licensePlate?: string;
   vehicleType?: string;
+  vehicleTypeLabel?: string;
+  fuelType?: string;
   isVip?: boolean;
   slotPhotoUrl?: string;
   lastUpdated?: string;
 }
 
+const zoneOrder = ['F1', 'F2', 'B1', 'G'];
+
 const vehicleTypeLabel = (type?: string) => {
   const value = (type || '').toUpperCase();
   if (value.includes('SUV_CUV_MPV')) return 'Xe 7-9 chỗ';
   if (value.includes('LARGE') || value.includes('VAN') || value.includes('MINIBUS')) return 'Xe lớn';
-  if (value.includes('EV')) return 'Xe điện';
   return 'Xe 4-5 chỗ';
 };
 
+const fuelTypeLabel = (fuel?: string) => {
+  return (fuel || '').toUpperCase() === 'ELECTRIC' ? 'Xe điện' : 'Xe xăng/dầu';
+};
+
 const sortZones = (zones: ZoneOverview[]) => {
-  const order = ['F1', 'F2', 'B1', 'G'];
-  return [...zones].sort((a, b) => order.indexOf(a.zoneCode) - order.indexOf(b.zoneCode));
+  return [...zones].sort((a, b) => {
+    const aIndex = zoneOrder.indexOf(a.zoneCode);
+    const bIndex = zoneOrder.indexOf(b.zoneCode);
+    return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
+  });
 };
 
 export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorViewProps) {
@@ -65,7 +76,7 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
   const [loading, setLoading] = useState(false);
 
   const notify = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
-    if (triggerToast) triggerToast(msg, type);
+    triggerToast?.(msg, type);
   };
 
   const loadData = async () => {
@@ -78,10 +89,12 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
       const normalizedZones = sortZones(Array.isArray(zoneData) ? zoneData : []);
       setZones(normalizedZones);
       setSlots(Array.isArray(slotData) ? slotData : []);
-      if (!selectedZone && normalizedZones[0]) setSelectedZone(normalizedZones[0].zoneCode);
+      if (!selectedZone && normalizedZones[0]) {
+        setSelectedZone(normalizedZones[0].zoneCode);
+      }
     } catch (error) {
       console.error(error);
-      notify('Không tải được bản đồ tầng/sensor', 'error');
+      notify('Không tải được dữ liệu Zone Map/Sensor.', 'error');
     } finally {
       setLoading(false);
     }
@@ -92,6 +105,7 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
   }, []);
 
   const selectedZoneInfo = zones.find((zone) => zone.zoneCode === selectedZone) || zones[0];
+
   const visibleSlots = useMemo(() => {
     return slots
       .filter((slot) => !selectedZoneInfo || slot.zoneId === selectedZoneInfo.zoneId || slot.zoneCode === selectedZoneInfo.zoneCode)
@@ -103,6 +117,8 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
         );
       });
   }, [slots, selectedZoneInfo, search]);
+
+  const selectedSlot = slots.find((slot) => slot.id === selectedSlotId);
 
   const totals = useMemo(() => {
     return zones.reduce(
@@ -118,29 +134,41 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
 
   const submitSensor = async () => {
     if (!selectedSlotId) {
-      notify('Chọn một ô đỗ trước khi ghi nhận sensor', 'error');
+      notify('Chọn một ô đỗ trước khi ghi nhận sensor.', 'error');
       return;
     }
     if (sensorOccupied && !sensorPlate.trim()) {
-      notify('Sensor báo có xe thì cần biển số', 'error');
+      notify('Sensor báo có xe thì cần nhập biển số.', 'error');
       return;
     }
 
     try {
-      await apiClient.post('/v1/parking/slots/sensor-occupancy', {
+      const result: any = await apiClient.post('/v1/parking/slots/sensor-occupancy', {
         slotId: selectedSlotId,
         licensePlate: sensorPlate.trim().toUpperCase(),
         vehicleType: sensorVehicleType,
         occupied: sensorOccupied,
         imageUrl: sensorImageUrl.trim()
       });
-      notify('Đã cập nhật dữ liệu sensor ô đỗ', 'success');
+
+      if (result?.violationCreated) {
+        const firstOnly = Array.isArray(result.violations) && result.violations.every((v: any) => v.firstViolation);
+        notify(
+          firstOnly
+            ? 'Đã ghi nhận vi phạm lần 1: nhắc nhở 0đ.'
+            : 'Đã ghi nhận vi phạm lặp lại: sẽ cộng phí phạt khi checkout.',
+          'info'
+        );
+      } else {
+        notify('Đã cập nhật dữ liệu sensor ô đỗ.', 'success');
+      }
+
       setSensorPlate('');
       setSensorImageUrl('');
       await loadData();
     } catch (error: any) {
       console.error(error);
-      notify(error?.response?.data?.message || error?.message || 'Sensor update thất bại', 'error');
+      notify(error?.response?.data?.message || error?.message || 'Cập nhật sensor thất bại.', 'error');
     }
   };
 
@@ -149,7 +177,9 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-xl font-black tracking-tight">Zone Map & Sensor Control</h2>
-          <p className="text-sm text-slate-500">Quản lý phân tầng, sức chứa và trạng thái cảm biến từng ô đỗ.</p>
+          <p className="text-sm text-slate-500">
+            Một bãi xe duy nhất. Phân tầng theo loại xe, sensor chỉ ghi nhận xe đã có phiên ACTIVE từ cổng.
+          </p>
         </div>
         <button
           onClick={loadData}
@@ -214,7 +244,9 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
                   <td className="px-4 py-3 font-bold text-blue-700">{zone.currentOccupied}</td>
                   <td className="px-4 py-3 font-bold text-emerald-700">{zone.availableSlots}</td>
                   <td className="px-4 py-3">
-                    <span className={`rounded-full px-2 py-1 text-xs font-bold ${zone.sensorStatus === 'ONLINE' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    <span className={`rounded-full px-2 py-1 text-xs font-bold ${
+                      zone.sensorStatus === 'ONLINE' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                    }`}>
                       {zone.sensorOnline}/{zone.sensorTotal}
                     </span>
                   </td>
@@ -230,7 +262,9 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
           <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 md:flex-row md:items-center md:justify-between">
             <div>
               <h3 className="text-sm font-black uppercase tracking-wide">Sensor ô đỗ {selectedZoneInfo?.zoneCode}</h3>
-              <p className="text-xs text-slate-500">Slot chỉ được gán khi sensor/camera xác nhận xe đã đỗ.</p>
+              <p className="text-xs text-slate-500">
+                Nếu sensor ghi xe sai tầng hoặc xe xăng vào slot EV, hệ thống tạo vi phạm. Lần 1 nhắc nhở 0đ.
+              </p>
             </div>
             <div className="flex items-center gap-2 rounded-md border border-slate-200 px-2">
               <Search size={16} className="text-slate-400" />
@@ -238,7 +272,7 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Tìm slot, biển số, sensor"
-                className="h-9 w-56 outline-none text-sm"
+                className="h-9 w-56 text-sm outline-none"
               />
             </div>
           </div>
@@ -250,7 +284,7 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
                 <button
                   key={slot.id}
                   onClick={() => setSelectedSlotId(slot.id)}
-                  className={`min-h-[92px] rounded-md border p-3 text-left transition ${
+                  className={`min-h-[96px] rounded-md border p-3 text-left transition ${
                     selected ? 'border-blue-500 ring-2 ring-blue-100' :
                     occupied ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'
                   }`}
@@ -259,8 +293,13 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
                     <span className="font-black">{slot.slotNumber}</span>
                     <span className={`h-2 w-2 rounded-full ${occupied ? 'bg-red-500' : 'bg-emerald-500'}`} />
                   </div>
-                  <div className="mt-2 text-xs font-bold text-slate-600">{occupied ? (slot.licensePlate || 'Có xe') : 'Trống'}</div>
-                  <div className="mt-1 text-[11px] text-slate-500">{occupied ? vehicleTypeLabel(slot.vehicleType) : slot.sensorMockId || 'No sensor'}</div>
+                  <div className="mt-2 text-xs font-bold text-slate-700">{occupied ? (slot.licensePlate || 'Có xe') : 'Trống'}</div>
+                  <div className="mt-1 text-[11px] text-slate-500">
+                    {occupied ? `${slot.vehicleTypeLabel || vehicleTypeLabel(slot.vehicleType)} · ${fuelTypeLabel(slot.fuelType)}` : slot.sensorMockId || 'No sensor'}
+                  </div>
+                  {slot.slotType?.toUpperCase() === 'EV' && (
+                    <div className="mt-1 inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-700">EV</div>
+                  )}
                 </button>
               );
             })}
@@ -275,7 +314,7 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
           <div className="space-y-3">
             <label className="block text-xs font-bold uppercase text-slate-500">Slot đã chọn</label>
             <div className="rounded-md bg-slate-50 px-3 py-2 text-sm font-bold">
-              {slots.find((slot) => slot.id === selectedSlotId)?.slotNumber || 'Chưa chọn'}
+              {selectedSlot?.slotNumber || 'Chưa chọn'}
             </div>
             <label className="flex items-center gap-2 text-sm font-semibold">
               <input type="checkbox" checked={sensorOccupied} onChange={(event) => setSensorOccupied(event.target.checked)} />
@@ -297,7 +336,6 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
               <option value="SEDAN_HATCHBACK">Xe 4-5 chỗ</option>
               <option value="SUV_CUV_MPV">Xe 7-9 chỗ</option>
               <option value="LARGE_VAN_MINIBUS">Xe lớn</option>
-              <option value="EV_CAR">Xe điện</option>
             </select>
             <input
               value={sensorImageUrl}
@@ -314,7 +352,7 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
             </button>
             <div className="flex gap-2 rounded-md bg-amber-50 p-3 text-xs text-amber-800">
               <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-              Sensor không tạo session mới. Xe phải có phiên ACTIVE từ gate trước khi gán vào ô.
+              Sensor không tạo phiên gửi xe mới. Xe phải check-in thành công ở cổng trước khi được gán vào ô.
             </div>
           </div>
         </aside>

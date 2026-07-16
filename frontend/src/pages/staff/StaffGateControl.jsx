@@ -22,6 +22,7 @@ export const StaffGateControl = () => {
   const [manualPlate, setManualPlate] = useState('');
   const [manualCardCode, setManualCardCode] = useState('');
   const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [isScanningSampleCard, setIsScanningSampleCard] = useState(false);
   const [lastCheckInResult, setLastCheckInResult] = useState(null);
   
   const [terminalTime, setTerminalTime] = useState(new Date().toLocaleTimeString('en-GB') + ' GMT+7');
@@ -160,6 +161,47 @@ export const StaffGateControl = () => {
     }
     setAiImagePreview(getVehicleCameraImage(vehicle));
     setIsAiModalVisible(true);
+  };
+
+  const handleSampleCardScan = async () => {
+    setIsScanningSampleCard(true);
+    try {
+      const cardsResponse = await apiClient.get('/v1/cards');
+      const cards = Array.isArray(cardsResponse)
+        ? cardsResponse
+        : (cardsResponse?.items || cardsResponse?.data || []);
+      const inUseCardCodes = new Set((activeVehicles || [])
+        .map(v => String(v.cardCode || '').trim())
+        .filter(Boolean));
+      const availableCards = cards.filter(card => {
+        const code = String(card.cardCode || card.card_code || '').trim();
+        const status = String(card.status || '').toUpperCase();
+        return code && status === 'AVAILABLE' && !inUseCardCodes.has(code);
+      });
+
+      if (availableCards.length === 0) {
+        notification.error({
+          message: 'Không còn thẻ khả dụng',
+          description: 'Tất cả thẻ mẫu đang được dùng, đã mất hoặc bị khóa.'
+        });
+        return;
+      }
+
+      const selectedCard = availableCards[Math.floor(Math.random() * availableCards.length)];
+      const selectedCode = String(selectedCard.cardCode || selectedCard.card_code).trim();
+      setManualCardCode(selectedCode);
+      notification.success({
+        message: 'Đã quét thẻ khả dụng',
+        description: `Mã thẻ ${selectedCode} sẵn sàng cấp cho khách vãng lai.`
+      });
+    } catch (error) {
+      notification.error({
+        message: 'Không thể lấy thẻ mẫu',
+        description: error.response?.data?.message || error.response?.data?.error || 'Vui lòng kiểm tra backend hoặc đăng nhập lại tài khoản staff.'
+      });
+    } finally {
+      setIsScanningSampleCard(false);
+    }
   };
 
   const handleManualCheckIn = async () => {
@@ -1116,9 +1158,10 @@ export const StaffGateControl = () => {
                   className="border border-slate-200 p-2 rounded text-sm focus:outline-none focus:border-blue-500 flex-1"
                 />
                 <button 
-                  onClick={() => setManualCardCode(String(Math.floor(Math.random() * 50) + 1).padStart(6, '0'))}
+                  onClick={handleSampleCardScan}
+                  disabled={isScanningSampleCard}
                   title="Giả lập máy quét thẻ"
-                  className="bg-slate-100 border border-slate-200 px-3 rounded text-xs font-semibold text-slate-600 hover:bg-slate-200 transition-colors flex items-center gap-1"
+                  className="bg-slate-100 border border-slate-200 px-3 rounded text-xs font-semibold text-slate-600 hover:bg-slate-200 transition-colors flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   💳 Quét mẫu
                 </button>

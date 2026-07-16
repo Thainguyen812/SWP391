@@ -61,20 +61,21 @@ public class SecurityConfig {
                         // 3. Phân vùng API dành cho Quản lý (MANAGER)
                         .requestMatchers("/api/revenue/shift-stats", "/api/revenue/transactions",
                                 "/api/revenue/transactions/**")
-                        .hasAnyRole("MANAGER", "STAFF")
-                        .requestMatchers("/api/revenue/**").hasRole("MANAGER")
-                        .requestMatchers("/api/dashboard/**").hasRole("MANAGER")
-                        .requestMatchers("/api/settings/**").hasRole("MANAGER")
+                        .hasAnyRole("ADMIN", "MANAGER", "STAFF")
+                        .requestMatchers("/api/revenue/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/api/dashboard/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/api/settings/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/api/customers/**").hasAnyRole("ADMIN", "MANAGER")
 
                         // 4. Phân vùng API dùng chung cho lực lượng vận hành (STAFF và MANAGER)
-                        .requestMatchers("/api/blacklisted-cards/**").hasAnyRole("STAFF", "MANAGER")
-                        .requestMatchers("/api/tickets/**").hasAnyRole("STAFF", "MANAGER")
-                        .requestMatchers("/api/shifts/**", "/api/personnel/**").hasAnyRole("STAFF", "MANAGER")
-                        .requestMatchers("/api/monitoring/**").hasAnyRole("STAFF", "MANAGER")
-                        .requestMatchers("/api/camera/**").hasAnyRole("STAFF", "MANAGER")
+                        .requestMatchers("/api/blacklisted-cards/**").hasAnyRole("ADMIN", "STAFF", "MANAGER")
+                        .requestMatchers("/api/tickets/**").hasAnyRole("ADMIN", "STAFF", "MANAGER")
+                        .requestMatchers("/api/shifts/**", "/api/personnel/**").hasAnyRole("ADMIN", "STAFF", "MANAGER")
+                        .requestMatchers("/api/monitoring/**").hasAnyRole("ADMIN", "STAFF", "MANAGER")
+                        .requestMatchers("/api/camera/**").hasAnyRole("ADMIN", "STAFF", "MANAGER")
                         .requestMatchers("/api/sessions/daily-volume").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers("/api/sessions/**").hasAnyRole("STAFF", "MANAGER", "ADMIN")
-                        .requestMatchers("/api/gate/**").hasAnyRole("STAFF", "MANAGER")
+                        .requestMatchers("/api/gate/**").hasAnyRole("ADMIN", "STAFF", "MANAGER")
                         .requestMatchers(HttpMethod.GET, "/api/branches").authenticated() // Đăng nhập là xem được
                         .requestMatchers(HttpMethod.POST, "/api/branches").hasRole("ADMIN") // Chỉ Admin được tạo
 
