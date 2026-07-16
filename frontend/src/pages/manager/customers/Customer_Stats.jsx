@@ -15,30 +15,30 @@ export const CustomerStats = ({ stats, loading }) => {
     {
       title: "TỔNG KHÁCH HÀNG",
       icon: <TeamOutlined className="text-[#1677ff] text-xl" />,
-      value: stats.total.value,
-      sub: stats.total.trend,
-      subIcon: stats.total.isPositive ? <ArrowUpOutlined className="text-[#00a572] text-xs" /> : null,
+      value: stats?.total?.value ?? stats?.totalDrivers ?? 0,
+      sub: stats?.total?.trend ?? "Tổng tài khoản",
+      subIcon: stats?.total?.isPositive ? <ArrowUpOutlined className="text-[#00a572] text-xs" /> : null,
       subClass: "text-[#00a572]"
     },
     {
       title: "KHÁCH THUÊ THÁNG",
       icon: <CalendarOutlined className="text-[#1677ff] text-xl" />,
-      value: stats.monthly.value,
-      sub: stats.monthly.sub,
+      value: stats?.monthly?.value ?? stats?.activeMonthly ?? 0,
+      sub: stats?.monthly?.sub ?? "Đang thuê tháng",
       subClass: "text-[#44474c] dark:text-slate-400"
     },
     {
       title: "VIP",
       icon: <StarOutlined className="text-[#eab308] text-xl" />,
-      value: stats.vip.value,
-      sub: stats.vip.sub,
+      value: stats?.vip?.value ?? 0,
+      sub: stats?.vip?.sub ?? "Đang hoạt động",
       subClass: "text-[#44474c] dark:text-slate-400"
     },
     {
       title: "CẦN GIA HẠN",
       icon: <WarningOutlined className="text-[#ba1a1a] text-xl" />,
-      value: stats.expired.value,
-      sub: stats.expired.sub,
+      value: stats?.expired?.value ?? 0,
+      sub: stats?.expired?.sub ?? "Cần gia hạn",
       subClass: "text-[#ba1a1a]",
       valueClass: "text-[#ba1a1a]"
     }

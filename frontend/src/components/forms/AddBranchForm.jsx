@@ -64,7 +64,7 @@ export const AddBranchForm = ({ isOpen, onClose }) => {
                 type="text"
                 required
                 className="form-input"
-                placeholder="VD: Bãi xe ngầm Vincom"
+                placeholder="VD: Bãi xe UrbanPark"
                 value={formData.name}
                 onChange={handleChange}
                 disabled={isSubmitting}

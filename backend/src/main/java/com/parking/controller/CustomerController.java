@@ -51,16 +51,55 @@ public class CustomerController {
     @GetMapping("/stats")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public Map<String, Object> getCustomerStats() {
+        // Tổng số khách hàng (DRIVER)
+        long totalDrivers = userRepo.findAll().stream()
+                .filter(u -> u.getRole() == User.Role.DRIVER)
+                .count();
+
+        // VIP đang hoạt động
         long vipCount = vipRepo.countByStatus(VipSubscription.Status.ACTIVE);
+
+        // VIP hết hạn (cần gia hạn)
+        long expiredVip = vipRepo.countByStatus(VipSubscription.Status.EXPIRED);
+
+        // Khách vãng lai đang trong bãi
         long activeVisitorSessions = parkingSessionRepo.findAll().stream()
                 .filter(session -> session.getSessionStatus() == ParkingSession.SessionStatus.ACTIVE)
                 .filter(session -> !Boolean.TRUE.equals(session.getIsVip()))
                 .count();
 
-        return Map.of(
-                "activeMonthly", vipCount,
-                "activeBlacklist", blacklistRepo.count(),
-                "activeVisitors", activeVisitorSessions);
+        // Khách thuê tháng = đăng ký xe nhưng không phải VIP
+        long registeredVehicles = vehicleRepo.findAll().stream()
+                .filter(Vehicle::isActive)
+                .count();
+
+        Map<String, Object> total = new java.util.LinkedHashMap<>();
+        total.put("value", totalDrivers);
+        total.put("trend", "Tổng tài khoản đăng ký");
+        total.put("isPositive", true);
+
+        Map<String, Object> monthly = new java.util.LinkedHashMap<>();
+        monthly.put("value", registeredVehicles);
+        monthly.put("sub", "Xe đã đăng ký trong hệ thống");
+
+        Map<String, Object> vip = new java.util.LinkedHashMap<>();
+        vip.put("value", vipCount);
+        vip.put("sub", "Đang hoạt động");
+
+        Map<String, Object> expired = new java.util.LinkedHashMap<>();
+        expired.put("value", expiredVip);
+        expired.put("sub", "Cần gia hạn");
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("total", total);
+        result.put("monthly", monthly);
+        result.put("vip", vip);
+        result.put("expired", expired);
+        // Keep backward-compat flat keys
+        result.put("activeMonthly", vipCount);
+        result.put("activeBlacklist", blacklistRepo.count());
+        result.put("activeVisitors", activeVisitorSessions);
+        return result;
     }
 
     @GetMapping("/blacklist")
@@ -180,8 +219,30 @@ public class CustomerController {
         row.put("subscriptionId", subscription.getId().toString());
 
         List<String> photos = new ArrayList<>();
-        if (subscription.getDocumentPhotos() != null) {
-            extractUrls(subscription.getDocumentPhotos(), photos);
+        String rawPhotos = subscription.getDocumentPhotos();
+        if (rawPhotos != null && !rawPhotos.isBlank()) {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                @SuppressWarnings("unchecked")
+                Map<String, Object> photoMap = mapper.readValue(rawPhotos, Map.class);
+                // Order: 1. Cà vẹt, 2. CCCD, 3. Ảnh xe
+                String[] keys = {"registrationPaper", "identityCard", "frontPhoto"};
+                for (String key : keys) {
+                    Object val = photoMap.get(key);
+                    if (val != null && !val.toString().isBlank()) {
+                        photos.add(val.toString());
+                    }
+                }
+                if (photos.isEmpty()) {
+                    for (Object val : photoMap.values()) {
+                        if (val != null && val.toString().startsWith("http")) {
+                            photos.add(val.toString());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                extractUrls(rawPhotos, photos);
+            }
         }
         row.put("photos_urls", photos);
     }

@@ -92,7 +92,7 @@ export const PersonnelMain = () => {
     <>
       <PageLayout
         title="Quản lý Nhân sự & Ca trực"
-        subtitle="Cơ sở: Trung tâm thương mại Vincom Center (Cơ sở 01)"
+        subtitle="Hệ thống tòa nhà gửi xe"
         actions={
           <>
             <div className="relative mr-2">
