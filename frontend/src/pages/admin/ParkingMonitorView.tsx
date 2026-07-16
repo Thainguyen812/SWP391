@@ -127,14 +127,21 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
     }
 
     try {
-      await apiClient.post('/v1/parking/slots/sensor-occupancy', {
+      const res = await apiClient.post('/v1/parking/slots/sensor-occupancy', {
         slotId: selectedSlotId,
         licensePlate: sensorPlate.trim().toUpperCase(),
         vehicleType: sensorVehicleType,
         occupied: sensorOccupied,
         imageUrl: sensorImageUrl.trim()
       });
-      notify('Đã cập nhật dữ liệu sensor ô đỗ', 'success');
+      
+      const responseData = res.data || res;
+      if (responseData.message === 'SENSOR_SLOT_RECORDED_WITH_VIOLATION') {
+        notify('Đã cập nhật sensor. CHÚ Ý: Phát hiện xe đỗ sai vị trí, đã ghi nhận vé phạt vào hệ thống!', 'error');
+      } else {
+        notify('Đã cập nhật dữ liệu sensor ô đỗ', 'success');
+      }
+      
       setSensorPlate('');
       setSensorImageUrl('');
       await loadData();
