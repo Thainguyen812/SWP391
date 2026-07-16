@@ -1527,10 +1527,10 @@ public class ParkingServiceImpl implements ParkingService {
         boolean zoneMismatch = session.getAssignedZoneId() != null && !session.getAssignedZoneId().equals(slot.getZoneId());
         
         boolean isEvSlot = "EV_CHARGING".equalsIgnoreCase(slot.getSlotType());
-        boolean isGasCar = false;
+        boolean isGasCar = true; // Assume gas car unless registered as EV
         java.util.Optional<Vehicle> vehicleOpt = vehicleRepository.findByLicensePlate(session.getLicensePlate());
-        if (vehicleOpt.isPresent() && "GASOLINE".equalsIgnoreCase(vehicleOpt.get().getFuelType())) {
-            isGasCar = true;
+        if (vehicleOpt.isPresent() && "EV".equalsIgnoreCase(vehicleOpt.get().getFuelType())) {
+            isGasCar = false;
         }
 
         if (zoneMismatch || (isEvSlot && isGasCar)) {
