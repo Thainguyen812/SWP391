@@ -6,22 +6,23 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class VNPayService {
 
-    @org.springframework.beans.factory.annotation.Value("${vnp.payurl:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}")
-    private String vnp_PayUrl;
+    @Value("${vnp.payurl}")
+    private String vnpPayUrl;
 
-    @org.springframework.beans.factory.annotation.Value("${vnp.returnurl:http://localhost:5173/payment-success}")
-    private String vnp_ReturnUrl;
+    @Value("${vnp.returnurl}")
+    private String vnpReturnUrl;
 
-    @org.springframework.beans.factory.annotation.Value("${vnp.tmncode:3WFSAH6C}")
-    private String vnp_TmnCode;
+    @Value("${vnp.tmncode}")
+    private String vnpTmnCode;
 
-    @org.springframework.beans.factory.annotation.Value("${vnp.hashsecret:W5QQCZ0C958UEDBFXCA439X0ET0XKM5A}")
-    private String vnp_HashSecret;
+    @Value("${vnp.hashsecret}")
+    private String vnpHashSecret;
 
     public String createPaymentUrl(String orderId, long amount, String ipAddress) throws UnsupportedEncodingException {
         return createPaymentUrl(orderId, amount, ipAddress, null);
@@ -33,20 +34,20 @@ public class VNPayService {
         String vnp_OrderInfo = "Thanh toan dang ky VIP don hang:" + orderId;
         String vnp_TxnRef = orderId;
         
-        // VNPay yêu cầu số tiền nhân thêm 100 (Ví dụ: 10,000 VND phải gửi là 1000000)
+        // VNPay requires amount multiplied by 100.
         String vnp_Amount = String.valueOf(amount * 100); 
  
         Map<String, String> vnp_Params = new HashMap<>();
         vnp_Params.put("vnp_Version", vnp_Version);
         vnp_Params.put("vnp_Command", vnp_Command);
-        vnp_Params.put("vnp_TmnCode", vnp_TmnCode);
+        vnp_Params.put("vnp_TmnCode", vnpTmnCode);
         vnp_Params.put("vnp_Amount", vnp_Amount);
         vnp_Params.put("vnp_CurrCode", "VND");
         vnp_Params.put("vnp_TxnRef", vnp_TxnRef);
         vnp_Params.put("vnp_OrderInfo", vnp_OrderInfo);
         vnp_Params.put("vnp_OrderType", "other");
         vnp_Params.put("vnp_Locale", "vn");
-        vnp_Params.put("vnp_ReturnUrl", customReturnUrl != null ? customReturnUrl : vnp_ReturnUrl);
+        vnp_Params.put("vnp_ReturnUrl", customReturnUrl != null ? customReturnUrl : vnpReturnUrl);
         vnp_Params.put("vnp_IpAddr", ipAddress);
 
         Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
@@ -82,12 +83,12 @@ public class VNPayService {
             }
         }
         String queryUrl = query.toString();
-        String vnp_SecureHash = hmacSHA512(vnp_HashSecret, hashData.toString());
+        String vnp_SecureHash = hmacSHA512(vnpHashSecret, hashData.toString());
 
         queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
-        return vnp_PayUrl + "?" + queryUrl;
+        return vnpPayUrl + "?" + queryUrl;
     }
-    // Hàm mã hóa bảo mật SHA512 (Bạn có thể bỏ vào class Util riêng hoặc để đây)
+    // Generates secure HMAC SHA512 signature for VNPay request validation.
     private String hmacSHA512(final String key, final String data) {
         try {
             if (key == null || data == null) return null;

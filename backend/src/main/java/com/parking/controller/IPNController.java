@@ -2,6 +2,7 @@ package com.parking.controller;
 
 import com.parking.model.VipSubscription;
 import com.parking.repository.VipSubscriptionRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,7 +19,8 @@ import java.util.*;
 public class IPNController {
 
     private final VipSubscriptionRepository vipRepo;
-    private final String vnp_HashSecret = "W5QQCZ0C958UEDBFXCA439X0ET0XKM5A"; // Trùng với Service nhé
+    @Value("${vnp.hashsecret}")
+    private String vnpHashSecret;
 
     public IPNController(VipSubscriptionRepository vipRepo) {
         this.vipRepo = vipRepo;
@@ -48,7 +50,7 @@ public class IPNController {
                     }
                 }
             }
-            String calculatedHash = hmacSHA512(vnp_HashSecret, hashData.toString());
+            String calculatedHash = hmacSHA512(vnpHashSecret, hashData.toString());
 
             // Kiểm tra xem chữ ký trùng khớp không
             if (!calculatedHash.equals(vnp_SecureHash)) {

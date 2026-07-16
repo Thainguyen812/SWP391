@@ -15,7 +15,6 @@ import com.parking.dto.VehicleRegistrationRequest;
 import com.parking.model.User;
 import com.parking.repository.UserRepository;
 import com.parking.repository.VipSubscriptionRepository;
-import com.parking.model.VipSubscription;
 import com.parking.model.ParkingSession;
 import com.parking.repository.ParkingSessionRepository;
 import com.parking.repository.SecurityAlertRepository;
