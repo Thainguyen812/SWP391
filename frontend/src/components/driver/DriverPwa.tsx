@@ -2609,74 +2609,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         </div>
                       </div>
 
-{/* Notifications settings */}
-                      <div className="bg-white p-6 rounded-[24px] border border-slate-200/60 space-y-4">
-                        <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block">
-                          Tùy chọn thông báo
-                        </strong>
 
-                        <div className="divide-y divide-slate-100 font-sans text-xs">
-                          {/* Row 1 */}
-                          <div className="py-3 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                            <div className="space-y-0.5">
-                              <strong className="text-slate-800 font-extrabold">Sự kiện vào/ra bãi xe</strong>
-                              <p className="text-slate-400 text-[11px] font-semibold leading-normal">
-                                Nhận thông báo thời gian thực khi xe đi qua trạm kiểm soát rào chắn.
-                              </p>
-                            </div>
-                            <div className="flex gap-4 font-black text-[11px]">
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input
-                                  type="checkbox"
-                                  checked={emailNotifyGate}
-                                  onChange={(e) => setEmailNotifyGate(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                />
-                                <span>Email</span>
-                              </label>
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input
-                                  type="checkbox"
-                                  checked={smsNotifyGate}
-                                  onChange={(e) => setSmsNotifyGate(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                />
-                                <span>SMS</span>
-                              </label>
-                            </div>
-                          </div>
-
-                          {/* Row 2 */}
-                          <div className="py-3.5 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                            <div className="space-y-0.5">
-                              <strong className="text-slate-800 font-extrabold">Biên lai thanh toán</strong>
-                              <p className="text-slate-400 text-[11px] font-semibold leading-normal">
-                                Tự động gửi biên lai hóa đơn thuế điện tử về tài khoản sau hành trình.
-                              </p>
-                            </div>
-                            <div className="flex gap-4 font-black text-[11px]">
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input
-                                  type="checkbox"
-                                  checked={emailNotifyReceipt}
-                                  onChange={(e) => setEmailNotifyReceipt(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                />
-                                <span>Email</span>
-                              </label>
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input
-                                  type="checkbox"
-                                  checked={smsNotifyReceipt}
-                                  onChange={(e) => setSmsNotifyReceipt(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                />
-                                <span>SMS</span>
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
 
                     </div>
 
