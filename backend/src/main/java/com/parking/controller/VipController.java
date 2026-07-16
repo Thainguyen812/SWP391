@@ -36,13 +36,13 @@ public class VipController {
     }
 
     @GetMapping("/pending")
-    @PreAuthorize("hasRole('MANAGER')") // Chỉ quản lý được xem danh sách chờ
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')") // Manager/Admin được xem danh sách chờ
     public List<VipSubscriptionResponseDTO> getPending() {
         return vipService.getPending();
     }
 
     @GetMapping("/all")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public List<VipSubscription> getAll() {
         return vipService.getAll();
     }
@@ -75,6 +75,9 @@ public class VipController {
             
             // Bước E: Trả link về cho Frontend
             Map<String, String> response = new HashMap<>();
+            response.put("id", subscription.getId().toString());
+            response.put("status", subscription.getStatus().name());
+            response.put("paymentStatus", subscription.getPaymentStatus());
             response.put("paymentUrl", paymentUrl);
             
             return ResponseEntity.ok(response);
@@ -85,7 +88,7 @@ public class VipController {
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<?> approveVip(@PathVariable UUID id, Principal principal) {
         String username = principal.getName();
         User manager = userRepository.findByUsername(username)
@@ -97,7 +100,7 @@ public class VipController {
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     public ResponseEntity<?> rejectVip(@PathVariable UUID id, @RequestBody RejectRequest req, Principal principal) {
         String username = principal.getName();
         User manager = userRepository.findByUsername(username)

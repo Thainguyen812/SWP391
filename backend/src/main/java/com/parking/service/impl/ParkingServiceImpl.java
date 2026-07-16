@@ -259,6 +259,7 @@ public class ParkingServiceImpl implements ParkingService {
             alert.setReason("Phát hiện cố tình xuất bãi khi xe đang bật Khóa chống trộm.");
             alert.setIsActionable(true);
             securityAlertRepository.save(alert);
+            sendAntiTheftPush(session);
 
             throw new ApiExceptions.ForbiddenException(
                     "Xe đang ở trạng thái KHÓA AN TOÀN chống trộm! Không thể xuất bãi.");
@@ -289,7 +290,11 @@ public class ParkingServiceImpl implements ParkingService {
         parkingSessionRepository.save(session);
 
         Transaction transaction = new Transaction();
+        transaction.setId(UUID.randomUUID());
         transaction.setSessionId(session.getId());
+        transaction.setParkingFee(BigDecimal.ZERO);
+        transaction.setLostCardPenalty(BigDecimal.ZERO);
+        transaction.setViolationPenalty(BigDecimal.ZERO);
         transaction.setTotalAmount(java.math.BigDecimal.ZERO);
         transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
         transaction.setPaymentStatus(Transaction.PaymentStatus.SUCCESS);
@@ -561,7 +566,7 @@ public class ParkingServiceImpl implements ParkingService {
 
         if (existing.isPresent()) {
             ParkingSession session = existing.get();
-            if (session.getEntryGate() != null) {
+            if (session.getEntryGate() != null && session.getCardId() == null) {
                 // If the vehicle is currently waiting at the entry gate, update this session during check-in
                 sessionToUpdate = session;
             } else {
@@ -678,6 +683,7 @@ public class ParkingServiceImpl implements ParkingService {
             session.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
             session.setIsVip(false);
             session.setMobileCheckoutPhoto(request.getImage_url());
+            session.setEntryGate(request.getGate());
         }
 
         session.setAssignedZoneId(chosen.getId());
@@ -688,7 +694,6 @@ public class ParkingServiceImpl implements ParkingService {
         if (sessionToUpdate != null) {
             session.setIsSuspicious(false);
             session.setSuspiciousReason(null);
-            session.setEntryGate(null); // Clear entry gate to let it inside
             session.setCheckInTime(Instant.now());
         }
 
@@ -795,38 +800,9 @@ public class ParkingServiceImpl implements ParkingService {
 
         // task 7
         if (session.getSessionStatus() == ParkingSession.SessionStatus.PASSED_CONFIRMED) {
-            Instant expireTime = session.getMobileCheckoutAt().plusSeconds(1800);
-
-            if (Instant.now().isAfter(expireTime)) {
-                session.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
-                parkingSessionRepository.save(session);
-                throw new ApiExceptions.BadRequestException("Phiên thanh toán lưu động đã hết hạn 30 phút");
-            }
-
-            session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
-            session.setCheckOutTime(Instant.now());
-            session.setSlotPhotoUrl(null);
-            if (session.getParkedSlotId() != null) {
-                slotRepository.findById(session.getParkedSlotId()).ifPresent(slot -> {
-                    slot.setSlotStatus("AVAILABLE");
-                    slot.setLastUpdated(Instant.now());
-                    slotRepository.save(slot);
-                });
-            }
-
-            parkingSessionRepository.save(session);
-
-            Card card = cardRepository.findById(cardId)
-                    .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thẻ"));
-
-            card.setStatus(Card.CardStatus.AVAILABLE);
-            cardRepository.save(card);
-
-            if (session.getAssignedZoneId() != null) {
-                zoneRepository.decreaseOccupied(session.getAssignedZoneId());
-            }
-
-            return transactionRepository.findBySessionId(session.getId()).orElseThrow();
+            Transaction transaction = transactionRepository.findBySessionId(session.getId())
+                    .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay giao dich Mobile POS"));
+            return decorateMobileCheckoutWindow(transaction, session, Instant.now());
         }
 
         if (session.getIsVip() != null && session.getIsVip()) {
@@ -937,6 +913,95 @@ public class ParkingServiceImpl implements ParkingService {
         parkingViolationRepository.saveAll(pendingViolations);
     }
 
+    private BigDecimal zeroIfNull(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
+    private BigDecimal calculateMobileCheckoutOverstayPenalty(
+            ParkingSession session,
+            Instant expireTime,
+            Instant checkOutTime) {
+
+        if (expireTime == null || checkOutTime == null || !checkOutTime.isAfter(expireTime)) {
+            return BigDecimal.ZERO;
+        }
+
+        Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay thong tin xe de tinh phi qua han"));
+
+        return this.calculateParkingFeeSafe(
+                vehicle.getVehicleSize(),
+                expireTime,
+                checkOutTime);
+    }
+
+    private Transaction decorateMobileCheckoutWindow(
+            Transaction transaction,
+            ParkingSession session,
+            Instant referenceTime) {
+
+        if (session.getMobileCheckoutAt() == null) {
+            transaction.setMobileCheckoutExpiresAt(null);
+            transaction.setMobileCheckoutGraceExpired(false);
+            transaction.setMobileCheckoutOverstayPenalty(BigDecimal.ZERO);
+            return transaction;
+        }
+
+        Instant expireTime = session.getMobileCheckoutAt().plusSeconds(1800);
+        Instant checkTime = referenceTime != null ? referenceTime : Instant.now();
+        BigDecimal overstayPenalty = calculateMobileCheckoutOverstayPenalty(session, expireTime, checkTime);
+
+        transaction.setMobileCheckoutExpiresAt(expireTime);
+        transaction.setMobileCheckoutGraceExpired(checkTime.isAfter(expireTime));
+        transaction.setMobileCheckoutOverstayPenalty(overstayPenalty);
+        return transaction;
+    }
+
+    private Transaction completeMobileCheckoutExit(
+            Transaction transaction,
+            ParkingSession session,
+            Instant checkOutTime) {
+
+        Transaction decorated = decorateMobileCheckoutWindow(transaction, session, checkOutTime);
+        BigDecimal overstayPenalty = zeroIfNull(decorated.getMobileCheckoutOverstayPenalty());
+
+        if (overstayPenalty.compareTo(BigDecimal.ZERO) > 0) {
+            transaction.setViolationPenalty(zeroIfNull(transaction.getViolationPenalty()).add(overstayPenalty));
+            transaction.setTotalAmount(zeroIfNull(transaction.getTotalAmount()).add(overstayPenalty));
+        }
+
+        transaction.setPaymentStatus(Transaction.PaymentStatus.SUCCESS);
+        transaction = transactionRepository.save(transaction);
+        transaction.setMobileCheckoutExpiresAt(decorated.getMobileCheckoutExpiresAt());
+        transaction.setMobileCheckoutGraceExpired(decorated.getMobileCheckoutGraceExpired());
+        transaction.setMobileCheckoutOverstayPenalty(overstayPenalty);
+
+        session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
+        session.setCheckOutTime(checkOutTime);
+        session.setSlotPhotoUrl(null);
+        if (session.getParkedSlotId() != null) {
+            slotRepository.findById(session.getParkedSlotId()).ifPresent(slot -> {
+                slot.setSlotStatus("AVAILABLE");
+                slot.setLastUpdated(Instant.now());
+                slotRepository.save(slot);
+            });
+        }
+        parkingSessionRepository.save(session);
+
+        if (session.getCardId() != null) {
+            cardRepository.findById(session.getCardId()).ifPresent(card -> {
+                card.setStatus(Card.CardStatus.AVAILABLE);
+                cardRepository.save(card);
+            });
+        }
+
+        if (session.getAssignedZoneId() != null) {
+            zoneRepository.decreaseOccupied(session.getAssignedZoneId());
+        }
+
+        return transaction;
+    }
+
     // confirm check out cho visitor
     @Override
     @Transactional
@@ -948,6 +1013,23 @@ public class ParkingServiceImpl implements ParkingService {
                         "Không tìm thấy transaction"));
 
         if (transaction.getPaymentStatus() == Transaction.PaymentStatus.SUCCESS) {
+            if (Boolean.TRUE.equals(transaction.getIsMobileCheckout())) {
+                ParkingSession mobileSession = parkingSessionRepository
+                        .findById(transaction.getSessionId())
+                        .orElseThrow(() -> new ApiExceptions.NotFoundException(
+                                "Khong tim thay parking session"));
+
+                if (mobileSession.getSessionStatus() == ParkingSession.SessionStatus.COMPLETED) {
+                    Instant referenceTime = mobileSession.getCheckOutTime() != null
+                            ? mobileSession.getCheckOutTime()
+                            : Instant.now();
+                    return decorateMobileCheckoutWindow(transaction, mobileSession, referenceTime);
+                }
+
+                if (mobileSession.getSessionStatus() != ParkingSession.SessionStatus.COMPLETED) {
+                    return completeMobileCheckoutExit(transaction, mobileSession, Instant.now());
+                }
+            }
 
             throw new ApiExceptions.ConflictException(
                     "Transaction đã được xác nhận");
@@ -1705,5 +1787,28 @@ public class ParkingServiceImpl implements ParkingService {
         } catch (org.springframework.dao.DataAccessException e) {
             throw new ApiExceptions.BadRequestException("Không tìm thấy bảng giá hệ thống phù hợp đang kích hoạt cho loại xe: " + vehicleSize);
         }
+    }
+    private void sendAntiTheftPush(ParkingSession session) {
+        String plate = session.getLicensePlate();
+        String fcmToken = null;
+
+        if (plate != null && !plate.trim().isEmpty()) {
+            Optional<Vehicle> vehicleOpt = vehicleRepository.findByLicensePlate(plate);
+            if (vehicleOpt.isPresent()) {
+                UUID ownerId = vehicleOpt.get().getOwnerId();
+                if (ownerId != null) {
+                    Optional<User> ownerOpt = userRepository.findById(ownerId);
+                    if (ownerOpt.isPresent()) {
+                        fcmToken = ownerOpt.get().getFcmToken();
+                    }
+                }
+            }
+        }
+
+        fcmService.sendPushNotification(
+                fcmToken != null ? fcmToken : "",
+                "[CẢNH BÁO CHỐNG TRỘM]",
+                "Phát hiện xe " + (plate != null ? plate : "N/A")
+                        + " cố tình di chuyển ra khỏi bãi xe khi đang ở trạng thái KHÓA AN TOÀN!");
     }
 }

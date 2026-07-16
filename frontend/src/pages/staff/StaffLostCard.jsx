@@ -174,6 +174,26 @@ export const StaffLostCard = () => {
     return Math.abs(hash) % 90000 + 10000;
   }, [foundVehicle?.plate, searchPlate]);
 
+  const normalizeGateText = (value) => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]/g, '');
+
+  const entryGateLabel = useMemo(() => {
+    if (!foundVehicle) return 'Không rõ';
+    if (foundVehicle.entryGate) return foundVehicle.entryGate;
+    if (foundVehicle.entry_gate) return foundVehicle.entry_gate;
+
+    const currentGate = foundVehicle.gate;
+    const normalizedGate = normalizeGateText(currentGate);
+    if (normalizedGate.includes('VAO') || normalizedGate.includes('IN')) {
+      return currentGate;
+    }
+
+    return 'Không rõ';
+  }, [foundVehicle]);
+
   const [cccdImage, setCccdImage] = useState(null);
   const [idBackImg, setIdBackImg] = useState(null);
   const [regImage, setRegImage] = useState(null);
@@ -321,7 +341,7 @@ export const StaffLostCard = () => {
                   </div>
                   <div>
                     <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">CỬA VÀO</div>
-                    <div className="font-bold text-slate-800">{foundVehicle.gate}</div>
+                    <div className="font-bold text-slate-800">{entryGateLabel}</div>
                   </div>
                   <div>
                     <div className="text-[10px] font-bold text-slate-500 uppercase mb-1">LOẠI VÉ</div>

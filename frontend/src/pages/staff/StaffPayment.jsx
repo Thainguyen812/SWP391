@@ -255,11 +255,30 @@ export const StaffPayment = () => {
   }, [isVip]);
 
   useEffect(() => {
+    if (!isMobileCheckoutTxn || !mobileCheckoutExpiresAt || !canReviewVehicle) {
+      return undefined;
+    }
+
+    setNowTick(Date.now());
+    const timer = window.setInterval(() => {
+      setNowTick(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [isMobileCheckoutTxn, mobileCheckoutExpiresAt, canReviewVehicle]);
+
+  useEffect(() => {
     if (backendTxn) {
+      const txnAlreadyPaid = backendTxn.paymentStatus === 'SUCCESS' || backendTxn.status === 'SUCCESS';
+      const txnIsMobileCheckout = txnAlreadyPaid
+        && (backendTxn.isMobileCheckout === true || backendTxn.mobileCheckout === true);
+      const txnMobilePenalty = Number(backendTxn.mobileCheckoutOverstayPenalty || 0);
+      const amountToCollect = txnIsMobileCheckout ? txnMobilePenalty : backendTxn.totalAmount;
+
       setTotalAmount(prev => {
-        if (prev !== backendTxn.totalAmount) {
-          setCashGiven(backendTxn.totalAmount);
-          return backendTxn.totalAmount;
+        if (prev !== amountToCollect) {
+          setCashGiven(amountToCollect);
+          return amountToCollect;
         }
         return prev;
       });
@@ -361,6 +380,9 @@ export const StaffPayment = () => {
 
       const response = await apiClient.post(`/v1/parking/checkout-by-code/${normalizedCode}`);
       const txn = response?.data || response;
+      const isMobilePaidTxn = (txn?.paymentStatus === "SUCCESS" || txn?.status === "SUCCESS")
+        && (txn?.isMobileCheckout === true || txn?.mobileCheckout === true);
+      const scannedMobilePenalty = Number(txn?.mobileCheckoutOverstayPenalty || 0);
       
       setBackendTxn(txn);
       if (!lpr) setLpr(matchedByCard?.plate || `THẺ: ${normalizedCode}`); // Only fallback to card code if plate is unknown
@@ -371,7 +393,16 @@ export const StaffPayment = () => {
       setHasVehicle(true);
       setIdentityVerified(true);
       setLan1Status('busy');
-      notification.success({message: 'Xác nhận thẻ thành công', description: `Đã mở ảnh đối chiếu và tính phí: ${txn.totalAmount} VND.`});
+      notification.success({
+        message: isMobilePaidTxn
+          ? (scannedMobilePenalty > 0 ? "Mobile POS quá hạn" : "Xe đã thanh toán Mobile POS")
+          : "Xác nhận thẻ thành công",
+        description: isMobilePaidTxn
+          ? (scannedMobilePenalty > 0
+            ? `Xe đã quá hạn 30 phút. Cần thu phí phát sinh ${scannedMobilePenalty.toLocaleString()} VND trước khi mở cổng.`
+            : `Đã xác nhận thẻ xe ${matchedByCard?.plate || lpr}. Staff chỉ cần đối chiếu ảnh và mở cổng, không thu thêm tiền.`)
+          : `Đã mở ảnh đối chiếu và tính phí: ${txn.totalAmount} VND.`
+      });
     } catch (error) {
         notification.error({message: 'Lỗi Check-out', description: error.response?.data?.message || 'Không thể check-out bằng thẻ này'});
         setHasVehicle(false);
@@ -395,20 +426,46 @@ export const StaffPayment = () => {
       });
       return;
     }
+    if (isMobileCheckoutTxn && mobileGraceExpired && !hasMobileOverstayPenalty) {
+      notification.warning({
+        message: 'Mobile POS đã quá hạn',
+        description: 'Vui lòng quẹt lại thẻ để backend tính phí phát sinh sau 30 phút trước khi mở cổng.'
+      });
+      return;
+    }
     
+    const confirmTitle = isMobileCheckoutTxn
+      ? (hasMobileOverstayPenalty ? "Thu phí quá hạn Mobile POS" : "Xác nhận mở cổng sau Mobile POS")
+      : (displayAmount === 0 ? "Xác nhận mở cổng" : "Xác nhận thanh toán");
+    const confirmContent = isMobileCheckoutTxn
+      ? (hasMobileOverstayPenalty
+        ? "Xe " + lpr + " đã quá hạn 30 phút sau Mobile POS. Thu thêm " + mobileOverstayPenalty.toLocaleString() + " VND phí phát sinh rồi mở cổng."
+        : "Xe " + lpr + " đã thanh toán qua Mobile POS (" + mobilePrepaidAmount.toLocaleString() + " VND). Staff xác nhận thẻ/ảnh đúng và mở cổng, không thu thêm tiền.")
+      : isLostCard
+        ? "Tiến hành thu " + displayAmount.toLocaleString() + " đ (bao gồm phí đỗ xe và phạt mất thẻ) và mở cổng cho xe " + lpr + "?"
+        : (displayAmount === 0
+          ? "Xác nhận ảnh đối chiếu đúng và mở cổng cho xe " + (isVip ? "VIP " : "") + lpr + "?"
+          : "Tiến hành thu phí và mở cổng cho xe " + lpr + "?");
+    const confirmOkText = isMobileCheckoutTxn
+      ? (hasMobileOverstayPenalty ? "Thu phí quá hạn & Mở cổng" : "Xác nhận & Mở cổng")
+      : ((isMobilePrepaidCheckout || displayAmount === 0) ? "Xác nhận & Mở cổng" : "Thu tiền & Mở cổng");
+
     Modal.confirm({
-      title: displayAmount === 0 ? 'Xác nhận mở cổng' : 'Xác nhận thanh toán',
-      content: isLostCard ? `Tiến hành thu ${displayAmount.toLocaleString()} đ (Bao gồm phí đỗ xe và phạt mất thẻ) và mở cổng cho xe ${lpr}?` :
-               (displayAmount === 0 ? `Xác nhận ảnh đối chiếu đúng và mở cổng cho xe VIP ${lpr}?` : `Tiến hành thu phí và mở cổng cho xe ${lpr}?`),
-      okText: displayAmount === 0 ? 'Xác nhận & Mở cổng' : 'Thu tiền & Mở cổng',
+      title: confirmTitle,
+      content: confirmContent,
+      okText: confirmOkText,
       cancelText: 'Hủy',
       okButtonProps: { className: 'bg-emerald-600 border-emerald-600 hover:bg-emerald-700' },
       async onOk() {
+        let checkoutAlreadyConfirmed = false;
         try {
           if (isVip && !isLostCard) {
             await apiClient.post('/sessions/approve-exit', { plate: lpr });
           } else if (backendTxn && backendTxn.id) {
-            await parkingService.confirmCheckout(backendTxn.id);
+            const alreadyConfirmed = backendTxn.paymentStatus === 'SUCCESS' || backendTxn.status === 'SUCCESS';
+            if (!alreadyConfirmed || isMobileCheckoutTxn) {
+              await parkingService.confirmCheckout(backendTxn.id);
+            }
           } else {
             // NEW LOGIC FOR LOST CARD
             if (isLostCard) {
@@ -427,6 +484,7 @@ export const StaffPayment = () => {
                 // Send mock transaction to backend so it saves in DB
                 await apiClient.post('/revenue/transactions/mock', {
                   amount: totalAmount,
+                  lostCardPenalty: penaltyAmount,
                   plate: lpr
                 });
               } else {
@@ -437,10 +495,43 @@ export const StaffPayment = () => {
           // Refresh global context to pull latest transactions and remove from active
           if (fetchAllDataFromBackend) fetchAllDataFromBackend();
         } catch (e) {
-          console.error("Failed to mock transaction", e);
+          console.error("Checkout failed", e);
+          const backendMessage = e.response?.data?.message
+            || e.response?.data?.error
+            || (typeof e.response?.data === 'string' ? e.response.data : null)
+            || e.message
+            || 'Không thể hoàn tất checkout. Vui lòng kiểm tra lại session/mã thẻ.';
+          const normalizedBackendMessage = String(backendMessage).toLowerCase();
+          if (
+            isMobileCheckoutTxn
+            && e.response?.status === 409
+            && normalizedBackendMessage.includes('transaction')
+            && (normalizedBackendMessage.includes('xác nhận') || normalizedBackendMessage.includes('xac nhan'))
+          ) {
+            checkoutAlreadyConfirmed = true;
+          } else {
+          notification.error({
+            message: 'Lỗi thanh toán',
+            description: backendMessage,
+            placement: 'topRight'
+          });
+          return;
+          }
         }
 
-        notification.success({message: 'Thanh toán thành công', description: 'Đã gửi lệnh mở cổng ra.', placement: 'topRight'});
+        notification.success({
+          message: isMobileCheckoutTxn
+            ? (checkoutAlreadyConfirmed ? "Xe đã được xác nhận ra cổng" : (hasMobileOverstayPenalty ? "Đã thu phí quá hạn" : "Đã xác nhận xe ra cổng"))
+            : "Thanh toán thành công",
+          description: isMobileCheckoutTxn
+            ? (checkoutAlreadyConfirmed
+              ? "Giao dịch Mobile POS đã được backend xác nhận trước đó. UI đã cập nhật trạng thái xe ra cổng."
+              : hasMobileOverstayPenalty
+              ? "Đã thu phí phát sinh sau 30 phút và gửi lệnh mở cổng ra."
+              : "Xe đã thanh toán Mobile POS trước đó. Đã gửi lệnh mở cổng ra.")
+            : "Đã gửi lệnh mở cổng ra.",
+          placement: "topRight"
+        });
         
         // Tắt hiển thị xe ngay lập tức (UI state)
         setIsPaid(true);
@@ -630,6 +721,28 @@ export const StaffPayment = () => {
                   <div className="text-right">
                     <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Tổng tiền thu</h4>
                     <div className="text-2xl font-black text-red-600">{displayAmount.toLocaleString()} <span className="text-sm font-bold">VND</span></div>
+                    {isMobileCheckoutTxn && (
+                      <div className={`text-[10px] mt-1 font-bold px-2 py-1 rounded border text-left ${
+                        hasMobileOverstayPenalty
+                          ? 'text-red-700 bg-red-50 border-red-100'
+                          : mobileGraceExpired
+                            ? 'text-amber-700 bg-amber-50 border-amber-100'
+                            : 'text-emerald-700 bg-emerald-50 border-emerald-100'
+                      }`}>
+                        {hasMobileOverstayPenalty
+                          ? `Đã thu qua Mobile POS: ${mobilePrepaidAmount.toLocaleString()} VND. Quá hạn 30 phút, cần thu thêm ${mobileOverstayPenalty.toLocaleString()} VND.`
+                          : mobileGraceExpired
+                            ? 'Mobile POS đã quá hạn. Quẹt lại thẻ để tính phí phát sinh.'
+                            : `Đã thu qua Mobile POS: ${mobilePrepaidAmount.toLocaleString()} VND. Xe còn ${mobileCountdownLabel} để ra cổng.`}
+                        <div className="mt-1 pt-1 border-t border-current/20 text-[9px] leading-relaxed font-semibold">
+                          <div>Thanh toán lưu động: {formatMobileClock(mobileCheckoutPaidAt)}</div>
+                          <div>Hạn ra cổng: {formatMobileClock(mobileCheckoutExpiresAt)}</div>
+                          {mobileGraceExpired && (
+                            <div>Thời gian quá hạn: {mobileOverstayLabel}</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     {!canReviewVehicle && <div className="text-[10px] text-blue-600 mt-1 font-bold">Chưa tính phí do chưa xác nhận thẻ</div>}
                     {isLostCard && <div className="text-[10px] text-red-500 mt-1">Đã bao gồm 200k tiền phạt thẻ</div>}
                     {(backendTxn?.violationPenalty > 0 || (lpr && lpr.includes('EV'))) && <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">⚠️ Bị phạt Đỗ sai vị trí EV (+500k)</div>}

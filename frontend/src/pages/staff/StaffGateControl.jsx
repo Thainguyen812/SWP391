@@ -101,13 +101,43 @@ export const StaffGateControl = () => {
     return `${label} → ${getFloorShortName(code)}`;
   };
 
-  useEffect(() => {
-    if (currentVehicle && currentVehicle.plate) {
-      setManualPlate(currentVehicle.plate);
+  const normalizeGateText = (value) => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]/g, '');
+
+  const isEntryGateId = (value) => normalizeGateText(value).includes('VAO') || normalizeGateText(value).includes('IN');
+  const isExitGateId = (value) => normalizeGateText(value).includes('RA') || normalizeGateText(value).includes('OUT');
+
+  const handleGateRowSelect = (gate) => {
+    if (!gate.vehicleId || !activeVehicles) {
+      setCurrentVehicle(null);
+      setManualPlate('');
+      return;
     }
-  }, [currentVehicle]);
+
+    const vehicle = activeVehicles.find(av => av.id === gate.vehicleId);
+    if (!vehicle) {
+      setCurrentVehicle(null);
+      setManualPlate('');
+      return;
+    }
+
+    setCurrentVehicle(vehicle);
+
+    if (isEntryGateId(gate.id)) {
+      setManualPlate(gate.plate && gate.plate !== '---' ? gate.plate : vehicle.plate || '');
+      return;
+    }
+
+    if (isExitGateId(gate.id)) {
+      setManualPlate('');
+    }
+  };
 
   // AI Simulator State
+  const DEFAULT_CAMERA_IMAGE = 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80';
   const [isAiModalVisible, setIsAiModalVisible] = useState(false);
   const [isLotModalVisible, setIsLotModalVisible] = useState(false);
   const [aiPlate, setAiPlate] = useState('30G-123.45');
@@ -115,11 +145,8 @@ export const StaffGateControl = () => {
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [aiImagePreview, setAiImagePreview] = useState(getVehicleImageByPlate('51A-999.99'));
 
-  const handleAiImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setAiImagePreview(URL.createObjectURL(file));
-    }
+  const getVehicleCameraImage = (vehicle) => {
+    return vehicle?.image || vehicle?.imageUrl || vehicle?.cameraImage || vehicle?.entryImageUrl || DEFAULT_CAMERA_IMAGE;
   };
 
   const getSelectedGateVehicle = () => {
@@ -132,6 +159,7 @@ export const StaffGateControl = () => {
     if (vehicle?.plate) {
       setAiPlate(vehicle.plate);
     }
+    setAiImagePreview(getVehicleCameraImage(vehicle));
     setIsAiModalVisible(true);
   };
 
@@ -147,7 +175,7 @@ export const StaffGateControl = () => {
 
     const normalizedManualPlate = manualPlate.trim().toUpperCase();
     const existingVehicle = activeVehicles?.find(v => v.plate?.toUpperCase() === normalizedManualPlate);
-    const isWaitingEntry = existingVehicle?.gate?.toUpperCase().includes('VÀO');
+    const isWaitingEntry = isEntryGateId(existingVehicle?.gate);
     const isExistingVip = existingVehicle && (existingVehicle.type === 'VIP' || existingVehicle.isVip === true);
 
     if (existingVehicle && !isWaitingEntry) {
@@ -171,7 +199,7 @@ export const StaffGateControl = () => {
     
     setIsCheckingIn(true);
     try {
-      const waitingVehicleForForm = activeVehicles?.find(v => v.plate?.toUpperCase() === normalizedManualPlate && v.gate && v.gate.toUpperCase().includes('VÀO'));
+      const waitingVehicleForForm = activeVehicles?.find(v => v.plate?.toUpperCase() === normalizedManualPlate && isEntryGateId(v.gate));
       const detectedType = inferVehicleType(waitingVehicleForForm);
       const mappedType = detectedType;
 
@@ -275,7 +303,7 @@ export const StaffGateControl = () => {
     setIsAiProcessing(true);
     try {
       // Check if there is a vehicle waiting at the IN gate (in activeVehicles) matching this plate
-      const waitingVehicle = activeVehicles?.find(v => v.plate?.toUpperCase() === plateUpper && v.gate && v.gate.toUpperCase().includes('VÀO'));
+      const waitingVehicle = activeVehicles?.find(v => v.plate?.toUpperCase() === plateUpper && isEntryGateId(v.gate));
       const aiVehicleType = inferVehicleType(waitingVehicle || currentVehicle);
 
       if (waitingVehicle) {
@@ -426,7 +454,7 @@ export const StaffGateControl = () => {
       return;
     }
 
-    const isExitGate = id.includes('RA');
+    const isExitGate = isExitGateId(id);
     const fee = isExitGate ? 25000 : 0;
     const vehicle = activeVehicles.find(v => v.plate === plate);
     const isVip = vehicle && (vehicle.type === 'VIP' || vehicle.isVip === true);
@@ -854,14 +882,7 @@ export const StaffGateControl = () => {
                     return (
                   <tr 
                     key={i} 
-                    onClick={() => {
-                      if (gate.vehicleId && activeVehicles) {
-                        const v = activeVehicles.find(av => av.id === gate.vehicleId);
-                        if (v) setCurrentVehicle(v);
-                      } else {
-                        setCurrentVehicle(null);
-                      }
-                    }}
+                    onClick={() => handleGateRowSelect(gate)}
                     className={`border-b hover:bg-slate-50 transition-colors last:border-0 cursor-pointer ${isSelected ? 'bg-blue-50/50 border-blue-200 shadow-sm' : 'border-slate-100'}`}
                   >
                     <td className="p-4 font-bold text-slate-800">{gate.id}</td>
@@ -903,7 +924,7 @@ export const StaffGateControl = () => {
                             className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded flex items-center gap-1.5 transition-colors shadow-sm"
                           >
                             <CheckCircleFilled className="text-white" />
-                            {gate.id.includes('RA') ? "THANH TOÁN" : "PHÊ DUYỆT"}
+                            {isExitGateId(gate.id) ? "THANH TOÁN" : "PHÊ DUYỆT"}
                           </button>
                         )}
                         {gate.actions.includes("reject") && (
@@ -1106,7 +1127,8 @@ export const StaffGateControl = () => {
               </div>
               {(() => {
                 const normalizedPlate = manualPlate.trim().toUpperCase();
-                const waitingVehicleForForm = activeVehicles?.find(v => v.plate?.toUpperCase() === normalizedPlate && v.gate && v.gate.toUpperCase().includes('VÀO'));
+                if (!normalizedPlate) return null;
+                const waitingVehicleForForm = activeVehicles?.find(v => v.plate?.toUpperCase() === normalizedPlate && isEntryGateId(v.gate));
                 const detectedZone = waitingVehicleForForm?.assignedZoneCode;
                 const detectedType = getVehicleTypeForZone(inferVehicleType(waitingVehicleForForm), detectedZone);
                 return (
@@ -1171,13 +1193,10 @@ export const StaffGateControl = () => {
         destroyOnClose
       >
         <div className="flex flex-col gap-5 mt-4">
-          {/* Mock Camera Image Area */}
-          <label htmlFor="ai-image-upload" className="border-2 border-dashed border-slate-300 rounded-lg p-2 flex flex-col items-center justify-center bg-slate-50 relative overflow-hidden group cursor-pointer hover:border-blue-400 transition-colors">
-             <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-             <img src={aiImagePreview} alt="Xe mẫu" className="w-full h-40 object-cover rounded mb-2 opacity-80" />
-             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider absolute bottom-4 bg-white/80 px-3 py-1 rounded backdrop-blur-sm group-hover:text-blue-600 transition-colors shadow-sm">TẢI ẢNH XE LÊN (BẤM ĐỂ CHỌN)</span>
-             <input type="file" id="ai-image-upload" accept="image/*" className="hidden" onChange={handleAiImageUpload} />
-          </label>
+          {/* Camera Image Area */}
+          <div className="border border-slate-200 rounded-lg p-2 flex flex-col bg-slate-50 relative overflow-hidden">
+             <img src={aiImagePreview || DEFAULT_CAMERA_IMAGE} alt="Ảnh camera xe tại cổng" className="w-full h-40 object-cover rounded opacity-85" />
+          </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nhận diện Biển số</label>

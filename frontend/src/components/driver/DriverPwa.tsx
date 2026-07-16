@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Modal } from 'antd';
 import { apiClient } from '../../api/apiClient';
+import { registerDriverFcmToken } from '../../services/fcmClient';
 import {
   Home,
   Car,
@@ -653,11 +654,50 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [selectedSubForDetail, setSelectedSubForDetail] = useState<any | null>(null);
   const [topupAmount, setTopupAmount] = useState<number>(500000);
+  const [pushStatus, setPushStatus] = useState<'idle' | 'registering' | 'ready' | 'blocked' | 'missing-config' | 'unsupported'>('idle');
 
   const triggerToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ text, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  const syncDriverPushToken = async (showToast = false) => {
+    if (!accessToken || isOffline || pushStatus === 'registering') return;
+
+    setPushStatus('registering');
+    const result = await registerDriverFcmToken();
+
+    if (result.ok) {
+      setPushStatus('ready');
+      if (showToast) {
+        triggerToast('Da bat thong bao chong trom cho thiet bi nay.', 'success');
+      }
+      return;
+    }
+
+    if (result.status === 'permission-denied') {
+      setPushStatus('blocked');
+    } else if (result.status === 'missing-config') {
+      setPushStatus('missing-config');
+    } else if (result.status === 'unsupported') {
+      setPushStatus('unsupported');
+    } else {
+      setPushStatus('idle');
+    }
+
+    if (showToast) {
+      triggerToast(result.message, 'error');
+    }
+  };
+
+  useEffect(() => {
+    if (!accessToken || typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      syncDriverPushToken(false);
+    } else if (Notification.permission === 'denied') {
+      setPushStatus('blocked');
+    }
+  }, [accessToken, isOffline]);
 
   // Sync state to LocalStorage
   useEffect(() => {
@@ -2033,11 +2073,26 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
               {/* Action bells */}
               <button
-                onClick={() => triggerToast('Không có thông báo mới nào hôm nay.', 'info')}
+                onClick={() => {
+                  if (pushStatus === 'ready') {
+                    triggerToast('Thiet bi nay da san sang nhan canh bao FCM.', 'success');
+                    return;
+                  }
+                  syncDriverPushToken(true);
+                }}
                 className="p-2 text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-full relative"
+                title="Bat thong bao chong trom"
               >
                 <Bell className="w-4.5 h-4.5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                <span
+                  className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ${
+                    pushStatus === 'ready'
+                      ? 'bg-emerald-500'
+                      : pushStatus === 'blocked' || pushStatus === 'missing-config'
+                        ? 'bg-red-500'
+                        : 'bg-blue-600 animate-pulse'
+                  }`}
+                />
               </button>
 
               <button

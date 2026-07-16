@@ -135,7 +135,7 @@ export const GlobalProvider = ({ children }) => {
 
         if (dataArray && dataArray.length >= 0) {
           const active = dataArray
-            .filter(s => s.sessionStatus === 'ACTIVE')
+            .filter(s => ['ACTIVE', 'PASSED_CONFIRMED'].includes(s.sessionStatus))
             .map((session, index) => {
               const checkInTime = session.checkInTime ? new Date(session.checkInTime) : null;
               let durationStr = "Đang vào";
@@ -171,6 +171,7 @@ export const GlobalProvider = ({ children }) => {
 
               const isPendingSession = session.isPending === true;
               const sessionIsVip = session.isVip || session.vip;
+              const isMobilePrepaid = session.sessionStatus === 'PASSED_CONFIRMED';
 
               return {
                 id: session.id,
@@ -178,8 +179,11 @@ export const GlobalProvider = ({ children }) => {
                 type: sessionIsVip ? "VIP" : "Vãng lai",
                 isVip: sessionIsVip,
                 confidence: "99%",
-                status: (session.isSuspicious || session.suspicious) ? "Lỗi thẻ" : (session.exitGate && !sessionIsVip ? "Chờ thanh toán" : "Hợp lệ"),
+                status: isMobilePrepaid ? "Đã thanh toán lưu động" : ((session.isSuspicious || session.suspicious) ? "Lỗi thẻ" : (session.exitGate && !sessionIsVip ? "Chờ thanh toán" : "Hợp lệ")),
                 gate: isPendingSession ? (session.exitGate || session.entryGate || null) : (session.exitGate || null),
+                entryGate: session.entryGate || null,
+                exitGate: session.exitGate || null,
+                sessionStatus: session.sessionStatus,
                 inTime: checkInTime && !isNaN(checkInTime.getTime()) ? checkInTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
                 timestamp: checkInTime ? checkInTime.getTime() : 0,
                 outTime: "--:--",
