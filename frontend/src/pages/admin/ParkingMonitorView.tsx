@@ -258,7 +258,18 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
               return (
                 <button
                   key={slot.id}
-                  onClick={() => setSelectedSlotId(slot.id)}
+                  onClick={() => {
+                    setSelectedSlotId(slot.id);
+                    if (slot.slotType === 'EV') {
+                      setSensorVehicleType('EV_CAR');
+                    } else {
+                      if (selectedZoneInfo?.zoneCode === 'F1') setSensorVehicleType('SEDAN_HATCHBACK');
+                      else if (selectedZoneInfo?.zoneCode === 'F2') setSensorVehicleType('SUV_CUV_MPV');
+                      else if (selectedZoneInfo?.zoneCode === 'B1') setSensorVehicleType('VAN_TRUCK');
+                      else if (selectedZoneInfo?.zoneCode === 'G') setSensorVehicleType('MINIBUS_16');
+                      else setSensorVehicleType('LARGE_VAN_MINIBUS');
+                    }
+                  }}
                   className={`min-h-[92px] rounded-md border p-3 text-left transition ${
                     selected ? 'border-blue-500 ring-2 ring-blue-100' :
                     occupied ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'
@@ -300,13 +311,16 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
             <select
               value={sensorVehicleType}
               onChange={(event) => setSensorVehicleType(event.target.value)}
-              disabled={!sensorOccupied}
+              disabled={!sensorOccupied || !selectedSlotId}
               className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100"
             >
+              <option value="">Chọn loại xe...</option>
               <option value="SEDAN_HATCHBACK">Xe 4-5 chỗ</option>
               <option value="SUV_CUV_MPV">Xe 7-9 chỗ</option>
-              <option value="LARGE_VAN_MINIBUS">Xe lớn</option>
-              <option value="EV_CAR">Xe điện</option>
+              <option value="VAN_TRUCK">Xe van/ xe tải nhỏ</option>
+              <option value="MINIBUS_16">Xe 12-16 chỗ</option>
+              <option value="LARGE_VAN_MINIBUS">Xe lớn (Khác)</option>
+              <option value="EV_CAR">Xe điện (EV)</option>
             </select>
             <input
               value={sensorImageUrl}

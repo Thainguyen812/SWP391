@@ -46,8 +46,8 @@ export const StaffGateControl = () => {
   const getFloorFullName = (code) => {
     if (!code) return "Chưa gán";
     const c = code.toUpperCase();
-    if (c === "F1") return "Tầng 1 — Khu Xe Gia Đình 4-5 Chỗ (Sedan, Hatchback, EV)";
-    if (c === "F2") return "Tầng 2 — Khu Xe 7-9 Chỗ (SUV, CUV, MPV)";
+    if (c === "F1") return "Tầng 1 — Xe 4-5 Chỗ (Khu Xăng) & Khu Sạc EV";
+    if (c === "F2") return "Tầng 2 — Xe 7-9 Chỗ (Khu Xăng) & Khu Sạc EV";
     if (c === "B1") return "Tầng B1 — Khu Xe Van & Xe Tải Nhỏ";
     if (c === "G") return "Tầng G — Khu Xe Khách 12-16 Chỗ";
     return `Tầng ${c}`;
@@ -95,8 +95,14 @@ export const StaffGateControl = () => {
   const getRouteHint = (type, zoneCode) => {
     const code = (zoneCode || getZoneForVehicleType(type)).toUpperCase();
     const label = getVehicleTypeLabel(type);
-    if (code === 'F1') return `${label} → Tầng F1`;
-    if (code === 'F2') return `${label} → Tầng F2`;
+    
+    if (type === 'EV_CAR' || type === 'ELECTRIC') {
+      if (code === 'F1') return `${label} → Tầng F1 (Vào Khu Sạc EV)`;
+      if (code === 'F2') return `${label} → Tầng F2 (Vào Khu Sạc EV)`;
+    }
+    
+    if (code === 'F1') return `${label} → Tầng F1 (Khu Đỗ Xe Xăng)`;
+    if (code === 'F2') return `${label} → Tầng F2 (Khu Đỗ Xe Xăng)`;
     if (code === 'B1' || code === 'G' || code === 'B1/G') return `${label} → Tầng B1/G`;
     return `${label} → ${getFloorShortName(code)}`;
   };
@@ -257,7 +263,7 @@ export const StaffGateControl = () => {
       setDailyVolume(prev => prev + 1);
       setManualPlate('');
       setManualCardCode('');
-    } catch (err) {
+      } catch (err) {
       console.error(err);
       if (err.response?.data?.error === 'VEHICLE_LOCKED') {
         notification.error({
@@ -267,10 +273,21 @@ export const StaffGateControl = () => {
           style: { backgroundColor: '#fef2f2', border: '2px solid #ef4444' }
         });
         addLog(`[SECURITY_ALERT] Xe bị khóa cố tình vượt trạm!`, 'ERROR');
+        setLastCheckInResult({
+           isRejected: true,
+           plate: manualPlate.trim().toUpperCase(),
+           message: 'XE ĐANG BỊ KHÓA'
+        });
       } else {
         const errorMsg = err.response?.data?.message || err.response?.data?.error || 'Không thể check-in lúc này';
         notification.error({ message: 'Thất bại', description: errorMsg });
         addLog(`[ERROR] Check-in thất bại: ${errorMsg}`, 'ERROR');
+        
+        setLastCheckInResult({
+           isRejected: true,
+           plate: manualPlate.trim().toUpperCase(),
+           message: errorMsg
+        });
       }
     } finally {
       setIsCheckingIn(false);
@@ -414,6 +431,12 @@ export const StaffGateControl = () => {
       const errorMsg = err.response?.data?.message || err.response?.data?.error || 'Xác thực VIP thất bại';
       notification.error({ message: 'Lỗi', description: errorMsg });
       addLog(`[ERROR] AI Check-in: ${errorMsg}`, 'ERROR');
+      
+      setLastCheckInResult({
+         isRejected: true,
+         plate: aiPlate.trim().toUpperCase(),
+         message: errorMsg
+      });
     } finally {
       setIsAiProcessing(false);
     }
@@ -966,7 +989,15 @@ export const StaffGateControl = () => {
             </div>
             <div className="bg-slate-950/80 rounded px-2 py-3 border border-slate-900 flex items-center justify-center min-h-[50px]">
               {lastCheckInResult ? (
-                lastCheckInResult.type === 'VIP' ? (
+                lastCheckInResult.isRejected ? (
+                  <marquee 
+                    className="font-mono text-sm sm:text-base font-extrabold tracking-widest text-red-500" 
+                    style={{ textShadow: '0 0 8px rgba(239, 68, 68, 0.8)' }}
+                    scrollamount="6"
+                  >
+                    TỪ CHỐI XE {lastCheckInResult.plate} ➔ {lastCheckInResult.message.toUpperCase()}
+                  </marquee>
+                ) : lastCheckInResult.type === 'VIP' ? (
                   <marquee 
                     className="font-mono text-sm sm:text-base font-extrabold tracking-widest text-amber-500" 
                     style={{ textShadow: '0 0 8px rgba(245, 158, 11, 0.8)' }}
