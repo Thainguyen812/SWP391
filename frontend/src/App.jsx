@@ -111,6 +111,7 @@ const DriverAppWrapper = () => {
       }}
       accessToken={sessionStorage.getItem('token') || localStorage.getItem('token')}
       onLogout={() => {
+        localStorage.removeItem('urbanpark_vip_subscriptions');
         authService.logout();
         navigate('/login');
       }}
