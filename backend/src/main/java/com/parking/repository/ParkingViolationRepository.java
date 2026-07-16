@@ -12,10 +12,10 @@ import java.util.UUID;
 public interface ParkingViolationRepository extends JpaRepository<ParkingViolation, UUID> {
     boolean existsBySessionIdAndViolationType(UUID sessionId, String violationType);
 
-    @Query("SELECT COUNT(v) FROM ParkingViolation v, ParkingSession s WHERE v.sessionId = s.id AND s.vehicleId = :vehicleId")
+    @Query(value = "SELECT COUNT(v.id) FROM parking_violations v INNER JOIN parking_sessions s ON v.session_id = s.id WHERE s.vehicle_id = :vehicleId", nativeQuery = true)
     long countByVehicleId(@Param("vehicleId") UUID vehicleId);
 
-    @Query("SELECT COUNT(v) FROM ParkingViolation v, ParkingSession s WHERE v.sessionId = s.id AND s.licensePlate = :licensePlate")
+    @Query(value = "SELECT COUNT(v.id) FROM parking_violations v INNER JOIN parking_sessions s ON v.session_id = s.id WHERE s.license_plate = :licensePlate", nativeQuery = true)
     long countByLicensePlate(@Param("licensePlate") String licensePlate);
 
     List<ParkingViolation> findBySessionIdAndStatus(UUID sessionId, String status);
