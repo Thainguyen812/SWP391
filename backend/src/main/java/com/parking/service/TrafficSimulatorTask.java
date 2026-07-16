@@ -108,7 +108,7 @@ public class TrafficSimulatorTask {
                     for (int attempt = 0; attempt < 20; attempt++) {
                         String prefix = prefixes[(int)(Math.random() * prefixes.length)];
                         int number = 10000 + (int)(Math.random() * 90000);
-                        String candidatePlate = prefix + "-" + number + ".SIM";
+                        String candidatePlate = prefix + "-" + (number / 100) + "." + String.format("%02d", number % 100);
                         boolean existsInPending = processingIns.stream()
                                 .anyMatch(p -> candidatePlate.equalsIgnoreCase(p.getLicensePlate()));
                         boolean existsInSessions = allSessions.stream()
