@@ -85,6 +85,12 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest req) {
         try {
+            if (req.getEmail() == null || req.getEmail().trim().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "Email không được để trống!"));
+            }
+            if (!com.parking.util.EmailDomainValidator.isEmailAddressValid(req.getEmail().trim())) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "Địa chỉ email không tồn tại trên hệ thống thư!"));
+            }
             return ResponseEntity.status(201).body(authService.register(req));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(java.util.Collections.singletonMap("message", e.getMessage()));
@@ -117,6 +123,9 @@ public class AuthController {
     public ResponseEntity<?> sendOtp(@RequestBody SendOtpRequest req) {
         if (req.getEmail() == null || req.getEmail().trim().isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "Email không được để trống!"));
+        }
+        if (!com.parking.util.EmailDomainValidator.isEmailAddressValid(req.getEmail().trim())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "Địa chỉ email không tồn tại trên hệ thống thư!"));
         }
         String otp = otpService.generateOtp(req.getEmail());
         emailService.sendOtpEmail(req.getEmail(), otp);

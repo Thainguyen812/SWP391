@@ -59,6 +59,7 @@ export const BillingHistoryTable: React.FC = () => {
   if (!context) return null;
  
   const {
+    vehicles,
     transactions,
     billingTimeFilter,
     setBillingTimeFilter,
@@ -190,7 +191,53 @@ export const BillingHistoryTable: React.FC = () => {
           } catch (e) {}
         }
         
-        const activeOrPendingSubs = mySubs.filter((s: any) => 
+        const userVehiclePlates = new Set((vehicles || []).map((v: any) => v.plate.trim().toUpperCase()));
+        
+        // Filter by user's own vehicle plates
+        const userOnlySubs = mySubs.filter((s: any) => 
+          s.vehicle_plate && userVehiclePlates.has(s.vehicle_plate.trim().toUpperCase())
+        );
+
+        // Group by vehicle plate and select latest subscription
+        const groupedSubsMap: { [plate: string]: any } = {};
+        for (const sub of userOnlySubs) {
+          const plate = sub.vehicle_plate.trim().toUpperCase();
+          const existing = groupedSubsMap[plate];
+          if (!existing) {
+            groupedSubsMap[plate] = { ...sub };
+          } else {
+            // Compare status: prefer ACTIVE over PENDING/REJECTED
+            if (sub.status === 'ACTIVE') {
+              existing.status = 'ACTIVE';
+            } else if (existing.status !== 'ACTIVE' && (sub.status === 'PENDING' || sub.status === 'PENDING_APPROVAL')) {
+              existing.status = 'PENDING';
+            }
+            
+            // Compare endDate: choose the latest one
+            const parseDate = (dStr: string) => {
+              try {
+                if (dStr.includes('/')) {
+                  const parts = dStr.split('/');
+                  return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                }
+                return new Date(dStr);
+              } catch (e) {
+                return new Date(0);
+              }
+            };
+            
+            const existingDate = parseDate(existing.endDate);
+            const newDate = parseDate(sub.endDate);
+            
+            if (newDate > existingDate) {
+              existing.endDate = sub.endDate;
+              existing.type = sub.type;
+              existing.id = sub.id;
+            }
+          }
+        }
+        
+        const activeOrPendingSubs = Object.values(groupedSubsMap).filter((s: any) => 
           s.status === 'ACTIVE' || s.status === 'PENDING' || s.status === 'PENDING_APPROVAL'
         );
         

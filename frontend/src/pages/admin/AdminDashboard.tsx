@@ -179,32 +179,6 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   const [editingStaffGateId, setEditingStaffGateId] = useState<string | null>(null);
   const [showAddBranchModal, setShowAddBranchModal] = useState(false);
   const [branches, setBranches] = useState<any[]>(() => {
-    const saved = localStorage.getItem('urbanpark_manager_branches');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.length >= 2) return parsed;
-        if (parsed.length === 1 && parsed[0].id === 'br-1') {
-          return [
-            parsed[0],
-            {
-              id: 'br-2',
-              name: 'Cơ sở Landmark 81 (CS 02)',
-              address: '208 Nguyễn Hữu Cảnh, Bình Thạnh',
-              status: 'Hoạt động',
-              capacity: 600,
-              occupied: 546,
-              cars: '200 / 250',
-              motorbikes: '346 / 350',
-              updateTime: 'Cập nhật 2 phút trước'
-            }
-          ];
-        }
-        return parsed;
-      } catch (e) {
-        // fallback
-      }
-    }
     return [
       {
         id: 'br-1',
@@ -216,17 +190,6 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
         cars: '120 / 150',
         motorbikes: '222 / 250',
         updateTime: 'Cập nhật 1 phút trước'
-      },
-      {
-        id: 'br-2',
-        name: 'Cơ sở Landmark 81 (CS 02)',
-        address: '208 Nguyễn Hữu Cảnh, Bình Thạnh',
-        status: 'Hoạt động',
-        capacity: 600,
-        occupied: 546,
-        cars: '200 / 250',
-        motorbikes: '346 / 350',
-        updateTime: 'Cập nhật 2 phút trước'
       }
     ];
   });
@@ -1553,91 +1516,22 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 select-none pb-2 border-b border-slate-150 dark:border-slate-800">
                       <div className="space-y-1 text-left block">
                         <div className="text-[10px] uppercase font-black tracking-widest text-slate-400 dark:text-slate-500">
-                          Trang chủ &gt; Quản lý Cơ sở
+                          Trang chủ &gt; Tổng quan
                         </div>
                         <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-sans">
-                          Quản lý Cơ sở
+                          Tổng quan bãi xe
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-bold font-sans">
-                          Tổng quan 12 bãi xe đang hoạt động trong hệ thống
+                          Thông tin vận hành bãi đỗ xe thông minh
                         </p>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => setShowAddBranchModal(true)}
-                          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Plus className="w-4 h-4 stroke-[3]" />
-                          <span>+ THÊM CƠ SỞ MỚI</span>
-                        </button>
                       </div>
                     </div>
 
                     {/* MAIN TWO-COLUMN CONTAINER */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                       
-                      {/* LEFT RAIL: MAP & OVERALL HEALTH (col-span-4) */}
+                      {/* LEFT RAIL: OVERALL HEALTH (col-span-4) */}
                       <div className="lg:col-span-4 flex flex-col gap-6">
-                        
-                        {/* MAP CONTAINER */}
-                        <div className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 text-left flex flex-col justify-between">
-                          <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
-                            <span className="font-bold text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                              Bản đồ hệ thống
-                            </span>
-                            <button 
-                              onClick={() => triggerToast('Mở rộng toàn bản đồ vệ tinh!', 'info')}
-                              className="text-[10.5px] font-extrabold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                            >
-                              Mở rộng
-                            </button>
-                          </div>
-
-                          {/* HIGH CONTRAST STYLIZED VECTOR MAP PLACEHOLDER */}
-                          <div className="relative h-48 bg-[#151c2c] rounded-xl my-4 overflow-hidden shadow-inner flex items-center justify-center">
-                            {/* Grid Lines */}
-                            <div className="absolute inset-0 bg-[linear-gradient(to_right,#334155_1px,transparent_1px),linear-gradient(to_bottom,#334155_1px,transparent_1px)] bg-[size:14px_24px] opacity-20" />
-                            
-                            {/* Vector Landmass Shapes */}
-                            <div className="absolute w-20 h-20 rounded-full bg-slate-805/40 -top-4 -left-4 blurred-2xl" />
-                            <div className="absolute w-32 h-20 rounded-3xl bg-slate-805/20 bottom-2 right-4 blurred-2xl" />
-
-                            {/* Street pathways */}
-                            <div className="absolute top-1/2 w-full h-1 bg-slate-700/30 transform -translate-y-1/2" />
-                            <div className="absolute left-1/3 h-full w-1 bg-slate-700/30" />
-                            <div className="absolute right-1/4 h-full w-1 bg-slate-700/30 transform rotate-12" />
-
-                            {/* MAP MARKERS (SCREENSHOT 1 SPECIFICS) */}
-                            {/* Marker 1: Q1-A (Blue, Active) */}
-                            <div className="absolute top-[25%] left-[28%] text-center cursor-pointer transform -translate-y-1/2 -translate-x-1/2 scale-100 hover:scale-110 transition-all select-none" onClick={() => triggerToast('Cơ sở Quận 1 (A) hoạt động ổn định', 'success')}>
-                              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 absolute top-1.5 left-1.5 animate-ping" />
-                              <div className="px-2 py-1 bg-blue-600 text-white font-mono text-[9px] font-black rounded-md shadow-md border border-blue-450 z-10 relative">
-                                Q1-A
-                              </div>
-                            </div>
-
-                            {/* Marker 2: Q3-B (Blue, Active) */}
-                            <div className="absolute bottom-[35%] right-[32%] text-center cursor-pointer transform -translate-y-1/2 -translate-x-1/2 scale-100 hover:scale-110 transition-all select-none" onClick={() => triggerToast('Cơ sở Quận 3 (B) hoạt động ổn định', 'success')}>
-                              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 absolute top-1.5 left-1.5 animate-ping" />
-                              <div className="px-2 py-1 bg-blue-600 text-white font-mono text-[9px] font-black rounded-md shadow-md border border-blue-450 z-10 relative">
-                                Q3-B
-                              </div>
-                            </div>
-
-                            {/* Marker 3: Q5-C (Red, Alert / Maintenance) */}
-                            <div className="absolute top-[45%] right-[15%] text-center cursor-pointer transform -translate-y-1/2 -translate-x-1/2 scale-100 hover:scale-110 transition-all select-none" onClick={() => triggerToast('Cơ sở Quận 5 (C) SC VivoCity đang bảo trì LPR!', 'error')}>
-                              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 absolute top-1.5 left-1.5 animate-ping" />
-                              <div className="px-2 py-1 bg-rose-600 text-white font-mono text-[9px] font-black rounded-md shadow-md border border-rose-450 z-10 relative">
-                                Q5-C
-                              </div>
-                            </div>
-                          </div>
-
-                          <span className="text-[10px] text-slate-400 font-bold block text-center">
-                            📡 Hệ thống định vị trạm thời gian thực (LBS) GPS
-                          </span>
-                        </div>
 
                         {/* OVERALL HEALTH CONTAINER */}
                         <div className="bg-white dark:bg-slate-905 border border-slate-205 dark:border-slate-800 rounded-2xl p-5 text-left block">
@@ -1647,13 +1541,13 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
                           <div className="space-y-4 block">
                             <div className="flex justify-between items-end">
-                              <span className="text-xs font-bold text-slate-500">Sức chứa toàn hệ thống</span>
-                              <strong className="text-base font-black text-slate-850 dark:text-white">72%</strong>
+                              <span className="text-xs font-bold text-slate-500">Sức chứa bãi xe</span>
+                              <strong className="text-base font-black text-slate-850 dark:text-white">85%</strong>
                             </div>
 
                             {/* Indigo Progress gauge bar */}
                             <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                              <div className="h-full bg-blue-600 rounded-full" style={{ width: '72%' }} />
+                              <div className="h-full bg-blue-600 rounded-full" style={{ width: '85%' }} />
                             </div>
 
                             {/* Grid of total Active vs Maintenance indicators */}
@@ -1664,7 +1558,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
                                   <span className="text-[10px] font-bold text-slate-400 uppercase">Hoạt động</span>
                                 </div>
-                                <h4 className="text-xl font-black font-mono tracking-tight mt-1">11</h4>
+                                <h4 className="text-xl font-black font-mono tracking-tight mt-1">1</h4>
                               </div>
                               
                               {/* Box 2: Maintenance */}
@@ -1673,20 +1567,11 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                                   <span className="w-2 h-2 rounded-full bg-amber-500" />
                                   <span className="text-[10px] font-bold text-slate-400 uppercase">Bảo trì</span>
                                 </div>
-                                <h4 className="text-xl font-black font-mono tracking-tight mt-1">01</h4>
+                                <h4 className="text-xl font-black font-mono tracking-tight mt-1">0</h4>
                               </div>
                             </div>
                           </div>
 
-                        </div>
-
-                        {/* BOTTOM PAGINATION CONTROLS */}
-                        <div className="flex items-center justify-center gap-1.5 pt-4 font-sans select-none">
-                          <button onClick={() => triggerToast('Trang trước', 'info')} className="p-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 text-xs font-extrabold">&lt;</button>
-                          <button onClick={() => triggerToast('Trang 1', 'info')} className="px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-black">1</button>
-                          <button onClick={() => triggerToast('Sang trang 2', 'info')} className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 bg-white dark:bg-slate-900 rounded-xl text-xs font-extrabold text-slate-500">2</button>
-                          <button onClick={() => triggerToast('Sang trang 3', 'info')} className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 bg-white dark:bg-slate-900 rounded-xl text-xs font-extrabold text-slate-500">3</button>
-                          <button onClick={() => triggerToast('Trang sau', 'info')} className="p-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 text-xs font-extrabold">&gt;</button>
                         </div>
 
                       </div>
@@ -1741,15 +1626,6 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                               </div>
                             );
                           })}
-                        </div>
-
-                        {/* BOTTOM PAGINATION CONTROLS */}
-                        <div className="flex items-center justify-center gap-1.5 pt-4 font-sans select-none">
-                          <button onClick={() => triggerToast('Trang trước', 'info')} className="p-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 text-xs font-extrabold">&lt;</button>
-                          <button onClick={() => triggerToast('Trang 1', 'info')} className="px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-black">1</button>
-                          <button onClick={() => triggerToast('Sang trang 2', 'info')} className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 bg-white dark:bg-slate-900 rounded-xl text-xs font-extrabold text-slate-500">2</button>
-                          <button onClick={() => triggerToast('Sang trang 3', 'info')} className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 bg-white dark:bg-slate-900 rounded-xl text-xs font-extrabold text-slate-500">3</button>
-                          <button onClick={() => triggerToast('Trang sau', 'info')} className="p-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl hover:bg-slate-50 text-xs font-extrabold">&gt;</button>
                         </div>
 
                       </div>

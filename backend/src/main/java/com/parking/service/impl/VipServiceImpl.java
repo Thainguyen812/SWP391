@@ -104,6 +104,14 @@ public class VipServiceImpl implements VipService {
                 vip.setStatus(("DAILY".equals(request.getSubscriptionType()) || "DAY".equals(request.getSubscriptionType())) ? VipSubscription.Status.ACTIVE : VipSubscription.Status.PENDING_APPROVAL);
 
                 java.time.LocalDate startDate = java.time.LocalDate.now();
+                List<VipSubscription> existingSubs = repo.findByVehicleId(vehicle.getId());
+                for (VipSubscription sub : existingSubs) {
+                    if (sub.getStatus() == VipSubscription.Status.ACTIVE || sub.getStatus() == VipSubscription.Status.PENDING_APPROVAL) {
+                        if (sub.getEndDate() != null && sub.getEndDate().isAfter(startDate)) {
+                            startDate = sub.getEndDate();
+                        }
+                    }
+                }
                 vip.setStartDate(startDate);
 
                 // Tính toán endDate và feeAmount dựa vào subscriptionType và vehicleSize
@@ -181,7 +189,7 @@ public class VipServiceImpl implements VipService {
                 vip.setFeeAmount(feeAmount);
 
                 vip.setPaymentMethod("BANK_TRANSFER");
-                vip.setPaymentStatus(("DAILY".equals(request.getSubscriptionType()) || "DAY".equals(request.getSubscriptionType())) ? "PAID" : "PENDING");
+                vip.setPaymentStatus(("DAILY".equals(request.getSubscriptionType()) || "DAY".equals(request.getSubscriptionType())) ? "SUCCESS" : "PENDING");
                 vip.setCreatedAt(java.time.Instant.now());
                 vip.setUpdatedAt(java.time.Instant.now());
 

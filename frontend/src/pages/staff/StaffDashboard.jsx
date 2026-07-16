@@ -870,7 +870,14 @@ export const StaffDashboard = () => {
                 {activeVehicles && activeVehicles.filter(v => !v.gate).length > 0 ? (
                   activeVehicles.filter(v => !v.gate).map(v => (
                     <tr key={v.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="p-3 font-bold text-slate-700">{v.plate}</td>
+                      <td className="p-3 font-bold text-slate-700 flex items-center gap-1.5">
+                        <span>{v.plate}</span>
+                        {v.isLocked && (
+                          <span className="bg-red-100 text-red-600 border border-red-200 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider animate-pulse">
+                            🔒 Đang Khóa
+                          </span>
+                        )}
+                      </td>
                       <td className="p-3">
                         <span className={`px-2 py-1 rounded text-[10px] font-bold ${v.type === 'VIP' ? 'bg-slate-800 text-white' : 'bg-blue-100 text-blue-700'}`}>
                           {v.type}
@@ -944,7 +951,14 @@ export const StaffDashboard = () => {
                   .sort((a, b) => a.gate.localeCompare(b.gate))
                   .map(v => (
                     <tr key={v.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="p-3 font-bold text-slate-700">{v.plate}</td>
+                      <td className="p-3 font-bold text-slate-700 flex items-center gap-1.5">
+                        <span>{v.plate}</span>
+                        {v.isLocked && (
+                          <span className="bg-red-100 text-red-600 border border-red-200 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider animate-pulse">
+                            🔒 Đang Khóa
+                          </span>
+                        )}
+                      </td>
                       <td className="p-3 text-slate-600 text-sm">{v.gate}</td>
                       <td className="p-3">
                         <span className={`px-2 py-1 rounded text-[10px] font-bold ${v.status === 'Lỗi thẻ' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>

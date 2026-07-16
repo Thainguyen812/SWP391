@@ -155,96 +155,30 @@ export function DriverHome() {
                   )}
 
                   {/* Top segment grid columns */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                  <div className="grid grid-cols-1 gap-6">
                     
-                    {/* Left Card: Trạng thái hiện tại */}
-                    <div className="lg:col-span-7 bg-blue-500/5 hover:bg-blue-500/10 rounded-2xl border border-blue-100 flex flex-col justify-between p-6 transition-all relative overflow-hidden">
-                      <div className="absolute right-0 top-0 w-48 h-48 bg-blue-300/10 rounded-full blur-2xl pointer-events-none" />
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <span className="text-[10px] font-black uppercase text-slate-400">TRỌNG ĐIỂM GIÁM SÁT</span>
-                          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Trạng Thái Hiện Tại</h3>
+                    <button 
+                      onClick={() => {
+                        setActiveTab('vip_reg');
+                        setRegStep(2);
+                      }}
+                      className="w-full p-6 bg-white hover:bg-slate-50 border border-slate-200 rounded-3xl flex items-center justify-between gap-4 cursor-pointer active:scale-[0.99] transition-all"
+                    >
+                      <div className="flex items-center gap-4 text-left">
+                        <div className="p-4 bg-sky-50 text-sky-600 rounded-2xl">
+                          <Calendar className="w-6 h-6" />
                         </div>
-                        {currentParked ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 text-[#10b981] font-bold text-xs rounded-full uppercase tracking-wide">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            ĐANG ĐỖ
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 border border-slate-200 text-slate-500 font-bold text-xs rounded-full uppercase tracking-wide">
-                            TRỐNG
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-slate-500 text-xs mt-3">
-                        {currentParked ? "Xe đang đỗ trong cơ sở bãi đỗ thông minh" : "Hiện tại không có xe nào đang đỗ trong bãi"}
-                      </p>
-
-                      <div className="grid grid-cols-2 gap-4 mt-6">
-                        <div className="p-4 bg-white border border-slate-200/60 rounded-xl leading-snug">
-                          <span className="text-[9px] font-extrabold text-slate-400 uppercase block tracking-wider">BIỂN SỐ NHẬN DIỆN</span>
-                          <strong className="text-sm sm:text-base font-black text-slate-800 font-mono italic tracking-wide">{currentParked?.plate || 'Chưa ghi nhận'}</strong>
-                        </div>
-                        <div className="p-4 bg-white border border-slate-200/60 rounded-xl leading-snug flex items-center gap-3">
-                          <div className="p-2 bg-red-50 text-red-500 rounded-lg">
-                            <MapPin className="w-4.5 h-4.5" />
-                          </div>
-                          <div>
-                            <span className="text-[9px] font-extrabold text-slate-400 uppercase block tracking-wider">VỊ TRÍ CHỈ ĐỊNH</span>
-                            <strong className="text-xs sm:text-sm font-extrabold text-slate-850 block">
-                              {currentParked?.assignedZone ? `Tầng ${getFloorNumber(currentParked.assignedZone)}` : (currentParked?.location || 'Chưa ghi nhận')}
-                            </strong>
-                          </div>
+                        <div>
+                          <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">Gia Hạn Vé Tháng / VIP</h4>
+                          <p className="text-xs text-slate-400 font-semibold leading-normal">
+                            Đăng ký hoặc gia hạn gói giữ xe tháng/năm tiện lợi cho phương tiện của bạn.
+                          </p>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Right Card: Quick billing operations & shortcuts */}
-                    <div className="lg:col-span-5 flex flex-col gap-4">
-                      
-                      {/* Large Blue payment trigger */}
-                      <button 
-                        onClick={() => {
-                          setActiveTab('vip_reg');
-                          setRegStep(2);
-                        }}
-                        className="w-full p-5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-base rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-blue-600/10 cursor-pointer active:scale-[0.99] transition-all"
-                      >
-                        <CreditCard className="w-5 h-5 text-white" />
-                        <span>Thanh Toán Ngay</span>
-                      </button>
-
-                      {/* Beneath grid */}
-                      <div className="grid grid-cols-2 gap-4 flex-1">
-                        
-                        <button 
-                          onClick={handleFindCar}
-                          className="p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center gap-2 select-none group cursor-pointer active:scale-95 transition-all"
-                        >
-                          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-full group-hover:scale-110 transition-transform">
-                            <MapPin className="w-5 h-5" />
-                          </div>
-                          <span className="text-xs font-black text-slate-700 tracking-tight leading-none">Tìm Xe Của Tôi</span>
-                        </button>
-
-                        <button 
-                          onClick={() => {
-                            setActiveTab('vip_reg');
-                            setRegStep(2);
-                          }}
-                          className="p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center gap-2 select-none group cursor-pointer active:scale-95 transition-all"
-                        >
-                          <div className="p-2.5 bg-sky-50 text-sky-600 rounded-full group-hover:scale-110 transition-transform">
-                            <Calendar className="w-5 h-5" />
-                          </div>
-                          <span className="text-xs font-black text-slate-700 tracking-tight leading-none">Gia Hạn Vé Tháng</span>
-                        </button>
-
+                      <div className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 font-black text-xs rounded-xl uppercase tracking-wider">
+                        Tiếp Tục
                       </div>
-
-                    </div>
+                    </button>
 
                   </div>
 

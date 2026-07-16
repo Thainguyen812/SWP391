@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons';
 import { notification, Modal, Input } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
+import { apiClient } from '../../api/apiClient';
 
 export const StaffSecurityAlerts = () => {
   const { securityAlerts, removeSecurityAlert, restoreSecurityAlerts, addVehicleFine, addActivityLog } = useGlobalContext();
@@ -27,7 +28,7 @@ export const StaffSecurityAlerts = () => {
       content: `Đánh dấu đã xử lý cảnh báo ${type}?`,
       okText: 'Đồng ý',
       cancelText: 'Hủy',
-      onOk() {
+      async onOk() {
         notification.success({ message: `Đã ghi nhận xử lý cảnh báo: ${type}`, placement: 'topRight' });
         
         const alert = securityAlerts.find(a => a.id === id);
@@ -47,7 +48,7 @@ export const StaffSecurityAlerts = () => {
           });
         }
         
-        removeSecurityAlert(id);
+        await removeSecurityAlert(id);
         setResolvingAlerts(prev => { const n = {...prev}; delete n[id]; return n; });
       }
     });
@@ -240,9 +241,14 @@ export const StaffSecurityAlerts = () => {
                   }} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-sm transition-colors cursor-pointer flex items-center justify-center gap-2">
                       Lập biên bản
                     </button>
-                    <button onClick={() => {
+                    <button onClick={async () => {
+                      try {
+                        await apiClient.post('/vehicles/lock', { plate: alert.plate, isLocked: false });
+                      } catch (e) {
+                        console.error("Failed to unlock vehicle on security resolution", e);
+                      }
                       notification.success({ message: 'Đã gỡ phong tỏa phương tiện', placement: 'topRight' });
-                      removeSecurityAlert(alert.id);
+                      await removeSecurityAlert(alert.id);
                       setResolvingAlerts(prev => { const n = {...prev}; delete n[alert.id]; return n; });
                     }} className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold px-3 rounded-lg flex items-center justify-center transition-colors cursor-pointer gap-2 text-sm">
                       Gỡ phong tỏa
@@ -342,16 +348,21 @@ export const StaffSecurityAlerts = () => {
         }
         open={isFineModalVisible}
         onCancel={() => setIsFineModalVisible(false)}
-        onOk={() => {
-          notification.success({ message: `Đã ghi nhận phạt ${fineAmount.toLocaleString()}đ vào hệ thống và gỡ phong tỏa`, placement: 'topRight' });
+        onOk={async () => {
           if (currentFineAlertId) {
             const alert = securityAlerts.find(a => a.id === currentFineAlertId);
             if (alert) {
+              try {
+                await apiClient.post('/vehicles/lock', { plate: alert.plate, isLocked: false });
+              } catch (e) {
+                console.error("Failed to unlock vehicle on fine resolution", e);
+              }
               addVehicleFine({ plate: alert.plate, amount: parseInt(fineAmount) || 0, reason: fineNote });
             }
-            removeSecurityAlert(currentFineAlertId);
+            await removeSecurityAlert(currentFineAlertId);
             setResolvingAlerts(prev => { const n = {...prev}; delete n[currentFineAlertId]; return n; });
           }
+          notification.success({ message: `Đã ghi nhận phạt ${fineAmount.toLocaleString()}đ vào hệ thống và gỡ phong tỏa`, placement: 'topRight' });
           setIsFineModalVisible(false);
         }}
         okText="Ghi nhận & Hoàn tất"

@@ -105,8 +105,8 @@ export const StaffMonitoring = () => {
       content: 'Bạn chắc chắn muốn bỏ qua cảnh báo này?',
       okText: 'Đồng ý',
       cancelText: 'Hủy',
-      onOk() {
-        removeSecurityAlert(id);
+      async onOk() {
+        await removeSecurityAlert(id);
         notification.info({ message: 'Đã bỏ qua cảnh báo', placement: 'topRight' });
       }
     });
@@ -119,8 +119,8 @@ export const StaffMonitoring = () => {
       okText: 'Tiếp nhận',
       cancelText: 'Hủy',
       okButtonProps: { className: 'bg-emerald-600' },
-      onOk() {
-        removeSecurityAlert(id);
+      async onOk() {
+        await removeSecurityAlert(id);
         notification.success({ message: 'Đang xử lý cảnh báo', description: 'Đã tiếp nhận yêu cầu và điều phối An ninh.', placement: 'topRight' });
       }
     });

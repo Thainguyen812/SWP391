@@ -867,6 +867,8 @@ export const StaffGateControl = () => {
                     gate.id.toLowerCase().includes(searchQuery.toLowerCase())
                   )
                   .map((gate, i) => {
+                    const matchingVeh = activeVehicles?.find(av => av.plate === gate.plate);
+                    const isVehLocked = matchingVeh?.isLocked;
                     const isSelected = currentVehicle?.id === gate.vehicleId;
                     return (
                   <tr 
@@ -881,7 +883,14 @@ export const StaffGateControl = () => {
                       </span>
                     </td>
                     <td className="p-4 font-bold text-slate-800 tracking-wider">
-                      {gate.plate}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span>{gate.plate}</span>
+                        {isVehLocked && (
+                          <span className="bg-red-100 text-red-600 border border-red-200 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider animate-pulse">
+                            🔒 Đang khóa
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">

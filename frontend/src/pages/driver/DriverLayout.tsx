@@ -36,7 +36,8 @@ import {
   AlertTriangle,
   KeyRound,
   Coins,
-  Sliders
+  Sliders,
+  Trash2
 } from 'lucide-react';
 
 interface DriverPwaProps {
@@ -73,6 +74,51 @@ interface TransactionItem {
   isEntry: boolean;
   status: 'Thành công' | 'Đang xử lý' | 'Thất bại';
 }
+
+const getVehicleImage = (plate: string, type: string) => {
+  const cleanPlate = (plate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  let hash = 0;
+  for (let i = 0; i < cleanPlate.length; i++) {
+    hash = cleanPlate.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  hash = Math.abs(hash);
+
+  const images5 = [
+    '/images/raize.png',
+    'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=500&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=500&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=500&auto=format&fit=crop&q=80'
+  ];
+
+  const images7 = [
+    '/images/santafe.png',
+    'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=500&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?w=500&auto=format&fit=crop&q=80'
+  ];
+
+  const images9 = [
+    '/images/granvia.png',
+    'https://images.unsplash.com/photo-1616422285623-13ff0162193c?w=500&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=500&auto=format&fit=crop&q=80'
+  ];
+
+  const images16 = [
+    '/images/transit.png',
+    'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=500&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=500&auto=format&fit=crop&q=80'
+  ];
+
+  const t = (type || '').toLowerCase();
+  if (t.includes('16') || t.includes('minibus')) {
+    return images16[hash % images16.length];
+  } else if (t.includes('9') || t.includes('van')) {
+    return images9[hash % images9.length];
+  } else if (t.includes('7') || t.includes('suv')) {
+    return images7[hash % images7.length];
+  } else {
+    return images5[hash % images5.length];
+  }
+};
 
 const isTxDateInFilter = (txDateStr: string, filter: string) => {
   if (!txDateStr || filter === 'Tất cả') return true;
@@ -350,7 +396,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               type: sizeLabel,
               regDate: '12/10/2023',
               isActive: true,
-              image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
+              image: getVehicleImage(v.plate, sizeLabel),
               isLocked: activeSub ? (v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false)) : false,
               fuelType: v.fuelType || existingLocal?.fuelType || 'GASOLINE',
               activeSubscription: activeSub,
@@ -393,25 +439,25 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
-        const response = await fetch('/api/logs', {
-          headers: { 'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}` }
+        const response = await fetch('/api/v1/driver/billing-history', {
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}` 
+          }
         });
         if (response.ok) {
           const data = await response.json();
-          if (data && data.items && data.items.length > 0) {
-            const mapped = data.items.map((item: any, index: number) => ({
-              id: `#TRX-${9000 + index}`,
-              date: item.time,
-              type: 'Gửi xe',
+          if (Array.isArray(data)) {
+            const mapped = data.map((item: any) => ({
+              id: item.id.startsWith('#') ? item.id : `#${item.id}`,
+              date: item.date,
+              type: item.type,
               plate: item.plate,
-              fee: item.action === 'Vào bãi' ? '0 đ' : '15,000 đ',
-              isEntry: item.action === 'Vào bãi',
-              status: item.status === 'Thành Công' ? 'Thành công' : 'Đang xử lý'
+              fee: item.fee,
+              isEntry: item.isEntry || false,
+              status: item.status
             }));
-            setTransactions(prev => {
-              const localPayments = prev.filter(tx => !tx.id.startsWith('#TRX-'));
-              return [...localPayments, ...mapped];
-            });
+            setTransactions(mapped);
           }
         }
       } catch (err) {
@@ -419,6 +465,8 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       }
     };
     fetchTransactions();
+    const timer = setInterval(fetchTransactions, 5000);
+    return () => clearInterval(timer);
   }, [user]);
 
   // Current parked vehicle mock details
@@ -890,6 +938,46 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       }
     } catch (err) {
       triggerToast('Lỗi kết nối API Backend!', 'error');
+    }
+  };
+
+  const handleDeleteVehicle = async () => {
+    if (!editingVehicleId) return;
+    
+    if (window.confirm("Bạn có chắc chắn muốn xóa phương tiện này không? Hành động này không thể hoàn tác.")) {
+      if (isOffline) {
+        setVehicles(prev => prev.filter(v => v.id !== editingVehicleId));
+        setEditVehicleModalOpen(false);
+        triggerToast('Đã xóa phương tiện thành công (Chế độ Ngoại tuyến)!', 'success');
+        return;
+      }
+      
+      try {
+        const token = accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'));
+        const response = await fetch(`/api/vehicles/${editingVehicleId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          triggerToast('Xóa phương tiện thành công!', 'success');
+          setEditVehicleModalOpen(false);
+          fetchVehiclesFromApi();
+        } else {
+          let errMsg = 'Xóa phương tiện thất bại!';
+          try {
+            const errData = await response.json();
+            if (errData && errData.message) {
+              errMsg = errData.message;
+            }
+          } catch (e) {}
+          triggerToast(errMsg, 'error');
+        }
+      } catch (error: any) {
+        triggerToast(error.message || 'Đã xảy ra lỗi khi kết nối tới máy chủ!', 'error');
+      }
     }
   };
 
@@ -1696,6 +1784,14 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
                   </div>
 
                   <div className="flex gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleDeleteVehicle}
+                      className="px-4 py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl transition-all cursor-pointer border border-rose-100 flex items-center justify-center gap-1.5"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Xoá xe
+                    </button>
                     <button
                       type="button"
                       onClick={() => setEditVehicleModalOpen(false)}

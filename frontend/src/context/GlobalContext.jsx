@@ -212,7 +212,8 @@ export const GlobalProvider = ({ children }) => {
                 assignedZoneCode: zoneCode,
                 floorName: mapZoneToFloor(zoneCode),
                 vehicleType: session.vehicleType || session.vehicleSize || null,
-                cardCode: session.cardCode
+                cardCode: session.cardCode,
+                isLocked: session.isLocked || session.locked || false
               };
             });
 
@@ -304,7 +305,15 @@ export const GlobalProvider = ({ children }) => {
   const addTransaction = (newTx) => setTransactions(prev => [{ ...newTx, isManual: true }, ...prev]);
   const addActivityLog = (newLog) => setActivityLogs(prev => [{ ...newLog, isManual: true, id: Math.random().toString() }, ...prev]);
   const addSecurityAlert = (newAlert) => setSecurityAlerts(prev => [{ ...newAlert, isManual: true }, ...prev]);
-  const removeSecurityAlert = (id) => setSecurityAlerts(prev => prev.filter(alert => alert.id !== id));
+  const removeSecurityAlert = async (id) => {
+    try {
+      await apiClient.put(`/security/alerts/${id}/resolve`);
+      setSecurityAlerts(prev => prev.filter(alert => alert.id !== id));
+    } catch (e) {
+      console.error("Failed to resolve security alert in backend", e);
+      setSecurityAlerts(prev => prev.filter(alert => alert.id !== id));
+    }
+  };
   
   const addVehicleFine = (fine) => setVehicleFines(prev => [...prev, { ...fine, id: Math.random().toString(), date: new Date().toISOString() }]);
   const clearVehicleFines = (plate) => setVehicleFines(prev => prev.filter(f => f.plate !== plate));

@@ -200,6 +200,7 @@ public class ParkingServiceImpl implements ParkingService {
 
         if (vehicleOpt.isPresent()) {
             ps.setVehicleId(vehicleOpt.get().getId());
+            ps.setIsLocked(vehicleOpt.get().isLocked());
         }
 
         zoneRepository.increaseOccupied(chosen.getId());
@@ -234,6 +235,7 @@ public class ParkingServiceImpl implements ParkingService {
             if (session.getVehicleId() == null) {
                 session.setVehicleId(vehicle.getId());
             }
+            session.setIsLocked(vehicle.isLocked());
         }
 
         Zone zone = ensureApprovedZone(session, vehicleType);
@@ -334,7 +336,11 @@ public class ParkingServiceImpl implements ParkingService {
         session.setIsSuspicious(pendingEntry.isSuspicious());
         session.setSuspiciousReason(pendingEntry.getSuspiciousReason());
         session.setEntryGate(null);
-        vehicleOpt.ifPresent(vehicle -> session.setVehicleId(vehicle.getId()));
+        if (vehicleOpt.isPresent()) {
+            Vehicle vehicle = vehicleOpt.get();
+            session.setVehicleId(vehicle.getId());
+            session.setIsLocked(vehicle.isLocked());
+        }
 
         Zone zone = ensureApprovedZone(session, vehicleType);
         parkingSessionRepository.save(session);
@@ -677,6 +683,7 @@ public class ParkingServiceImpl implements ParkingService {
             session.setId(UUID.randomUUID());
             session.setLicensePlate(plate);
             session.setVehicleId(vehicle.getId());
+            session.setIsLocked(vehicle.isLocked());
             session.setCheckInTime(Instant.now());
             session.setCreatedAt(Instant.now());
             session.setAssignedZoneId(chosen.getId());
@@ -1086,18 +1093,6 @@ public class ParkingServiceImpl implements ParkingService {
                 .orElseThrow(
                         () -> new ApiExceptions.NotFoundException(
                                 "Không tìm thấy phiên gửi xe ACTIVE"));
-
-        if (session.getIsLocked() != null && session.getIsLocked()) {
-            SecurityAlert alert = new SecurityAlert();
-            alert.setAlertType("NGHI NGỜ TRỘM CẮP");
-            alert.setLicensePlate(session.getLicensePlate() != null ? session.getLicensePlate() : "N/A");
-            alert.setReason("Phát hiện cố tình xuất bãi khi xe đang bật Khóa chống trộm.");
-            alert.setIsActionable(true);
-            securityAlertRepository.save(alert);
-
-            throw new ApiExceptions.ForbiddenException(
-                    "Xe đang ở trạng thái KHÓA AN TOÀN chống trộm! Không thể xuất bãi.");
-        }
 
         if (session.getIsVip() != null
                 && session.getIsVip()) {
@@ -1560,8 +1555,18 @@ public class ParkingServiceImpl implements ParkingService {
         } else {
             subscription.setRejectionReason(null);
 
-            // Cập nhật ngày gia hạn bắt đầu và kết thúc dựa trên thời gian thực lúc duyệt
+            // Cập nhật ngày gia hạn bắt đầu và kết thúc dựa trên thời gian thực lúc duyệt, có cộng dồn/xếp chồng
             java.time.LocalDate startDate = java.time.LocalDate.now();
+            List<VipSubscription> existingSubs = vipSubscriptionRepository.findByVehicleId(subscription.getVehicleId());
+            for (VipSubscription sub : existingSubs) {
+                // Chỉ so sánh với các gói ACTIVE khác hoặc PENDING_APPROVAL khác không trùng với gói hiện tại đang duyệt
+                if (!sub.getId().equals(subscription.getId()) &&
+                    (sub.getStatus() == VipSubscription.Status.ACTIVE || sub.getStatus() == VipSubscription.Status.PENDING_APPROVAL)) {
+                    if (sub.getEndDate() != null && sub.getEndDate().isAfter(startDate)) {
+                        startDate = sub.getEndDate();
+                    }
+                }
+            }
             subscription.setStartDate(startDate);
             String type = subscription.getSubscriptionType() != null ? subscription.getSubscriptionType().toUpperCase()
                     : "MONTHLY";

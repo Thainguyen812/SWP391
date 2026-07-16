@@ -24,14 +24,18 @@ export const VipRegistrationModal: React.FC = () => {
     triggerToast,
     setAddVehicleModalOpen,
     setNewType,
-    setActiveTab
+    setActiveTab,
+    photoCavet,
+    setPhotoCavet,
+    photoCccd,
+    setPhotoCccd,
+    photoXe,
+    setPhotoXe,
+    extractedPlate,
+    setExtractedPlate
   } = context;
 
-  const [photoCavet, setPhotoCavet] = useState<string | null>(null);
-  const [photoCccd, setPhotoCccd] = useState<string | null>(null);
-  const [photoXe, setPhotoXe] = useState<string | null>(null);
   const [isOcrLoading, setIsOcrLoading] = useState(false);
-  const [extractedPlate, setExtractedPlate] = useState<string | null>(null);
   const [explanation, setExplanation] = useState('');
 
   const handleCheckoutValidation = () => {

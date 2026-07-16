@@ -6,36 +6,48 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class VNPayService {
 
-    private final String vnp_PayUrl = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
-    private final String vnp_ReturnUrl = "http://localhost:5173/payment-success"; // FE nhận kết quả
-    private final String vnp_TmnCode = "2QXUI4J4";
-    private final String vnp_HashSecret = "GR97B6X3H8X1Z2C3V4B5N6M7K8L9Q0W1";
+    @Value("${vnp.payurl}")
+    private String vnpPayUrl;
+
+    @Value("${vnp.returnurl}")
+    private String vnpReturnUrl;
+
+    @Value("${vnp.tmncode}")
+    private String vnpTmnCode;
+
+    @Value("${vnp.hashsecret}")
+    private String vnpHashSecret;
 
     public String createPaymentUrl(String orderId, long amount, String ipAddress) throws UnsupportedEncodingException {
+        return createPaymentUrl(orderId, amount, ipAddress, null);
+    }
+
+    public String createPaymentUrl(String orderId, long amount, String ipAddress, String customReturnUrl) throws UnsupportedEncodingException {
         String vnp_Version = "2.1.0";
         String vnp_Command = "pay";
         String vnp_OrderInfo = "Thanh toan dang ky VIP don hang:" + orderId;
         String vnp_TxnRef = orderId;
         
-        // VNPay yêu cầu số tiền nhân thêm 100 (Ví dụ: 10,000 VND phải gửi là 1000000)
+        // VNPay requires amount multiplied by 100.
         String vnp_Amount = String.valueOf(amount * 100); 
-
+ 
         Map<String, String> vnp_Params = new HashMap<>();
         vnp_Params.put("vnp_Version", vnp_Version);
         vnp_Params.put("vnp_Command", vnp_Command);
-        vnp_Params.put("vnp_TmnCode", vnp_TmnCode);
+        vnp_Params.put("vnp_TmnCode", vnpTmnCode);
         vnp_Params.put("vnp_Amount", vnp_Amount);
         vnp_Params.put("vnp_CurrCode", "VND");
         vnp_Params.put("vnp_TxnRef", vnp_TxnRef);
         vnp_Params.put("vnp_OrderInfo", vnp_OrderInfo);
         vnp_Params.put("vnp_OrderType", "other");
         vnp_Params.put("vnp_Locale", "vn");
-        vnp_Params.put("vnp_ReturnUrl", vnp_ReturnUrl);
+        vnp_Params.put("vnp_ReturnUrl", customReturnUrl != null ? customReturnUrl : vnpReturnUrl);
         vnp_Params.put("vnp_IpAddr", ipAddress);
 
         Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
@@ -59,11 +71,11 @@ public class VNPayService {
                 // Build hash data
                 hashData.append(fieldName);
                 hashData.append('=');
-                hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8.toString()));
                 // Build query
-                query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()));
+                query.append(URLEncoder.encode(fieldName, StandardCharsets.UTF_8.toString()));
                 query.append('=');
-                query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                query.append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8.toString()));
                 if (itr.hasNext()) {
                     query.append('&');
                     hashData.append('&');
@@ -71,13 +83,12 @@ public class VNPayService {
             }
         }
         String queryUrl = query.toString();
-        // Hàm băm mật mã bảo mật mã hóa SHA512 tạo vnp_SecureHash (Cần hàm helper HmacSHA512)
-        String vnp_SecureHash = hmacSHA512(vnp_HashSecret, hashData.toString());
-        queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
-        return vnp_PayUrl + "?" + queryUrl;
-    }
+        String vnp_SecureHash = hmacSHA512(vnpHashSecret, hashData.toString());
 
-    // Hàm mã hóa bảo mật SHA512 (Bạn có thể bỏ vào class Util riêng hoặc để đây)
+        queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
+        return vnpPayUrl + "?" + queryUrl;
+    }
+    // Generates secure HMAC SHA512 signature for VNPay request validation.
     private String hmacSHA512(final String key, final String data) {
         try {
             if (key == null || data == null) return null;
