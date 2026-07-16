@@ -66,14 +66,7 @@ export const StaffMobilePOS = () => {
     };
   }, [paymentMethod, backendTxn, isSuccess, vnpayUrl, vehicle]);
 
-  const stopScanner = () => {
-    if (scannerRef.current) {
-      scannerRef.current.stop().then(() => {
-        scannerRef.current.clear();
-        scannerRef.current = null;
-      }).catch(err => console.log('Error stopping scanner', err));
-    }
-
+  const stopScanner = async () => {
     const scanner = scannerRef.current;
     scannerRef.current = null;
 
