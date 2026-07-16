@@ -1537,7 +1537,13 @@ public class ParkingServiceImpl implements ParkingService {
             ParkingViolation violation = new ParkingViolation();
             violation.setSessionId(session.getId());
             violation.setViolationType("EV_ZONE_MISUSE");
-            violation.setDetectedBy(java.util.UUID.randomUUID());
+            
+            java.util.UUID detectedById = userRepository.findAll().stream()
+                .findFirst()
+                .map(com.parking.model.User::getId)
+                .orElse(java.util.UUID.randomUUID());
+            violation.setDetectedBy(detectedById);
+            
             violation.setDetectedAt(Instant.now());
             violation.setPenaltyAmount(new java.math.BigDecimal("100000"));
             violation.setSlotId(slot.getId());
