@@ -12,8 +12,134 @@ import {
   QrcodeOutlined,
   DollarOutlined
 } from '@ant-design/icons';
-import { notification, Modal, Spin, Segmented } from 'antd';
+import { notification, Modal, Spin, Segmented, Button } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
+
+import { UploadOutlined } from '@ant-design/icons';
+const CameraCaptureModal = ({ visible, onCancel, onCapture, title, captureTarget }) => {
+  const videoRef = React.useRef(null);
+  const [stream, setStream] = React.useState(null);
+  const fileInputRef = React.useRef(null);
+  
+  const isDocument = ['cccdFront', 'cccdBack', 'reg'].includes(captureTarget);
+
+  const startCamera = React.useCallback(async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      setStream(mediaStream);
+    } catch (err) {
+      console.error("Lỗi camera", err);
+    }
+  }, []);
+
+  const stopCamera = React.useCallback(() => {
+    setStream(currentStream => {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+      return null;
+    });
+  }, []);
+
+  React.useEffect(() => {
+    if (visible) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    return () => stopCamera();
+  }, [visible, startCamera, stopCamera]);
+
+  React.useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(e => console.log("Lỗi play video", e));
+    }
+  }, [stream]);
+
+  const takePhoto = (e) => {
+    let overrideStatus = 'good';
+    if (e && e.shiftKey) overrideStatus = 'invalid';
+    else if (e && e.altKey) overrideStatus = 'bad';
+
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg');
+      onCapture(dataUrl, overrideStatus);
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      // Default to good for file upload unless we want to complicate it
+      onCapture(url, 'good');
+    }
+  };
+
+  return (
+    <Modal
+      title={title || "Chụp ảnh"}
+      open={visible}
+      onCancel={onCancel}
+      footer={null}
+      destroyOnClose
+      width={isDocument ? 600 : 400}
+      centered
+    >
+      <div className="flex flex-col items-center gap-4">
+        <div className={`w-full bg-black rounded-lg overflow-hidden relative flex items-center justify-center ${isDocument ? 'aspect-[4/3]' : 'aspect-video'}`}>
+          {stream ? (
+            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+          ) : (
+            <div className="text-white text-sm">Không tìm thấy Camera hoặc đang tải...</div>
+          )}
+
+          {/* Document Overlay */}
+          {isDocument && stream && (
+            <div className="absolute inset-0 z-10 pointer-events-none flex flex-col items-center justify-center">
+              <div 
+                className="w-[85%] aspect-[1.6/1] border-2 border-white/20 relative rounded-sm"
+                style={{
+                  boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.65)'
+                }}
+              >
+                {/* Corner markers */}
+                <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-blue-500 rounded-tl"></div>
+                <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-blue-500 rounded-tr"></div>
+                <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-blue-500 rounded-bl"></div>
+                <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-blue-500 rounded-br"></div>
+              </div>
+              
+              <div className="absolute bottom-6 text-white text-center w-full px-4 drop-shadow-lg">
+                <div className="font-bold text-base mb-1 text-blue-400">
+                   {captureTarget === 'cccdFront' ? 'CHỤP MẶT TRƯỚC CCCD/CMND' : 
+                    captureTarget === 'cccdBack' ? 'CHỤP MẶT SAU CCCD/CMND' : 'CHỤP GIẤY ĐĂNG KÝ XE'}
+                </div>
+                <div className="text-sm font-medium mb-0.5 text-white/90">Vui lòng căn chỉnh giấy tờ nằm gọn trong khung</div>
+                <div className="text-xs text-white/70">Đảm bảo đủ ánh sáng, rõ nét, không bị chói lóa</div>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="flex gap-2 w-full mt-2">
+          <Button type="primary" icon={<CameraOutlined />} size="large" className="flex-1 bg-blue-600 h-12 text-base font-bold" onClick={takePhoto}>
+            Chụp ảnh
+          </Button>
+          <Button icon={<UploadOutlined />} size="large" className="h-12" onClick={() => fileInputRef.current?.click()}>
+            Tải file
+          </Button>
+          <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+        </div>
+      </div>
+    </Modal>
+  );
+};
 
 export const StaffLostCard = () => {
   const navigate = useNavigate();
@@ -42,11 +168,12 @@ export const StaffLostCard = () => {
     let sum = 0;
     const str = plate || "default";
     for(let i=0; i<str.length; i++) sum += str.charCodeAt(i);
+    const idx = sum % images.length;
     return {
-      in1: images[sum % images.length],
-      in2: images[(sum + 1) % images.length],
-      out1: images[(sum + 2) % images.length],
-      out2: images[(sum + 3) % images.length]
+      in1: images[idx],
+      in2: images[(idx + 1) % images.length],
+      out1: images[(idx + 2) % images.length],
+      out2: images[(idx + 3) % images.length]
     };
   };
 
@@ -103,7 +230,131 @@ export const StaffLostCard = () => {
   }, [foundVehicle]);
 
   const [cccdImage, setCccdImage] = useState(null);
+  const [idBackImg, setIdBackImg] = useState(null);
   const [regImage, setRegImage] = useState(null);
+
+  const [cameraModalVisible, setCameraModalVisible] = useState(false);
+  const [currentCaptureTarget, setCurrentCaptureTarget] = useState(null); // 'in1', 'in2', 'out1', 'out2', 'cccdFront', 'cccdBack', 'reg'
+  const [customImgs, setCustomImgs] = useState({});
+  const [imageQuality, setImageQuality] = useState({});
+
+  const openCamera = (target) => {
+    setCurrentCaptureTarget(target);
+    setCameraModalVisible(true);
+  };
+
+  const handleCaptureResult = (imgUrl, overrideStatus = 'good') => {
+    setCameraModalVisible(false);
+    
+    if (currentCaptureTarget === 'cccdFront') setCccdImage(imgUrl);
+    else if (currentCaptureTarget === 'cccdBack') setIdBackImg(imgUrl);
+    else if (currentCaptureTarget === 'reg') setRegImage(imgUrl);
+    else {
+      setCustomImgs(prev => ({ ...prev, [currentCaptureTarget]: imgUrl }));
+    }
+
+    if (['cccdFront', 'cccdBack', 'reg'].includes(currentCaptureTarget)) {
+      setImageQuality(prev => ({ ...prev, [currentCaptureTarget]: 'checking' }));
+      
+      // Simulate AI quality check with controlled outcome
+      setTimeout(() => {
+        const status = overrideStatus;
+        
+        setImageQuality(prev => ({ ...prev, [currentCaptureTarget]: status }));
+        
+        if (status === 'bad') {
+          notification.error({
+            message: 'Ảnh không đạt chuẩn',
+            description: 'Ảnh bị mờ hoặc lóa sáng. Vui lòng chụp lại để đảm bảo rõ nét.',
+            placement: 'topRight',
+          });
+        } else if (status === 'invalid') {
+          notification.error({
+            message: 'Sai định dạng thẻ',
+            description: 'Không phải CCCD/CMND hoặc sai mặt thẻ. Vui lòng chụp đúng loại thẻ.',
+            placement: 'topRight',
+          });
+        } else {
+          notification.success({
+            message: 'Ảnh đạt chuẩn',
+            description: 'Chất lượng hình ảnh tốt.',
+            placement: 'topRight',
+            duration: 2
+          });
+        }
+      }, 1500);
+    }
+  };
+
+  const renderImageBox = (target, image, label, icon = <CameraOutlined className="text-2xl mb-1" />) => {
+    const quality = imageQuality[target];
+    const isBad = quality === 'bad';
+    const isInvalid = quality === 'invalid';
+    const isChecking = quality === 'checking';
+    const isGood = quality === 'good';
+    const hasError = isBad || isInvalid;
+
+    return (
+        <div 
+          onClick={() => !isChecking && openCamera(target)} 
+          className={`w-full bg-slate-50 hover:bg-slate-100 border-2 ${hasError ? 'border-red-400 border-solid' : isGood ? 'border-emerald-400 border-solid' : 'border-dashed border-slate-300'} rounded-lg aspect-[2.5/1] flex flex-col items-center justify-center ${!isChecking ? 'cursor-pointer group' : ''} overflow-hidden relative transition-colors`}
+        >
+          {image ? (
+            <>
+              <img src={image} className={`w-full h-full object-cover transition-opacity ${hasError ? 'opacity-50 grayscale' : ''}`} alt={label} />
+              
+              {isChecking && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-white font-medium text-xs backdrop-blur-[2px]">
+                  <LoadingOutlined className="text-2xl mb-2" />
+                  <span>Đang kiểm tra AI...</span>
+                </div>
+              )}
+
+              {isBad && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-900/40 text-white font-medium text-xs">
+                  <div className="bg-white rounded-full p-1.5 mb-1 flex items-center justify-center shadow-lg">
+                    <WarningOutlined className="text-xl text-red-500" />
+                  </div>
+                  <span className="bg-red-500 text-white font-bold px-2 py-1 rounded shadow-md mt-1">Ảnh mờ - Nhấn chụp lại</span>
+                </div>
+              )}
+
+              {isInvalid && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-900/60 text-white font-medium text-xs">
+                  <div className="bg-white rounded-full p-1.5 mb-1 flex items-center justify-center shadow-lg">
+                    <WarningOutlined className="text-xl text-red-500" />
+                  </div>
+                  <span className="bg-red-500 text-white font-bold px-2 py-1 rounded shadow-md mt-1">Sai thẻ - Nhấn chụp lại</span>
+                </div>
+              )}
+
+              {isGood && (
+                <div className="absolute top-2 right-2 bg-emerald-50 text-emerald-600 rounded-full p-1 shadow-sm">
+                  <CheckCircleFilled />
+                </div>
+              )}
+
+              {!isChecking && !hasError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 text-white font-bold">
+                  <CameraOutlined className="text-2xl mb-1" />
+                  <span className="text-sm">Chụp lại</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className={`text-slate-400 ${!isChecking ? 'group-hover:text-blue-500 group-hover:scale-110' : ''} transition-all`}>
+                {icon}
+              </div>
+              <span className={`text-xs font-medium mt-1 px-1 text-center text-slate-400 ${!isChecking ? 'group-hover:text-blue-500' : ''} transition-colors`}>{label}</span>
+            </>
+          )}
+        </div>
+    );
+  };
+
+
+
 
   const handleSearch = () => {
     setIsSearching(true);
@@ -149,6 +400,10 @@ export const StaffLostCard = () => {
       notification.warning({ message: 'Yêu cầu chụp CCCD/CMND', description: 'Vui lòng xác minh giấy tờ tùy thân của người điều khiển trước khi xử lý.', placement: 'topRight' });
       return;
     }
+    if (imageQuality.cccdFront === 'bad' || imageQuality.cccdBack === 'bad' || imageQuality.cccdFront === 'invalid' || imageQuality.cccdBack === 'invalid') {
+      notification.warning({ message: 'Ảnh chưa đạt chuẩn', description: 'CCCD/CMND bị mờ hoặc sai thẻ, vui lòng chụp lại để đảm bảo hồ sơ hợp lệ.', placement: 'topRight' });
+      return;
+    }
 
     Modal.confirm({
       title: 'Chuyển sang Thanh toán',
@@ -173,13 +428,16 @@ export const StaffLostCard = () => {
   };
   return (
     <div className="p-6 w-full">
-      <div className="flex justify-end mb-6">
-        <div className="bg-red-50 text-red-600 border border-red-200 px-4 py-1.5 rounded text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-sm">
-          <WarningOutlined /> CẢNH BÁO MẤT THẺ
-        </div>
-      </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <CameraCaptureModal 
+        visible={cameraModalVisible}
+        onCancel={() => setCameraModalVisible(false)}
+        onCapture={handleCaptureResult}
+        title={currentCaptureTarget?.includes('in') || currentCaptureTarget?.includes('out') ? "Chụp ảnh Camera" : "Chụp ảnh Hồ sơ"}
+        captureTarget={currentCaptureTarget}
+      />
         {/* Left Column: Lookup and Image Comparison */}
         <div className="lg:col-span-8 flex flex-col gap-6">
           
@@ -249,7 +507,10 @@ export const StaffLostCard = () => {
               {/* Image 1 */}
               <div className="relative bg-slate-200 rounded-lg aspect-video flex items-center justify-center overflow-hidden border border-slate-300">
                 {foundVehicle ? (
-                  <img src={carImgs.in1} alt="Front Left" className="w-full h-full object-cover opacity-90" />
+                  <div onClick={() => openCamera('in1')} className="w-full h-full cursor-pointer group relative">
+                    <img src={customImgs.in1 || carImgs.in1} alt="Front Left" className="w-full h-full object-cover opacity-90 group-hover:opacity-70 transition-opacity" />
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 text-white font-bold"><CameraOutlined className="text-3xl" /></div>
+                  </div>
                 ) : (
                   <div className="text-slate-400 text-xs">Chưa có dữ liệu</div>
                 )}
@@ -261,7 +522,10 @@ export const StaffLostCard = () => {
               {/* Image 2 */}
               <div className="relative bg-slate-200 rounded-lg aspect-video flex items-center justify-center overflow-hidden border border-slate-300">
                 {foundVehicle ? (
-                  <img src={carImgs.in2} alt="Front Right" className="w-full h-full object-cover opacity-90" />
+                  <div onClick={() => openCamera('in2')} className="w-full h-full cursor-pointer group relative">
+                    <img src={customImgs.in2 || carImgs.in2} alt="Front Right" className="w-full h-full object-cover opacity-90 group-hover:opacity-70 transition-opacity" />
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 text-white font-bold"><CameraOutlined className="text-3xl" /></div>
+                  </div>
                 ) : (
                   <div className="text-slate-400 text-xs">Chưa có dữ liệu</div>
                 )}
@@ -273,7 +537,10 @@ export const StaffLostCard = () => {
               {/* Image 3 (LIVE) */}
               <div className="relative bg-slate-200 rounded-lg aspect-video flex items-center justify-center overflow-hidden border-2 border-red-300">
                 {foundVehicle ? (
-                  <img src={carImgs.out1} alt="Rear Left Live" className="w-full h-full object-cover opacity-90" />
+                  <div onClick={() => openCamera('out1')} className="w-full h-full cursor-pointer group relative">
+                    <img src={customImgs.out1 || carImgs.out1} alt="Rear Left Live" className="w-full h-full object-cover opacity-90 group-hover:opacity-70 transition-opacity" />
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 text-white font-bold"><CameraOutlined className="text-3xl" /></div>
+                  </div>
                 ) : (
                   <div className="text-slate-400 text-xs font-medium">Chưa có phương tiện tại cổng</div>
                 )}
@@ -286,7 +553,10 @@ export const StaffLostCard = () => {
               {/* Image 4 (LIVE) */}
               <div className="relative bg-slate-200 rounded-lg aspect-video flex items-center justify-center overflow-hidden border-2 border-red-300">
                 {foundVehicle ? (
-                  <img src={carImgs.out2} alt="Rear Right Live" className="w-full h-full object-cover opacity-90" />
+                  <div onClick={() => openCamera('out2')} className="w-full h-full cursor-pointer group relative">
+                    <img src={customImgs.out2 || carImgs.out2} alt="Rear Right Live" className="w-full h-full object-cover opacity-90 group-hover:opacity-70 transition-opacity" />
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 text-white font-bold"><CameraOutlined className="text-3xl" /></div>
+                  </div>
                 ) : (
                   <div className="text-slate-400 text-xs font-medium">Chưa có phương tiện tại cổng</div>
                 )}
@@ -309,41 +579,16 @@ export const StaffLostCard = () => {
             <p className="text-xs text-slate-500 mb-5 leading-relaxed">Yêu cầu chụp lại giấy tờ tùy thân của người điều khiển phương tiện để lưu trữ báo cáo sự cố.</p>
 
             <div className="mb-5">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">CCCD / CMND / GPLX <span className="text-red-500">*</span></label>
-              <button onClick={handleCaptureCccd} className="w-full bg-slate-50 hover:bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg aspect-[2.5/1] flex flex-col items-center justify-center text-slate-400 hover:text-blue-500 hover:border-blue-300 transition-colors cursor-pointer group overflow-hidden relative">
-                {cccdImage ? (
-                  <>
-                    <img src={cccdImage} alt="CCCD" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity font-medium text-sm gap-2">
-                      <CameraOutlined /> Chụp lại
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <CameraOutlined className="text-2xl mb-1 group-hover:scale-110 transition-transform" />
-                    <span className="text-xs font-medium mt-1">Nhấn để chụp</span>
-                  </>
-                )}
-              </button>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">CCCD / CMND / GPLX (2 MẶT) <span className="text-red-500">*</span></label>
+              <div className="grid grid-cols-2 gap-2">
+                {renderImageBox('cccdFront', cccdImage, 'Chụp mặt trước')}
+                {renderImageBox('cccdBack', idBackImg, 'Chụp mặt sau')}
+              </div>
             </div>
 
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">GIẤY ĐĂNG KÝ XE (Tùy chọn)</label>
-              <button onClick={handleCaptureReg} className="w-full bg-slate-50 hover:bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg aspect-[2.5/1] flex flex-col items-center justify-center text-slate-400 hover:text-blue-500 hover:border-blue-300 transition-colors cursor-pointer group overflow-hidden relative">
-                {regImage ? (
-                  <>
-                    <img src={regImage} alt="Đăng ký xe" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity font-medium text-sm gap-2">
-                      <CameraOutlined /> Chụp lại
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <CameraOutlined className="text-2xl mb-1 group-hover:scale-110 transition-transform" />
-                    <span className="text-xs font-medium mt-1">Nhấn để chụp</span>
-                  </>
-                )}
-              </button>
+              {renderImageBox('reg', regImage, 'Nhấn để chụp')}
             </div>
           </div>
 
