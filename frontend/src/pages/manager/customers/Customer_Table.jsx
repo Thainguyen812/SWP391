@@ -59,6 +59,11 @@ export const CustomerTable = ({ customers, loading, onOpenVipApproval }) => {
                   {c.type === 'VIP' && <span className="bg-[#041627] dark:bg-blue-900 text-white text-xs px-2 py-0.5 rounded font-medium">VIP</span>}
                   {c.type === 'Tháng' && <span className="text-gray-600 dark:text-gray-300 text-sm">Tháng</span>}
                   {c.type === 'Guest' && <span className="bg-gray-100 dark:bg-slate-600 text-gray-600 dark:text-gray-300 text-xs px-2 py-0.5 rounded">Guest</span>}
+                  {!['VIP', 'ThÃ¡ng', 'Guest'].includes(c.type) && (
+                    <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs px-2 py-0.5 rounded">
+                      {c.type === 'Registered' ? 'Registered' : c.type || 'Customer'}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-4">
                   {c.status === 'ACTIVE' && (

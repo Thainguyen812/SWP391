@@ -41,6 +41,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.Duration;
 
 import java.math.BigDecimal;// task 5
 
@@ -340,6 +341,9 @@ public class ParkingServiceImpl implements ParkingService {
             Vehicle vehicle = vehicleOpt.get();
             session.setVehicleId(vehicle.getId());
             session.setIsLocked(vehicle.isLocked());
+        }
+        if (pendingEntry.getAssignedZoneId() != null) {
+            session.setAssignedZoneId(pendingEntry.getAssignedZoneId());
         }
 
         Zone zone = ensureApprovedZone(session, vehicleType);
@@ -927,10 +931,44 @@ public class ParkingServiceImpl implements ParkingService {
         Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
                 .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay thong tin xe de tinh phi qua han"));
 
-        return this.calculateParkingFeeSafe(
+        return this.calculateParkingFeeByElapsedBlocks(
                 vehicle.getVehicleSize(),
                 expireTime,
                 checkOutTime);
+    }
+
+    private BigDecimal calculateParkingFeeByElapsedBlocks(String vehicleSize, Instant checkIn, Instant checkOut) {
+        PricingRule pricingRule = pricingRuleRepository
+                .findFirstByVehicleSizeAndIsActiveTrueOrderByEffectiveFromDesc(vehicleSize)
+                .orElseThrow(() -> new ApiExceptions.NotFoundException(
+                        "Khong tim thay bang gia he thong phu hop cho loai xe: " + vehicleSize));
+
+        long seconds = Duration.between(checkIn, checkOut).getSeconds();
+        if (seconds <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        long totalHours = Math.max(1, (seconds + 3599) / 3600);
+        long fullDays = totalHours / 24;
+        long remainingHours = totalHours % 24;
+
+        BigDecimal firstHourFee = zeroIfNull(pricingRule.getFirstHourFee());
+        BigDecimal additionalHourFee = zeroIfNull(pricingRule.getAdditionalHourFee());
+        BigDecimal maxDailyFee = zeroIfNull(pricingRule.getMaxDailyFee());
+
+        BigDecimal total = maxDailyFee.multiply(BigDecimal.valueOf(fullDays));
+        if (remainingHours > 0) {
+            BigDecimal partialFee = firstHourFee;
+            if (remainingHours > 1) {
+                partialFee = partialFee.add(additionalHourFee.multiply(BigDecimal.valueOf(remainingHours - 1)));
+            }
+            if (maxDailyFee.compareTo(BigDecimal.ZERO) > 0) {
+                partialFee = partialFee.min(maxDailyFee);
+            }
+            total = total.add(partialFee);
+        }
+
+        return total;
     }
 
     private Transaction decorateMobileCheckoutWindow(
@@ -1344,7 +1382,8 @@ public class ParkingServiceImpl implements ParkingService {
             zoneRepository.findById(slot.getZoneId()).ifPresent(zone -> {
                 map.put("zoneCode", zone.getCode());
                 map.put("zoneName", zone.getZoneName());
-                map.put("allowedVehicleTypes", formatAllowedVehicleTypes(zone.getAllowedSizes()));
+                map.put("allowedSizes", allowedVehicleSizeCodes(zone));
+                map.put("allowedVehicleTypes", formatAllowedVehicleTypes(zone));
             });
 
             parkingSessionRepository
@@ -1356,7 +1395,9 @@ public class ParkingServiceImpl implements ParkingService {
                         map.put("isVip", session.getIsVip());
                         map.put("slotPhotoUrl", session.getSlotPhotoUrl());
                         vehicleRepository.findByLicensePlate(session.getLicensePlate()).ifPresent(vehicle -> {
-                            map.put("vehicleType", vehicle.getVehicleSize());
+                            map.put("vehicleType", normalizeVehicleSize(vehicle.getVehicleSize()));
+                            map.put("vehicleTypeLabel", vehicleSizeLabel(vehicle.getVehicleSize()));
+                            map.put("fuelType", vehicle.getFuelType());
                         });
                     });
             result.add(map);
@@ -1364,14 +1405,141 @@ public class ParkingServiceImpl implements ParkingService {
         return result;
     }
 
-    private List<String> formatAllowedVehicleTypes(String allowedSizes) {
+    private List<String> allowedVehicleSizeCodes(Zone zone) {
+        if (zone == null || zone.getCode() == null) {
+            return java.util.List.of("SEDAN_HATCHBACK");
+        }
+        String code = zone.getCode().trim().toUpperCase();
+        return switch (code) {
+            case "F1" -> java.util.List.of("SEDAN_HATCHBACK");
+            case "F2" -> java.util.List.of("SUV_CUV_MPV");
+            case "B1", "G" -> java.util.List.of("LARGE_VAN_MINIBUS");
+            default -> parseAllowedSizeCodes(zone.getAllowedSizes());
+        };
+    }
+
+    private List<String> parseAllowedSizeCodes(String allowedSizes) {
         if (allowedSizes == null || allowedSizes.isBlank()) {
             return new java.util.ArrayList<>();
         }
-        return java.util.Arrays.stream(allowedSizes.split(","))
+        String sanitized = allowedSizes
+                .replace("[", "")
+                .replace("]", "")
+                .replace("\"", "")
+                .replace("'", "");
+        return java.util.Arrays.stream(sanitized.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
+                .map(this::normalizeVehicleSize)
+                .filter(size -> !"EV_CAR".equals(size))
+                .distinct()
                 .collect(java.util.stream.Collectors.toList());
+    }
+
+    private List<String> formatAllowedVehicleTypes(Zone zone) {
+        return allowedVehicleSizeCodes(zone).stream()
+                .map(this::vehicleSizeLabel)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    private String normalizeVehicleSize(String value) {
+        String normalized = value == null ? "" : value.trim().toUpperCase();
+        if (normalized.contains("SUV") || normalized.contains("CUV") || normalized.contains("MPV")
+                || normalized.contains("7") || normalized.contains("9")) {
+            return "SUV_CUV_MPV";
+        }
+        if (normalized.contains("LARGE") || normalized.contains("VAN") || normalized.contains("MINIBUS")
+                || normalized.contains("BUS") || normalized.contains("TRUCK") || normalized.contains("12")
+                || normalized.contains("16")) {
+            return "LARGE_VAN_MINIBUS";
+        }
+        if (normalized.contains("EV")) {
+            return "SEDAN_HATCHBACK";
+        }
+        return "SEDAN_HATCHBACK";
+    }
+
+    private String vehicleSizeLabel(String value) {
+        return switch (normalizeVehicleSize(value)) {
+            case "SUV_CUV_MPV" -> "Xe 7-9 chỗ";
+            case "LARGE_VAN_MINIBUS" -> "Xe lớn";
+            default -> "Xe 4-5 chỗ";
+        };
+    }
+
+    private boolean isVehicleAllowedInZone(String vehicleSize, Zone zone) {
+        return allowedVehicleSizeCodes(zone).contains(normalizeVehicleSize(vehicleSize));
+    }
+
+    private boolean isEvSlot(ParkingSlot slot) {
+        String slotType = slot.getSlotType() != null ? slot.getSlotType().trim().toUpperCase() : "";
+        return "EV".equals(slotType) || (slot.getEvChargerId() != null && !slot.getEvChargerId().isBlank());
+    }
+
+    private boolean isGasolineVehicle(Vehicle vehicle) {
+        String fuelType = vehicle != null && vehicle.getFuelType() != null
+                ? vehicle.getFuelType().trim().toUpperCase()
+                : "GASOLINE";
+        return !"ELECTRIC".equals(fuelType);
+    }
+
+    private java.util.Map<String, Object> createSensorViolationIfAbsent(
+            ParkingSession session,
+            Vehicle vehicle,
+            ParkingSlot slot,
+            String violationType,
+            String notes,
+            String imageUrl) {
+        if (session == null || vehicle == null || slot == null) {
+            return null;
+        }
+        if (parkingViolationRepository.existsBySessionIdAndViolationType(session.getId(), violationType)) {
+            return null;
+        }
+
+        UUID detectedBy = session.getOverrideByStaff();
+        if (detectedBy == null) {
+            detectedBy = userRepository.findAll().stream()
+                    .filter(user -> user.getRole() == User.Role.STAFF
+                            || user.getRole() == User.Role.MANAGER
+                            || user.getRole() == User.Role.ADMIN)
+                    .map(User::getId)
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (detectedBy == null) {
+            return null;
+        }
+
+        long historyViolations = parkingViolationRepository.countByVehicleId(vehicle.getId());
+        boolean firstViolation = historyViolations == 0;
+
+        ParkingViolation violation = new ParkingViolation();
+        violation.setSessionId(session.getId());
+        violation.setSlotId(slot.getId());
+        violation.setViolationType(violationType);
+        violation.setDetectedBy(detectedBy);
+        violation.setDetectedAt(Instant.now());
+        violation.setFirstViolation(firstViolation);
+        violation.setPenaltyApplied(false);
+        violation.setPenaltyAmount(BigDecimal.ZERO);
+        violation.setStatus("PENDING");
+        violation.setNotes(notes);
+        violation.setPhotoUrls(imageUrl != null && !imageUrl.isBlank()
+                ? "[\"" + imageUrl.replace("\"", "") + "\"]"
+                : "[]");
+        ParkingViolation saved = parkingViolationRepository.save(violation);
+
+        vehicle.setViolationCount(firstViolation ? 1 : vehicle.getViolationCount() + 1);
+        vehicleRepository.save(vehicle);
+
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("id", saved.getId());
+        result.put("type", saved.getViolationType());
+        result.put("firstViolation", saved.isFirstViolation());
+        result.put("penaltyAmount", saved.getPenaltyAmount());
+        result.put("notes", saved.getNotes());
+        return result;
     }
 
     @Override
@@ -1402,8 +1570,8 @@ public class ParkingServiceImpl implements ParkingService {
             map.put("zoneId", zone.getId());
             map.put("zoneCode", zone.getCode());
             map.put("zoneName", zone.getZoneName());
-            map.put("allowedSizes", zone.getAllowedSizes());
-            map.put("allowedVehicleTypes", formatAllowedVehicleTypes(zone.getAllowedSizes()));
+            map.put("allowedSizes", allowedVehicleSizeCodes(zone));
+            map.put("allowedVehicleTypes", formatAllowedVehicleTypes(zone));
             map.put("totalSlots", zone.getTotalSlots());
             map.put("currentOccupied", zone.getCurrentOccupied());
             map.put("availableSlots", Math.max(0, zone.getTotalSlots() - zone.getCurrentOccupied()));
@@ -1428,6 +1596,8 @@ public class ParkingServiceImpl implements ParkingService {
 
         ParkingSlot slot = slotRepository.findById(request.getSlotId())
                 .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay o do"));
+        Zone slotZone = zoneRepository.findById(slot.getZoneId())
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay tang cua o do"));
 
         boolean occupied = request.getOccupied() == null || request.getOccupied();
         java.util.Map<String, Object> response = new java.util.HashMap<>();
@@ -1459,6 +1629,8 @@ public class ParkingServiceImpl implements ParkingService {
         ParkingSession session = parkingSessionRepository
                 .findByLicensePlateAndSessionStatus(plate, ParkingSession.SessionStatus.ACTIVE)
                 .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay session ACTIVE cua bien so nay"));
+        Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
+                .orElse(null);
 
         parkingSessionRepository
                 .findByParkedSlotIdAndSessionStatus(slot.getId(), ParkingSession.SessionStatus.ACTIVE)
@@ -1487,11 +1659,54 @@ public class ParkingServiceImpl implements ParkingService {
         parkingSessionRepository.save(session);
 
         boolean zoneMismatch = session.getAssignedZoneId() != null && !session.getAssignedZoneId().equals(slot.getZoneId());
+        String observedVehicleType = request.getVehicleType() != null && !request.getVehicleType().isBlank()
+                ? request.getVehicleType()
+                : (vehicle != null ? vehicle.getVehicleSize() : null);
+        boolean vehicleTypeMismatch = !isVehicleAllowedInZone(observedVehicleType, slotZone);
+        boolean evMisuse = isEvSlot(slot) && isGasolineVehicle(vehicle);
+        java.util.List<java.util.Map<String, Object>> createdViolations = new java.util.ArrayList<>();
+
+        if (zoneMismatch || vehicleTypeMismatch) {
+            java.util.Map<String, Object> violation = createSensorViolationIfAbsent(
+                    session,
+                    vehicle,
+                    slot,
+                    "DOUBLE_PARKING",
+                    "Sensor phát hiện xe đỗ sai tầng/khu vực. Biển số " + session.getLicensePlate()
+                            + ", loại xe " + vehicleSizeLabel(observedVehicleType)
+                            + ", khu vực hiện tại " + slotZone.getCode(),
+                    request.getImageUrl());
+            if (violation != null) {
+                createdViolations.add(violation);
+            }
+        }
+
+        if (evMisuse) {
+            java.util.Map<String, Object> violation = createSensorViolationIfAbsent(
+                    session,
+                    vehicle,
+                    slot,
+                    "EV_ZONE_MISUSE",
+                    "Sensor phát hiện xe xăng/dầu đỗ vào ô sạc điện " + slot.getSlotNumber(),
+                    request.getImageUrl());
+            if (violation != null) {
+                createdViolations.add(violation);
+            }
+        }
+
         response.put("sessionId", session.getId());
         response.put("licensePlate", session.getLicensePlate());
         response.put("slotStatus", slot.getSlotStatus());
-        response.put("zoneMismatch", zoneMismatch);
-        response.put("message", zoneMismatch ? "SENSOR_SLOT_RECORDED_ZONE_MISMATCH" : "SENSOR_SLOT_RECORDED");
+        response.put("zoneCode", slotZone.getCode());
+        response.put("allowedVehicleTypes", formatAllowedVehicleTypes(slotZone));
+        response.put("vehicleType", normalizeVehicleSize(observedVehicleType));
+        response.put("vehicleTypeLabel", vehicleSizeLabel(observedVehicleType));
+        response.put("fuelType", vehicle != null ? vehicle.getFuelType() : null);
+        response.put("zoneMismatch", zoneMismatch || vehicleTypeMismatch);
+        response.put("evMisuse", evMisuse);
+        response.put("violationCreated", !createdViolations.isEmpty());
+        response.put("violations", createdViolations);
+        response.put("message", !createdViolations.isEmpty() ? "SENSOR_SLOT_RECORDED_WITH_VIOLATION" : "SENSOR_SLOT_RECORDED");
         return response;
     }
 

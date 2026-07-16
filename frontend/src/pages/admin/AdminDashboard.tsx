@@ -69,6 +69,10 @@ import {
 
 import { VipApprovalPanel } from './VipApprovalPanel';
 import { ParkingMonitorView } from './ParkingMonitorView';
+import { RevenuePage } from '../manager/revenue/Revenue_Main';
+import { PersonnelMain } from '../manager/personnel/Personnel_Main';
+import { CustomerPage } from '../manager/customers/Customer_Main';
+import { apiClient } from '../../api/apiClient';
 
 interface DashboardProps {
   user: {
@@ -877,6 +881,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
           {/* BOTTOM RAIL BUTTONS */}
           <div className="space-y-3 pt-6 border-t border-[#14233c] mt-8">
             {/* Added facility trigger */}
+            {false && (
             <button 
               onClick={() => {
                 const name = `Bãi Xe Phụ ${Math.floor(Math.random() * 100)}`;
@@ -889,6 +894,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
               <Plus className="w-4 h-4 stroke-[3]" />
               <span>Thêm cơ sở mới</span>
             </button>
+            )}
 
             <button 
               onClick={() => {
@@ -1017,6 +1023,12 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                 </div>
 
                 {/* SEGMENT BRANCH TABS ("Cơ sở 01", "Cơ sở 02", "Toàn hệ thống") */}
+                <div className="flex items-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-300">
+                  <MapPin className="h-4 w-4" />
+                  <span>Vincom Center - 1 cơ sở duy nhất</span>
+                </div>
+
+                {false && (
                 <div className="flex bg-slate-100 dark:bg-[#030712] p-1 rounded-2xl gap-1 items-center shrink-0">
                   {[
                     { id: 'cs1', label: 'Cơ sở 01' },
@@ -1042,6 +1054,8 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                     );
                   })}
                 </div>
+
+                )}
 
                 {/* RIGHT BUTTONS GROUP */}
                 <div className="flex items-center gap-4 ml-auto">
@@ -1124,7 +1138,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
           {/* ACTIVE CONTENT WORKSPACE */}
           <div className="p-6 lg:p-8 flex-1 overflow-y-auto space-y-8">
             
-            {['revenue', 'staff', 'technical', 'security', 'system_log'].includes(activeMenu) && user?.role !== 'ADMIN' ? (
+            {['technical', 'security', 'system_log'].includes(activeMenu) && user?.role !== 'ADMIN' ? (
               <div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-xl mx-auto space-y-6 animate-fade-in">
                 <div className="p-5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full animate-bounce">
                   <Shield className="w-12 h-12 stroke-[1.5]" />
@@ -1667,6 +1681,9 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                 setShowFloorDropdown={setShowFloorDropdown}
               />
             )}
+            {activeMenu === 'revenue' && <RevenuePage />}
+            {activeMenu === 'staff' && <PersonnelMain />}
+            {activeMenu === 'customers' && <CustomerPage />}
             {(activeMenu as string) === 'monitoring_DEPRECATED' && (
               <div className="space-y-6 animate-fade-in" id="monitoring-sub-view">
                 
@@ -2299,7 +2316,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
             )}
 
             {/* SUB-VIEW 3: DOANH THU & VAT DIGITAL E-RECEIPTS (Screenshot 3 Replication) */}
-            {activeMenu === 'revenue' && (
+            {(activeMenu as string) === 'revenue_DEPRECATED' && (
               <div className="space-y-6 animate-fade-in" id="revenue-sub-view">
                 
                 {/* HEADER ROW WITH FACILITIES AND SELECTORS */}
@@ -2544,7 +2561,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
             )}
 
             {/* SUB-VIEW 4: QUAN LY NHAN SỰ RASTER (Screenshot 5 Replication) */}
-            {activeMenu === 'staff' && (
+            {(activeMenu as string) === 'staff_DEPRECATED' && (
               <div className="space-y-6 animate-fade-in text-left" id="staff-sub-view">
                 
                 {/* HEADER SUBTITLE AND CONTROLS */}
@@ -2927,7 +2944,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
             )}
 
             {/* SUB-VIEW 5: VIP VERIFICATION PANEL INTEGRATION & CUSTOMER MANAGEMENT TABLE (Screenshot 4 Replication) */}
-            {activeMenu === 'customers' && (
+            {(activeMenu as string) === 'customers_DEPRECATED' && (
               <div className="space-y-6 animate-fade-in text-left" id="customers-sub-view">
                 
                 {/* DUAL-TAB SEGMENT HEADERS */}
@@ -4194,7 +4211,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
         {/* MODAL ADD BRANCH DIALOG */}
         <AnimatePresence>
-          {showAddBranchModal && (
+          {false && showAddBranchModal && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
               <div className={`w-full max-w-sm rounded-[24px] p-6 border text-slate-850 ${isDarkMode ? 'bg-[#0f172a] border-slate-850 text-white' : 'bg-white border-slate-200'}`}>
                 <div className="space-y-4 block text-left font-sans text-xs">

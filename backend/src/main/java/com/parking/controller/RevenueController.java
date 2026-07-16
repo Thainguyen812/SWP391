@@ -1,22 +1,38 @@
 package com.parking.controller;
 
-import com.parking.model.Transaction;
 import com.parking.model.ParkingSession;
-import com.parking.repository.TransactionRepository;
+import com.parking.model.Transaction;
 import com.parking.repository.ParkingSessionRepository;
-
+import com.parking.repository.TransactionRepository;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/revenue")
 public class RevenueController {
+
+    private static final ZoneId APP_ZONE = ZoneId.systemDefault();
+    private static final DateTimeFormatter DATE_LABEL = DateTimeFormatter.ofPattern("dd/MM");
+    private static final DateTimeFormatter DATE_TIME_LABEL = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy")
+            .withZone(APP_ZONE);
 
     private final TransactionRepository transactionRepo;
     private final ParkingSessionRepository sessionRepo;
@@ -27,51 +43,90 @@ public class RevenueController {
     }
 
     @GetMapping("/summary")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public Map<String, Object> getSummary(@RequestParam(required = false) String month) {
-        List<Transaction> transactions = transactionRepo.findAll();
-        double total = transactions.stream()
-                .mapToDouble(t -> t.getTotalAmount() != null ? t.getTotalAmount().doubleValue() : 0.0)
-                .sum();
+        List<Transaction> successTransactions = successfulTransactions();
+        LocalDate today = LocalDate.now(APP_ZONE);
+        YearMonth currentMonth = YearMonth.from(today);
+
+        BigDecimal todayTotal = sum(successTransactions.stream()
+                .filter(t -> today.equals(transactionDate(t)))
+                .toList());
+        BigDecimal monthTotal = sum(successTransactions.stream()
+                .filter(t -> currentMonth.equals(transactionMonth(t)))
+                .toList());
+        BigDecimal yearTotal = sum(successTransactions.stream()
+                .filter(t -> transactionDate(t) != null && transactionDate(t).getYear() == today.getYear())
+                .toList());
 
         Map<String, Object> response = new HashMap<>();
-        response.put("today", Map.of("value", String.format("%.1fK", total / 1000), "trend", "+5.2% so với hôm qua",
+        response.put("today", Map.of(
+                "value", compactMoney(todayTotal),
+                "trend", "Doanh thu hôm nay",
                 "isPositive", true));
-        response.put("thisMonth", Map.of("value", String.format("%.1fM", total * 30 / 1000000), "trend",
-                "+2.1% so với tháng trước", "isPositive", true));
-        response.put("projectedYear",
-                Map.of("value", String.format("%.1fB", total * 365 / 1000000000), "subtitle", "Đạt 85% KPI"));
+        response.put("thisMonth", Map.of(
+                "value", compactMoney(monthTotal),
+                "trend", "Tháng " + today.getMonthValue() + "/" + today.getYear(),
+                "isPositive", true));
+        response.put("projectedYear", Map.of(
+                "value", compactMoney(yearTotal),
+                "subtitle", "Doanh thu thực tế năm " + today.getYear()));
         return response;
     }
 
     @GetMapping("/charts")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public Map<String, Object> getCharts(@RequestParam(required = false) String month) {
+        List<Transaction> successTransactions = successfulTransactions();
+        LocalDate today = LocalDate.now(APP_ZONE);
+        LocalDate start = today.minusDays(13);
 
-        // Lấy doanh thu theo ngày
-        List<Object[]> rows = transactionRepo.getRevenueByDay();
-
-        List<Map<String, Object>> barData = new ArrayList<>();
-
-        for (Object[] row : rows) {
-
-            Map<String, Object> item = new HashMap<>();
-
-            item.put("date", row[0].toString());
-            item.put("revenue", row[1]);
-
-            barData.add(item);
+        Map<LocalDate, BigDecimal> byDate = new LinkedHashMap<>();
+        for (LocalDate day = start; !day.isAfter(today); day = day.plusDays(1)) {
+            byDate.put(day, BigDecimal.ZERO);
+        }
+        for (Transaction transaction : successTransactions) {
+            LocalDate date = transactionDate(transaction);
+            if (date != null && !date.isBefore(start) && !date.isAfter(today)) {
+                byDate.put(date, byDate.get(date).add(amount(transaction)));
+            }
         }
 
-        BigDecimal totalRevenue = transactionRepo.sumTotalRevenueByStatus(
-                Transaction.PaymentStatus.SUCCESS);
+        List<Map<String, Object>> barData = new ArrayList<>();
+        byDate.forEach((date, value) -> {
+            Map<String, Object> item = new HashMap<>();
+            item.put("name", DATE_LABEL.format(date));
+            item.put("date", DATE_LABEL.format(date));
+            item.put("value", value);
+            item.put("revenue", value);
+            barData.add(item);
+        });
 
-        // Tạm giữ biểu đồ tròn
-        List<Map<String, Object>> pieData = Arrays.asList(
-                Map.of("type", "Ô tô", "value", 60),
-                Map.of("type", "Xe máy", "value", 40));
+        Map<String, BigDecimal> byTicketType = new LinkedHashMap<>();
+        byTicketType.put("Vãng lai", BigDecimal.ZERO);
+        byTicketType.put("VIP", BigDecimal.ZERO);
+        for (Transaction transaction : successTransactions) {
+            String type = sessionRepo.findById(transaction.getSessionId())
+                    .map(session -> Boolean.TRUE.equals(session.getIsVip()) ? "VIP" : "Vãng lai")
+                    .orElse("Vãng lai");
+            byTicketType.put(type, byTicketType.getOrDefault(type, BigDecimal.ZERO).add(amount(transaction)));
+        }
 
-        // Tổng doanh thu thật
+        BigDecimal totalRevenue = sum(successTransactions);
+        List<Map<String, Object>> pieData = new ArrayList<>();
+        String[] colors = { "#1677ff", "#10b981" };
+        int colorIndex = 0;
+        for (Map.Entry<String, BigDecimal> entry : byTicketType.entrySet()) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("name", entry.getKey());
+            item.put("type", entry.getKey());
+            item.put("value", entry.getValue());
+            item.put("color", colors[colorIndex++ % colors.length]);
+            item.put("percent", totalRevenue.signum() == 0 ? 0
+                    : entry.getValue().multiply(BigDecimal.valueOf(100)).divide(totalRevenue, 0, java.math.RoundingMode.HALF_UP));
+            pieData.add(item);
+        }
+
         Map<String, Object> response = new HashMap<>();
         response.put("barData", barData);
         response.put("pieData", pieData);
@@ -80,149 +135,117 @@ public class RevenueController {
     }
 
     @GetMapping("/transactions")
-    @PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
     public Map<String, Object> getTransactions(@RequestParam(defaultValue = "1") int page) {
+        List<Transaction> transactions = transactionRepo
+                .findAll(Sort.by(Sort.Direction.DESC, "processedAt"))
+                .stream()
+                .filter(t -> Transaction.PaymentStatus.SUCCESS.equals(t.getPaymentStatus()))
+                .sorted(Comparator.comparing(Transaction::getProcessedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+
         List<Map<String, Object>> items = new ArrayList<>();
-        List<Transaction> transactions = transactionRepo.findAll(org.springframework.data.domain.Sort
-                .by(org.springframework.data.domain.Sort.Direction.DESC, "processedAt"));
-        for (Transaction t : transactions) {
+        for (Transaction transaction : transactions) {
+            Optional<ParkingSession> sessionOpt = sessionRepo.findById(transaction.getSessionId());
             Map<String, Object> item = new HashMap<>();
-            item.put("id", t.getId().toString().substring(0, 8));
-            item.put("time", t.getProcessedAt() != null ? t.getProcessedAt().toString() : "Hôm nay");
-
-            // Fetch associated ParkingSession for plate and type
-            if (t.getSessionId() != null) {
-                Optional<ParkingSession> session = sessionRepo.findById(t.getSessionId());
-                if (session.isPresent()) {
-                    item.put("plate", session.get().getLicensePlate());
-                    item.put("type", session.get().getIsVip() != null && session.get().getIsVip() ? "VIP" : "Vãng lai");
-                    if (session.get().getCheckInTime() != null) {
-                        item.put("inTime", session.get().getCheckInTime().toString());
-                    }
-                    if (session.get().getCheckOutTime() != null) {
-                        item.put("outTime", session.get().getCheckOutTime().toString());
-                    }
-                } else {
-                    item.put("plate", "---");
-                    item.put("type", "Phương tiện");
-                }
-            } else {
-                item.put("plate", "---");
-                item.put("type", "Khách vãng lai");
-            }
-
-            item.put("amount", t.getTotalAmount() != null ? t.getTotalAmount().toString() + "đ" : "0đ");
-            item.put("method", t.getPaymentMethod() != null ? t.getPaymentMethod().name() : "TIỀN MẶT");
-            item.put("status", t.getPaymentStatus() != null ? t.getPaymentStatus().name() : "THÀNH CÔNG");
+            item.put("id", "#TRX-" + transaction.getId().toString().substring(0, 8).toUpperCase());
+            item.put("time", transaction.getProcessedAt() != null
+                    ? DATE_TIME_LABEL.format(transaction.getProcessedAt())
+                    : "Chưa ghi nhận");
+            item.put("plate", sessionOpt.map(ParkingSession::getLicensePlate).orElse("---"));
+            item.put("type", sessionOpt
+                    .map(session -> Boolean.TRUE.equals(session.getIsVip()) ? "Vé tháng (VIP)" : "Ô tô - Vãng lai")
+                    .orElse("Phương tiện"));
+            item.put("amount", formatMoney(amount(transaction)));
+            item.put("method", paymentMethodLabel(transaction.getPaymentMethod()));
+            item.put("status", "Thành công");
+            item.put("statusCode", "SUCCESS");
             items.add(item);
         }
+
         Map<String, Object> response = new HashMap<>();
         response.put("total", items.size());
         response.put("items", items);
         return response;
     }
 
-    @PostMapping("/transactions/mock")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
-    @Transactional
-    public Map<String, Object> mockTransaction(@RequestBody Map<String, Object> payload) {
-        String plate = Optional.ofNullable(payload.get("plate"))
-                .map(Object::toString)
-                .map(String::trim)
-                .filter(value -> !value.isEmpty())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Thiếu biển số xe cần thanh toán"));
-
-        ParkingSession session = sessionRepo
-                .findByLicensePlateAndSessionStatus(plate, ParkingSession.SessionStatus.ACTIVE)
-                .or(() -> sessionRepo.findByLicensePlateAndSessionStatus(plate, ParkingSession.SessionStatus.LOST_CARD))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Không tìm thấy phiên ACTIVE/LOST_CARD của xe " + plate));
-
-        BigDecimal totalAmount = BigDecimal.ZERO;
-        if (payload.get("amount") != null) {
-            String amountText = payload.get("amount").toString()
-                    .replace("VND", "")
-                    .replace("vnd", "")
-                    .replace("đ", "")
-                    .replace(",", "")
-                    .trim();
-            if (!amountText.isEmpty()) {
-                totalAmount = new BigDecimal(amountText);
-            }
-        }
-        BigDecimal lostCardPenalty = BigDecimal.ZERO;
-        if (payload.get("lostCardPenalty") != null) {
-            String penaltyText = payload.get("lostCardPenalty").toString()
-                    .replace("VND", "")
-                    .replace("vnd", "")
-                    .replace("đ", "")
-                    .replace(",", "")
-                    .trim();
-            if (!penaltyText.isEmpty()) {
-                lostCardPenalty = new BigDecimal(penaltyText);
-            }
-        }
-        BigDecimal parkingFee = totalAmount.subtract(lostCardPenalty);
-        if (parkingFee.signum() < 0) {
-            parkingFee = BigDecimal.ZERO;
-        }
-
-        session.setSessionStatus(ParkingSession.SessionStatus.COMPLETED);
-        session.setCheckOutTime(java.time.Instant.now());
-        sessionRepo.save(session);
-
-        Transaction transaction = transactionRepo.findBySessionId(session.getId())
-                .orElseGet(() -> {
-                    Transaction created = new Transaction();
-                    created.setId(UUID.randomUUID());
-                    created.setSessionId(session.getId());
-                    return created;
-                });
-
-        transaction.setParkingFee(parkingFee);
-        transaction.setLostCardPenalty(lostCardPenalty);
-        transaction.setViolationPenalty(BigDecimal.ZERO);
-        transaction.setTotalAmount(totalAmount);
-        transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
-        transaction.setPaymentStatus(Transaction.PaymentStatus.SUCCESS);
-        transaction.setProcessedAt(java.time.Instant.now());
-        transaction.setIsMobileCheckout(false);
-
-        Transaction saved = transactionRepo.save(transaction);
-        return Map.of("success", true, "transactionId", saved.getId());
-    }
-
     @GetMapping("/shift-stats")
-    @PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
     public Map<String, Object> getShiftStats() {
-        List<Transaction> transactions = transactionRepo.findAll();
-        // Lấy các giao dịch trong ngày hôm nay (giả lập ca hiện tại)
-        java.time.LocalDate today = java.time.LocalDate.now();
-        List<Transaction> shiftTxns = transactions.stream()
-                .filter(t -> t.getProcessedAt() != null
-                        && t.getProcessedAt().atZone(java.time.ZoneId.systemDefault()).toLocalDate().equals(today))
+        LocalDate today = LocalDate.now(APP_ZONE);
+        List<Transaction> shiftTransactions = successfulTransactions().stream()
+                .filter(t -> today.equals(transactionDate(t)))
                 .toList();
 
-        double revenue = 0;
-        double cash = 0;
-        double transfer = 0;
-
-        for (Transaction t : shiftTxns) {
-            double amount = t.getTotalAmount() != null ? t.getTotalAmount().doubleValue() : 0.0;
-            revenue += amount;
-            if (Transaction.PaymentMethod.CASH.equals(t.getPaymentMethod())) {
-                cash += amount;
-            } else {
-                transfer += amount;
-            }
-        }
+        BigDecimal cash = sum(shiftTransactions.stream()
+                .filter(t -> Transaction.PaymentMethod.CASH.equals(t.getPaymentMethod()))
+                .toList());
+        BigDecimal transfer = sum(shiftTransactions.stream()
+                .filter(t -> !Transaction.PaymentMethod.CASH.equals(t.getPaymentMethod()))
+                .toList());
+        BigDecimal revenue = cash.add(transfer);
 
         Map<String, Object> response = new HashMap<>();
         response.put("revenue", revenue);
         response.put("cash", cash);
         response.put("transfer", transfer);
-        response.put("transactions", shiftTxns.size());
-
+        response.put("transactions", shiftTransactions.size());
         return response;
+    }
+
+    private List<Transaction> successfulTransactions() {
+        return transactionRepo.findAll().stream()
+                .filter(t -> Transaction.PaymentStatus.SUCCESS.equals(t.getPaymentStatus()))
+                .toList();
+    }
+
+    private BigDecimal sum(List<Transaction> transactions) {
+        return transactions.stream()
+                .map(this::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal amount(Transaction transaction) {
+        return transaction.getTotalAmount() != null ? transaction.getTotalAmount() : BigDecimal.ZERO;
+    }
+
+    private LocalDate transactionDate(Transaction transaction) {
+        Instant processedAt = transaction.getProcessedAt();
+        return processedAt == null ? null : processedAt.atZone(APP_ZONE).toLocalDate();
+    }
+
+    private YearMonth transactionMonth(Transaction transaction) {
+        LocalDate date = transactionDate(transaction);
+        return date == null ? null : YearMonth.from(date);
+    }
+
+    private String compactMoney(BigDecimal amount) {
+        long value = amount.longValue();
+        if (value >= 1_000_000_000L) {
+            return String.format("%.1fB", value / 1_000_000_000.0);
+        }
+        if (value >= 1_000_000L) {
+            return String.format("%.1fM", value / 1_000_000.0);
+        }
+        if (value >= 1_000L) {
+            return String.format("%.1fK", value / 1_000.0);
+        }
+        return value + "đ";
+    }
+
+    private String formatMoney(BigDecimal amount) {
+        return String.format("%,d", amount.longValue()).replace(',', '.') + "đ";
+    }
+
+    private String paymentMethodLabel(Transaction.PaymentMethod method) {
+        if (method == null) {
+            return "Không xác định";
+        }
+        return switch (method) {
+            case CASH -> "Tiền mặt";
+            case VNPAY_SANDBOX -> "VNPAY Sandbox";
+            case MOMO_SANDBOX -> "MoMo Sandbox";
+            case QR_BANK -> "VietQR";
+        };
     }
 }

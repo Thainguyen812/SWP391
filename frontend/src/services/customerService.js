@@ -9,11 +9,11 @@ export const customerService = {
   // Lấy danh sách khách hàng từ backend
   getCustomers: async (filter = 'all') => {
     const response = await apiClient.get('/customers');
-    const realData = response.data;
+    const realData = Array.isArray(response) ? response : [];
     
     let filtered = realData;
     if (filter === 'month') {
-      filtered = realData.filter(c => c.type === 'Tháng');
+      filtered = realData.filter(c => c.type === 'Registered' || c.type === 'Driver');
     } else if (filter === 'vip') {
       filtered = realData.filter(c => c.type === 'VIP' && c.status === 'ACTIVE');
     } else if (filter === 'pending') {
