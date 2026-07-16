@@ -1,52 +1,40 @@
-/* global firebase */
-importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js');
+self.addEventListener('push', (event) => {
+  let payload = {};
 
-const isUsableConfig = (config) =>
-  config &&
-  config.apiKey &&
-  config.projectId &&
-  config.messagingSenderId &&
-  config.appId;
-
-fetch('/firebase-config.json', { cache: 'no-store' })
-  .then((response) => (response.ok ? response.json() : {}))
-  .then((config) => {
-    const firebaseConfig = config.firebase || config;
-    if (!isUsableConfig(firebaseConfig)) {
-      console.warn('[FCM_SW] Missing Firebase web config. Background push is disabled.');
-      return;
-    }
-
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
-
-    const messaging = firebase.messaging();
-    messaging.onBackgroundMessage((payload) => {
-      const title = payload.notification?.title || payload.data?.title || 'UrbanPark';
-      const options = {
-        body: payload.notification?.body || payload.data?.body || '',
-        icon: '/favicon.svg',
-        badge: '/favicon.svg',
-        data: payload.data || {}
+  if (event.data) {
+    try {
+      payload = event.data.json();
+    } catch (error) {
+      payload = {
+        notification: {
+          title: 'UrbanPark',
+          body: event.data.text()
+        }
       };
+    }
+  }
 
-      self.registration.showNotification(title, options);
-    });
-  })
-  .catch((error) => {
-    console.warn('[FCM_SW] Firebase background messaging initialization failed.', error);
-  });
+  const notification = payload.notification || {};
+  const data = payload.data || {};
+  const title = notification.title || data.title || 'UrbanPark';
+  const options = {
+    body: notification.body || data.body || '',
+    icon: '/favicon.svg',
+    badge: '/favicon.svg',
+    data
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if ('focus' in client) return client.focus();
       }
-      if (clients.openWindow) return clients.openWindow('/driver');
+      if (self.clients.openWindow) return self.clients.openWindow('/driver');
       return undefined;
     })
   );
