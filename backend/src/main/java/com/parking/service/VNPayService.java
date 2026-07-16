@@ -18,17 +18,17 @@ public class VNPayService {
     @Value("${vnp.returnurl:http://localhost:5173/payment-success}")
     private String vnp_ReturnUrl;
 
-    @Value("${vnp.tmncode:2QXUI4J4}")
+    @Value("${vnp.tmncode:CGXZLS0Z}")
     private String vnp_TmnCode;
 
-    @Value("${vnp.hashsecret:GR97B6X3H8X1Z2C3V4B5N6M7K8L9Q0W1}")
+    @Value("${vnp.hashsecret:XNBCJFAKAZQSGTARRLGCHVZWCIOIGSHN}")
     private String vnp_HashSecret;
 
     public String createPaymentUrl(String orderId, long amount, String ipAddress) throws UnsupportedEncodingException {
         String vnp_Version = "2.1.0";
         String vnp_Command = "pay";
         String vnp_OrderInfo = "Thanh toan dang ky VIP don hang:" + orderId;
-        String vnp_TxnRef = orderId;
+        String vnp_TxnRef = orderId + "_" + System.currentTimeMillis();
 
         // VNPay yêu cầu số tiền nhân thêm 100 (Ví dụ: 10,000 VND phải gửi là 1000000)
         String vnp_Amount = String.valueOf(amount * 100);
@@ -46,8 +46,9 @@ public class VNPayService {
         vnp_Params.put("vnp_ReturnUrl", vnp_ReturnUrl);
         vnp_Params.put("vnp_IpAddr", ipAddress);
 
-        Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
+        Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
         SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
+        formatter.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
         String vnp_CreateDate = formatter.format(cld.getTime());
         vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
 

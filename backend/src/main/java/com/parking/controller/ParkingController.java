@@ -98,7 +98,7 @@ public class ParkingController {
                 parkingService.confirmCheckout(transactionId));
     }
 
-    @PostMapping("/checkout-by-code/{cardCode}")
+    @PostMapping("/checkout-by-code/{cardCode:.+}")
     @PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
     public ResponseEntity<Transaction> checkoutByCode(
             @PathVariable String cardCode) {

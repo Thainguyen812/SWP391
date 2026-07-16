@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { logService } from '../../services/logService';
 import { useGlobalContext } from '../../context/GlobalContext';
 import { apiClient } from '../../api/apiClient';
+import { getVehicleImageByPlate } from '../../utils/vehicleImages';
 
 export const StaffDashboard = () => {
   const navigate = useNavigate();
@@ -698,19 +699,32 @@ export const StaffDashboard = () => {
           <button key="cancel" onClick={() => setIsViolationModalVisible(false)} className="px-4 py-2 border border-slate-300 rounded hover:bg-slate-50 mr-2 text-slate-700 cursor-pointer">Hủy bỏ</button>,
           <button 
             key="submit" 
-            onClick={() => {
+            onClick={async () => {
               if(!violationPlate) {
                 notification.error({ message: 'Lỗi', description: 'Vui lòng nhập biển số xe vi phạm', placement: 'topRight' });
                 return;
               }
-              notification.success({ 
-                message: 'Đã gửi bộ phận An ninh', 
-                description: `Hệ thống đã đưa xe ${violationPlate} vào Blacklist và đẩy cảnh báo trực tiếp sang màn hình của đội An ninh.`, 
-                placement: 'topRight' 
-              });
-              setIsViolationModalVisible(false);
               const submittedPlate = violationPlate;
               const submittedReason = violationReason;
+              const isEV = submittedReason.includes('Sạc') || submittedReason.includes('EV');
+
+              try {
+                await apiClient.post('/v1/violations', {
+                  licensePlate: submittedPlate,
+                  violationType: isEV ? 'EV_ZONE_MISUSE' : 'DOUBLE_PARKING',
+                  notes: submittedReason
+                });
+                notification.success({ 
+                  message: 'Thành công', 
+                  description: `Đã ghi nhận lỗi cho xe ${submittedPlate}. Phí phạt sẽ tự động cộng vào hóa đơn Checkout.`, 
+                  placement: 'topRight' 
+                });
+              } catch (e) {
+                notification.error({ message: 'Lỗi', description: 'Ghi nhận lỗi thất bại. Hãy thử lại.' });
+                return;
+              }
+
+              setIsViolationModalVisible(false);
               setViolationPlate('');
               
               const matchedVehicle = activeVehicles?.find(v => v.plate === submittedPlate);

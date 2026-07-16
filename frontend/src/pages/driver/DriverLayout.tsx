@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
+import { getVehicleImageByPlate } from '../../utils/vehicleImages';
   Home, 
   Car, 
   Calendar, 
@@ -128,7 +129,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   // ----------------------------------------------------
   const [activeTab, setActiveTab] = useState<'home' | 'driver_pnl' | 'vehicles' | 'vip_reg' | 'billing' | 'settings' | 'support'>('driver_pnl');
   const [isOffline, setIsOffline] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'vnpay'>('wallet');
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'vnpay' | 'momo' | 'bank'>('wallet');
   const [balance, setBalance] = useState<number>(() => {
     const saved = localStorage.getItem(`urbanpark_user_balance_${user?.username || 'default'}`);
     return saved ? parseFloat(saved) : 0; // Default to 0 for new users
@@ -454,6 +455,10 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   const [vnpayOtp, setVnpayOtp] = useState('');
   const [vnpayModalOpen, setVnpayModalOpen] = useState(false);
   const [vnpayStep, setVnpayStep] = useState<'info' | 'otp' | 'success'>('info');
+  const [momoModalOpen, setMomoModalOpen] = useState(false);
+  const [momoStep, setMomoStep] = useState<'qr' | 'success'>('qr');
+  const [bankModalOpen, setBankModalOpen] = useState(false);
+  const [bankStep, setBankStep] = useState<'info' | 'success'>('info');
 
   // Alarm & Security Breach state
   const [isSirenMuted, setIsSirenMuted] = useState(false);
@@ -978,6 +983,260 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   };
 
   // Checkout VIP flow
+  const handleStartBank = async () => {
+    if (isOffline) {
+      triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
+      return;
+    }
+    const isTopUp = selectedPackLabel.includes('Nạp tiền');
+    if (isTopUp) {
+      setBankStep('info');
+      setBankModalOpen(true);
+    } else {
+      if (!selectedVehicleForVIP || selectedVehicleForVIP === '') {
+        triggerToast('Vui lòng chọn biển số xe để đăng ký VIP.', 'error');
+        return;
+      }
+      setBankStep('info');
+      setBankModalOpen(true);
+    }
+  };
+
+  const handleSimulateBankTransfer = async () => {
+    if (isOffline) {
+      triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
+      return;
+    }
+    setBankStep('success');
+
+    const isTopUp = selectedPackLabel.includes('Nạp tiền');
+    if (isTopUp) {
+      setBalance(prev => prev + selectedPackPrice);
+      const newTx: TransactionItem = {
+        id: `txn-${Date.now()}`,
+        date: 'Vừa xong',
+        type: 'Nạp ví qua CK Ngân hàng',
+        plate: '-',
+        fee: `+$${selectedPackPrice.toFixed(2)}`,
+        isEntry: true,
+        status: 'Thành công'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+      triggerToast(`Nạp thành công $${selectedPackPrice.toFixed(2)} vào ví điện tử!`, 'success');
+    } else {
+      const formattedPrice = selectedPackPrice.toLocaleString('vi-VN') + '₫';
+      const newTx: TransactionItem = {
+        id: `txn-${Date.now()}`,
+        date: 'Vừa xong',
+        type: `Đăng kí ${selectedPackLabel}`,
+        plate: selectedVehicleForVIP,
+        fee: `-${formattedPrice}`,
+        isEntry: false,
+        status: 'Thành công'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+      
+      const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
+      let expiryDate = new Date();
+      if (targetVeh && targetVeh.activeSubscription && targetVeh.subscriptionExpiry) {
+        const [day, month, year] = targetVeh.subscriptionExpiry.split('/');
+        const currentExp = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        if (currentExp > new Date()) expiryDate = currentExp;
+      }
+      if (selectedPackLabel.includes('Tháng')) expiryDate.setMonth(expiryDate.getMonth() + 1);
+      else if (selectedPackLabel.includes('Quý')) expiryDate.setMonth(expiryDate.getMonth() + 3);
+      else if (selectedPackLabel.includes('Năm')) expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      else expiryDate.setDate(expiryDate.getDate() + 1);
+
+      const expiryString = expiryDate.toLocaleDateString('vi-VN');
+
+      let subType = 'MONTHLY';
+      if (selectedPackLabel.includes('Vé Ngày')) subType = 'DAILY';
+      else if (selectedPackLabel.includes('Quý')) subType = 'QUARTERLY';
+      else if (selectedPackLabel.includes('Năm')) subType = 'YEARLY';
+
+      const tempId = `sub-${Date.now()}`;
+      const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+      const docPhotos = (window as any).lastUploadedPhotos?.photos || [];
+      const newSub = {
+        id: tempId,
+        vehicle_plate: selectedVehicleForVIP,
+        type: selectedPackLabel,
+        startDate: new Date().toLocaleDateString('vi-VN'),
+        endDate: expiryString,
+        status: (selectedPackLabel.includes('Vé Ngày') || selectedPackLabel.includes('Ngày')) ? 'ACTIVE' : 'PENDING_APPROVAL',
+        document_photos: docPhotos,
+        explanation: (window as any).lastUploadedPhotos?.explanation || ''
+      };
+      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify([newSub, ...savedSubs]));
+      window.dispatchEvent(new Event('storage'));
+
+      try {
+        apiClient.post('/vip/register', {
+          vehicleId: targetVeh ? targetVeh.id : null,
+          licensePlate: selectedVehicleForVIP,
+          subscriptionType: subType,
+          documentPhotos: JSON.stringify(docPhotos)
+        }).then(response => {
+          const data = response.data;
+          if (data && data.id) {
+            const currentSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+            const updated = currentSubs.map((s: any) => s.id === tempId ? { ...s, id: data.id } : s);
+            localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updated));
+            window.dispatchEvent(new Event('storage'));
+          }
+        }).catch(err => console.warn("Backend VIP registration failed:", err));
+      } catch (err) {
+        console.error("Lỗi khi đăng ký VIP:", err);
+      }
+
+      setRegStep(3);
+      triggerToast(
+        (selectedPackLabel.includes('Vé Ngày') || selectedPackLabel.includes('Ngày'))
+          ? "✨ Đã kích hoạt vé ngày thành công cho xe " + selectedVehicleForVIP + "!"
+          : "✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe " + selectedVehicleForVIP + ".",
+        'success'
+      );
+    }
+  };
+
+  const handleCloseBank = () => {
+    setBankModalOpen(false);
+    if (bankStep === 'success') {
+      if (selectedPackLabel.includes('Nạp tiền')) {
+        setSelectedPackLabel('');
+        setSelectedPackPrice(0);
+      }
+    }
+  };
+
+  const handleStartMomo = async () => {
+    if (isOffline) {
+      triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
+      return;
+    }
+    const isTopUp = selectedPackLabel.includes('Nạp tiền');
+    if (isTopUp) {
+      setMomoStep('qr');
+      setMomoModalOpen(true);
+    } else {
+      if (!selectedVehicleForVIP || selectedVehicleForVIP === '') {
+        triggerToast('Vui lòng chọn biển số xe để đăng ký VIP.', 'error');
+        return;
+      }
+      setMomoStep('qr');
+      setMomoModalOpen(true);
+    }
+  };
+
+  const handleSimulateMomoScan = async () => {
+    if (isOffline) {
+      triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
+      return;
+    }
+    setMomoStep('success');
+
+    const isTopUp = selectedPackLabel.includes('Nạp tiền');
+    if (isTopUp) {
+      setBalance(prev => prev + selectedPackPrice);
+      const newTx: TransactionItem = {
+        id: `txn-${Date.now()}`,
+        date: 'Vừa xong',
+        type: 'Nạp ví MoMo',
+        plate: '-',
+        fee: `+$${selectedPackPrice.toFixed(2)}`,
+        isEntry: true,
+        status: 'Thành công'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+      triggerToast(`Nạp thành công $${selectedPackPrice.toFixed(2)} vào ví điện tử!`, 'success');
+    } else {
+      const formattedPrice = selectedPackPrice.toLocaleString('vi-VN') + '₫';
+      const newTx: TransactionItem = {
+        id: `txn-${Date.now()}`,
+        date: 'Vừa xong',
+        type: `Đăng kí ${selectedPackLabel}`,
+        plate: selectedVehicleForVIP,
+        fee: `-${formattedPrice}`,
+        isEntry: false,
+        status: 'Thành công'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+      
+      const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
+      let expiryDate = new Date();
+      if (targetVeh && targetVeh.activeSubscription && targetVeh.subscriptionExpiry) {
+        const [day, month, year] = targetVeh.subscriptionExpiry.split('/');
+        const currentExp = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        if (currentExp > new Date()) expiryDate = currentExp;
+      }
+      if (selectedPackLabel.includes('Tháng')) expiryDate.setMonth(expiryDate.getMonth() + 1);
+      else if (selectedPackLabel.includes('Quý')) expiryDate.setMonth(expiryDate.getMonth() + 3);
+      else if (selectedPackLabel.includes('Năm')) expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      else expiryDate.setDate(expiryDate.getDate() + 1);
+
+      const expiryString = expiryDate.toLocaleDateString('vi-VN');
+
+      let subType = 'MONTHLY';
+      if (selectedPackLabel.includes('Vé Ngày')) subType = 'DAILY';
+      else if (selectedPackLabel.includes('Quý')) subType = 'QUARTERLY';
+      else if (selectedPackLabel.includes('Năm')) subType = 'YEARLY';
+
+      const tempId = `sub-${Date.now()}`;
+      const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+      const docPhotos = (window as any).lastUploadedPhotos?.photos || [];
+      const newSub = {
+        id: tempId,
+        vehicle_plate: selectedVehicleForVIP,
+        type: selectedPackLabel,
+        startDate: new Date().toLocaleDateString('vi-VN'),
+        endDate: expiryString,
+        status: (selectedPackLabel.includes('Vé Ngày') || selectedPackLabel.includes('Ngày')) ? 'ACTIVE' : 'PENDING_APPROVAL',
+        document_photos: docPhotos,
+        explanation: (window as any).lastUploadedPhotos?.explanation || ''
+      };
+      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify([newSub, ...savedSubs]));
+      window.dispatchEvent(new Event('storage'));
+
+      try {
+        apiClient.post('/vip/register', {
+          vehicleId: targetVeh ? targetVeh.id : null,
+          licensePlate: selectedVehicleForVIP,
+          subscriptionType: subType,
+          documentPhotos: JSON.stringify(docPhotos)
+        }).then(response => {
+          const data = response.data;
+          if (data && data.id) {
+            const currentSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+            const updated = currentSubs.map((s: any) => s.id === tempId ? { ...s, id: data.id } : s);
+            localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updated));
+            window.dispatchEvent(new Event('storage'));
+          }
+        }).catch(err => console.warn("Backend VIP registration failed:", err));
+      } catch (err) {
+        console.error("Lỗi khi đăng ký VIP:", err);
+      }
+
+      setRegStep(3);
+      triggerToast(
+        (selectedPackLabel.includes('Vé Ngày') || selectedPackLabel.includes('Ngày'))
+          ? "✨ Đã kích hoạt vé ngày thành công cho xe " + selectedVehicleForVIP + "!"
+          : "✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe " + selectedVehicleForVIP + ".",
+        'success'
+      );
+    }
+  };
+
+  const handleCloseMomo = () => {
+    setMomoModalOpen(false);
+    if (momoStep === 'success') {
+      if (selectedPackLabel.includes('Nạp tiền')) {
+        setSelectedPackLabel('');
+        setSelectedPackPrice(0);
+      }
+    }
+  };
+
   const handleStartVnpay = async () => {
     if (isOffline) {
       triggerToast('Lỗi: Không thể đăng ký Thẻ Tháng VIP ở chế độ Ngoại tuyến!', 'error');
@@ -1493,6 +1752,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               vnpayCardNo, setVnpayCardNo, vnpayCardHolder, setVnpayCardHolder,
               vnpayOtp, setVnpayOtp, vnpayModalOpen, setVnpayModalOpen,
               vnpayStep, setVnpayStep, isSirenMuted, setIsSirenMuted,
+              momoModalOpen, setMomoModalOpen, momoStep, setMomoStep,
               isAlertOverlayShown, setIsAlertOverlayShown, profileName, setProfileName,
               profilePhone, setProfilePhone, isPhoneVerified, setIsPhoneVerified, profileEmail, setProfileEmail,
               profileAddress, setProfileAddress, is2faEnabled, setIs2faEnabled,
@@ -1737,6 +1997,208 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       </AnimatePresence>
 
       {/* ==================================================== */}
+      {/* 5. MODAL ELEMENT: INTERACTIVE SANDBOX BANK TRANSFER */}
+      <AnimatePresence>
+        {bankModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 font-sans"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden relative border border-slate-100"
+            >
+              <div className="bg-blue-700 px-6 py-5 text-white flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0">
+                    <span className="text-blue-700 font-black text-xs font-mono tracking-tight text-center leading-[0.9]">VIET<br/>QR</span>
+                  </div>
+                  <div className="text-left font-sans">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-200 leading-none block">THANH TOÁN</span>
+                    <strong className="text-sm font-black leading-none block mt-0.5">CHUYỂN KHOẢN NGÂN HÀNG</strong>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleCloseBank}
+                  className="p-1 text-blue-200 hover:text-white bg-white/10 hover:bg-white/20 rounded-full cursor-pointer"
+                >
+                  <X className="w-4.5 h-4.5" />
+                </button>
+              </div>
+
+              {bankStep === 'info' && (
+                <div className="p-6 space-y-5 text-xs text-left font-sans">
+                  <div className="bg-slate-50 border border-slate-200/50 rounded-2xl p-4 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-semibold">Ngân hàng:</span>
+                      <strong className="text-slate-800 font-extrabold uppercase bg-white px-2 py-1 border border-slate-200 rounded">MB Bank - Ngân hàng Quân Đội</strong>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-semibold">Chủ tài khoản:</span>
+                      <strong className="text-slate-800 font-extrabold bg-slate-100 px-2 py-1 rounded">CONG TY URBANPARK</strong>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-semibold">Số tài khoản:</span>
+                      <strong className="text-blue-600 font-black text-sm bg-blue-50 px-2 py-1 rounded">99998888</strong>
+                    </div>
+                    <div className="flex justify-between border-t border-dashed border-slate-200 mt-2 pt-3 items-center">
+                      <span className="text-slate-600 font-black text-xs">SỐ TIỀN THANH TOÁN:</span>
+                      <strong className="text-blue-700 font-black text-lg font-mono">
+                        {selectedPackPrice.toLocaleString('vi-VN')} ₫
+                      </strong>
+                    </div>
+                    <div className="flex flex-col bg-amber-50 p-3 border border-amber-200 rounded-xl mt-2">
+                       <span className="text-amber-800 font-semibold mb-1">Nội dung chuyển khoản (BẮT BUỘC):</span>
+                       <strong className="text-amber-900 font-black font-mono text-center text-sm uppercase">UPARK {selectedVehicleForVIP || 'NAPTIEN'}</strong>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center py-2">
+                    <div className="p-2 border-4 border-blue-600 rounded-2xl mb-2 bg-white relative">
+                       <QrCode className="w-32 h-32 text-blue-600 opacity-90" />
+                       <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="bg-white p-1 rounded shadow-sm border border-blue-100">
+                             <span className="text-blue-700 font-black text-[9px] font-mono tracking-tight text-center leading-[1]">VIET<br/>QR</span>
+                          </div>
+                       </div>
+                    </div>
+                    <p className="text-slate-500 font-medium text-center">Quét mã QR qua ứng dụng Ngân hàng của bạn.</p>
+                  </div>
+
+                  <button
+                    onClick={handleSimulateBankTransfer}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-black text-sm uppercase tracking-wide cursor-pointer transition-all active:scale-95 flex justify-center items-center gap-2 shadow-lg shadow-blue-600/20"
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                    Giả lập: Đã chuyển khoản thành công
+                  </button>
+                </div>
+              )}
+
+              {bankStep === 'success' && (
+                <div className="p-8 flex flex-col items-center justify-center text-center space-y-4 font-sans">
+                  <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center border-4 border-emerald-50 mb-2">
+                    <CheckCircle className="w-10 h-10 text-emerald-500" />
+                  </div>
+                  <h3 className="text-2xl font-black text-slate-800 tracking-tight">Xác nhận chuyển khoản!</h3>
+                  <p className="text-slate-500 text-sm font-medium leading-relaxed max-w-sm">
+                    Giao dịch trị giá <strong className="text-slate-700">{selectedPackPrice.toLocaleString('vi-VN')} ₫</strong> đã được hệ thống ghi nhận.
+                  </p>
+                  
+                  <button
+                    onClick={handleCloseBank}
+                    className="w-full bg-slate-800 hover:bg-slate-900 text-white py-3.5 rounded-xl font-bold text-sm mt-6 cursor-pointer transition-all active:scale-95"
+                  >
+                    Đóng cửa sổ
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* 5. MODAL ELEMENT: INTERACTIVE SANDBOX MOMO PAYOUT */}
+      <AnimatePresence>
+        {momoModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 font-sans"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden relative border border-slate-100"
+            >
+              <div className="bg-[#a50064] px-6 py-5 text-white flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0">
+                    <span className="text-[#a50064] font-black text-xs font-mono tracking-tight">MoMo</span>
+                  </div>
+                  <div className="text-left font-sans">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-pink-200 leading-none block">VÍ ĐIỆN TỬ</span>
+                    <strong className="text-sm font-black leading-none block mt-0.5">MOMO SANDBOX KERNEL</strong>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleCloseMomo}
+                  className="p-1 text-pink-200 hover:text-white bg-white/10 hover:bg-white/20 rounded-full cursor-pointer"
+                >
+                  <X className="w-4.5 h-4.5" />
+                </button>
+              </div>
+
+              {momoStep === 'qr' && (
+                <div className="p-6 space-y-5 text-xs text-left font-sans">
+                  <div className="bg-slate-50 border border-slate-200/50 rounded-2xl p-4 space-y-2.5">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-semibold">Nhà cung cấp:</span>
+                      <strong className="text-slate-800 font-extrabold uppercase">CÔNG TY CPDV CÔNG NGHỆ URBANPARK</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 font-semibold">Gói dịch vụ:</span>
+                      <strong className="text-slate-800 font-extrabold">{selectedPackLabel}</strong>
+                    </div>
+                    <div className="flex justify-between border-t border-dashed border-slate-200 mt-2 pt-2">
+                      <span className="text-slate-600 font-black text-xs">SỐ TIỀN CẦN THANH TOÁN:</span>
+                      <strong className="text-[#a50064] font-black text-base font-mono">
+                        {selectedPackPrice.toLocaleString('vi-VN')} ₫
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center py-6">
+                    <div className="p-2 border-4 border-[#a50064] rounded-2xl mb-4 bg-white relative">
+                       <QrCode className="w-40 h-40 text-[#a50064] opacity-80" />
+                       <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="bg-white p-2 rounded-lg shadow">
+                             <span className="text-[#a50064] font-black text-xs font-mono tracking-tight">MoMo</span>
+                          </div>
+                       </div>
+                    </div>
+                    <p className="text-slate-500 font-medium text-center">Sử dụng Ứng dụng MoMo Sandbox để quét mã QR.</p>
+                  </div>
+
+                  <button
+                    onClick={handleSimulateMomoScan}
+                    className="w-full bg-[#a50064] hover:bg-[#80004d] text-white py-3.5 rounded-xl font-black text-sm uppercase tracking-wide cursor-pointer transition-all active:scale-95 flex justify-center items-center gap-2"
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                    Giả lập Khách đã quét QR xong
+                  </button>
+                </div>
+              )}
+
+              {momoStep === 'success' && (
+                <div className="p-8 flex flex-col items-center justify-center text-center space-y-4 font-sans">
+                  <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center border-4 border-emerald-50 mb-2">
+                    <CheckCircle className="w-10 h-10 text-emerald-500" />
+                  </div>
+                  <h3 className="text-2xl font-black text-slate-800 tracking-tight">Thanh toán MoMo thành công!</h3>
+                  <p className="text-slate-500 text-sm font-medium leading-relaxed max-w-sm">
+                    Giao dịch trị giá <strong className="text-slate-700">{selectedPackPrice.toLocaleString('vi-VN')} ₫</strong> đã được ghi nhận an toàn vào hệ thống UrbanPark.
+                  </p>
+                  
+                  <button
+                    onClick={handleCloseMomo}
+                    className="w-full bg-slate-800 hover:bg-slate-900 text-white py-3.5 rounded-xl font-bold text-sm mt-6 cursor-pointer transition-all active:scale-95"
+                  >
+                    Đóng cửa sổ
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 5. MODAL ELEMENT: INTERACTIVE SANDBOX VNPAY PAYOUT */}
       {/* ==================================================== */}
       <AnimatePresence>

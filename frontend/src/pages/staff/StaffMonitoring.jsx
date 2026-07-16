@@ -9,6 +9,7 @@ import {
 import { notification, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useGlobalContext } from '../../context/GlobalContext';
+import { getVehicleImageByPlate } from '../../utils/vehicleImages';
 
 export const StaffMonitoring = () => {
   const navigate = useNavigate();

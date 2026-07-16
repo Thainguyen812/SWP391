@@ -26,7 +26,7 @@ public class IPNController {
     private final TransactionRepository transactionRepo;
     private final ParkingService parkingService;
     private final VNPayService vnPayService;
-    private final String vnp_HashSecret = "GR97B6X3H8X1Z2C3V4B5N6M7K8L9Q0W1"; // Trùng với Service nhé
+    private final String vnp_HashSecret = "XNBCJFAKAZQSGTARRLGCHVZWCIOIGSHN"; // Trùng với Service nhé
 
     public IPNController(VipSubscriptionRepository vipRepo, TransactionRepository transactionRepo, ParkingService parkingService, VNPayService vnPayService) {
         this.vipRepo = vipRepo;
@@ -102,7 +102,8 @@ public class IPNController {
             }
 
             // 2. Lấy thông tin đơn hàng từ VNPay gửi về
-            String orderIdStr = requestParams.get("vnp_TxnRef");
+            String txnRef = requestParams.get("vnp_TxnRef");
+            String orderIdStr = txnRef.contains("_") ? txnRef.split("_")[0] : txnRef;
             String vnp_ResponseCode = requestParams.get("vnp_ResponseCode");
 
             UUID orderId = UUID.fromString(orderIdStr);

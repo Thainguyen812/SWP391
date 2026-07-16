@@ -12,6 +12,7 @@ import { notification, Modal, Dropdown, Input, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../api/apiClient';
 import { useGlobalContext } from '../../context/GlobalContext';
+import { getVehicleImageByPlate } from '../../utils/vehicleImages';
 
 export const StaffGateControl = () => {
   const navigate = useNavigate();
@@ -112,7 +113,7 @@ export const StaffGateControl = () => {
   const [aiPlate, setAiPlate] = useState('30G-123.45');
   const [aiConfidence, setAiConfidence] = useState(98.5);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
-  const [aiImagePreview, setAiImagePreview] = useState('https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80');
+  const [aiImagePreview, setAiImagePreview] = useState(getVehicleImageByPlate('51A-999.99'));
 
   const handleAiImageUpload = (e) => {
     const file = e.target.files[0];
@@ -230,9 +231,19 @@ export const StaffGateControl = () => {
       setManualCardCode('');
     } catch (err) {
       console.error(err);
-      const errorMsg = err.response?.data?.message || err.response?.data?.error || 'Không thể check-in lúc này';
-      notification.error({ message: 'Thất bại', description: errorMsg });
-      addLog(`[ERROR] Check-in thất bại: ${errorMsg}`, 'ERROR');
+      if (err.response?.data?.error === 'VEHICLE_LOCKED') {
+        notification.error({
+          message: '🚨 CẢNH BÁO BẢO MẬT 🚨',
+          description: `Phát hiện xe đang khóa cố tình vượt cổng ra! Hệ thống đã kích hoạt báo động.`,
+          duration: 0,
+          style: { backgroundColor: '#fef2f2', border: '2px solid #ef4444' }
+        });
+        addLog(`[SECURITY_ALERT] Xe bị khóa cố tình vượt trạm!`, 'ERROR');
+      } else {
+        const errorMsg = err.response?.data?.message || err.response?.data?.error || 'Không thể check-in lúc này';
+        notification.error({ message: 'Thất bại', description: errorMsg });
+        addLog(`[ERROR] Check-in thất bại: ${errorMsg}`, 'ERROR');
+      }
     } finally {
       setIsCheckingIn(false);
     }
@@ -333,7 +344,7 @@ export const StaffGateControl = () => {
         vehicle_type: aiVehicleType,
         camera_id: "CAM-01-IN",
         confidence_score: parsedConfidence,
-        image_url: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80'
+        image_url: getVehicleImageByPlate(newVehicle.licensePlate)
       });
       const payload = response?.data || response;
       
@@ -1044,7 +1055,7 @@ export const StaffGateControl = () => {
 
                   return (
                     <div key={displayGate.id} className="relative rounded overflow-hidden aspect-[16/9] bg-slate-900 border border-blue-500 shadow-md ring-2 ring-blue-500">
-                      <img src={displayVehicle.image || "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80"} alt={`Cam ${displayGate.id}`} className="w-full h-full object-cover opacity-80" />
+                      <img src={getVehicleImageByPlate(displayVehicle.licensePlate)} alt={`Cam ${displayGate.id}`} className="w-full h-full object-cover opacity-80" />
                       <div className="absolute top-2 left-2 bg-black/70 text-white text-[9px] font-bold px-2 py-1 rounded backdrop-blur-sm flex items-center gap-1.5">
                         <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></div>
                         CAM - {displayGate.id}

@@ -31,7 +31,7 @@ public class Application {
                 for (String line : lines) {
                     line = line.trim();
                     if (line.isEmpty() || line.startsWith("#")) {
-                        continue;
+                        continue;  
                     }
                     int eqIdx = line.indexOf('=');
                     if (eqIdx > 0) {

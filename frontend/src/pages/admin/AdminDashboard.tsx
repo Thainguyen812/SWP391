@@ -72,6 +72,7 @@ import { ParkingMonitorView } from './ParkingMonitorView';
 import { adminService } from '../../services/adminService';
 import { parkingService } from '../../services/parkingService';
 import { apiClient } from '../../api/apiClient';
+import { getVehicleImageByPlate } from '../../utils/vehicleImages';
 
 interface DashboardProps {
   user: {

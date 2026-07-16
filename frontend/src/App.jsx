@@ -75,33 +75,7 @@ const LegacyAdminWrapper = () => {
 };
 
 const RootRedirect = () => {
-  if (import.meta.env.DEV) {
-    // Dev Mode Quick Access Hub
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 font-sans">
-        <div className="max-w-md w-full space-y-6">
-          <div className="text-center space-y-2">
-            <h1 className="text-2xl font-bold text-white">Dev Mode 🚀</h1>
-            <p className="text-slate-400 text-sm">Backend đang tắt. Chọn giao diện bạn muốn xem:</p>
-          </div>
-          <div className="grid gap-3">
-            <button onClick={() => window.location.href='/admin'} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-4 rounded-xl shadow-lg transition-all text-sm cursor-pointer">
-              Giao diện Admin (Quản lý)
-            </button>
-            <button onClick={() => window.location.href='/staff-dashboard'} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-4 rounded-xl shadow-lg transition-all text-sm cursor-pointer">
-              Giao diện Nhân viên Bảo vệ
-            </button>
-            <button onClick={() => window.location.href='/driver'} className="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold py-4 rounded-xl shadow-lg transition-all text-sm cursor-pointer">
-              Giao diện Khách hàng (PWA)
-            </button>
-            <button onClick={() => window.location.href='/login'} className="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-4 rounded-xl shadow-lg transition-all text-sm border border-slate-700 cursor-pointer">
-              Xem lại trang Đăng nhập
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+
 
   const isAuthenticated = authService.isAuthenticated();
   const user = authService.getUser();
@@ -166,6 +140,7 @@ function App() {
         {/* Protected Routes */}
         
         {/* Nhóm Quản trị */}
+        <Route path="/manager" element={<Navigate to="/overview" replace />} />
         <Route path="/overview" element={
           <ProtectedPage allowedRoles={managementRoles}><SystemOverviewSection /></ProtectedPage>
         } />

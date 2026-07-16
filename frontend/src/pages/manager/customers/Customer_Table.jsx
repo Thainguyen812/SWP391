@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Pagination } from 'antd';
 import { EditOutlined, HistoryOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
-export const CustomerTable = ({ customers, loading, onOpenVipApproval }) => {
+export const CustomerTable = ({ customers = [], loading, onOpenVipApproval }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 4;
 

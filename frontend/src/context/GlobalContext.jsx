@@ -26,26 +26,7 @@ export const GlobalProvider = ({ children }) => {
   const [recentlyProcessed, setRecentlyProcessed] = useState([]); // [{plate, action}] // Hide plates temporarily to prevent flashing
   
   // Security Alerts & Stats (Initially Empty)
-  const [securityAlerts, setSecurityAlerts] = useState([
-    {
-      id: 'AL-BL-' + Date.now(),
-      plate: '51F-888.88',
-      type: 'BIỂN SỐ ĐEN',
-      reason: 'Xe bị báo mất cắp, có yêu cầu giữ xe từ cơ quan chức năng.',
-      time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      status: 'new',
-      isManual: true
-    },
-    {
-      id: 'AL-TH-' + Date.now(),
-      plate: '30G-123.45',
-      type: 'NGHI NGỜ TRỘM CẮP',
-      reason: 'Phát hiện chấn động mạnh khi xe đang bật Khóa chống trộm.',
-      time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      status: 'new',
-      isManual: true
-    }
-  ]);
+  const [securityAlerts, setSecurityAlerts] = useState([]);
   const [vehicleFines, setVehicleFines] = useState([]); // Array of fines: { id, plate, amount, reason, date }
   const [shiftStats, setShiftStats] = useState({ revenue: 0, cash: 0, transfer: 0, transactions: 0 });
   const [dailyVolume, setDailyVolume] = useState(0);

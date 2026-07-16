@@ -10,18 +10,112 @@ import {
   ArrowRightOutlined,
   WarningFilled,
   CarOutlined,
-  WalletOutlined
+  WalletOutlined,
+  CameraOutlined,
+  UploadOutlined
 } from '@ant-design/icons';
 import { notification, Input, Button, Modal, Spin, QRCode } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
 import { apiClient } from '../../api/apiClient';
 import { parkingService } from '../../services/parkingService';
 
+const CameraCaptureModal = ({ visible, onCancel, onCapture, title }) => {
+  const videoRef = React.useRef(null);
+  const [stream, setStream] = React.useState(null);
+  const fileInputRef = React.useRef(null);
+
+  const startCamera = React.useCallback(async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      setStream(mediaStream);
+    } catch (err) {
+      console.error("Lỗi camera", err);
+    }
+  }, []);
+
+  const stopCamera = React.useCallback(() => {
+    setStream(currentStream => {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+      return null;
+    });
+  }, []);
+
+  React.useEffect(() => {
+    if (visible) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    return () => stopCamera();
+  }, [visible, startCamera, stopCamera]);
+
+  React.useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(e => console.log("Lỗi play video", e));
+    }
+  }, [stream]);
+
+  const takePhoto = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg');
+      onCapture(dataUrl);
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      onCapture(url);
+    }
+  };
+
+  return (
+    <Modal
+      title={title || "Chụp ảnh"}
+      open={visible}
+      onCancel={onCancel}
+      footer={null}
+      destroyOnClose
+      width={400}
+    >
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-full bg-black rounded-lg overflow-hidden aspect-video relative flex items-center justify-center">
+          {stream ? (
+            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+          ) : (
+            <div className="text-white text-sm">Không tìm thấy Camera hoặc đang tải...</div>
+          )}
+        </div>
+        <div className="flex gap-2 w-full">
+          <Button type="primary" icon={<CameraOutlined />} size="large" className="flex-1 bg-blue-600" onClick={takePhoto}>
+            Chụp ảnh
+          </Button>
+          <Button icon={<UploadOutlined />} size="large" onClick={() => fileInputRef.current?.click()}>
+            Tải file
+          </Button>
+          <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 export const StaffPayment = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { transactions, fetchAllDataFromBackend, addTransaction, updateShiftStats, shiftStats, addActivityLog, currentVehicle, activeVehicles, removeActiveVehicle, isEmergency, currentUser, getVehicleFines, clearVehicleFines } = useGlobalContext();
   
+  const [captureTarget, setCaptureTarget] = useState(null);
+  const [capturedImages, setCapturedImages] = useState({ in1: null, in2: null, out1: null, out2: null });
 
   const totalSlots = 500; // Static capacity for now until API provides it
   const activeCount = activeVehicles ? activeVehicles.filter(v => !v.gate).length : 0;
@@ -98,7 +192,11 @@ export const StaffPayment = () => {
       if (!vnpayUrl) {
         apiClient.get(`/v1/payment/vnpay-url?transactionId=${backendTxn.id}`)
           .then(res => setVnpayUrl((res.data || res).paymentUrl))
-          .catch(err => console.error("Error fetching VNPay URL", err));
+          .catch(err => {
+            console.error("Error fetching VNPay URL", err);
+            notification.error({ message: 'Lỗi', description: 'Không thể tạo mã QR VNPay. Vui lòng chọn Tiền mặt.' });
+            setPaymentMethod('cash');
+          });
       }
         
       setIsPollingVnpay(true);
@@ -227,12 +325,27 @@ export const StaffPayment = () => {
       notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể quét thẻ lúc này.' });
       return;
     }
+
+    if (isVip) {
+      setIdentityVerified(true);
+      setHasVehicle(true);
+      setLan1Status('busy');
+      setTotalAmount(0);
+      setCashGiven(0);
+      notification.success({
+        message: 'Đã xác nhận VIP',
+        description: 'Ảnh vào/ra đã được mở để staff đối chiếu trước khi cho xe ra.'
+      });
+      return;
+    }
+
     const normalizedCode = cardCode.trim();
     if (!normalizedCode) return notification.warning({message: 'Vui lòng nhập hoặc quét mã thẻ/định danh'});
-    if (expectedCredential && normalizedCode !== expectedCredential) {
+    
+    if (expectedCredential && normalizedCode !== expectedCredential && normalizedCode !== lpr) {
       notification.error({
         message: 'Sai mã xác nhận',
-        description: `Mã vừa quét không khớp với ${isVip ? 'định danh VIP' : 'thẻ vãng lai'} của xe ${lpr}.`
+        description: `Mã vừa quét không khớp với thẻ vãng lai hoặc biển số của xe ${lpr}.`
       });
       setIdentityVerified(false);
       return;
@@ -240,20 +353,8 @@ export const StaffPayment = () => {
 
     setIsCheckingOut(true);
     try {
-      if (isVip) {
-        setIdentityVerified(true);
-        setHasVehicle(true);
-        setLan1Status('busy');
-        setTotalAmount(0);
-        setCashGiven(0);
-        notification.success({
-          message: 'Đã xác nhận VIP',
-          description: 'Ảnh vào/ra đã được mở để staff đối chiếu trước khi cho xe ra.'
-        });
-        return;
-      }
 
-      const matchedByCard = activeVehicles?.find(v => v.cardCode === normalizedCode);
+      const matchedByCard = activeVehicles?.find(v => v.cardCode === normalizedCode || v.plate === normalizedCode);
       if (matchedByCard?.plate && matchedByCard.plate !== lpr) {
         setLpr(matchedByCard.plate);
       }
@@ -265,6 +366,8 @@ export const StaffPayment = () => {
       if (!lpr) setLpr(matchedByCard?.plate || `THẺ: ${normalizedCode}`); // Only fallback to card code if plate is unknown
       setTotalAmount(txn.totalAmount);
       setCashGiven(txn.totalAmount);
+      setPaymentMethod('cash'); // Reset payment method
+      setVnpayUrl('');
       setHasVehicle(true);
       setIdentityVerified(true);
       setLan1Status('busy');
@@ -358,7 +461,7 @@ export const StaffPayment = () => {
 
         removeActiveVehicle(lpr);
         if (lpr) clearVehicleFines(lpr);
-
+        
         setHasVehicle(false);
         setBackendTxn(null);
         setIdentityVerified(false);
@@ -478,32 +581,32 @@ export const StaffPayment = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc vào (Cam 1 - Góc trái)</span>
-                    <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={carImgs.in1} className={reviewImageClass} />
+                    <div onClick={() => canReviewVehicle && setCaptureTarget('in1')} className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
+                      <img src={capturedImages.in1 || carImgs.in1} className={reviewImageClass} />
                       {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">ENT: CAM-01</span>
                     </div>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc vào (Cam 2 - Góc phải)</span>
-                    <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={carImgs.in2} className={reviewImageClass} />
+                    <div onClick={() => canReviewVehicle && setCaptureTarget('in2')} className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
+                      <img src={capturedImages.in2 || carImgs.in2} className={reviewImageClass} />
                       {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">ENT: CAM-02</span>
                     </div>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc ra (Cam 3 - Góc trái)</span>
-                    <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={carImgs.out1} className={reviewImageClass} />
+                    <div onClick={() => canReviewVehicle && setCaptureTarget('out1')} className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
+                      <img src={capturedImages.out1 || carImgs.out1} className={reviewImageClass} />
                       {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">EXT: CAM-03</span>
                     </div>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc ra (Cam 4 - Góc phải)</span>
-                    <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={carImgs.out2} className={reviewImageClass} />
+                    <div onClick={() => canReviewVehicle && setCaptureTarget('out2')} className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
+                      <img src={capturedImages.out2 || carImgs.out2} className={reviewImageClass} />
                       {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">EXT: CAM-04</span>
                     </div>
@@ -561,6 +664,10 @@ export const StaffPayment = () => {
                           notification.warning({ message: 'Không khả dụng', description: 'Khách VIP bắt buộc thanh toán bằng QR Động theo quy trình.' });
                           return;
                         }
+                        if (displayAmount === 0) {
+                          notification.warning({ message: 'Không khả dụng', description: 'Giao dịch 0đ không hỗ trợ thanh toán qua VNPAY.' });
+                          return;
+                        }
                         setPaymentMethod('vnpay');
                         setVnpayUrl('');
                       }}
@@ -611,9 +718,9 @@ export const StaffPayment = () => {
                       <div className="flex justify-between items-end">
                         <span className="text-sm font-semibold text-slate-600 mb-1">Tiền thối lại:</span>
                         <div className="text-right">
-                          <span className="text-3xl font-black text-slate-800 tracking-tight">
-                            {Math.max(0, parseInt(cashGiven || 0) - displayAmount).toLocaleString('en-US')}
-                          </span>
+                        <span className="text-3xl font-black text-slate-800 tracking-tight">
+                          {!canReviewVehicle ? '0' : Math.max(0, parseInt(cashGiven || 0) - displayAmount).toLocaleString('en-US')}
+                        </span>
                           <span className="text-sm font-bold text-slate-500 ml-1">VND</span>
                         </div>
                       </div>
@@ -622,20 +729,25 @@ export const StaffPayment = () => {
 
                   {paymentMethod === 'vnpay' && (
                     <div className="bg-white border border-blue-200 rounded-lg p-4 flex flex-col items-center justify-center animate-fadeIn shadow-sm relative overflow-hidden">
-                      <div className="w-32 h-32 bg-slate-50 rounded-lg flex items-center justify-center mb-3 border border-slate-200 overflow-hidden relative p-2">
+                      <div className="bg-slate-50 rounded-lg flex items-center justify-center mb-3 border border-slate-200 overflow-hidden relative p-4">
                         {!canReviewVehicle ? (
-                          <div className="text-center">
+                          <div className="text-center w-[150px] h-[150px] flex items-center justify-center">
                             <span className="text-[10px] font-bold text-slate-400 block px-2">CHỜ XÁC NHẬN</span>
                           </div>
                         ) : vnpayUrl ? (
-                          <QRCode value={vnpayUrl} size={150} bordered={false} />
+                          <a href={vnpayUrl} target="_blank" rel="noreferrer" className="block cursor-pointer hover:opacity-80 transition-opacity" title="Bấm vào đây để mở trang thanh toán VNPAY">
+                            <QRCode value={vnpayUrl} size={150} bordered={false} />
+                          </a>
                         ) : (
-                          <Spin />
+                          <div className="w-[150px] h-[150px] flex items-center justify-center">
+                            <Spin />
+                          </div>
                         )}
                         <div className="absolute inset-0 bg-blue-500/10 animate-pulse pointer-events-none"></div>
                       </div>
                       <span className="text-xs font-medium text-slate-500 text-center mb-3">
                         {!canReviewVehicle ? "Vui lòng 'Xác nhận thẻ' trước để lấy mã QR" : isPollingVnpay ? "Đang đợi thanh toán VNPay Sandbox..." : "Yêu cầu khách quét mã VNPay Sandbox"}
+                        {canReviewVehicle && vnpayUrl && <span className="block mt-1 text-[10px] text-blue-500 cursor-pointer" onClick={() => window.open(vnpayUrl, '_blank')}>(Hoặc click vào mã QR để thanh toán test)</span>}
                       </span>
                     </div>
                   )}
@@ -850,6 +962,16 @@ export const StaffPayment = () => {
 
         </div>
       </div>
+      
+      <CameraCaptureModal
+        visible={!!captureTarget}
+        onCancel={() => setCaptureTarget(null)}
+        onCapture={(imgUrl) => {
+          setCapturedImages(prev => ({ ...prev, [captureTarget]: imgUrl }));
+          setCaptureTarget(null);
+        }}
+        title="Chụp ảnh đối chiếu"
+      />
     </div>
   );
 };

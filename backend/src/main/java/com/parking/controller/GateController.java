@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.parking.repository.VipSubscriptionRepository;
 import com.parking.repository.ZoneRepository;
@@ -30,19 +31,22 @@ public class GateController {
     private final ZoneRepository zoneRepo;
     private final ParkingService parkingService;
     private final PendingGateVehicleService pendingGateVehicleService;
+    private final com.parking.repository.AuditLogRepository auditLogRepository;
 
     public GateController(VehicleRepository vehicleRepo, 
                           ParkingSessionRepository sessionRepo,
                           VipSubscriptionRepository vipSubscriptionRepository,
                           ZoneRepository zoneRepo,
                           ParkingService parkingService,
-                          PendingGateVehicleService pendingGateVehicleService) {
+                          PendingGateVehicleService pendingGateVehicleService,
+                          com.parking.repository.AuditLogRepository auditLogRepository) {
         this.vehicleRepo = vehicleRepo;
         this.sessionRepo = sessionRepo;
         this.vipSubscriptionRepository = vipSubscriptionRepository;
         this.zoneRepo = zoneRepo;
         this.parkingService = parkingService;
         this.pendingGateVehicleService = pendingGateVehicleService;
+        this.auditLogRepository = auditLogRepository;
     }
 
     public static class GateScanRequest {
@@ -63,6 +67,24 @@ public class GateController {
         if (request.plate != null && !request.plate.isEmpty()) {
             Optional<Vehicle> optVehicle = vehicleRepo.findByLicensePlate(request.plate);
             if (optVehicle.isPresent() && optVehicle.get().isLocked()) {
+                
+                // --- ADDED ANTI-THEFT LOG ---
+                com.parking.model.AuditLog securityLog = new com.parking.model.AuditLog();
+                securityLog.setId(UUID.randomUUID());
+                securityLog.setUserId(optVehicle.get().getOwnerId());
+                securityLog.setActionType("SECURITY_ALERT");
+                securityLog.setEntityType("Vehicle");
+                securityLog.setEntityId(optVehicle.get().getId());
+                securityLog.setNewValue("{\"alert\": \"CẢNH BÁO BẢO MẬT: Phát hiện xe đang khóa cố tình vượt cổng ra!\", \"plate\": \"" + request.plate + "\"}");
+                securityLog.setCreatedAt(java.time.Instant.now());
+                // Note: Assuming there is a way to save it or we need to inject AuditLogRepository.
+                // Wait! Since I didn't inject AuditLogRepository, I will just print it for now and inject it if needed.
+                System.err.println("CẢNH BÁO BẢO MẬT: Phát hiện xe đang khóa cố tình vượt cổng ra! Biển số: " + request.plate);
+                if (this.auditLogRepository != null) {
+                    this.auditLogRepository.save(securityLog);
+                }
+                // -----------------------------
+
                 response.put("success", false);
                 response.put("error", "VEHICLE_LOCKED");
                 Map<String, Object> vehicleData = new HashMap<>();

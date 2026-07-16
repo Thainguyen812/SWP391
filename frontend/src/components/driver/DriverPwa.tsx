@@ -44,6 +44,7 @@ import { createContext } from 'react';
 import { VehicleManagementList } from './subcomponents/VehicleManagementList';
 import { VipRegistrationModal } from './subcomponents/VipRegistrationModal';
 import { BillingHistoryTable } from './subcomponents/BillingHistoryTable';
+import { getVehicleImageByPlate } from '../../utils/vehicleImages';
 
 export const DriverContext = createContext<any>(null);
 
@@ -223,7 +224,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   // ----------------------------------------------------
   const [activeTab, setActiveTab] = useState<'home' | 'driver_pnl' | 'vehicles' | 'vip_reg' | 'billing' | 'settings' | 'support'>('driver_pnl');
   const [isOffline, setIsOffline] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'vnpay'>('wallet');
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'vnpay' | 'momo' | 'bank'>('wallet');
   const [balance, setBalance] = useState<number>(() => {
     const saved = localStorage.getItem(`urbanpark_user_balance_${user?.phone || 'default'}`);
     if (saved) {
@@ -572,6 +573,10 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [vnpayOtp, setVnpayOtp] = useState('');
   const [vnpayModalOpen, setVnpayModalOpen] = useState(false);
   const [vnpayStep, setVnpayStep] = useState<'info' | 'otp' | 'success'>('info');
+  const [momoModalOpen, setMomoModalOpen] = useState(false);
+  const [momoStep, setMomoStep] = useState<'qr' | 'success'>('qr');
+  const [bankModalOpen, setBankModalOpen] = useState(false);
+  const [bankStep, setBankStep] = useState<'info' | 'success'>('info');
 
   // Alarm & Security Breach state
   const [isSirenMuted, setIsSirenMuted] = useState(false);
@@ -1085,6 +1090,260 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   };
 
   // Checkout VIP flow
+  const handleStartBank = async () => {
+    if (isOffline) {
+      triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
+      return;
+    }
+    const isTopUp = selectedPackLabel.includes('Nạp tiền');
+    if (isTopUp) {
+      setBankStep('info');
+      setBankModalOpen(true);
+    } else {
+      if (!selectedVehicleForVIP || selectedVehicleForVIP === '') {
+        triggerToast('Vui lòng chọn biển số xe để đăng ký VIP.', 'error');
+        return;
+      }
+      setBankStep('info');
+      setBankModalOpen(true);
+    }
+  };
+
+  const handleSimulateBankTransfer = async () => {
+    if (isOffline) {
+      triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
+      return;
+    }
+    setBankStep('success');
+
+    const isTopUp = selectedPackLabel.includes('Nạp tiền');
+    if (isTopUp) {
+      setBalance(prev => prev + selectedPackPrice);
+      const newTx: TransactionItem = {
+        id: `txn-${Date.now()}`,
+        date: 'Vừa xong',
+        type: 'Nạp ví qua CK Ngân hàng',
+        plate: '-',
+        fee: `+$${selectedPackPrice.toFixed(2)}`,
+        isEntry: true,
+        status: 'Thành công'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+      triggerToast(`Nạp thành công $${selectedPackPrice.toFixed(2)} vào ví điện tử!`, 'success');
+    } else {
+      const formattedPrice = selectedPackPrice.toLocaleString('vi-VN') + '₫';
+      const newTx: TransactionItem = {
+        id: `txn-${Date.now()}`,
+        date: 'Vừa xong',
+        type: `Đăng kí ${selectedPackLabel}`,
+        plate: selectedVehicleForVIP,
+        fee: `-${formattedPrice}`,
+        isEntry: false,
+        status: 'Thành công'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+      
+      const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
+      let expiryDate = new Date();
+      if (targetVeh && targetVeh.activeSubscription && targetVeh.subscriptionExpiry) {
+        const [day, month, year] = targetVeh.subscriptionExpiry.split('/');
+        const currentExp = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        if (currentExp > new Date()) expiryDate = currentExp;
+      }
+      if (selectedPackLabel.includes('Tháng')) expiryDate.setMonth(expiryDate.getMonth() + 1);
+      else if (selectedPackLabel.includes('Quý')) expiryDate.setMonth(expiryDate.getMonth() + 3);
+      else if (selectedPackLabel.includes('Năm')) expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      else expiryDate.setDate(expiryDate.getDate() + 1);
+
+      const expiryString = expiryDate.toLocaleDateString('vi-VN');
+
+      let subType = 'MONTHLY';
+      if (selectedPackLabel.includes('Vé Ngày')) subType = 'DAILY';
+      else if (selectedPackLabel.includes('Quý')) subType = 'QUARTERLY';
+      else if (selectedPackLabel.includes('Năm')) subType = 'YEARLY';
+
+      const tempId = `sub-${Date.now()}`;
+      const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+      const docPhotos = (window as any).lastUploadedPhotos?.photos || [];
+      const newSub = {
+        id: tempId,
+        vehicle_plate: selectedVehicleForVIP,
+        type: selectedPackLabel,
+        startDate: new Date().toLocaleDateString('vi-VN'),
+        endDate: expiryString,
+        status: (selectedPackLabel.includes('Vé Ngày') || selectedPackLabel.includes('Ngày')) ? 'ACTIVE' : 'PENDING_APPROVAL',
+        document_photos: docPhotos,
+        explanation: (window as any).lastUploadedPhotos?.explanation || ''
+      };
+      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify([newSub, ...savedSubs]));
+      window.dispatchEvent(new Event('storage'));
+
+      try {
+        apiClient.post('/vip/register', {
+          vehicleId: targetVeh ? targetVeh.id : null,
+          licensePlate: selectedVehicleForVIP,
+          subscriptionType: subType,
+          documentPhotos: JSON.stringify(docPhotos)
+        }).then(response => {
+          const data = response.data;
+          if (data && data.id) {
+            const currentSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+            const updated = currentSubs.map((s: any) => s.id === tempId ? { ...s, id: data.id } : s);
+            localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updated));
+            window.dispatchEvent(new Event('storage'));
+          }
+        }).catch(err => console.warn("Backend VIP registration failed:", err));
+      } catch (err) {
+        console.error("Lỗi khi đăng ký VIP:", err);
+      }
+
+      setRegStep(3);
+      triggerToast(
+        (selectedPackLabel.includes('Vé Ngày') || selectedPackLabel.includes('Ngày'))
+          ? "✨ Đã kích hoạt vé ngày thành công cho xe " + selectedVehicleForVIP + "!"
+          : "✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe " + selectedVehicleForVIP + ".",
+        'success'
+      );
+    }
+  };
+
+  const handleCloseBank = () => {
+    setBankModalOpen(false);
+    if (bankStep === 'success') {
+      if (selectedPackLabel.includes('Nạp tiền')) {
+        setSelectedPackLabel('');
+        setSelectedPackPrice(0);
+      }
+    }
+  };
+
+  const handleStartMomo = async () => {
+    if (isOffline) {
+      triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
+      return;
+    }
+    const isTopUp = selectedPackLabel.includes('Nạp tiền');
+    if (isTopUp) {
+      setMomoStep('qr');
+      setMomoModalOpen(true);
+    } else {
+      if (!selectedVehicleForVIP || selectedVehicleForVIP === '') {
+        triggerToast('Vui lòng chọn biển số xe để đăng ký VIP.', 'error');
+        return;
+      }
+      setMomoStep('qr');
+      setMomoModalOpen(true);
+    }
+  };
+
+  const handleSimulateMomoScan = async () => {
+    if (isOffline) {
+      triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
+      return;
+    }
+    setMomoStep('success');
+
+    const isTopUp = selectedPackLabel.includes('Nạp tiền');
+    if (isTopUp) {
+      setBalance(prev => prev + selectedPackPrice);
+      const newTx: TransactionItem = {
+        id: `txn-${Date.now()}`,
+        date: 'Vừa xong',
+        type: 'Nạp ví MoMo',
+        plate: '-',
+        fee: `+$${selectedPackPrice.toFixed(2)}`,
+        isEntry: true,
+        status: 'Thành công'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+      triggerToast(`Nạp thành công $${selectedPackPrice.toFixed(2)} vào ví điện tử!`, 'success');
+    } else {
+      const formattedPrice = selectedPackPrice.toLocaleString('vi-VN') + '₫';
+      const newTx: TransactionItem = {
+        id: `txn-${Date.now()}`,
+        date: 'Vừa xong',
+        type: `Đăng kí ${selectedPackLabel}`,
+        plate: selectedVehicleForVIP,
+        fee: `-${formattedPrice}`,
+        isEntry: false,
+        status: 'Thành công'
+      };
+      setTransactions(prev => [newTx, ...prev]);
+      
+      const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
+      let expiryDate = new Date();
+      if (targetVeh && targetVeh.activeSubscription && targetVeh.subscriptionExpiry) {
+        const [day, month, year] = targetVeh.subscriptionExpiry.split('/');
+        const currentExp = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        if (currentExp > new Date()) expiryDate = currentExp;
+      }
+      if (selectedPackLabel.includes('Tháng')) expiryDate.setMonth(expiryDate.getMonth() + 1);
+      else if (selectedPackLabel.includes('Quý')) expiryDate.setMonth(expiryDate.getMonth() + 3);
+      else if (selectedPackLabel.includes('Năm')) expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      else expiryDate.setDate(expiryDate.getDate() + 1);
+
+      const expiryString = expiryDate.toLocaleDateString('vi-VN');
+
+      let subType = 'MONTHLY';
+      if (selectedPackLabel.includes('Vé Ngày')) subType = 'DAILY';
+      else if (selectedPackLabel.includes('Quý')) subType = 'QUARTERLY';
+      else if (selectedPackLabel.includes('Năm')) subType = 'YEARLY';
+
+      const tempId = `sub-${Date.now()}`;
+      const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+      const docPhotos = (window as any).lastUploadedPhotos?.photos || [];
+      const newSub = {
+        id: tempId,
+        vehicle_plate: selectedVehicleForVIP,
+        type: selectedPackLabel,
+        startDate: new Date().toLocaleDateString('vi-VN'),
+        endDate: expiryString,
+        status: (selectedPackLabel.includes('Vé Ngày') || selectedPackLabel.includes('Ngày')) ? 'ACTIVE' : 'PENDING_APPROVAL',
+        document_photos: docPhotos,
+        explanation: (window as any).lastUploadedPhotos?.explanation || ''
+      };
+      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify([newSub, ...savedSubs]));
+      window.dispatchEvent(new Event('storage'));
+
+      try {
+        apiClient.post('/vip/register', {
+          vehicleId: targetVeh ? targetVeh.id : null,
+          licensePlate: selectedVehicleForVIP,
+          subscriptionType: subType,
+          documentPhotos: JSON.stringify(docPhotos)
+        }).then(response => {
+          const data = response.data;
+          if (data && data.id) {
+            const currentSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
+            const updated = currentSubs.map((s: any) => s.id === tempId ? { ...s, id: data.id } : s);
+            localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updated));
+            window.dispatchEvent(new Event('storage'));
+          }
+        }).catch(err => console.warn("Backend VIP registration failed:", err));
+      } catch (err) {
+        console.error("Lỗi khi đăng ký VIP:", err);
+      }
+
+      setRegStep(3);
+      triggerToast(
+        (selectedPackLabel.includes('Vé Ngày') || selectedPackLabel.includes('Ngày'))
+          ? "✨ Đã kích hoạt vé ngày thành công cho xe " + selectedVehicleForVIP + "!"
+          : "✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe " + selectedVehicleForVIP + ".",
+        'success'
+      );
+    }
+  };
+
+  const handleCloseMomo = () => {
+    setMomoModalOpen(false);
+    if (momoStep === 'success') {
+      if (selectedPackLabel.includes('Nạp tiền')) {
+        setSelectedPackLabel('');
+        setSelectedPackPrice(0);
+      }
+    }
+  };
+
   const handleStartVnpay = async () => {
     if (isOffline) {
       triggerToast('Lỗi: Không thể đăng ký Thẻ Tháng VIP ở chế độ Ngoại tuyến!', 'error');

@@ -428,6 +428,8 @@ export const AuthPage = () => {
             navigate('/driver');
           } else if (user && user.role === 'STAFF') {
             navigate('/staff-dashboard');
+          } else if (user && user.role === 'MANAGER') {
+            navigate('/manager');
           } else {
             navigate('/admin');
           }
