@@ -219,18 +219,8 @@ this.securityAlertRepository = securityAlertRepository;
     vip.setFeeAmount(java.math.BigDecimal.ZERO);
     vip.setPaymentMethod("BANK_TRANSFER");
     vip.setPaymentStatus("SUCCESS");
-
-    String regDoc = saved.getRegistrationDocUrl() != null ? saved.getRegistrationDocUrl() : "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80";
-    String regPhoto = saved.getRegistrationPhotoUrl() != null ? saved.getRegistrationPhotoUrl() : "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80";
-    vip.setDocumentPhotos(String.format(
-        "{\"registrationPaper\":\"%s\",\"identityCard\":\"%s\",\"frontPhoto\":\"%s\"}",
-        regDoc,
-        regPhoto,
-        "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80"
-    ));
-    vip.setCreatedAt(Instant.now());
-    vip.setUpdatedAt(Instant.now());
     vipSubscriptionRepository.save(vip);
+
 
     return saved;
 }

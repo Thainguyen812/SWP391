@@ -26,6 +26,6 @@ IF NOT EXIST "%CLOUDFLARED_PATH%" (
     echo Tai xong! Bat dau tao duong ham...
 )
 
-"%CLOUDFLARED_PATH%" tunnel --url http://127.0.0.1:5173
+"%CLOUDFLARED_PATH%" tunnel --url http://127.0.0.1:5173 --protocol http2 --edge-ip-version 4
 
 pause

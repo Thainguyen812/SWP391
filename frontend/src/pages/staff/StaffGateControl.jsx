@@ -21,7 +21,6 @@ export const StaffGateControl = () => {
 
   const [manualPlate, setManualPlate] = useState('');
   const [manualCardCode, setManualCardCode] = useState('');
-  const [manualType, setManualType] = useState('Ô tô gầm thấp 4-5 chỗ');
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [lastCheckInResult, setLastCheckInResult] = useState(null);
   
@@ -53,29 +52,115 @@ export const StaffGateControl = () => {
     return `Tầng ${c}`;
   };
 
-  useEffect(() => {
-    if (currentVehicle && currentVehicle.plate) {
-      setManualPlate(currentVehicle.plate);
+  const getVehicleTypeLabel = (type) => {
+    const t = (type || '').toUpperCase();
+    if (t === 'SUV_CUV_MPV') return 'Xe 7-9 chỗ';
+    if (t === 'LARGE_VAN_MINIBUS') return 'Xe lớn';
+    if (t === 'EV_CAR' || t === 'ELECTRIC') return 'Xe điện';
+    return 'Xe 4-5 chỗ';
+  };
+
+  const getVehicleTypeFromZone = (zoneCode) => {
+    const code = (zoneCode || '').toUpperCase();
+    if (code === 'F1') return 'SEDAN_HATCHBACK';
+    if (code === 'F2') return 'SUV_CUV_MPV';
+    if (code === 'B1' || code === 'G' || code === 'B1/G') return 'LARGE_VAN_MINIBUS';
+    return null;
+  };
+
+  const inferVehicleType = (vehicle) => {
+    const zoneVehicleType = getVehicleTypeFromZone(vehicle?.assignedZoneCode);
+    if (zoneVehicleType) return zoneVehicleType;
+    const directType = vehicle?.vehicleType || vehicle?.vehicleSize || vehicle?.detectedVehicleType;
+    if (directType) return directType;
+
+    const text = `${vehicle?.model || ''} ${vehicle?.type || ''}`.toUpperCase();
+    if (text.includes('SUV') || text.includes('CUV') || text.includes('MPV') || text.includes('7') || text.includes('9')) {
+      return 'SUV_CUV_MPV';
     }
-  }, [currentVehicle]);
+    if (text.includes('VAN') || text.includes('BUS') || text.includes('TRUCK') || text.includes('16')) {
+      return 'LARGE_VAN_MINIBUS';
+    }
+    return 'SEDAN_HATCHBACK';
+  };
+
+  const getZoneForVehicleType = (type) => {
+    const t = (type || '').toUpperCase();
+    if (t === 'SUV_CUV_MPV') return 'F2';
+    if (t === 'LARGE_VAN_MINIBUS') return 'B1/G';
+    return 'F1';
+  };
+
+  const getRouteHint = (type, zoneCode) => {
+    const code = (zoneCode || getZoneForVehicleType(type)).toUpperCase();
+    const label = getVehicleTypeLabel(type);
+    if (code === 'F1') return `${label} → Tầng F1`;
+    if (code === 'F2') return `${label} → Tầng F2`;
+    if (code === 'B1' || code === 'G' || code === 'B1/G') return `${label} → Tầng B1/G`;
+    return `${label} → ${getFloorShortName(code)}`;
+  };
+
+  const normalizeGateText = (value) => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]/g, '');
+
+  const isEntryGateId = (value) => normalizeGateText(value).includes('VAO') || normalizeGateText(value).includes('IN');
+  const isExitGateId = (value) => normalizeGateText(value).includes('RA') || normalizeGateText(value).includes('OUT');
+
+  const handleGateRowSelect = (gate) => {
+    if (!gate.vehicleId || !activeVehicles) {
+      setCurrentVehicle(null);
+      setManualPlate('');
+      return;
+    }
+
+    const vehicle = activeVehicles.find(av => av.id === gate.vehicleId);
+    if (!vehicle) {
+      setCurrentVehicle(null);
+      setManualPlate('');
+      return;
+    }
+
+    setCurrentVehicle(vehicle);
+
+    if (isEntryGateId(gate.id)) {
+      setManualPlate(gate.plate && gate.plate !== '---' ? gate.plate : vehicle.plate || '');
+      return;
+    }
+
+    if (isExitGateId(gate.id)) {
+      setManualPlate('');
+    }
+  };
 
   // AI Simulator State
+  const DEFAULT_CAMERA_IMAGE = 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80';
   const [isAiModalVisible, setIsAiModalVisible] = useState(false);
   const [isLotModalVisible, setIsLotModalVisible] = useState(false);
   const [aiPlate, setAiPlate] = useState('30G-123.45');
   const [aiConfidence, setAiConfidence] = useState(98.5);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
-  const [aiImagePreview, setAiImagePreview] = useState('https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80');
+  const [aiImagePreview, setAiImagePreview] = useState(DEFAULT_CAMERA_IMAGE);
 
-  const handleAiImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setAiImagePreview(URL.createObjectURL(file));
-    }
+  const getVehicleCameraImage = (vehicle) => {
+    return vehicle?.image || vehicle?.imageUrl || vehicle?.cameraImage || vehicle?.entryImageUrl || DEFAULT_CAMERA_IMAGE;
   };
 
-  const isAiPlateDuplicate = aiPlate && activeVehicles?.some(v => v.plate === aiPlate.toUpperCase());
-  const isManualPlateDuplicate = manualPlate && activeVehicles?.some(v => v.plate === manualPlate.toUpperCase());
+  const getSelectedGateVehicle = () => {
+    if (currentVehicle?.plate) return currentVehicle;
+    return activeVehicles?.find(v => v.gate) || null;
+  };
+
+  const openVipCameraModal = () => {
+    const vehicle = getSelectedGateVehicle();
+    if (vehicle?.plate) {
+      setAiPlate(vehicle.plate);
+    }
+    setAiImagePreview(getVehicleCameraImage(vehicle));
+    setIsAiModalVisible(true);
+  };
 
   const handleManualCheckIn = async () => {
     if (isEmergency) {
@@ -86,92 +171,80 @@ export const StaffGateControl = () => {
       notification.error({ message: 'Lỗi', description: 'Vui lòng nhập biển số xe!' });
       return;
     }
-    if (isManualPlateDuplicate) {
-      const existingVehicle = activeVehicles?.find(v => v.plate === manualPlate.toUpperCase());
-      if (existingVehicle && existingVehicle.gate && existingVehicle.gate.toUpperCase().includes('VÀO')) {
-        // Simulated car is waiting at the IN gate. We simulate a successful manual confirmation.
-        notification.success({ message: 'Check-in Thành công', description: `Biển số ${manualPlate} đã được nhân viên xác nhận vào bãi.` });
-        setManualPlate('');
-        setManualCardCode('');
-        
-        addActivityLog({
-          plate: manualPlate,
-          model: "Xác nhận Thủ Công",
-          type: "Vãng lai",
-          gate: existingVehicle.gate,
-          action: "Vào Cổng (Thủ công)",
-          time: new Date().toISOString(),
-          status: "Thành Công",
-          typeColor: "text-blue-600",
-          statusColor: "bg-emerald-100 text-emerald-700",
-          actionColor: "text-emerald-600",
-          image: existingVehicle.image || existingVehicle.imageUrl || "https://camera-storage.com/live/gate_scan.jpg"
-        });
-        processEntryVehicle(existingVehicle.plate);
-        
-        // Notify backend so it persists the log and session!
-        apiClient.post('/sessions/approve-entry', { plate: existingVehicle.plate }).catch(e => console.log(e));
-        
-        addLog(`[OK] [${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}] [${existingVehicle.gate}] Vào bãi: ${manualPlate.toUpperCase()}`, 'OK');
-        
-        setLastCheckInResult({
-          plate: manualPlate.toUpperCase(),
-          type: 'Vãng lai',
-          vehicleType: 'SEDAN_HATCHBACK',
-          assignedZoneCode: 'F1',
-          floorName: 'Tầng 1',
-          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-        });
-        
-        return;
-      }
-      
-      notification.error({ message: 'Lỗi Check-in', description: 'Xe này ĐÃ CÓ trong bãi (phiên gửi xe ACTIVE).' });
+
+    const normalizedManualPlate = manualPlate.trim().toUpperCase();
+    const existingVehicle = activeVehicles?.find(v => v.plate?.toUpperCase() === normalizedManualPlate);
+    const isWaitingEntry = isEntryGateId(existingVehicle?.gate);
+    const isExistingVip = existingVehicle && (existingVehicle.type === 'VIP' || existingVehicle.isVip === true);
+
+    if (existingVehicle && !isWaitingEntry) {
+      notification.error({ message: 'Lỗi Check-in', description: 'Xe này đã có phiên gửi xe ACTIVE trong bãi.' });
+      return;
+    }
+
+    if (isWaitingEntry && isExistingVip) {
+      setAiPlate(normalizedManualPlate);
+      notification.warning({
+        message: 'Xe VIP cần xác thực camera',
+        description: 'Xe VIP không check-in bằng thẻ vãng lai. Dùng nút "Xác thực VIP Camera" hoặc phê duyệt VIP ở bảng làn.'
+      });
+      return;
+    }
+
+    if (!manualCardCode || !manualCardCode.trim()) {
+      notification.error({ message: 'Thiếu mã thẻ', description: 'Khách vãng lai phải quẹt/cấp thẻ tạm trước khi vào bãi.' });
       return;
     }
     
     setIsCheckingIn(true);
     try {
-      let mappedType = 'SEDAN_HATCHBACK';
-      if (manualType && manualType.includes('7')) mappedType = 'SUV_CUV_MPV';
-      if (manualType && (manualType.includes('9') || manualType.includes('16'))) mappedType = 'LARGE_VAN_MINIBUS';
+      const waitingVehicleForForm = activeVehicles?.find(v => v.plate?.toUpperCase() === normalizedManualPlate && isEntryGateId(v.gate));
+      const detectedType = inferVehicleType(waitingVehicleForForm);
+      const mappedType = detectedType;
 
       // Gọi API /api/gate/scan thông minh (Tự nhận diện VIP hoặc cấp thẻ vãng lai)
       const response = await apiClient.post(`/gate/scan`, {
-        plate: manualPlate.trim().toUpperCase(),
-        cardCode: manualCardCode ? manualCardCode.trim() : '',
-        gate: 'Bốt Gác Cổng Trực 1',
-        vehicleType: mappedType
-      });
-      
-      notification.success({ 
-        message: 'Thành công', 
-        description: response.data?.message || `Đã check-in thành công cho xe ${manualPlate}` 
-      });
-      addLog(`[GATE_SCAN] Success: ${response.data?.message}`, 'SUCCESS');
-      
-      const isVip = response.data?.message?.toLowerCase().includes('vip') || false;
-      const zone = response.data?.data?.assignedZoneCode || 'F1';
-      setLastCheckInResult({
-        plate: manualPlate.trim().toUpperCase(),
-        type: isVip ? 'VIP' : 'Vãng lai',
+        plate: normalizedManualPlate,
+        cardCode: manualCardCode.trim(),
+        gate: waitingVehicleForForm?.gate || 'L-VÀO 1',
+        direction: 'ENTRY',
         vehicleType: mappedType,
+        fuelType: mappedType === 'EV_CAR' ? 'ELECTRIC' : 'GASOLINE'
+      });
+      const payload = response?.data || response;
+
+      notification.success({
+        message: 'Thành công',
+        description: payload?.message || `Đã check-in thành công cho xe ${normalizedManualPlate}`
+      });
+      addLog(`[GATE_SCAN] Success: ${payload?.message}`, 'OK');
+
+      const isVip = payload?.message?.toLowerCase().includes('vip') || false;
+      const zone = payload?.data?.assignedZoneCode || getZoneForVehicleType(mappedType);
+      setLastCheckInResult({
+        plate: normalizedManualPlate,
+        type: isVip ? 'VIP' : 'Vãng lai',
+        vehicleType: getVehicleTypeLabel(mappedType),
         assignedZoneCode: zone,
         floorName: getFloorShortName(zone),
         floorFullName: getFloorFullName(zone),
+        routeHint: getRouteHint(mappedType, zone),
         timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
       });
 
+      if (waitingVehicleForForm) {
+        processEntryVehicle(normalizedManualPlate);
+      }
       if (fetchAllDataFromBackend) {
         fetchAllDataFromBackend();
       }
       
       addActivityLog({
-        plate: manualPlate.trim().toUpperCase(),
+        plate: normalizedManualPlate,
         model: 'Khách vãng lai',
         type: 'MỞ BARRIER',
-        gate: 'Bốt Gác Cổng Trực 1',
-        action: 'Mở Thủ công',
+        gate: waitingVehicleForForm?.gate || 'L-VÀO 1',
+        action: 'Vào bãi bằng thẻ tạm',
         time: new Date().toISOString(),
         status: 'THÀNH CÔNG',
         typeColor: 'text-orange-600',
@@ -198,77 +271,120 @@ export const StaffGateControl = () => {
       notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể check-in lúc này.' });
       return;
     }
-    if (!aiPlate) {
+    if (!aiPlate || !aiPlate.trim()) {
       notification.warning({ message: 'Lỗi', description: 'Vui lòng nhập biển số.' });
       return;
     }
-    
-    if (isAiPlateDuplicate) {
-      const existingVehicle = activeVehicles?.find(v => v.plate === aiPlate.toUpperCase());
-      if (existingVehicle && existingVehicle.gate && existingVehicle.gate.toUpperCase().includes('VÀO')) {
-        // Clear the gate in the backend so the UI updates immediately
-        try {
-          await apiClient.post(`/v1/parking/clear-gate`, { plate: aiPlate.toUpperCase() });
-        } catch (err) {
-          console.error("Error clearing gate:", err);
-        }
-        
-        notification.success({ message: 'AI Nhận diện Thành công', description: `Biển số ${aiPlate} hợp lệ và đã vào bãi.` });
-        addLog(`[AI_LPR] Success (Cleared Gate): Plate ${aiPlate}, Conf: ${aiConfidence}%`, 'OK');
-        
-        // Refresh global context to pull latest transactions and remove from active
-        if (fetchAllDataFromBackend) fetchAllDataFromBackend();
-        
-        addActivityLog({
-          plate: aiPlate,
-          model: "Vào thẳng bãi",
-          type: "VIP",
-          gate: existingVehicle.gate || "CAM-01-IN",
-          action: "Vào Bãi (Đã thông cổng)",
-          time: "Vừa xong",
-          status: "Thành Công",
-          typeColor: "text-amber-600",
-          statusColor: "bg-emerald-100 text-emerald-700",
-          actionColor: "text-blue-600"
-        });
-        
-        setIsAiModalVisible(false);
-        setAiPlate('');
-        return;
-      }
-      notification.error({ message: 'Lỗi', description: 'Xe này đang có phiên gửi xe ACTIVE trong bãi.' });
+
+    const plateUpper = aiPlate.trim().toUpperCase();
+    const parsedConfidence = parseFloat(aiConfidence);
+
+    // Confidence below 70% must be blocked
+    if (Number.isNaN(parsedConfidence) || parsedConfidence < 70) {
+      notification.error({
+        message: 'Bị từ chối',
+        description: `Độ tin cậy (${aiConfidence}%) dưới ngưỡng 70%. Không thể mở cổng!`
+      });
+      addLog(`[AI_LPR] Blocked: Plate ${plateUpper}, Conf: ${aiConfidence}% (Under 70%)`, 'WARN');
       return;
     }
 
     setIsAiProcessing(true);
     try {
+      // Check if there is a vehicle waiting at the IN gate (in activeVehicles) matching this plate
+      const waitingVehicle = activeVehicles?.find(v => v.plate?.toUpperCase() === plateUpper && isEntryGateId(v.gate));
+      const aiVehicleType = inferVehicleType(waitingVehicle || currentVehicle);
+
+      if (waitingVehicle) {
+        const isWaitingVip = waitingVehicle.type === 'VIP' || waitingVehicle.isVip === true;
+        if (isWaitingVip) {
+          // If VIP is waiting + confidence >= 70%: call /sessions/approve-entry
+          await apiClient.post('/sessions/approve-entry', { plate: plateUpper });
+          const zone = waitingVehicle.assignedZoneCode || getZoneForVehicleType(aiVehicleType);
+
+          notification.success({
+            message: 'Xác thực VIP Camera thành công',
+            description: `Mở cổng cho xe VIP ${plateUpper}`
+          });
+
+          addLog(`[AI_LPR] VIP Approved (LPR): Plate ${plateUpper}, Conf: ${aiConfidence}%`, 'OK');
+          processEntryVehicle(plateUpper);
+
+          setLastCheckInResult({
+            plate: plateUpper,
+            type: 'VIP',
+            vehicleType: getVehicleTypeLabel(aiVehicleType),
+            assignedZoneCode: zone,
+            floorName: getFloorShortName(zone),
+            floorFullName: getFloorFullName(zone),
+            routeHint: getRouteHint(aiVehicleType, zone),
+            timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          });
+
+          addActivityLog({
+            plate: plateUpper,
+            model: "Nhận diện VIP Camera",
+            type: "VIP",
+            gate: waitingVehicle.gate || "CAM-01-IN",
+            action: "Vào Cổng (Xác thực LPR)",
+            time: "Vừa xong",
+            status: "Thành Công",
+            typeColor: "text-amber-600",
+            statusColor: "bg-emerald-100 text-emerald-700",
+            actionColor: "text-emerald-600"
+          });
+
+          setDailyVolume(prev => prev + 1);
+          setIsAiModalVisible(false);
+          setAiPlate('');
+          if (fetchAllDataFromBackend) fetchAllDataFromBackend();
+          return;
+        } else {
+          // If Visitor (Vãng lai) is waiting: do not call VIP API!
+          // Auto-fill license plate to the form, close modal, and ask staff to swipe temporary card.
+          setManualPlate(plateUpper);
+
+          notification.info({
+            message: 'Cần quẹt thẻ tạm',
+            description: `Xe vãng lai ${plateUpper} đã được tự điền. Staff quẹt/cấp thẻ tạm để check-in.`
+          });
+
+          setIsAiModalVisible(false);
+          return;
+        }
+      }
+
+      // If not in the waiting queue, but is a VIP check-in in DB (or new entry):
+      // Call /v1/parking/check-in/ai
       const response = await apiClient.post(`/v1/parking/check-in/ai`, {
-        plate: aiPlate.toUpperCase(),
-        vehicle_type: 'SEDAN_HATCHBACK',
+        plate: plateUpper,
+        vehicle_type: aiVehicleType,
         camera_id: "CAM-01-IN",
-        confidence_score: parseFloat(aiConfidence),
-        image_url: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80'
+        confidence_score: parsedConfidence,
+        image_url: aiImagePreview || DEFAULT_CAMERA_IMAGE
       });
+      const payload = response?.data || response;
       
-      const zone = response.data?.assigned_zone_code || 'F1';
+      const zone = payload?.assigned_zone_code || getZoneForVehicleType(aiVehicleType);
       setLastCheckInResult({
-        plate: aiPlate.toUpperCase(),
+        plate: plateUpper,
         type: 'VIP',
-        vehicleType: 'SEDAN_HATCHBACK',
+        vehicleType: getVehicleTypeLabel(aiVehicleType),
         assignedZoneCode: zone,
         floorName: getFloorShortName(zone),
         floorFullName: getFloorFullName(zone),
+        routeHint: getRouteHint(aiVehicleType, zone),
         timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
       });
 
-      notification.success({ message: 'AI Nhận diện Thành công', description: `Biển số ${aiPlate} hợp lệ.` });
-      addLog(`[AI_LPR] Success: Plate ${aiPlate}, Conf: ${aiConfidence}%`, 'OK');
+      notification.success({ message: 'Xác thực VIP Camera thành công', description: `Biển số VIP ${plateUpper} hợp lệ.` });
+      addLog(`[AI_LPR] Success (New VIP check-in): Plate ${plateUpper}, Conf: ${aiConfidence}%`, 'OK');
       setIsAiModalVisible(false);
       setAiPlate('');
       setAiConfidence(98.5);
       
       addActivityLog({
-        plate: aiPlate,
+        plate: plateUpper,
         model: "Nhận diện Camera",
         type: "VIP",
         gate: "CAM-01-IN",
@@ -280,22 +396,13 @@ export const StaffGateControl = () => {
         actionColor: "text-emerald-600"
       });
       setDailyVolume(prev => prev + 1);
+      if (fetchAllDataFromBackend) fetchAllDataFromBackend();
 
     } catch (err) {
       console.error(err);
-      const errorMsg = err.response?.data?.message || err.response?.data?.error || 'AI Nhận diện thất bại';
-      // MÔ PHỎNG LOGIC NGOẠI LỆ < 70%
-      if (aiConfidence < 70 || errorMsg.includes("mờ")) {
-         notification.warning({ 
-           message: 'Cảnh báo AI', 
-           description: errorMsg,
-           duration: 8
-         });
-         addLog(`[AI_LPR] Failed: Conf ${aiConfidence}%. Reason: ${errorMsg}`, 'WARN');
-      } else {
-         notification.error({ message: 'Lỗi', description: errorMsg });
-         addLog(`[ERROR] AI Check-in: ${errorMsg}`, 'ERROR');
-      }
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || 'Xác thực VIP thất bại';
+      notification.error({ message: 'Lỗi', description: errorMsg });
+      addLog(`[ERROR] AI Check-in: ${errorMsg}`, 'ERROR');
     } finally {
       setIsAiProcessing(false);
     }
@@ -336,15 +443,35 @@ export const StaffGateControl = () => {
       return;
     }
 
-    const isExitGate = id.includes('RA');
+    const isExitGate = isExitGateId(id);
     const fee = isExitGate ? 25000 : 0;
     const vehicle = activeVehicles.find(v => v.plate === plate);
-    const isVip = vehicle && vehicle.type === 'VIP';
+    const isVip = vehicle && (vehicle.type === 'VIP' || vehicle.isVip === true);
 
-    // If it's an exit gate and not a VIP, we MUST go to the payment screen to handle proper checkout
-    if (isExitGate && !isVip) {
-      notification.info({ message: 'Chuyển hướng', description: 'Đang mở màn hình thanh toán để xử lý giao dịch...', placement: 'topRight' });
-      navigate('/staff-payment', { state: { lpr: plate } });
+    // Exit gate always goes through the payment/review screen so staff can verify card/ID and compare images first.
+    if (isExitGate) {
+      notification.info({ message: 'Chuyển hướng', description: 'Đang mở màn hình thanh toán/đối chiếu ảnh...', placement: 'topRight' });
+      navigate('/staff-payment', {
+        state: {
+          lpr: plate,
+          cardCode: vehicle?.cardCode,
+          type: vehicle?.type,
+          isVip,
+          duration: vehicle?.duration,
+          inTime: vehicle?.inTime
+        }
+      });
+      return;
+    }
+
+    // If it's an entry gate and not a VIP, we MUST use the form below to swipe card code and check-in
+    if (!isExitGate && !isVip) {
+      notification.info({
+        message: 'Yêu cầu quẹt thẻ',
+        description: `Vui lòng quẹt thẻ tạm ở form "Check-in vãng lai bằng thẻ" phía dưới để hoàn tất check-in cho xe ${plate}!`,
+        placement: 'topRight'
+      });
+      setManualPlate(plate);
       return;
     }
 
@@ -566,6 +693,26 @@ export const StaffGateControl = () => {
     });
   };
 
+  const getVehicleTypeDisplay = (type) => {
+    const t = (type || '').toUpperCase();
+    if (t === 'SUV_CUV_MPV') return 'Xe 7-9 chỗ (SUV/CUV/MPV)';
+    if (t === 'LARGE_VAN_MINIBUS') return 'Xe lớn (Van/Minibus)';
+    if (t === 'EV_CAR' || t === 'ELECTRIC') return 'Xe điện';
+    return 'Xe 4-5 chỗ (Sedan/Hatchback)';
+  };
+
+  const getLedDirection = (type) => {
+    const t = (type || '').toUpperCase();
+    if (t === 'SUV_CUV_MPV') return 'Tầng F2';
+    if (t === 'LARGE_VAN_MINIBUS') return 'Tầng B1/G';
+    return 'Tầng F1';
+  };
+
+  const getVehicleTypeForZone = (type, zoneCode) => {
+    if (!zoneCode) return type;
+    return getVehicleTypeFromZone(zoneCode) || type;
+  };
+
   return (
     <div className="p-6 w-full">
       {/* Top Stats & Emergency */}
@@ -724,14 +871,7 @@ export const StaffGateControl = () => {
                     return (
                   <tr 
                     key={i} 
-                    onClick={() => {
-                      if (gate.vehicleId && activeVehicles) {
-                        const v = activeVehicles.find(av => av.id === gate.vehicleId);
-                        if (v) setCurrentVehicle(v);
-                      } else {
-                        setCurrentVehicle(null);
-                      }
-                    }}
+                    onClick={() => handleGateRowSelect(gate)}
                     className={`border-b hover:bg-slate-50 transition-colors last:border-0 cursor-pointer ${isSelected ? 'bg-blue-50/50 border-blue-200 shadow-sm' : 'border-slate-100'}`}
                   >
                     <td className="p-4 font-bold text-slate-800">{gate.id}</td>
@@ -773,9 +913,7 @@ export const StaffGateControl = () => {
                             className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded flex items-center gap-1.5 transition-colors shadow-sm"
                           >
                             <CheckCircleFilled className="text-white" />
-                            {gate.id.includes('RA') && activeVehicles.find(v => v.plate === gate.plate)?.type !== 'VIP' 
-                              ? "THANH TOÁN" 
-                              : "PHÊ DUYỆT"}
+                            {isExitGateId(gate.id) ? "THANH TOÁN" : "PHÊ DUYỆT"}
                           </button>
                         )}
                         {gate.actions.includes("reject") && (
@@ -831,7 +969,7 @@ export const StaffGateControl = () => {
                     style={{ textShadow: '0 0 8px rgba(52, 211, 153, 0.8)' }}
                     scrollamount="6"
                   >
-                    BIỂN SỐ: {lastCheckInResult.plate} ➔ XE {lastCheckInResult.vehicleType} ➔ HƯỚNG ĐI: {lastCheckInResult.floorName.toUpperCase()}
+                    BIỂN SỐ: {lastCheckInResult.plate} ➔ {lastCheckInResult.routeHint || `${lastCheckInResult.vehicleType} → ${lastCheckInResult.floorName}`}
                   </marquee>
                 )
               ) : (
@@ -939,10 +1077,10 @@ export const StaffGateControl = () => {
                   );
                 })()}
               <button 
-                onClick={() => setIsAiModalVisible(true)}
+                onClick={openVipCameraModal}
                 className="mt-1 w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 px-4 rounded transition-colors flex items-center justify-center gap-2 text-xs uppercase tracking-wider shadow-sm"
               >
-                <VideoCameraOutlined /> MÔ PHỎNG LPR CAMERA
+                <VideoCameraOutlined /> XÁC THỰC VIP CAMERA
               </button>
             </div>
           </div>
@@ -950,7 +1088,7 @@ export const StaffGateControl = () => {
           {/* Manual Check-In */}
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col p-4 mb-6">
             <h3 className="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wider flex items-center gap-2">
-              <CheckCircleFilled className="text-emerald-500" /> Nhập xe thủ công
+              <CheckCircleFilled className="text-emerald-500" /> Check-in vãng lai bằng thẻ
             </h3>
             <div className="flex flex-col gap-3">
               <input 
@@ -976,22 +1114,35 @@ export const StaffGateControl = () => {
                   💳 Quét mẫu
                 </button>
               </div>
-              <select 
-                value={manualType} 
-                onChange={(e) => setManualType(e.target.value)}
-                className="border border-slate-200 p-2 rounded text-sm focus:outline-none focus:border-blue-500"
-              >
-                <option value="Ô tô gầm thấp 4-5 chỗ">Ô tô gầm thấp 4-5 chỗ (Sedan/Hatchback)</option>
-                <option value="Xe 7 chỗ">Xe 7 chỗ (SUV/CUV/MPV)</option>
-                <option value="Xe 9 chỗ">Xe 9 chỗ (Minibus/Van)</option>
-                <option value="Xe 16 chỗ">Xe 16 chỗ (Minibus)</option>
-              </select>
+              {(() => {
+                const normalizedPlate = manualPlate.trim().toUpperCase();
+                if (!normalizedPlate) return null;
+                const waitingVehicleForForm = activeVehicles?.find(v => v.plate?.toUpperCase() === normalizedPlate && isEntryGateId(v.gate));
+                const detectedZone = waitingVehicleForForm?.assignedZoneCode;
+                const detectedType = getVehicleTypeForZone(inferVehicleType(waitingVehicleForForm), detectedZone);
+                return (
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col gap-1.5 text-xs text-slate-600 font-medium my-1">
+                    <div>
+                      <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px] block mb-0.5">Camera nhận diện</span>
+                      <span className="text-slate-800 font-extrabold text-[13px]">
+                        {getVehicleTypeDisplay(detectedType).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="mt-1 border-t border-slate-200/60 pt-1.5">
+                      <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px] block mb-0.5">Hướng dẫn LED bảng chỉ dẫn</span>
+                      <span className="text-emerald-600 font-extrabold text-[13px] tracking-wide">
+                        XE {normalizedPlate || '...'} ➔ {getRouteHint(detectedType, detectedZone).toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
               <button 
                 onClick={handleManualCheckIn}
                 disabled={isCheckingIn}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors disabled:bg-blue-400"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded transition-colors disabled:bg-blue-400 flex items-center justify-center gap-2 text-xs uppercase tracking-wider shadow-sm mt-1"
               >
-                {isCheckingIn ? 'Đang xử lý...' : 'CHECK-IN KHÁCH'}
+                💳 QUẸT THẺ & CHECK-IN
               </button>
             </div>
           </div>
@@ -1022,7 +1173,7 @@ export const StaffGateControl = () => {
       <Modal
         title={
           <div className="flex items-center gap-2 text-slate-800 uppercase tracking-wider font-bold">
-            <VideoCameraOutlined className="text-blue-600" /> Mô phỏng AI LPR Scanner
+            <VideoCameraOutlined className="text-amber-500" /> Xác thực VIP qua LPR
           </div>
         }
         open={isAiModalVisible}
@@ -1031,13 +1182,10 @@ export const StaffGateControl = () => {
         destroyOnClose
       >
         <div className="flex flex-col gap-5 mt-4">
-          {/* Mock Camera Image Area */}
-          <label htmlFor="ai-image-upload" className="border-2 border-dashed border-slate-300 rounded-lg p-2 flex flex-col items-center justify-center bg-slate-50 relative overflow-hidden group cursor-pointer hover:border-blue-400 transition-colors">
-             <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-             <img src={aiImagePreview} alt="Xe mẫu" className="w-full h-40 object-cover rounded mb-2 opacity-80" />
-             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider absolute bottom-4 bg-white/80 px-3 py-1 rounded backdrop-blur-sm group-hover:text-blue-600 transition-colors shadow-sm">TẢI ẢNH XE LÊN (BẤM ĐỂ CHỌN)</span>
-             <input type="file" id="ai-image-upload" accept="image/*" className="hidden" onChange={handleAiImageUpload} />
-          </label>
+          {/* Camera Image Area */}
+          <div className="border border-slate-200 rounded-lg p-2 flex flex-col bg-slate-50 relative overflow-hidden">
+             <img src={aiImagePreview || DEFAULT_CAMERA_IMAGE} alt="Ảnh camera xe tại cổng" className="w-full h-40 object-cover rounded opacity-85" />
+          </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Nhận diện Biển số</label>
@@ -1076,9 +1224,9 @@ export const StaffGateControl = () => {
           <button
             onClick={handleAiCheckIn}
             disabled={isAiProcessing}
-            className={`w-full font-bold py-3.5 px-4 rounded-lg transition-colors shadow-md mt-2 flex items-center justify-center gap-2 uppercase tracking-wider ${aiConfidence < 70 ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-500/20' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20'} disabled:opacity-70`}
+            className={`w-full font-bold py-3.5 px-4 rounded-lg transition-colors shadow-md mt-2 flex items-center justify-center gap-2 uppercase tracking-wider ${aiConfidence < 70 ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-500/20' : 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20'} disabled:opacity-70`}
           >
-            {isAiProcessing ? 'Đang gửi Backend xử lý...' : (aiConfidence < 70 ? 'Quét (Bị từ chối)' : 'Quét Camera LPR')}
+            {isAiProcessing ? 'Đang gửi Backend xử lý...' : (aiConfidence < 70 ? 'Phê duyệt (Bị từ chối)' : 'Phê duyệt VIP')}
           </button>
         </div>
       </Modal>

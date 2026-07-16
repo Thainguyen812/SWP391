@@ -2,9 +2,11 @@ package com.parking.controller;
 
 import com.parking.model.ParkingSession;
 import com.parking.model.VipQrIdentifier;
+import com.parking.dto.FcmTokenRequest;
 import com.parking.repository.ParkingSessionRepository;
 import com.parking.repository.VipQrIdentifierRepository;
 import com.parking.repository.VipSubscriptionRepository;
+import com.parking.exception.ApiExceptions;
 import com.parking.service.ParkingService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
 
 import com.parking.model.User;
 import com.parking.model.Vehicle;
@@ -103,6 +106,27 @@ public class DriverController {
     @PreAuthorize("hasAnyRole('DRIVER', 'STAFF', 'MANAGER')")
     public ResponseEntity<java.util.Map<String, Object>> getVehicleStatus(@PathVariable UUID vehicleId) {
         return ResponseEntity.ok(parkingService.getVehicleStatus(vehicleId));
+    }
+
+    @PutMapping("/fcm-token")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ResponseEntity<Map<String, Object>> updateFcmToken(
+            @RequestBody FcmTokenRequest request,
+            Authentication authentication) {
+        if (request == null || request.getFcmToken() == null || request.getFcmToken().trim().isEmpty()) {
+            throw new ApiExceptions.BadRequestException("FCM token khong duoc de trong");
+        }
+
+        User currentUser = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay tai khoan driver"));
+
+        currentUser.setFcmToken(request.getFcmToken().trim());
+        userRepository.save(currentUser);
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Da cap nhat FCM token cho driver",
+                "userId", currentUser.getId()));
     }
 
     // Helper DTOs
@@ -204,11 +228,11 @@ public class DriverController {
                 try {
                     long feeLong = Long.parseLong(feeVal);
                     if (feeLong == 0) {
-                        if ("DAILY".equals(sub.getSubscriptionType()) || "DAY".equals(sub.getSubscriptionType())) feeLong = 50000;
-                        else if ("QUARTERLY".equals(sub.getSubscriptionType())) feeLong = 2700000;
-                        else if ("HALF_YEARLY".equals(sub.getSubscriptionType())) feeLong = 5000000;
-                        else if ("YEARLY".equals(sub.getSubscriptionType())) feeLong = 9000000;
-                        else feeLong = 1000000;
+                        if ("DAILY".equals(sub.getSubscriptionType()) || "DAY".equals(sub.getSubscriptionType())) feeLong = 70000;
+                        else if ("QUARTERLY".equals(sub.getSubscriptionType())) feeLong = 3800000;
+                        else if ("HALF_YEARLY".equals(sub.getSubscriptionType())) feeLong = 7000000;
+                        else if ("YEARLY".equals(sub.getSubscriptionType())) feeLong = 12500000;
+                        else feeLong = 1400000;
                     }
                     feeVal = String.format("%,d", feeLong).replace(',', '.') + "₫";
                 } catch (Exception e) {

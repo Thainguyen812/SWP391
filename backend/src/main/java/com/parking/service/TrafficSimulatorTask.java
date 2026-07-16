@@ -45,6 +45,7 @@ public class TrafficSimulatorTask {
         try {
             // Logic Check-in: Clear entry gates that have been occupied for > 90s
             Instant threshold = Instant.now().minus(90, ChronoUnit.SECONDS);
+            List<ParkingSession> allSessions = sessionRepo.findAll();
             List<PendingGateVehicleService.PendingEntry> processingIns = pendingGateVehicleService.findAll();
 
             // AUTOMATIC CHECK-IN COMMENTED OUT - wait for manual staff approval
@@ -58,7 +59,7 @@ public class TrafficSimulatorTask {
             */
 
             // Logic Check-out: Find cars at exit gates
-            List<ParkingSession> processingOuts = sessionRepo.findAll().stream()
+            List<ParkingSession> processingOuts = allSessions.stream()
                 .filter(s -> s.getSessionStatus() == ParkingSession.SessionStatus.ACTIVE && s.getExitGate() != null)
                 .collect(Collectors.toList());
 
@@ -91,34 +92,47 @@ public class TrafficSimulatorTask {
             }
             */
 
-            // Randomly check in a new vehicle to an EMPTY entry gate
-            if (Math.random() > 0.5) {
-                List<String> occupiedInGates = processingIns.stream()
-                    .map(PendingGateVehicleService.PendingEntry::getEntryGate)
-                    .collect(Collectors.toList());
-                occupiedInGates.addAll(sessionRepo.findAll().stream()
-                    .filter(s -> s.getSessionStatus() == ParkingSession.SessionStatus.ACTIVE && s.getEntryGate() != null)
-                    .map(ParkingSession::getEntryGate)
-                    .collect(Collectors.toList()));
-                List<String> emptyInGates = IN_GATES.stream().filter(g -> !occupiedInGates.contains(g)).collect(Collectors.toList());
-                
-                if (!emptyInGates.isEmpty()) {
-                    String selectedGate = emptyInGates.get((int) (Math.random() * emptyInGates.size()));
-                    
+            // Every 45s, simulate one new random vehicle for each empty entry gate.
+            List<String> occupiedInGates = processingIns.stream()
+                .map(PendingGateVehicleService.PendingEntry::getEntryGate)
+                .collect(Collectors.toList());
+            List<String> emptyInGates = IN_GATES.stream().filter(g -> !occupiedInGates.contains(g)).collect(Collectors.toList());
+
+            if (!emptyInGates.isEmpty()) {
+                List<String> generatedThisTick = new java.util.ArrayList<>();
+                for (String selectedGate : emptyInGates) {
                     ParkingSession session = new ParkingSession();
                     session.setId(UUID.randomUUID());
                     String[] prefixes = {"51A", "51F", "51G", "51H", "51K", "29A", "30E", "30G"};
-                    String prefix = prefixes[(int)(Math.random() * prefixes.length)];
-                    int number = 10000 + (int)(Math.random() * 90000);
-                    session.setLicensePlate(prefix + "-" + number + ".SIM");
+                    String generatedPlate = null;
+                    for (int attempt = 0; attempt < 20; attempt++) {
+                        String prefix = prefixes[(int)(Math.random() * prefixes.length)];
+                        int number = 10000 + (int)(Math.random() * 90000);
+                        String candidatePlate = prefix + "-" + number + ".SIM";
+                        boolean existsInPending = processingIns.stream()
+                                .anyMatch(p -> candidatePlate.equalsIgnoreCase(p.getLicensePlate()));
+                        boolean existsInSessions = allSessions.stream()
+                                .anyMatch(s -> candidatePlate.equalsIgnoreCase(s.getLicensePlate()));
+                        boolean existsInCurrentTick = generatedThisTick.stream()
+                                .anyMatch(p -> candidatePlate.equalsIgnoreCase(p));
+                        if (!existsInPending && !existsInSessions && !existsInCurrentTick) {
+                            generatedPlate = candidatePlate;
+                            break;
+                        }
+                    }
+                    if (generatedPlate == null) {
+                        continue;
+                    }
+
+                    session.setLicensePlate(generatedPlate);
                     session.setCheckInTime(Instant.now());
                     session.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
                     session.setEntryGate(selectedGate);
-                    session.setIsVip(Math.random() < 0.2);
-                    
+                    session.setIsVip(Math.random() < 0.25);
+
                     String[] vehicleTypes = {"SEDAN_HATCHBACK", "SUV_CUV_MPV", "LARGE_VAN_MINIBUS", "EV_CAR"};
                     String resolvedVehicleType = vehicleTypes[(int)(Math.random() * vehicleTypes.length)];
-                    
+
                     List<Zone> candidates = zoneRepo.findByAllowedSizesContaining(resolvedVehicleType);
                     Zone chosen = null;
                     if (!candidates.isEmpty()) {
@@ -132,17 +146,17 @@ public class TrafficSimulatorTask {
                             chosen = allZones.get(0);
                         }
                     }
-                    
+
                     if (chosen != null) {
                         session.setAssignedZoneId(chosen.getId());
                     } else {
                         return; // Cannot simulate without zones
                     }
-                    
+
                     if (Math.random() < 0.1) {
                         session.setIsSuspicious(true);
                         session.setSuspiciousReason("Cảnh báo AI: Dấu hiệu bất thường (Mô phỏng)");
-                        
+
                         SecurityAlert alert = new SecurityAlert();
                         alert.setAlertType("AI_WARNING");
                         alert.setLicensePlate(session.getLicensePlate());
@@ -151,7 +165,7 @@ public class TrafficSimulatorTask {
                         alert.setIsResolved(false);
                         alertRepo.save(alert);
                     }
-                    pendingGateVehicleService.add(new PendingGateVehicleService.PendingEntry(
+                    boolean added = pendingGateVehicleService.add(new PendingGateVehicleService.PendingEntry(
                         session.getId(),
                         session.getLicensePlate(),
                         session.getEntryGate(),
@@ -161,28 +175,39 @@ public class TrafficSimulatorTask {
                         resolvedVehicleType,
                         session.getCheckInTime()
                     ));
-                }
-            } // Added missing closing brace here
-
-            // Randomly start checking out an existing vehicle
-            if (Math.random() > 0.6) {
-                List<String> occupiedOutGates = processingOuts.stream().map(ParkingSession::getExitGate).collect(Collectors.toList());
-                List<String> emptyOutGates = OUT_GATES.stream().filter(g -> !occupiedOutGates.contains(g)).collect(Collectors.toList());
-                
-                if (!emptyOutGates.isEmpty()) {
-                    List<ParkingSession> insideVehicles = sessionRepo.findAll().stream()
-                        .filter(s -> s.getSessionStatus() == ParkingSession.SessionStatus.ACTIVE 
-                                  && s.getEntryGate() == null 
-                                  && s.getExitGate() == null)
-                        .collect(Collectors.toList());
-                        
-                    if (!insideVehicles.isEmpty()) {
-                        ParkingSession session = insideVehicles.get((int) (Math.random() * insideVehicles.size()));
-                        String selectedGate = emptyOutGates.get((int) (Math.random() * emptyOutGates.size()));
-                        session.setExitGate(selectedGate);
-                        session.setCheckOutTime(Instant.now()); 
-                        sessionRepo.save(session);
+                    if (added) {
+                        generatedThisTick.add(session.getLicensePlate());
                     }
+                }
+            }
+
+            // Every 45s, move one eligible parked vehicle to each empty exit gate.
+            Instant exitEligibilityThreshold = Instant.now().minus(30, ChronoUnit.SECONDS);
+            List<String> occupiedOutGates = processingOuts.stream().map(ParkingSession::getExitGate).collect(Collectors.toList());
+            List<String> emptyOutGates = OUT_GATES.stream().filter(g -> !occupiedOutGates.contains(g)).collect(Collectors.toList());
+
+            if (!emptyOutGates.isEmpty()) {
+                List<ParkingSession> insideVehicles = allSessions.stream()
+                    .filter(s -> s.getSessionStatus() == ParkingSession.SessionStatus.ACTIVE
+                              && s.getExitGate() == null)
+                    .filter(s -> s.getEntryGate() == null
+                              || s.getCardId() != null
+                              || Boolean.TRUE.equals(s.getIsVip()))
+                    .filter(s -> s.getCheckInTime() != null && s.getCheckInTime().isBefore(exitEligibilityThreshold))
+                    .filter(s -> processingIns.stream()
+                            .noneMatch(p -> p.getLicensePlate().equalsIgnoreCase(s.getLicensePlate())))
+                    .collect(Collectors.toList());
+
+                java.util.Collections.shuffle(insideVehicles);
+                int vehicleIndex = 0;
+                for (String selectedGate : emptyOutGates) {
+                    if (vehicleIndex >= insideVehicles.size()) {
+                        break;
+                    }
+                    ParkingSession session = insideVehicles.get(vehicleIndex++);
+                    session.setExitGate(selectedGate);
+                    session.setCheckOutTime(Instant.now());
+                    sessionRepo.save(session);
                 }
             }
         } catch (Exception e) {

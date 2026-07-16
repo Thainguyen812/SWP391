@@ -20,6 +20,6 @@ public interface ZoneRepository extends JpaRepository<Zone, UUID> {
     void increaseOccupied(UUID zoneId);
 
     @Modifying
-    @Query("UPDATE Zone z SET z.currentOccupied = z.currentOccupied - 1 WHERE z.id = :zoneId")
+    @Query("UPDATE Zone z SET z.currentOccupied = CASE WHEN z.currentOccupied > 0 THEN z.currentOccupied - 1 ELSE 0 END WHERE z.id = :zoneId")
     void decreaseOccupied(UUID zoneId);
 }

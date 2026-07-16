@@ -57,6 +57,15 @@ public class Transaction {
     @Column(name = "processed_at")
     private Instant processedAt;
 
+    @Transient
+    private Instant mobileCheckoutExpiresAt;
+
+    @Transient
+    private Boolean mobileCheckoutGraceExpired = false;
+
+    @Transient
+    private BigDecimal mobileCheckoutOverstayPenalty = BigDecimal.ZERO;
+
     public enum PaymentMethod {
         CASH, VNPAY_SANDBOX, MOMO_SANDBOX, QR_BANK
     }
@@ -183,5 +192,29 @@ public class Transaction {
 
     public void setProcessedAt(Instant processedAt) {
         this.processedAt = processedAt;
+    }
+
+    public Instant getMobileCheckoutExpiresAt() {
+        return mobileCheckoutExpiresAt;
+    }
+
+    public void setMobileCheckoutExpiresAt(Instant mobileCheckoutExpiresAt) {
+        this.mobileCheckoutExpiresAt = mobileCheckoutExpiresAt;
+    }
+
+    public Boolean getMobileCheckoutGraceExpired() {
+        return mobileCheckoutGraceExpired;
+    }
+
+    public void setMobileCheckoutGraceExpired(Boolean mobileCheckoutGraceExpired) {
+        this.mobileCheckoutGraceExpired = mobileCheckoutGraceExpired;
+    }
+
+    public BigDecimal getMobileCheckoutOverstayPenalty() {
+        return mobileCheckoutOverstayPenalty;
+    }
+
+    public void setMobileCheckoutOverstayPenalty(BigDecimal mobileCheckoutOverstayPenalty) {
+        this.mobileCheckoutOverstayPenalty = mobileCheckoutOverstayPenalty;
     }
 }

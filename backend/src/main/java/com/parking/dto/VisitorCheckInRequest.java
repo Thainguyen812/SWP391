@@ -3,6 +3,7 @@ package com.parking.dto;
 public class VisitorCheckInRequest {
     private String plate;
     private String vehicle_type;
+    private String fuel_type;
     private String card_code;
     private String image_url;
     private String gate;
@@ -21,6 +22,14 @@ public class VisitorCheckInRequest {
 
     public void setVehicle_type(String vehicle_type) {
         this.vehicle_type = vehicle_type;
+    }
+
+    public String getFuel_type() {
+        return fuel_type;
+    }
+
+    public void setFuel_type(String fuel_type) {
+        this.fuel_type = fuel_type;
     }
 
     public String getCard_code() {

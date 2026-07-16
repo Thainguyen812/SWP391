@@ -263,10 +263,8 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
   const fetchGateScanLogs = async () => {
     try {
-      const r = await fetch('/api/logs', {
-        headers: { 'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}` }
-      });
-      const d = await r.json();
+      const r = await apiClient.get('/logs');
+      const d = r.data;
       if (d && Array.isArray(d.items)) {
         setLiveScanLogs(d.items);
       }
@@ -289,20 +287,13 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     }
     setIsProcessingGateScan(true);
     try {
-      const response = await fetch('/api/gate/scan', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}`
-        },
-        body: JSON.stringify({
-          plate: gatePlate.trim(),
-          cardCode: gateCardCode.trim(),
-          qrToken: gateQrToken.trim(),
-          gate: gateActiveName
-        })
+      const response = await apiClient.post('/gate/scan', {
+        plate: gatePlate.trim(),
+        cardCode: gateCardCode.trim(),
+        qrToken: gateQrToken.trim(),
+        gate: gateActiveName
       });
-      const data = await response.json();
+      const data = response.data;
       if (data.success) {
         triggerToast(data.message, "success");
         // Reset local gate values
@@ -322,7 +313,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
         }
         fetchGateScanLogs();
       }
-    } catch (err) {
+    } catch (err: any) {
       triggerToast("Lỗi kết nối API cổng trực Backend!", "error");
     } finally {
       setIsProcessingGateScan(false);
@@ -331,11 +322,8 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
   const handleClearGateLogs = async () => {
     try {
-      const response = await fetch('/api/gate/clear', { 
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}` }
-      });
-      const data = await response.json();
+      const response = await apiClient.post('/gate/clear');
+      const data = response.data;
       if (data.success) {
         setLiveScanLogs([]);
         triggerToast("Đã dọn sạch nhật ký kiểm soát cổng trực!", "success");

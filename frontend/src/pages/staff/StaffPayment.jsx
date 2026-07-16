@@ -44,6 +44,8 @@ export const StaffPayment = () => {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
   const [backendTxn, setBackendTxn] = useState(null);
+  const [identityVerified, setIdentityVerified] = useState(isLostCard ? true : false);
+  const [nowTick, setNowTick] = useState(Date.now());
 
   const calculateVisitorFee = (durationStr) => {
     if (!durationStr || durationStr === 'Đang vào') return 30000; // Default minimum fee
@@ -63,31 +65,149 @@ export const StaffPayment = () => {
   };
 
   const vehicleToPay = useMemo(() => {
+    const locationVehicle = location.state?.lpr ? {
+      plate: location.state.lpr,
+      type: location.state.type,
+      cardCode: location.state.cardCode,
+      duration: location.state.duration,
+      inTime: location.state.inTime
+    } : null;
     if (activeVehicles) {
-      return activeVehicles.find(v => v.plate === lpr) || currentVehicle;
+      return activeVehicles.find(v => v.plate === lpr) || (currentVehicle?.plate === lpr ? currentVehicle : null) || locationVehicle;
     }
-    return currentVehicle;
-  }, [activeVehicles, lpr, currentVehicle]);
+    return (currentVehicle?.plate === lpr ? currentVehicle : null) || locationVehicle;
+  }, [activeVehicles, lpr, currentVehicle, location.state]);
 
-  const isVip = vehicleToPay?.type === 'VIP' || vehicleToPay?.type === 'Vé tháng' || backendTxn?.ticketType === 'VIP' || backendTxn?.ticketType === 'Vé tháng' || location.state?.isVip === true || location.state?.type === 'VIP' || location.state?.type === 'Vé tháng';
+  const isVehicleVip = vehicleToPay?.type === 'VIP' || vehicleToPay?.type === 'Vé tháng' || location.state?.isVip === true || location.state?.type === 'VIP' || location.state?.type === 'Vé tháng';
+  const isVip = isVehicleVip || backendTxn?.ticketType === 'VIP' || backendTxn?.ticketType === 'Vé tháng';
+  const expectedCredential = useMemo(() => {
+    if (isLostCard) return '';
+    if (vehicleToPay?.cardCode) return vehicleToPay.cardCode;
+    if (location.state?.cardCode) return location.state.cardCode;
+    if (isVehicleVip && lpr && !lpr.startsWith('THẺ:')) return `VIP-${lpr}`;
+    return '';
+  }, [isLostCard, vehicleToPay?.cardCode, location.state?.cardCode, isVehicleVip, lpr]);
+  const canReviewVehicle = identityVerified || isLostCard;
+  const backendPaymentStatus = backendTxn?.paymentStatus || backendTxn?.status;
+  const backendAlreadyPaid = backendPaymentStatus === 'SUCCESS';
+  const isMobileCheckoutTxn = Boolean(backendTxn)
+    && (backendTxn?.isMobileCheckout === true || backendTxn?.mobileCheckout === true);
+  const isMobilePrepaidCheckout = backendAlreadyPaid && isMobileCheckoutTxn;
+  const mobileOverstayPenalty = Number(backendTxn?.mobileCheckoutOverstayPenalty || 0);
+  const hasMobileOverstayPenalty = isMobileCheckoutTxn && mobileOverstayPenalty > 0;
+  const mobilePrepaidAmount = Number(backendTxn?.totalAmount || 0);
+  const mobileCheckoutExpiresAt = useMemo(() => {
+    const explicitExpiry = backendTxn?.mobileCheckoutExpiresAt;
+    if (explicitExpiry) {
+      const expiryMs = new Date(explicitExpiry).getTime();
+      return Number.isNaN(expiryMs) ? null : expiryMs;
+    }
+
+    if (isMobileCheckoutTxn && backendTxn?.processedAt) {
+      const processedMs = new Date(backendTxn.processedAt).getTime();
+      return Number.isNaN(processedMs) ? null : processedMs + 30 * 60 * 1000;
+    }
+
+    return null;
+  }, [backendTxn, isMobileCheckoutTxn]);
+  const mobileRemainingMs = mobileCheckoutExpiresAt ? mobileCheckoutExpiresAt - nowTick : null;
+  const mobileGraceExpired = isMobileCheckoutTxn
+    && (backendTxn?.mobileCheckoutGraceExpired === true || (mobileRemainingMs !== null && mobileRemainingMs <= 0));
+  const mobileCountdownLabel = useMemo(() => {
+    if (!isMobileCheckoutTxn || mobileRemainingMs === null) return '30 phút';
+    if (mobileRemainingMs <= 0) return 'đã quá hạn';
+
+    const totalSeconds = Math.ceil(mobileRemainingMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes} phút ${seconds.toString().padStart(2, '0')} giây`;
+  }, [isMobileCheckoutTxn, mobileRemainingMs]);
+  const mobileCheckoutPaidAt = useMemo(() => {
+    if (!isMobileCheckoutTxn || !backendTxn?.processedAt) return null;
+
+    const paidAtMs = new Date(backendTxn.processedAt).getTime();
+    return Number.isNaN(paidAtMs) ? null : paidAtMs;
+  }, [backendTxn, isMobileCheckoutTxn]);
+  const formatMobileClock = (timestampMs) => {
+    if (!timestampMs) return '--:--';
+
+    return new Date(timestampMs).toLocaleString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit'
+    });
+  };
+  const mobileOverstayLabel = useMemo(() => {
+    if (!mobileGraceExpired || mobileRemainingMs === null) return '';
+
+    const totalMinutes = Math.max(1, Math.ceil(Math.abs(mobileRemainingMs) / 60000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours <= 0) return `${minutes} phút`;
+    if (minutes === 0) return `${hours} giờ`;
+    return `${hours} giờ ${minutes} phút`;
+  }, [mobileGraceExpired, mobileRemainingMs]);
+  const displayAmount = canReviewVehicle ? (isMobileCheckoutTxn ? mobileOverstayPenalty : totalAmount) : 0;
+  const ticketNumber = useMemo(() => {
+    if (!lpr) return 1000;
+    let hash = 0;
+    for (let i = 0; i < lpr.length; i++) {
+      hash = lpr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash) % 9000 + 1000;
+  }, [lpr]);
 
   useEffect(() => {
     setIsPaid(false);
-  }, [vehicleToPay]);
+    setBackendTxn(null);
+    setIdentityVerified(isLostCard ? true : false);
+    setHasVehicle(isLostCard ? true : false);
+    if (expectedCredential) {
+      setCardCode(expectedCredential);
+      notification.info({
+        message: isVehicleVip ? 'Tự động điền mã định danh VIP' : 'Tự động điền mã thẻ',
+        description: isVehicleVip
+          ? `Mã định danh ${expectedCredential} đã được lấy từ xe VIP.`
+          : `Mã thẻ ${expectedCredential} đã được tự động lấy từ hệ thống.`,
+        placement: 'topRight'
+      });
+    }
+  }, [expectedCredential, isLostCard, isVehicleVip]);
 
   useEffect(() => {
     // Auto-select payment method if VIP
     if (isVip) {
-      setPaymentMethod('QR VIP');
+      setPaymentMethod('card');
     }
   }, [isVip]);
 
   useEffect(() => {
+    if (!isMobileCheckoutTxn || !mobileCheckoutExpiresAt || !canReviewVehicle) {
+      return undefined;
+    }
+
+    setNowTick(Date.now());
+    const timer = window.setInterval(() => {
+      setNowTick(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [isMobileCheckoutTxn, mobileCheckoutExpiresAt, canReviewVehicle]);
+
+  useEffect(() => {
     if (backendTxn) {
+      const txnAlreadyPaid = backendTxn.paymentStatus === 'SUCCESS' || backendTxn.status === 'SUCCESS';
+      const txnIsMobileCheckout = txnAlreadyPaid
+        && (backendTxn.isMobileCheckout === true || backendTxn.mobileCheckout === true);
+      const txnMobilePenalty = Number(backendTxn.mobileCheckoutOverstayPenalty || 0);
+      const amountToCollect = txnIsMobileCheckout ? txnMobilePenalty : backendTxn.totalAmount;
+
       setTotalAmount(prev => {
-        if (prev !== backendTxn.totalAmount) {
-          setCashGiven(backendTxn.totalAmount);
-          return backendTxn.totalAmount;
+        if (prev !== amountToCollect) {
+          setCashGiven(amountToCollect);
+          return amountToCollect;
         }
         return prev;
       });
@@ -144,29 +264,74 @@ export const StaffPayment = () => {
   };
 
   const carImgs = getCarImages(lpr);
+  const reviewImageClass = `absolute inset-0 w-full h-full object-cover transition-all duration-300 ${
+    canReviewVehicle ? 'opacity-85 group-hover:opacity-100' : 'opacity-35 blur-md scale-105'
+  }`;
 
   const handleScanCard = async () => {
     if (isEmergency) {
       notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể quét thẻ lúc này.' });
       return;
     }
-    if (!cardCode) return notification.warning({message: 'Vui lòng nhập hoặc quét mã thẻ'});
+    const normalizedCode = cardCode.trim();
+    if (!normalizedCode) return notification.warning({message: 'Vui lòng nhập hoặc quét mã thẻ/định danh'});
+    if (expectedCredential && normalizedCode !== expectedCredential) {
+      notification.error({
+        message: 'Sai mã xác nhận',
+        description: `Mã vừa quét không khớp với ${isVip ? 'định danh VIP' : 'thẻ vãng lai'} của xe ${lpr}.`
+      });
+      setIdentityVerified(false);
+      return;
+    }
+
     setIsCheckingOut(true);
     try {
-      const response = await apiClient.post(`/v1/parking/checkout-by-code/${cardCode}`);
-      const txn = response.data;
+      if (isVip) {
+        setIdentityVerified(true);
+        setHasVehicle(true);
+        setLan1Status('busy');
+        setTotalAmount(0);
+        setCashGiven(0);
+        notification.success({
+          message: 'Đã xác nhận VIP',
+          description: 'Ảnh vào/ra đã được mở để staff đối chiếu trước khi cho xe ra.'
+        });
+        return;
+      }
+
+      const matchedByCard = activeVehicles?.find(v => v.cardCode === normalizedCode);
+      if (matchedByCard?.plate && matchedByCard.plate !== lpr) {
+        setLpr(matchedByCard.plate);
+      }
+
+      const response = await apiClient.post(`/v1/parking/checkout-by-code/${normalizedCode}`);
+      const txn = response?.data || response;
+      const isMobilePaidTxn = (txn?.paymentStatus === "SUCCESS" || txn?.status === "SUCCESS")
+        && (txn?.isMobileCheckout === true || txn?.mobileCheckout === true);
+      const scannedMobilePenalty = Number(txn?.mobileCheckoutOverstayPenalty || 0);
       
       setBackendTxn(txn);
-      if (!lpr) setLpr(`THẺ: ${cardCode}`); // Only fallback to card code if plate is unknown
-      setTotalAmount(txn.totalAmount);
-      setCashGiven(txn.totalAmount);
+      if (!lpr) setLpr(matchedByCard?.plate || `THẺ: ${normalizedCode}`); // Only fallback to card code if plate is unknown
+      setTotalAmount(isMobilePaidTxn ? scannedMobilePenalty : txn.totalAmount);
+      setCashGiven(isMobilePaidTxn ? scannedMobilePenalty : txn.totalAmount);
       setHasVehicle(true);
+      setIdentityVerified(true);
       setLan1Status('busy');
-      notification.success({message: 'Quét thẻ thành công', description: `Đã tính phí: ${txn.totalAmount} VND. Vui lòng thu tiền.`});
+      notification.success({
+        message: isMobilePaidTxn
+          ? (scannedMobilePenalty > 0 ? "Mobile POS quá hạn" : "Xe đã thanh toán Mobile POS")
+          : "Xác nhận thẻ thành công",
+        description: isMobilePaidTxn
+          ? (scannedMobilePenalty > 0
+            ? `Xe đã quá hạn 30 phút. Cần thu phí phát sinh ${scannedMobilePenalty.toLocaleString()} VND trước khi mở cổng.`
+            : `Đã xác nhận thẻ xe ${matchedByCard?.plate || lpr}. Staff chỉ cần đối chiếu ảnh và mở cổng, không thu thêm tiền.`)
+          : `Đã mở ảnh đối chiếu và tính phí: ${txn.totalAmount} VND.`
+      });
     } catch (error) {
         notification.error({message: 'Lỗi Check-out', description: error.response?.data?.message || 'Không thể check-out bằng thẻ này'});
         setHasVehicle(false);
         setBackendTxn(null);
+        setIdentityVerified(false);
       } finally {
       setIsCheckingOut(false);
     }
@@ -178,24 +343,59 @@ export const StaffPayment = () => {
       notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể thanh toán và mở cổng lúc này.' });
       return;
     }
+    if (!canReviewVehicle) {
+      notification.warning({
+        message: 'Chưa xác nhận đối chiếu',
+        description: 'Vui lòng xác nhận đúng mã thẻ/định danh để mở ảnh đối chiếu trước khi thanh toán.'
+      });
+      return;
+    }
+    if (isMobileCheckoutTxn && mobileGraceExpired && !hasMobileOverstayPenalty) {
+      notification.warning({
+        message: 'Mobile POS đã quá hạn',
+        description: 'Vui lòng quẹt lại thẻ để backend tính phí phát sinh sau 30 phút trước khi mở cổng.'
+      });
+      return;
+    }
     
+    const confirmTitle = isMobileCheckoutTxn
+      ? (hasMobileOverstayPenalty ? "Thu phí quá hạn Mobile POS" : "Xác nhận mở cổng sau Mobile POS")
+      : (displayAmount === 0 ? "Xác nhận mở cổng" : "Xác nhận thanh toán");
+    const confirmContent = isMobileCheckoutTxn
+      ? (hasMobileOverstayPenalty
+        ? "Xe " + lpr + " đã quá hạn 30 phút sau Mobile POS. Thu thêm " + mobileOverstayPenalty.toLocaleString() + " VND phí phát sinh rồi mở cổng."
+        : "Xe " + lpr + " đã thanh toán qua Mobile POS (" + mobilePrepaidAmount.toLocaleString() + " VND). Staff xác nhận thẻ/ảnh đúng và mở cổng, không thu thêm tiền.")
+      : isLostCard
+        ? "Tiến hành thu " + displayAmount.toLocaleString() + " đ (bao gồm phí đỗ xe và phạt mất thẻ) và mở cổng cho xe " + lpr + "?"
+        : (displayAmount === 0
+          ? "Xác nhận ảnh đối chiếu đúng và mở cổng cho xe " + (isVip ? "VIP " : "") + lpr + "?"
+          : "Tiến hành thu phí và mở cổng cho xe " + lpr + "?");
+    const confirmOkText = isMobileCheckoutTxn
+      ? (hasMobileOverstayPenalty ? "Thu phí quá hạn & Mở cổng" : "Xác nhận & Mở cổng")
+      : ((isMobilePrepaidCheckout || displayAmount === 0) ? "Xác nhận & Mở cổng" : "Thu tiền & Mở cổng");
+
     Modal.confirm({
-      title: totalAmount === 0 ? 'Xác nhận mở cổng' : 'Xác nhận thanh toán',
-      content: isLostCard ? `Tiến hành thu ${totalAmount.toLocaleString()} đ (Bao gồm phí đỗ xe và phạt mất thẻ) và mở cổng cho xe ${lpr}?` : 
-               (totalAmount === 0 ? `Xác nhận mở cổng cho xe VIP ${lpr}?` : `Tiến hành thu phí và mở cổng cho xe ${lpr}?`),
-      okText: totalAmount === 0 ? 'Xác nhận & Mở cổng' : 'Thu tiền & Mở cổng',
+      title: confirmTitle,
+      content: confirmContent,
+      okText: confirmOkText,
       cancelText: 'Hủy',
       okButtonProps: { className: 'bg-emerald-600 border-emerald-600 hover:bg-emerald-700' },
       async onOk() {
+        let checkoutAlreadyConfirmed = false;
         try {
-          if (backendTxn && backendTxn.id) {
-            await parkingService.confirmCheckout(backendTxn.id);
+          if (isVip && !isLostCard) {
+            await apiClient.post('/sessions/approve-exit', { plate: lpr });
+          } else if (backendTxn && backendTxn.id) {
+            const alreadyConfirmed = backendTxn.paymentStatus === 'SUCCESS' || backendTxn.status === 'SUCCESS';
+            if (!alreadyConfirmed || isMobileCheckoutTxn) {
+              await parkingService.confirmCheckout(backendTxn.id);
+            }
           } else {
             // NEW LOGIC FOR LOST CARD
             if (isLostCard) {
               const staffId = currentUser?.id; // Fixed mock Staff ID
               try {
-                await apiClient.post('/api/blacklisted-cards/block-by-plate', null, {
+                await apiClient.post('/blacklisted-cards/block-by-plate', null, {
                   params: {
                     plate: lpr,
                     reason: 'LOST',
@@ -208,6 +408,7 @@ export const StaffPayment = () => {
                 // Send mock transaction to backend so it saves in DB
                 await apiClient.post('/revenue/transactions/mock', {
                   amount: totalAmount,
+                  lostCardPenalty: penaltyAmount,
                   plate: lpr
                 });
               } else {
@@ -218,10 +419,43 @@ export const StaffPayment = () => {
           // Refresh global context to pull latest transactions and remove from active
           if (fetchAllDataFromBackend) fetchAllDataFromBackend();
         } catch (e) {
-          console.error("Failed to mock transaction", e);
+          console.error("Checkout failed", e);
+          const backendMessage = e.response?.data?.message
+            || e.response?.data?.error
+            || (typeof e.response?.data === 'string' ? e.response.data : null)
+            || e.message
+            || 'Không thể hoàn tất checkout. Vui lòng kiểm tra lại session/mã thẻ.';
+          const normalizedBackendMessage = String(backendMessage).toLowerCase();
+          if (
+            isMobileCheckoutTxn
+            && e.response?.status === 409
+            && normalizedBackendMessage.includes('transaction')
+            && (normalizedBackendMessage.includes('xác nhận') || normalizedBackendMessage.includes('xac nhan'))
+          ) {
+            checkoutAlreadyConfirmed = true;
+          } else {
+          notification.error({
+            message: 'Lỗi thanh toán',
+            description: backendMessage,
+            placement: 'topRight'
+          });
+          return;
+          }
         }
 
-        notification.success({message: 'Thanh toán thành công', description: 'Đã gửi lệnh mở cổng ra.', placement: 'topRight'});
+        notification.success({
+          message: isMobileCheckoutTxn
+            ? (checkoutAlreadyConfirmed ? "Xe đã được xác nhận ra cổng" : (hasMobileOverstayPenalty ? "Đã thu phí quá hạn" : "Đã xác nhận xe ra cổng"))
+            : "Thanh toán thành công",
+          description: isMobileCheckoutTxn
+            ? (checkoutAlreadyConfirmed
+              ? "Giao dịch Mobile POS đã được backend xác nhận trước đó. UI đã cập nhật trạng thái xe ra cổng."
+              : hasMobileOverstayPenalty
+              ? "Đã thu phí phát sinh sau 30 phút và gửi lệnh mở cổng ra."
+              : "Xe đã thanh toán Mobile POS trước đó. Đã gửi lệnh mở cổng ra.")
+            : "Đã gửi lệnh mở cổng ra.",
+          placement: "topRight"
+        });
         
         // Tắt hiển thị xe ngay lập tức (UI state)
         setIsPaid(true);
@@ -245,6 +479,7 @@ export const StaffPayment = () => {
 
         setHasVehicle(false);
         setBackendTxn(null);
+        setIdentityVerified(false);
         setCardCode('');
         setTotalAmount(0);
         setCashGiven(0);
@@ -263,6 +498,8 @@ export const StaffPayment = () => {
       onOk() {
         notification.error({message: 'Đã huỷ bỏ giao dịch', placement: 'topRight'});
         setHasVehicle(false);
+        setIdentityVerified(false);
+        setBackendTxn(null);
         setLan1Status('free');
       }
     });
@@ -309,16 +546,9 @@ export const StaffPayment = () => {
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-6">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-bold text-slate-800 m-0 flex items-center gap-2">
-                  {isLostCard ? <span className="text-red-600"><WarningFilled className="mr-2"/> Xử lý Sự cố Mất thẻ</span> : "Xử lý vé vãng lai"}
+                  {isLostCard ? <span className="text-red-600"><WarningFilled className="mr-2"/> Xử lý Sự cố Mất thẻ</span> : (isVip ? "Xử lý xe VIP xuất bãi" : "Xử lý vé vãng lai")}
                 </h3>
-                <span className="bg-slate-100 text-slate-500 font-mono text-xs px-3 py-1 rounded">TICKET #{useMemo(() => {
-                  if (!lpr) return 1000;
-                  let hash = 0;
-                  for (let i = 0; i < lpr.length; i++) {
-                    hash = lpr.charCodeAt(i) + ((hash << 5) - hash);
-                  }
-                  return Math.abs(hash) % 9000 + 1000;
-                }, [lpr])}</span>
+                <span className="bg-slate-100 text-slate-500 font-mono text-xs px-3 py-1 rounded">TICKET #{ticketNumber}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-8">
@@ -345,32 +575,77 @@ export const StaffPayment = () => {
                   </div>
                 </div>
 
+                <div className={`border rounded-lg p-3 ${canReviewVehicle ? 'border-emerald-200 bg-emerald-50/70' : 'border-blue-200 bg-blue-50/70'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">
+                      {isVip ? 'Xác nhận định danh VIP' : 'Quét mã thẻ / ID thẻ'}
+                    </h4>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${canReviewVehicle ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {canReviewVehicle ? 'ĐÃ XÁC NHẬN' : 'BẮT BUỘC'}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={cardCode}
+                      onChange={(e) => {
+                        setCardCode(e.target.value.trim());
+                        setIdentityVerified(false);
+                        if (!isVip) setBackendTxn(null);
+                      }}
+                      placeholder={isVip ? 'Mã VIP tự động' : 'Nhấn vào đây và dùng máy quét thẻ...'}
+                      className="font-mono font-bold"
+                    />
+                    <Button
+                      type="primary"
+                      loading={isCheckingOut}
+                      onClick={handleScanCard}
+                      className="bg-blue-600 font-bold"
+                    >
+                      Xác nhận
+                    </Button>
+                  </div>
+                  {expectedCredential && (
+                    <div className="mt-2 text-[11px] text-slate-500">
+                      Mã hệ thống: <span className="font-mono font-bold text-slate-800">{expectedCredential}</span>
+                    </div>
+                  )}
+                  {!canReviewVehicle && (
+                    <div className="mt-2 text-[11px] text-blue-700 font-medium">
+                      Ảnh vào/ra đang được làm mờ. Xác nhận đúng mã để mở ảnh đối chiếu và tính phí.
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc vào (Cam 1 - Góc trái)</span>
                     <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={carImgs.in1} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                      <img src={carImgs.in1} className={reviewImageClass} />
+                      {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">ENT: CAM-01</span>
                     </div>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc vào (Cam 2 - Góc phải)</span>
                     <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={carImgs.in2} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                      <img src={carImgs.in2} className={reviewImageClass} />
+                      {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">ENT: CAM-02</span>
                     </div>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc ra (Cam 3 - Góc trái)</span>
                     <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={carImgs.out1} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                      <img src={carImgs.out1} className={reviewImageClass} />
+                      {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">EXT: CAM-03</span>
                     </div>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc ra (Cam 4 - Góc phải)</span>
                     <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={carImgs.out2} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                      <img src={carImgs.out2} className={reviewImageClass} />
+                      {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">EXT: CAM-04</span>
                     </div>
                   </div>
@@ -392,7 +667,30 @@ export const StaffPayment = () => {
                   </div>
                   <div className="text-right">
                     <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Tổng tiền thu</h4>
-                    <div className="text-2xl font-black text-red-600">{totalAmount.toLocaleString()} <span className="text-sm font-bold">VND</span></div>
+                    <div className="text-2xl font-black text-red-600">{displayAmount.toLocaleString()} <span className="text-sm font-bold">VND</span></div>
+                    {isMobileCheckoutTxn && (
+                      <div className={`text-[10px] mt-1 font-bold px-2 py-1 rounded border text-left ${
+                        hasMobileOverstayPenalty
+                          ? 'text-red-700 bg-red-50 border-red-100'
+                          : mobileGraceExpired
+                            ? 'text-amber-700 bg-amber-50 border-amber-100'
+                            : 'text-emerald-700 bg-emerald-50 border-emerald-100'
+                      }`}>
+                        {hasMobileOverstayPenalty
+                          ? `Đã thu qua Mobile POS: ${mobilePrepaidAmount.toLocaleString()} VND. Quá hạn 30 phút, cần thu thêm ${mobileOverstayPenalty.toLocaleString()} VND.`
+                          : mobileGraceExpired
+                            ? 'Mobile POS đã quá hạn. Quẹt lại thẻ để tính phí phát sinh.'
+                            : `Đã thu qua Mobile POS: ${mobilePrepaidAmount.toLocaleString()} VND. Xe còn ${mobileCountdownLabel} để ra cổng.`}
+                        <div className="mt-1 pt-1 border-t border-current/20 text-[9px] leading-relaxed font-semibold">
+                          <div>Thanh toán lưu động: {formatMobileClock(mobileCheckoutPaidAt)}</div>
+                          <div>Hạn ra cổng: {formatMobileClock(mobileCheckoutExpiresAt)}</div>
+                          {mobileGraceExpired && (
+                            <div>Thời gian quá hạn: {mobileOverstayLabel}</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {!canReviewVehicle && <div className="text-[10px] text-blue-600 mt-1 font-bold">Chưa tính phí do chưa xác nhận thẻ</div>}
                     {isLostCard && <div className="text-[10px] text-red-500 mt-1">Đã bao gồm 200k tiền phạt thẻ</div>}
                     {(backendTxn?.violationPenalty > 0 || (lpr && lpr.includes('EV'))) && <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">⚠️ Bị phạt Đỗ sai vị trí EV (+500k)</div>}
                     {lpr && getVehicleFines(lpr).length > 0 && <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">⚠️ Đã bao gồm phạt cộng dồn (+{getVehicleFines(lpr).reduce((sum, f) => sum + f.amount, 0).toLocaleString()}đ)</div>}
@@ -460,7 +758,8 @@ export const StaffPayment = () => {
                         <span className="text-sm font-medium text-slate-600">Tiền khách đưa:</span>
                         <Input 
                           className="w-32 text-right font-bold" 
-                          value={cashGiven ? parseInt(cashGiven).toLocaleString('en-US') : ''} 
+                          disabled={!canReviewVehicle}
+                          value={canReviewVehicle && cashGiven ? parseInt(cashGiven).toLocaleString('en-US') : ''}
                           onChange={(e) => setCashGiven(e.target.value.replace(/\D/g, ''))}
                         />
                       </div>
@@ -468,7 +767,7 @@ export const StaffPayment = () => {
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium text-slate-600">Tiền thối lại:</span>
                         <span className="text-lg font-black text-slate-800">
-                          {Math.max(0, parseInt(cashGiven || 0) - totalAmount).toLocaleString('en-US')} <span className="text-xs font-bold text-slate-500">VND</span>
+                          {Math.max(0, parseInt(cashGiven || 0) - displayAmount).toLocaleString('en-US')} <span className="text-xs font-bold text-slate-500">VND</span>
                         </span>
                       </div>
                     </div>
@@ -476,12 +775,12 @@ export const StaffPayment = () => {
                   {paymentMethod === 'qr' && (
                     <div className="bg-white border border-blue-200 rounded-lg p-4 flex flex-col items-center justify-center animate-fadeIn shadow-sm relative overflow-hidden">
                       <div className="w-28 h-28 bg-slate-50 rounded-lg flex items-center justify-center mb-3 border border-slate-200 overflow-hidden relative">
-                        <img src={`https://vietqr.app/img?acc=0818756569&bank=VietinBank&amount=${totalAmount}&des=${lpr}&template=compact&holder=DUONG PHUOC HUNG&store=Urban Park System`} 
-                        alt='QR thanh toán VietQR' className="w-24 h-24 object-contain" />
+                        <img src={`https://vietqr.app/img?acc=0818756569&bank=VietinBank&amount=${displayAmount}&des=${lpr}&template=compact&holder=DUONG PHUOC HUNG&store=Urban Park System`}
+                          alt='QR thanh toán VietQR' className="w-24 h-24 object-contain" />
                         <div className="absolute inset-0 bg-blue-500/10 animate-pulse pointer-events-none"></div>
                       </div>
                       <span className="text-xs font-medium text-slate-500 text-center mb-3">Vui lòng yêu cầu khách hàng quét mã QR<br/>bằng ứng dụng Ngân hàng</span>
-                      <button onClick={handlePayment} className="w-full bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 text-xs font-bold py-2 rounded transition-colors cursor-pointer">
+                      <button onClick={handlePayment} disabled={!canReviewVehicle} className={`w-full border text-xs font-bold py-2 rounded transition-colors ${canReviewVehicle ? 'bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200 cursor-pointer' : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'}`}>
                         Giả lập khách đã thanh toán thành công
                       </button>
                     </div>
@@ -493,7 +792,7 @@ export const StaffPayment = () => {
                         <div className="absolute inset-0 bg-amber-500/10 animate-pulse pointer-events-none"></div>
                       </div>
                       <span className="text-xs font-medium text-slate-500 text-center mb-3">Mã QR dành cho Thành viên VIP<br/>(Dùng app hệ thống để quét)</span>
-                      <button onClick={handlePayment} className="w-full bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200 text-xs font-bold py-2 rounded transition-colors cursor-pointer flex items-center justify-center gap-2">
+                      <button onClick={handlePayment} disabled={!canReviewVehicle} className={`w-full border text-xs font-bold py-2 rounded transition-colors flex items-center justify-center gap-2 ${canReviewVehicle ? 'bg-amber-50 hover:bg-amber-100 text-amber-600 border-amber-200 cursor-pointer' : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'}`}>
                         <QrcodeOutlined /> Giả lập đã quét mã VIP
                       </button>
                     </div>
@@ -506,13 +805,15 @@ export const StaffPayment = () => {
                   </button>
                   <button 
                     onClick={handlePayment} 
-                    disabled={isPaid || isCheckingOut}
+                    disabled={isPaid || isCheckingOut || !canReviewVehicle}
                     className={`flex-[2] text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md ${
-                      isPaid || isCheckingOut ? 'bg-slate-400 cursor-not-allowed shadow-none' : 'bg-[#1677ff] hover:bg-blue-600 shadow-blue-500/20 cursor-pointer'
+                      isPaid || isCheckingOut || !canReviewVehicle ? 'bg-slate-400 cursor-not-allowed shadow-none' : 'bg-[#1677ff] hover:bg-blue-600 shadow-blue-500/20 cursor-pointer'
                     }`}
                   >
                     <CheckCircleFilled />
-                    {totalAmount === 0 ? 'Xác nhận & Mở Cổng' : 'Thanh Toán & Mở Cổng'}
+                    {!canReviewVehicle
+                      ? 'Cần xác nhận thẻ'
+                      : (hasMobileOverstayPenalty ? 'Thu Phí Quá Hạn & Mở Cổng' : (displayAmount === 0 ? 'Xác nhận & Mở Cổng' : 'Thanh Toán & Mở Cổng'))}
                   </button>
                 </div>
               </div>

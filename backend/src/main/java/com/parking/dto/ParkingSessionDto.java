@@ -11,6 +11,7 @@ public class ParkingSessionDto {
     private UUID assignedZoneId;
     private String assignedZoneCode;
     private UUID cardId;
+    private String cardCode;
     private Instant checkInTime;
     private Instant checkOutTime;
     private String sessionStatus;
@@ -25,6 +26,7 @@ public class ParkingSessionDto {
     private String vehicleBrand;
     private String vehicleColor;
     private String vehicleModel;
+    private String vehicleType;
 
     public ParkingSessionDto(ParkingSession session, Vehicle vehicle) {
         this.id = session.getId();
@@ -44,6 +46,7 @@ public class ParkingSessionDto {
         if (vehicle != null) {
             this.vehicleBrand = vehicle.getBrand();
             this.vehicleColor = vehicle.getColor();
+            this.vehicleType = vehicle.getVehicleSize();
             this.vehicleModel = (vehicle.getBrand() != null ? vehicle.getBrand() : "") + " " + (vehicle.getBodyShape() != null ? vehicle.getBodyShape() : "");
         }
     }
@@ -68,6 +71,8 @@ public class ParkingSessionDto {
     public String getAssignedZoneCode() { return assignedZoneCode; }
     public void setAssignedZoneCode(String assignedZoneCode) { this.assignedZoneCode = assignedZoneCode; }
     public UUID getCardId() { return cardId; }
+    public String getCardCode() { return cardCode; }
+    public void setCardCode(String cardCode) { this.cardCode = cardCode; }
     public Instant getCheckInTime() { return checkInTime; }
     public Instant getCheckOutTime() { return checkOutTime; }
     public String getSessionStatus() { return sessionStatus; }
@@ -80,4 +85,6 @@ public class ParkingSessionDto {
     public String getVehicleBrand() { return vehicleBrand; }
     public String getVehicleColor() { return vehicleColor; }
     public String getVehicleModel() { return vehicleModel; }
+    public String getVehicleType() { return vehicleType; }
+    public void setVehicleType(String vehicleType) { this.vehicleType = vehicleType; }
 }
