@@ -259,6 +259,7 @@ public class ParkingServiceImpl implements ParkingService {
             alert.setReason("Phát hiện cố tình xuất bãi khi xe đang bật Khóa chống trộm.");
             alert.setIsActionable(true);
             securityAlertRepository.save(alert);
+            sendAntiTheftPush(session);
 
             throw new ApiExceptions.ForbiddenException(
                     "Xe đang ở trạng thái KHÓA AN TOÀN chống trộm! Không thể xuất bãi.");
@@ -1768,5 +1769,28 @@ public class ParkingServiceImpl implements ParkingService {
         } catch (org.springframework.dao.DataAccessException e) {
             throw new ApiExceptions.BadRequestException("Không tìm thấy bảng giá hệ thống phù hợp đang kích hoạt cho loại xe: " + vehicleSize);
         }
+    }
+    private void sendAntiTheftPush(ParkingSession session) {
+        String plate = session.getLicensePlate();
+        String fcmToken = null;
+
+        if (plate != null && !plate.trim().isEmpty()) {
+            Optional<Vehicle> vehicleOpt = vehicleRepository.findByLicensePlate(plate);
+            if (vehicleOpt.isPresent()) {
+                UUID ownerId = vehicleOpt.get().getOwnerId();
+                if (ownerId != null) {
+                    Optional<User> ownerOpt = userRepository.findById(ownerId);
+                    if (ownerOpt.isPresent()) {
+                        fcmToken = ownerOpt.get().getFcmToken();
+                    }
+                }
+            }
+        }
+
+        fcmService.sendPushNotification(
+                fcmToken != null ? fcmToken : "",
+                "[CẢNH BÁO CHỐNG TRỘM]",
+                "Phát hiện xe " + (plate != null ? plate : "N/A")
+                        + " cố tình di chuyển ra khỏi bãi xe khi đang ở trạng thái KHÓA AN TOÀN!");
     }
 }
