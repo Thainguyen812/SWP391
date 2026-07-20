@@ -19,6 +19,7 @@ import com.parking.model.ParkingSession;
 import com.parking.repository.ParkingSessionRepository;
 import com.parking.repository.SecurityAlertRepository;
 import com.parking.model.SecurityAlert;
+import com.parking.service.DemoVehicleDataset;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -71,15 +72,28 @@ this.securityAlertRepository = securityAlertRepository;
         List<java.util.Map<String, Object>> mapped = new java.util.ArrayList<>();
         for (Vehicle v : list) {
             java.util.Map<String, Object> map = new java.util.HashMap<>();
+            String normalizedPlate = DemoVehicleDataset.normalizePlate(v.getLicensePlate());
+            Optional<DemoVehicleDataset.Profile> profileOpt = DemoVehicleDataset.findByPlate(normalizedPlate);
+            String resolvedType = DemoVehicleDataset.resolveVehicleType(normalizedPlate, v.getVehicleSize());
+            String resolvedFuelType = DemoVehicleDataset.resolveFuelType(normalizedPlate, v.getFuelType());
+            String resolvedImageUrl = DemoVehicleDataset.resolveImageUrl(normalizedPlate, "DRIVER_CARD", v.getRegistrationPhotoUrl());
             map.put("id", v.getId());
-            map.put("plate", v.getLicensePlate());
+            map.put("plate", normalizedPlate);
             map.put("name", v.getBrand() != null ? v.getBrand() : "Xe của tôi");
-            map.put("type", v.getVehicleSize());
-            map.put("bodyShape", v.getBodyShape());
+            map.put("name", profileOpt.map(DemoVehicleDataset.Profile::model)
+                    .orElse(v.getBrand() != null ? v.getBrand() : "Xe cua toi"));
+            map.put("type", resolvedType);
+            map.put("bodyShape", profileOpt.map(DemoVehicleDataset.Profile::bodyShape).orElse(v.getBodyShape()));
+            map.put("fuelType", resolvedFuelType);
+            map.put("imageUrl", resolvedImageUrl);
+            map.put("zoneCode", DemoVehicleDataset.resolveZoneCode(normalizedPlate, resolvedType));
+            map.put("color", profileOpt.map(DemoVehicleDataset.Profile::color).orElse(v.getColor()));
+            map.put("colorRgb", profileOpt.map(DemoVehicleDataset.Profile::colorRgb).orElse(v.getColorRgb()));
             map.put("isLocked", v.isLocked());
             map.put("isActive", v.isActive());
-            map.put("registrationDocUrl", v.getRegistrationDocUrl());
-            map.put("registrationPhotoUrl", v.getRegistrationPhotoUrl());
+            map.put("registrationDocUrl", profileOpt.map(DemoVehicleDataset.Profile::registrationDocUrl).orElse(v.getRegistrationDocUrl()));
+            map.put("registrationPhotoUrl", profileOpt.map(DemoVehicleDataset.Profile::registrationPhotoUrl).orElse(resolvedImageUrl));
+            map.put("identityDocUrl", profileOpt.map(DemoVehicleDataset.Profile::identityDocUrl).orElse(null));
             map.put("createdAt", v.getCreatedAt() != null ? v.getCreatedAt().toString() : null);
             
             // Add VIP subscription details
@@ -156,7 +170,12 @@ this.securityAlertRepository = securityAlertRepository;
     //ĐĂNG KÝ XE MỚI 
     @PostMapping
     public Vehicle create(@Valid @RequestBody VehicleRegistrationRequest request) {
-        validateBrand(request.getBrand());
+        String normalizedPlate = DemoVehicleDataset.normalizePlate(request.getLicensePlate());
+        Optional<DemoVehicleDataset.Profile> profileOpt = DemoVehicleDataset.findByPlate(normalizedPlate);
+        String resolvedVehicleType = DemoVehicleDataset.resolveVehicleType(normalizedPlate, request.getVehicleSize());
+        String resolvedFuelType = DemoVehicleDataset.resolveFuelType(normalizedPlate, request.getFuelType());
+        String resolvedBrand = profileOpt.map(DemoVehicleDataset.Profile::model).orElse(request.getBrand());
+        validateBrand(resolvedBrand);
     
         // KTRA XEM BIỂN SỐ XE NÀY ĐÃ DC ĐĂNG KÝ CHƯA 
         Authentication authentication =
@@ -169,7 +188,7 @@ this.securityAlertRepository = securityAlertRepository;
             .orElseThrow(() ->
                     new RuntimeException("User không tồn tại"));
 
-    if (repo.findByLicensePlate(request.getLicensePlate()).isPresent()) {
+    if (repo.findByLicensePlate(normalizedPlate).isPresent()) {
         throw new RuntimeException("Biển số xe đã được đăng ký.");
 }                
     Vehicle vehicle = new Vehicle();
@@ -178,24 +197,26 @@ this.securityAlertRepository = securityAlertRepository;
 
     vehicle.setOwnerId(owner.getId());
 
-    vehicle.setLicensePlate(request.getLicensePlate());
+    vehicle.setLicensePlate(normalizedPlate);
 
-    vehicle.setVehicleSize(request.getVehicleSize());
+    vehicle.setVehicleSize(resolvedVehicleType);
 
-    vehicle.setColor(request.getColor());
+    vehicle.setColor(profileOpt.map(DemoVehicleDataset.Profile::color).orElse(request.getColor()));
 
-    vehicle.setColorRgb(request.getColorRgb());
+    vehicle.setColorRgb(profileOpt.map(DemoVehicleDataset.Profile::colorRgb).orElse(request.getColorRgb()));
 
     String safeBodyShape = request.getBodyShape();
     if (safeBodyShape == null || safeBodyShape.trim().isEmpty() || safeBodyShape.contains(" ")) {
         safeBodyShape = request.getVehicleSize() != null ? request.getVehicleSize() : "SEDAN_HATCHBACK";
     }
-    vehicle.setBodyShape(safeBodyShape);
+    vehicle.setBodyShape(profileOpt.map(DemoVehicleDataset.Profile::bodyShape).orElse(safeBodyShape));
 
-    vehicle.setBrand(request.getBrand());
-    vehicle.setFuelType(request.getFuelType());
-    vehicle.setRegistrationDocUrl(request.getRegistrationDocUrl());
-    vehicle.setRegistrationPhotoUrl(request.getRegistrationPhotoUrl());
+    vehicle.setBrand(resolvedBrand);
+    vehicle.setFuelType(resolvedFuelType);
+    vehicle.setRegistrationDocUrl(profileOpt.map(DemoVehicleDataset.Profile::registrationDocUrl)
+            .orElse(request.getRegistrationDocUrl()));
+    vehicle.setRegistrationPhotoUrl(profileOpt.map(DemoVehicleDataset.Profile::registrationPhotoUrl)
+            .orElse(DemoVehicleDataset.resolveImageUrl(normalizedPlate, "DRIVER_CARD", request.getRegistrationPhotoUrl())));
 
     vehicle.setViolationCount(0);
 
@@ -217,7 +238,12 @@ this.securityAlertRepository = securityAlertRepository;
         @Valid @RequestBody VehicleRegistrationRequest request) {
 
     return repo.findById(id).map(existing -> {
-        validateBrand(request.getBrand());
+        String normalizedPlate = DemoVehicleDataset.normalizePlate(request.getLicensePlate());
+        Optional<DemoVehicleDataset.Profile> profileOpt = DemoVehicleDataset.findByPlate(normalizedPlate);
+        String resolvedVehicleType = DemoVehicleDataset.resolveVehicleType(normalizedPlate, request.getVehicleSize());
+        String resolvedFuelType = DemoVehicleDataset.resolveFuelType(normalizedPlate, request.getFuelType());
+        String resolvedBrand = profileOpt.map(DemoVehicleDataset.Profile::model).orElse(request.getBrand());
+        validateBrand(resolvedBrand);
     // ktra xem có đúng tk đăng nhập đang sửa xe của họ ko , ko thì ko cho
         Authentication authentication =
         SecurityContextHolder.getContext().getAuthentication();
@@ -235,22 +261,24 @@ this.securityAlertRepository = securityAlertRepository;
     
         // Kiểm tra biển số xe đã tồn tại chưa
     Optional<Vehicle> duplicate =
-        repo.findByLicensePlate(request.getLicensePlate());
+        repo.findByLicensePlate(normalizedPlate);
 
     if (duplicate.isPresent()
         && !duplicate.get().getId().equals(existing.getId())) {
 
     throw new RuntimeException("Biển số xe đã tồn tại.");
     }    
-        existing.setLicensePlate(request.getLicensePlate());
-        existing.setVehicleSize(request.getVehicleSize());
-        existing.setColor(request.getColor());
-        existing.setColorRgb(request.getColorRgb());
-        existing.setBodyShape(request.getBodyShape());
-        existing.setBrand(request.getBrand());
-        existing.setFuelType(request.getFuelType());
-        existing.setRegistrationDocUrl(request.getRegistrationDocUrl());
-        existing.setRegistrationPhotoUrl(request.getRegistrationPhotoUrl());
+        existing.setLicensePlate(normalizedPlate);
+        existing.setVehicleSize(resolvedVehicleType);
+        existing.setColor(profileOpt.map(DemoVehicleDataset.Profile::color).orElse(request.getColor()));
+        existing.setColorRgb(profileOpt.map(DemoVehicleDataset.Profile::colorRgb).orElse(request.getColorRgb()));
+        existing.setBodyShape(profileOpt.map(DemoVehicleDataset.Profile::bodyShape).orElse(request.getBodyShape()));
+        existing.setBrand(resolvedBrand);
+        existing.setFuelType(resolvedFuelType);
+        existing.setRegistrationDocUrl(profileOpt.map(DemoVehicleDataset.Profile::registrationDocUrl)
+                .orElse(request.getRegistrationDocUrl()));
+        existing.setRegistrationPhotoUrl(profileOpt.map(DemoVehicleDataset.Profile::registrationPhotoUrl)
+                .orElse(DemoVehicleDataset.resolveImageUrl(normalizedPlate, "DRIVER_CARD", request.getRegistrationPhotoUrl())));
 
         existing.setUpdatedAt(Instant.now());
 

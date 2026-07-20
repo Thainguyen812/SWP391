@@ -17,6 +17,7 @@ import { notification, Input, Button, Modal, Spin } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
 import { apiClient } from '../../api/apiClient';
 import { parkingService } from '../../services/parkingService';
+import { getDemoVehicleImages, getDemoVehicleProfile } from '../../data/vehicleDataset';
 
 export const StaffPayment = () => {
   const navigate = useNavigate();
@@ -51,22 +52,11 @@ export const StaffPayment = () => {
   const [regImage, setRegImage] = useState(null);
 
   const getIdImages = (plate) => {
-    const cccdImages = [
-      "https://images.unsplash.com/photo-1633265486064-086b219458ce?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1621252179027-94459d278660?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1614064641913-6b110b47ce56?auto=format&fit=crop&w=600&q=80"
-    ];
-    const regImages = [
-      "https://images.unsplash.com/photo-1588681664899-f142ff2dc9b1?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=600&q=80"
-    ];
-    let sum = 0;
-    const str = plate || "default";
-    for(let i=0; i<str.length; i++) sum += str.charCodeAt(i);
+    const profile = getDemoVehicleProfile(plate);
+    const images = getDemoVehicleImages(profile || { plate });
     return {
-      cccd: cccdImages[sum % cccdImages.length],
-      reg: regImages[sum % regImages.length]
+      cccd: profile?.identityDocUrl || images.primary,
+      reg: profile?.registrationDocUrl || profile?.registrationPhotoUrl || images.primary
     };
   };
 
@@ -283,24 +273,19 @@ export const StaffPayment = () => {
   }, [lpr, vehicleToPay, isLostCard, backendTxn]);
 
   const getCarImages = (plate) => {
-    const images = [
-      "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1621416953228-868f04179e87?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=400&q=80"
-    ];
-    let sum = 0;
-    const str = plate || "default";
-    for(let i=0; i<str.length; i++) sum += str.charCodeAt(i);
+    const profile = getDemoVehicleProfile({
+      ...(vehicleToPay || {}),
+      plate,
+      vehicleType: vehicleToPay?.vehicleType || vehicleToPay?.vehicleSize || vehicleToPay?.type,
+      fuelType: vehicleToPay?.fuelType,
+      imageUrl: vehicleToPay?.image || vehicleToPay?.imageUrl
+    });
+    const images = getDemoVehicleImages(profile || { plate });
     return {
-      in1: images[sum % images.length],
-      in2: images[(sum + 1) % images.length],
-      out1: images[(sum + 2) % images.length],
-      out2: images[(sum + 3) % images.length]
+      in1: images.entry?.[0] || images.primary,
+      in2: images.entry?.[1] || images.primary,
+      out1: images.exit?.[0] || images.primary,
+      out2: images.exit?.[1] || images.primary
     };
   };
 

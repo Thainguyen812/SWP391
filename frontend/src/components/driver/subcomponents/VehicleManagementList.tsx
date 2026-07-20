@@ -82,6 +82,12 @@ export const VehicleManagementList: React.FC = () => {
                   <span className="text-[10px] font-bold tracking-wider font-mono uppercase text-slate-400 bg-slate-200/40 px-2 py-0.5 rounded-md">BIKE NO REGCARD</span>
                 </div>
               )}
+
+              {v.plate && (
+                <span className="absolute bottom-3 left-4 z-10 px-3 py-1 rounded-lg bg-black/75 text-white text-xs font-black font-mono tracking-wider shadow-sm">
+                  {v.plate}
+                </span>
+              )}
  
               {/* Anti-theft live scanner badge */}
               <div className="absolute top-4 left-4 flex gap-1.5 z-10">
