@@ -710,7 +710,7 @@ export const StaffPayment = () => {
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc ra (Cam 4 - Góc phải)</span>
                     <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={carImgs.out2} className={reviewImageClass} />
+                      <img src={carImgs.out2} className={`${reviewImageClass} scale-x-[-1]`} />
                       {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">EXT: CAM-04</span>
                     </div>
