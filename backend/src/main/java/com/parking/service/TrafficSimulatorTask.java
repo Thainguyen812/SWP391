@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -101,50 +102,62 @@ public class TrafficSimulatorTask {
             List<String> emptyInGates = IN_GATES.stream().filter(g -> !occupiedInGates.contains(g)).collect(Collectors.toList());
 
             if (!emptyInGates.isEmpty()) {
-                List<String> generatedThisTick = new java.util.ArrayList<>();
+                List<String> unavailablePlates = new ArrayList<>();
+                processingIns.forEach(p -> unavailablePlates.add(DemoVehicleDataset.normalizePlate(p.getLicensePlate())));
+                allSessions.forEach(s -> unavailablePlates.add(DemoVehicleDataset.normalizePlate(s.getLicensePlate())));
+
+                List<DemoVehicleDataset.Profile> availableVisitors = DemoVehicleDataset.profiles().stream()
+                        .filter(profile -> !profile.vip())
+                        .filter(profile -> !unavailablePlates.contains(DemoVehicleDataset.normalizePlate(profile.plate())))
+                        .collect(Collectors.toCollection(ArrayList::new));
+                List<DemoVehicleDataset.Profile> availableVips = DemoVehicleDataset.profiles().stream()
+                        .filter(DemoVehicleDataset.Profile::vip)
+                        .filter(profile -> !unavailablePlates.contains(DemoVehicleDataset.normalizePlate(profile.plate())))
+                        .collect(Collectors.toCollection(ArrayList::new));
+                java.util.Collections.shuffle(availableVisitors);
+                java.util.Collections.shuffle(availableVips);
+
+                int visitorIndex = 0;
+                int vipIndex = 0;
+                int generatedTotal = 0;
                 java.util.Collections.shuffle(emptyInGates);
                 int vipQuota = emptyInGates.size() == 1
                         ? (Math.random() < VIP_ENTRY_RATIO ? 1 : 0)
                         : Math.max(1, (int) Math.round(emptyInGates.size() * VIP_ENTRY_RATIO));
                 int generatedVipCount = 0;
                 for (String selectedGate : emptyInGates) {
-                    ParkingSession session = new ParkingSession();
-                    session.setId(UUID.randomUUID());
-                    String[] prefixes = {"51A", "51F", "51G", "51H", "51K", "29A", "30E", "30G"};
-                    String generatedPlate = null;
-                    for (int attempt = 0; attempt < 20; attempt++) {
-                        String prefix = prefixes[(int)(Math.random() * prefixes.length)];
-                        int number = 10000 + (int)(Math.random() * 90000);
-                        String candidatePlate = prefix + "-" + number + ".SIM";
-                        boolean existsInPending = processingIns.stream()
-                                .anyMatch(p -> candidatePlate.equalsIgnoreCase(p.getLicensePlate()));
-                        boolean existsInSessions = allSessions.stream()
-                                .anyMatch(s -> candidatePlate.equalsIgnoreCase(s.getLicensePlate()));
-                        boolean existsInCurrentTick = generatedThisTick.stream()
-                                .anyMatch(p -> candidatePlate.equalsIgnoreCase(p));
-                        if (!existsInPending && !existsInSessions && !existsInCurrentTick) {
-                            generatedPlate = candidatePlate;
-                            break;
-                        }
-                    }
-                    if (generatedPlate == null) {
-                        continue;
-                    }
-
-                    session.setLicensePlate(generatedPlate);
-                    session.setCheckInTime(Instant.now());
-                    session.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
-                    session.setEntryGate(selectedGate);
                     boolean shouldGenerateVip = generatedVipCount < vipQuota;
-                    session.setIsVip(shouldGenerateVip);
-                    if (shouldGenerateVip) {
+                    DemoVehicleDataset.Profile profile = null;
+                    if (shouldGenerateVip && vipIndex < availableVips.size()) {
+                        profile = availableVips.get(vipIndex++);
+                        generatedVipCount++;
+                    } else if (visitorIndex < availableVisitors.size()) {
+                        profile = availableVisitors.get(visitorIndex++);
+                    } else if (vipIndex < availableVips.size()) {
+                        profile = availableVips.get(vipIndex++);
                         generatedVipCount++;
                     }
 
-                    String[] vehicleTypes = {"SEDAN_HATCHBACK", "SUV_CUV_MPV", "LARGE_VAN_MINIBUS"};
-                    String resolvedVehicleType = vehicleTypes[(int)(Math.random() * vehicleTypes.length)];
+                    if (profile == null) {
+                        continue;
+                    }
 
-                    List<Zone> candidates = zoneRepo.findByAllowedSizesContaining(resolvedVehicleType);
+                    ParkingSession session = new ParkingSession();
+                    session.setId(UUID.randomUUID());
+                    session.setLicensePlate(profile.plate());
+                    session.setCheckInTime(Instant.now());
+                    session.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
+                    session.setEntryGate(selectedGate);
+                    session.setIsVip(profile.vip());
+
+                    String resolvedVehicleType = profile.vehicleType();
+                    String preferredZoneCode = profile.zoneCode();
+                    List<Zone> candidates = zoneRepo.findAll().stream()
+                            .filter(z -> z.getCode() != null && z.getCode().equalsIgnoreCase(preferredZoneCode))
+                            .collect(Collectors.toList());
+                    if (candidates.isEmpty()) {
+                        candidates = zoneRepo.findByAllowedSizesContaining(resolvedVehicleType);
+                    }
                     Zone chosen = null;
                     if (!candidates.isEmpty()) {
                         List<Zone> availableCandidates = candidates.stream()
@@ -190,7 +203,7 @@ public class TrafficSimulatorTask {
                         chosen.getCode()
                     ));
                     if (added) {
-                        generatedThisTick.add(session.getLicensePlate());
+                        generatedTotal++;
                     }
                 }
             }

@@ -47,7 +47,9 @@ const zoneOrder = ['F1', 'F2', 'B1', 'G'];
 const vehicleTypeLabel = (type?: string) => {
   const value = (type || '').toUpperCase();
   if (value.includes('SUV_CUV_MPV')) return 'Xe 7-9 chỗ';
-  if (value.includes('LARGE') || value.includes('VAN') || value.includes('MINIBUS')) return 'Xe lớn';
+  if (value.includes('MINIBUS_16')) return 'Xe khách 12-16 chỗ';
+  if (value.includes('VAN_TRUCK') || value.includes('VAN') || value.includes('TRUCK')) return 'Xe van / Xe tải nhỏ';
+  if (value.includes('LARGE')) return 'Xe lớn';
   return 'Xe 4-5 chỗ';
 };
 
@@ -335,7 +337,8 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
             >
               <option value="SEDAN_HATCHBACK">Xe 4-5 chỗ</option>
               <option value="SUV_CUV_MPV">Xe 7-9 chỗ</option>
-              <option value="LARGE_VAN_MINIBUS">Xe lớn</option>
+              <option value="VAN_TRUCK">Xe van / Xe tải nhỏ</option>
+              <option value="MINIBUS_16">Xe khách 12-16 chỗ</option>
             </select>
             <input
               value={sensorImageUrl}

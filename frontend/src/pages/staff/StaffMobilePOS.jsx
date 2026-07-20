@@ -4,12 +4,13 @@ import {
   ArrowLeftOutlined, QrcodeOutlined, SearchOutlined, 
   CheckCircleFilled, CarOutlined, DollarOutlined, 
   BankOutlined, CheckOutlined, MobileOutlined,
-  ClockCircleOutlined, CloseOutlined, ScanOutlined, EnvironmentOutlined, CameraOutlined
+  ClockCircleOutlined, CloseOutlined, ScanOutlined, EnvironmentOutlined
 } from '@ant-design/icons';
 import { notification, Spin } from 'antd';
 import { apiClient } from '../../api/apiClient';
 import dayjs from 'dayjs';
 import { useGlobalContext } from '../../context/GlobalContext';
+import { getDemoVehicleImages, getDemoVehicleProfile } from '../../data/vehicleDataset';
 
 export const StaffMobilePOS = () => {
   const navigate = useNavigate();
@@ -28,12 +29,13 @@ export const StaffMobilePOS = () => {
   const scannerStartTimeoutRef = React.useRef(null);
 
   const isVipVehicle = (targetVehicle) => {
-    const normalizedType = (targetVehicle?.type || '').toUpperCase();
+    const normalizedType = (targetVehicle?.type || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase();
     return Boolean(targetVehicle?.isVip)
       || normalizedType.includes('VIP')
-      || normalizedType.includes('VE THANG')
-      || normalizedType.includes('VÉ THÁNG')
-      || normalizedType.includes('VÃ‰ THÃNG');
+      || normalizedType.includes('VE THANG');
   };
 
   const normalizePlate = (value) => (value || '').trim().toUpperCase();
@@ -263,6 +265,9 @@ export const StaffMobilePOS = () => {
       const mockLng = (105.8 + Math.random() * 0.1).toFixed(6);
       const mockGps = `${mockLat}, ${mockLng}`;
       const timestamp = new Date().toISOString();
+      const demoProfile = getDemoVehicleProfile(vehicle);
+      const demoImages = getDemoVehicleImages(demoProfile || vehicle);
+      const proofImageUrl = demoProfile?.mobileProofImageUrl || demoImages.primary;
 
       // Gọi API congestion/checkout
       await apiClient.post('/v1/parking/congestion/checkout', {
@@ -270,7 +275,7 @@ export const StaffMobilePOS = () => {
         staffId: currentUser?.id,
         gpsLocation: mockGps,
         timestamp: timestamp,
-        proofImageUrl: 'https://example.com/mobile-proof.jpg', // Mock proof
+        proofImageUrl,
         paymentMethod: paymentMethod === 'cash' ? 'CASH' : 'QR_BANK'
       });
       
@@ -406,14 +411,6 @@ export const StaffMobilePOS = () => {
                       placeholder="VD: 51A-12345"
                       className="min-w-0 flex-1 bg-transparent border-none py-3 px-3 font-bold text-slate-700 focus:outline-none focus:ring-0 uppercase text-base"
                     />
-                    <button 
-                      onClick={startScanner}
-                      disabled={isLoading}
-                      className="hidden"
-                      title="Quét mã QR bằng Camera"
-                    >
-                      <CameraOutlined className="text-xl" />
-                    </button>
                     <button 
                       onClick={() => handleSearchWithPlate(null)}
                       disabled={isLoading}

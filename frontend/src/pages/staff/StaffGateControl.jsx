@@ -12,6 +12,12 @@ import { notification, Modal, Dropdown, Input, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../api/apiClient';
 import { useGlobalContext } from '../../context/GlobalContext';
+import {
+  getDemoVehicleImages,
+  getDemoVehicleProfile,
+  getVehicleTypeMeta,
+  normalizeVehicleType
+} from '../../data/vehicleDataset';
 
 export const StaffGateControl = () => {
   const navigate = useNavigate();
@@ -54,9 +60,11 @@ export const StaffGateControl = () => {
   };
 
   const getVehicleTypeLabel = (type) => {
+    return getVehicleTypeMeta(type).label;
     const t = (type || '').toUpperCase();
     if (t === 'SUV_CUV_MPV') return 'Xe 7-9 chỗ';
-    if (t === 'LARGE_VAN_MINIBUS') return 'Xe lớn';
+    if (t === 'VAN_TRUCK') return 'Xe van / xe tải nhỏ';
+    if (t === 'MINIBUS_16') return 'Xe 12-16 chỗ';
     if (t === 'EV_CAR' || t === 'ELECTRIC') return 'Xe điện';
     return 'Xe 4-5 chỗ';
   };
@@ -65,34 +73,46 @@ export const StaffGateControl = () => {
     const code = (zoneCode || '').toUpperCase();
     if (code === 'F1') return 'SEDAN_HATCHBACK';
     if (code === 'F2') return 'SUV_CUV_MPV';
-    if (code === 'B1' || code === 'G' || code === 'B1/G') return 'LARGE_VAN_MINIBUS';
+    if (code === 'B1') return 'VAN_TRUCK';
+    if (code === 'G') return 'MINIBUS_16';
     return null;
   };
 
   const inferVehicleType = (vehicle) => {
-    const zoneVehicleType = getVehicleTypeFromZone(vehicle?.assignedZoneCode);
+    const profile = getDemoVehicleProfile(vehicle);
+    if (profile?.vehicleType) return profile.vehicleType;
+
+    const zoneVehicleType = getVehicleTypeFromZone(vehicle?.assignedZoneCode || vehicle?.zoneCode);
     if (zoneVehicleType) return zoneVehicleType;
     const directType = vehicle?.vehicleType || vehicle?.vehicleSize || vehicle?.detectedVehicleType;
-    if (directType) return directType;
+    if (directType) return normalizeVehicleType(directType);
 
     const text = `${vehicle?.model || ''} ${vehicle?.type || ''}`.toUpperCase();
     if (text.includes('SUV') || text.includes('CUV') || text.includes('MPV') || text.includes('7') || text.includes('9')) {
       return 'SUV_CUV_MPV';
     }
-    if (text.includes('VAN') || text.includes('BUS') || text.includes('TRUCK') || text.includes('16')) {
-      return 'LARGE_VAN_MINIBUS';
+    if (text.includes('16') || text.includes('MINIBUS') || text.includes('BUS')) {
+      return 'MINIBUS_16';
+    }
+    if (text.includes('VAN') || text.includes('TRUCK') || text.includes('TAI')) {
+      return 'VAN_TRUCK';
     }
     return 'SEDAN_HATCHBACK';
   };
 
   const getZoneForVehicleType = (type) => {
+    return getVehicleTypeMeta(type).zoneCode;
     const t = (type || '').toUpperCase();
     if (t === 'SUV_CUV_MPV') return 'F2';
-    if (t === 'LARGE_VAN_MINIBUS') return 'B1/G';
+    if (t === 'VAN_TRUCK') return 'B1';
+    if (t === 'MINIBUS_16') return 'G';
     return 'F1';
   };
 
   const getRouteHint = (type, zoneCode) => {
+    const meta = getVehicleTypeMeta(type);
+    const codeForHint = (zoneCode || meta.zoneCode).toUpperCase();
+    return `${meta.label} → ${getFloorShortName(codeForHint)}`;
     const code = (zoneCode || getZoneForVehicleType(type)).toUpperCase();
     const label = getVehicleTypeLabel(type);
     if (code === 'F1') return `${label} → Tầng F1`;
@@ -137,7 +157,7 @@ export const StaffGateControl = () => {
   };
 
   // AI Simulator State
-  const DEFAULT_CAMERA_IMAGE = 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80';
+  const DEFAULT_CAMERA_IMAGE = '/images/raize.png';
   const [isAiModalVisible, setIsAiModalVisible] = useState(false);
   const [isLotModalVisible, setIsLotModalVisible] = useState(false);
   const [aiPlate, setAiPlate] = useState('30G-123.45');
@@ -146,6 +166,8 @@ export const StaffGateControl = () => {
   const [aiImagePreview, setAiImagePreview] = useState(DEFAULT_CAMERA_IMAGE);
 
   const getVehicleCameraImage = (vehicle) => {
+    const profile = getDemoVehicleProfile(vehicle);
+    return getDemoVehicleImages(profile || vehicle).primary || DEFAULT_CAMERA_IMAGE;
     return vehicle?.image || vehicle?.imageUrl || vehicle?.cameraImage || vehicle?.entryImageUrl || DEFAULT_CAMERA_IMAGE;
   };
 
@@ -242,7 +264,9 @@ export const StaffGateControl = () => {
     try {
       const waitingVehicleForForm = activeVehicles?.find(v => v.plate?.toUpperCase() === normalizedManualPlate && isEntryGateId(v.gate));
       const detectedType = inferVehicleType(waitingVehicleForForm);
-      const mappedType = detectedType;
+      const mappedType = normalizeVehicleType(detectedType);
+      const demoProfile = getDemoVehicleProfile({ ...(waitingVehicleForForm || {}), plate: normalizedManualPlate, vehicleType: mappedType });
+      const demoImages = getDemoVehicleImages(demoProfile || { plate: normalizedManualPlate, vehicleType: mappedType });
 
       // Gọi API /api/gate/scan thông minh (Tự nhận diện VIP hoặc cấp thẻ vãng lai)
       const response = await apiClient.post(`/gate/scan`, {
@@ -251,7 +275,8 @@ export const StaffGateControl = () => {
         gate: waitingVehicleForForm?.gate || 'L-VÀO 1',
         direction: 'ENTRY',
         vehicleType: mappedType,
-        fuelType: mappedType === 'EV_CAR' ? 'ELECTRIC' : 'GASOLINE'
+        fuelType: demoProfile?.fuelType || 'GASOLINE',
+        imageUrl: demoImages.primary
       });
       const payload = response?.data || response;
 
@@ -262,7 +287,7 @@ export const StaffGateControl = () => {
       addLog(`[GATE_SCAN] Success: ${payload?.message}`, 'OK');
 
       const isVip = payload?.message?.toLowerCase().includes('vip') || false;
-      const zone = payload?.data?.assignedZoneCode || getZoneForVehicleType(mappedType);
+      const zone = payload?.data?.assignedZoneCode || demoProfile?.zoneCode || getZoneForVehicleType(mappedType);
       setLastCheckInResult({
         plate: normalizedManualPlate,
         type: isVip ? 'VIP' : 'Vãng lai',
@@ -335,14 +360,16 @@ export const StaffGateControl = () => {
     try {
       // Check if there is a vehicle waiting at the IN gate (in activeVehicles) matching this plate
       const waitingVehicle = activeVehicles?.find(v => v.plate?.toUpperCase() === plateUpper && isEntryGateId(v.gate));
-      const aiVehicleType = inferVehicleType(waitingVehicle || currentVehicle);
+      const aiVehicleType = normalizeVehicleType(inferVehicleType(waitingVehicle || currentVehicle || { plate: plateUpper }));
+      const aiProfile = getDemoVehicleProfile({ ...(waitingVehicle || currentVehicle || {}), plate: plateUpper, vehicleType: aiVehicleType });
+      const aiImageUrl = aiImagePreview || getDemoVehicleImages(aiProfile || { plate: plateUpper, vehicleType: aiVehicleType }).primary || DEFAULT_CAMERA_IMAGE;
 
       if (waitingVehicle) {
         const isWaitingVip = waitingVehicle.type === 'VIP' || waitingVehicle.isVip === true;
         if (isWaitingVip) {
           // If VIP is waiting + confidence >= 70%: call /sessions/approve-entry
           await apiClient.post('/sessions/approve-entry', { plate: plateUpper });
-          const zone = waitingVehicle.assignedZoneCode || getZoneForVehicleType(aiVehicleType);
+          const zone = waitingVehicle.assignedZoneCode || aiProfile?.zoneCode || getZoneForVehicleType(aiVehicleType);
 
           notification.success({
             message: 'Xác thực VIP Camera thành công',
@@ -403,11 +430,11 @@ export const StaffGateControl = () => {
         vehicle_type: aiVehicleType,
         camera_id: "CAM-01-IN",
         confidence_score: parsedConfidence,
-        image_url: aiImagePreview || DEFAULT_CAMERA_IMAGE
+        image_url: aiImageUrl
       });
       const payload = response?.data || response;
       
-      const zone = payload?.assigned_zone_code || getZoneForVehicleType(aiVehicleType);
+      const zone = payload?.assigned_zone_code || aiProfile?.zoneCode || getZoneForVehicleType(aiVehicleType);
       setLastCheckInResult({
         plate: plateUpper,
         type: 'VIP',
@@ -736,23 +763,28 @@ export const StaffGateControl = () => {
   };
 
   const getVehicleTypeDisplay = (type) => {
+    const meta = getVehicleTypeMeta(type);
+    return meta.detail || meta.label;
     const t = (type || '').toUpperCase();
     if (t === 'SUV_CUV_MPV') return 'Xe 7-9 chỗ (SUV/CUV/MPV)';
-    if (t === 'LARGE_VAN_MINIBUS') return 'Xe lớn (Van/Minibus)';
+    if (t === 'VAN_TRUCK') return 'Xe van / xe tải nhỏ';
+    if (t === 'MINIBUS_16') return 'Xe khách 12-16 chỗ';
     if (t === 'EV_CAR' || t === 'ELECTRIC') return 'Xe điện';
     return 'Xe 4-5 chỗ (Sedan/Hatchback)';
   };
 
   const getLedDirection = (type) => {
+    return getVehicleTypeMeta(type).zoneLabel;
     const t = (type || '').toUpperCase();
     if (t === 'SUV_CUV_MPV') return 'Tầng F2';
-    if (t === 'LARGE_VAN_MINIBUS') return 'Tầng B1/G';
+    if (t === 'VAN_TRUCK') return 'Tầng B1';
+    if (t === 'MINIBUS_16') return 'Tầng G';
     return 'Tầng F1';
   };
 
   const getVehicleTypeForZone = (type, zoneCode) => {
     if (!zoneCode) return type;
-    return getVehicleTypeFromZone(zoneCode) || type;
+    return getVehicleTypeFromZone(zoneCode) || normalizeVehicleType(type);
   };
 
   return (

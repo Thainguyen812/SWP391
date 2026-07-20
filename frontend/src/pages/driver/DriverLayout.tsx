@@ -39,6 +39,7 @@ import {
   Sliders,
   Trash2
 } from 'lucide-react';
+import { createDemoVehicleFromInput, getDemoVehicleImages, getDemoVehicleProfile } from '../../data/vehicleDataset';
 
 interface DriverPwaProps {
   user: {
@@ -61,6 +62,9 @@ interface UserVehicle {
   image: string;
   isLocked: boolean;
   fuelType?: string;
+  imageUrl?: string;
+  registrationDocUrl?: string;
+  registrationPhotoUrl?: string;
   activeSubscription?: string;
   subscriptionExpiry?: string;
 }
@@ -76,48 +80,8 @@ interface TransactionItem {
 }
 
 const getVehicleImage = (plate: string, type: string) => {
-  const cleanPlate = (plate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  let hash = 0;
-  for (let i = 0; i < cleanPlate.length; i++) {
-    hash = cleanPlate.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  hash = Math.abs(hash);
-
-  const images5 = [
-    '/images/raize.png',
-    'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=500&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=500&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=500&auto=format&fit=crop&q=80'
-  ];
-
-  const images7 = [
-    '/images/santafe.png',
-    'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=500&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?w=500&auto=format&fit=crop&q=80'
-  ];
-
-  const images9 = [
-    '/images/granvia.png',
-    'https://images.unsplash.com/photo-1616422285623-13ff0162193c?w=500&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=500&auto=format&fit=crop&q=80'
-  ];
-
-  const images16 = [
-    '/images/transit.png',
-    'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=500&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=500&auto=format&fit=crop&q=80'
-  ];
-
-  const t = (type || '').toLowerCase();
-  if (t.includes('16') || t.includes('minibus')) {
-    return images16[hash % images16.length];
-  } else if (t.includes('9') || t.includes('van')) {
-    return images9[hash % images9.length];
-  } else if (t.includes('7') || t.includes('suv')) {
-    return images7[hash % images7.length];
-  } else {
-    return images5[hash % images5.length];
-  }
+  const profile = getDemoVehicleProfile({ plate, vehicleType: type });
+  return getDemoVehicleImages(profile || { plate, vehicleType: type }).primary;
 };
 
 const isTxDateInFilter = (txDateStr: string, filter: string) => {
@@ -309,7 +273,8 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               sizeLabel = v.bodyShape;
             } else {
               sizeLabel = sizeType === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
-                          sizeType === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
+                          sizeType === 'MINIBUS_16' ? 'Xe 16 chỗ' :
+                          sizeType === 'VAN_TRUCK' ? 'Xe van / xe tải nhỏ' :
                           'Ô tô gầm thấp 4-5 chỗ';
             }
 
@@ -708,7 +673,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     if (newType === 'Xe 7 chỗ' || newType === 'Xe 9 chỗ') {
       sizeType = 'SUV_CUV_MPV';
     } else if (newType === 'Xe 16 chỗ') {
-      sizeType = 'LARGE_VAN_MINIBUS';
+      sizeType = 'MINIBUS_16';
     }
 
     let bodyShapeDb = 'SEDAN';
@@ -724,31 +689,42 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
     });
+    const demoVehicle = createDemoVehicleFromInput({
+      plate: newPlate.toUpperCase().trim(),
+      model: newName.trim(),
+      vehicleType: sizeType,
+      fuelType: newFuelType
+    });
 
     const payload = {
       id: uuid,
       ownerId: ownerId,
-      licensePlate: newPlate.toUpperCase().trim(),
-      vehicleSize: sizeType,
-      brand: newName.trim() || 'Phương tiện mới',
-      color: 'WHITE',
-      colorRgb: '#FFFFFF',
-      bodyShape: bodyShapeDb,
+      licensePlate: demoVehicle.plate,
+      vehicleSize: demoVehicle.vehicleType,
+      brand: demoVehicle.model,
+      color: demoVehicle.color,
+      colorRgb: demoVehicle.colorRgb,
+      bodyShape: demoVehicle.bodyShape || bodyShapeDb,
       isActive: true,
-      fuelType: newFuelType
+      fuelType: demoVehicle.fuelType,
+      registrationDocUrl: demoVehicle.registrationDocUrl,
+      registrationPhotoUrl: demoVehicle.registrationPhotoUrl
     };
 
     if (isOffline) {
       const modelItem: UserVehicle = {
         id: uuid,
-        plate: newPlate.toUpperCase().trim(),
-        name: newName.trim() || 'Phương tiện mới',
+        plate: demoVehicle.plate,
+        name: demoVehicle.model,
         type: newType,
         regDate: new Date().toLocaleDateString('vi-VN'),
         isActive: true,
-        image: '',
+        image: demoVehicle.imageUrl,
         isLocked: false,
-        fuelType: newFuelType
+        fuelType: demoVehicle.fuelType,
+        imageUrl: demoVehicle.imageUrl,
+        registrationDocUrl: demoVehicle.registrationDocUrl,
+        registrationPhotoUrl: demoVehicle.registrationPhotoUrl
       };
       setVehicles(prev => [...prev, modelItem]);
       setNewPlate('');
@@ -784,14 +760,17 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       
       const modelItem: UserVehicle = {
         id: savedVehicle.id,
-        plate: savedVehicle.licensePlate || savedVehicle.plate,
-        name: savedVehicle.brand || savedVehicle.name,
+        plate: savedVehicle.licensePlate || savedVehicle.plate || demoVehicle.plate,
+        name: savedVehicle.brand || savedVehicle.name || demoVehicle.model,
         type: newType,
         regDate: new Date().toLocaleDateString('vi-VN'),
         isActive: true,
-        image: '',
+        image: savedVehicle.imageUrl || demoVehicle.imageUrl,
         isLocked: false,
-        fuelType: savedVehicle.fuelType || newFuelType
+        fuelType: savedVehicle.fuelType || demoVehicle.fuelType,
+        imageUrl: savedVehicle.imageUrl || demoVehicle.imageUrl,
+        registrationDocUrl: savedVehicle.registrationDocUrl || demoVehicle.registrationDocUrl,
+        registrationPhotoUrl: savedVehicle.registrationPhotoUrl || demoVehicle.registrationPhotoUrl
       };
 
       setVehicles(prev => [...prev, modelItem]);
@@ -858,7 +837,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     if (editType === 'Xe 7 chỗ' || editType === 'Xe 9 chỗ') {
       sizeType = 'SUV_CUV_MPV';
     } else if (editType === 'Xe 16 chỗ') {
-      sizeType = 'LARGE_VAN_MINIBUS';
+      sizeType = 'MINIBUS_16';
     }
 
     let bodyShapeDb = 'SEDAN';
@@ -1124,10 +1103,11 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         subType = 'YEARLY';
       }
 
+      const demoDocs = getDemoVehicleImages(getDemoVehicleProfile(targetVeh) || targetVeh);
       const docPhotos = (window as any).lastUploadedPhotos || {
-        registrationPaper: targetVeh?.registrationDocUrl || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-        identityCard: targetVeh?.registrationPhotoUrl || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-        frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+        registrationPaper: targetVeh?.registrationDocUrl || demoDocs.registrationDoc,
+        identityCard: demoDocs.identityDoc,
+        frontPhoto: targetVeh?.registrationPhotoUrl || demoDocs.primary
       };
 
       // Create subscription in localStorage with PENDING_APPROVAL status
@@ -1266,10 +1246,11 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         subType = 'YEARLY';
       }
 
+      const demoDocs = getDemoVehicleImages(getDemoVehicleProfile(targetVeh) || targetVeh);
       const docPhotos = (window as any).lastUploadedPhotos || {
-        registrationPaper: targetVeh?.registrationDocUrl || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-        identityCard: targetVeh?.registrationPhotoUrl || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-        frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+        registrationPaper: targetVeh?.registrationDocUrl || demoDocs.registrationDoc,
+        identityCard: demoDocs.identityDoc,
+        frontPhoto: targetVeh?.registrationPhotoUrl || demoDocs.primary
       };
 
       // Create subscription in localStorage with PENDING_APPROVAL status

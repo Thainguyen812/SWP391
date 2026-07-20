@@ -36,6 +36,7 @@ import com.parking.model.SecurityAlert;
 import com.parking.repository.TransactionRepository;// task 5
 
 import com.parking.service.FCMService;
+import com.parking.service.DemoVehicleDataset;
 import com.parking.service.ParkingService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -160,32 +161,10 @@ public class ParkingServiceImpl implements ParkingService {
                     "Xe không phải VIP đang hoạt động. Khách vãng lai cần quẹt thẻ tạm tại làn staff.");
         }
 
-        // Find matching zone with multi-tier fallback
-        List<Zone> candidates = zoneRepository.findByAllowedSizesContaining(request.getVehicle_type());
-        Zone chosen = null;
-        List<Zone> availableCandidates = new java.util.ArrayList<>();
-        for (Zone z : candidates) {
-            if (z.getTotalSlots() - z.getCurrentOccupied() > 0) {
-                availableCandidates.add(z);
-            }
-        }
-        if (!availableCandidates.isEmpty()) {
-            int randomIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(availableCandidates.size());
-            chosen = availableCandidates.get(randomIndex);
-        }
-        if (chosen == null && !candidates.isEmpty()) {
-            int randomIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(candidates.size());
-            chosen = candidates.get(randomIndex);
-        }
-        if (chosen == null) {
-            List<Zone> allZones = zoneRepository.findAll();
-            if (!allZones.isEmpty()) {
-                int randomIndex = java.util.concurrent.ThreadLocalRandom.current().nextInt(allZones.size());
-                chosen = allZones.get(randomIndex);
-            } else {
-                throw new ApiExceptions.BadRequestException("No available zone for vehicle type");
-            }
-        }
+        String targetVehicleType = normalizeVehicleSize(
+                DemoVehicleDataset.resolveVehicleType(plate, request.getVehicle_type()));
+        Zone chosen = chooseZoneForPlate(plate, targetVehicleType);
+        String evidenceImageUrl = DemoVehicleDataset.resolveImageUrl(plate, "ENTRY_LPR", request.getImage_url());
 
         // Create session
         ParkingSession ps = new ParkingSession();
@@ -197,7 +176,7 @@ public class ParkingServiceImpl implements ParkingService {
         ps.setIsVip(true);
         ps.setEntryGate(null);
         // store image url if provided
-        ps.setMobileCheckoutPhoto(request.getImage_url());
+        ps.setMobileCheckoutPhoto(evidenceImageUrl);
 
         if (vehicleOpt.isPresent()) {
             ps.setVehicleId(vehicleOpt.get().getId());
@@ -207,6 +186,8 @@ public class ParkingServiceImpl implements ParkingService {
         zoneRepository.increaseOccupied(chosen.getId());
 
         parkingSessionRepository.save(ps);
+        saveAiScanLog(ps, "ENTRY_GATE", "VIP_ENTRY_LPR", request.getCamera_id(), evidenceImageUrl,
+                targetVehicleType, confidence, true);
 
         return new CheckInResponse(ps.getId().toString(), chosen.getCode(), "OK");
     }
@@ -226,12 +207,12 @@ public class ParkingServiceImpl implements ParkingService {
             throw new ApiExceptions.BadRequestException("Khach vang lai phai quet the tam truoc khi vao bai");
         }
 
-        String vehicleType = "SEDAN_HATCHBACK";
+        String vehicleType = DemoVehicleDataset.resolveVehicleType(session.getLicensePlate(), "SEDAN_HATCHBACK");
         Optional<Vehicle> vehicleOpt = vehicleRepository.findByLicensePlate(session.getLicensePlate());
         if (vehicleOpt.isPresent()) {
             Vehicle vehicle = vehicleOpt.get();
             if (vehicle.getVehicleSize() != null) {
-                vehicleType = vehicle.getVehicleSize();
+                vehicleType = DemoVehicleDataset.resolveVehicleType(session.getLicensePlate(), vehicle.getVehicleSize());
             }
             if (session.getVehicleId() == null) {
                 session.setVehicleId(vehicle.getId());
@@ -240,10 +221,14 @@ public class ParkingServiceImpl implements ParkingService {
         }
 
         Zone zone = ensureApprovedZone(session, vehicleType);
+        String entryGateForLog = session.getEntryGate();
         session.setEntryGate(null);
         session.setCheckInTime(Instant.now());
         session.setUpdatedAt(Instant.now());
         parkingSessionRepository.save(session);
+        saveAiScanLog(session, "ENTRY_GATE", "ENTRY_APPROVAL", entryGateForLog,
+                DemoVehicleDataset.resolveImageUrl(session.getLicensePlate(), "ENTRY_APPROVAL", session.getMobileCheckoutPhoto()),
+                vehicleType, 99.0, true);
 
         return new CheckInResponse(session.getId().toString(), zone.getCode(), "ENTRY_APPROVED");
     }
@@ -291,6 +276,9 @@ public class ParkingServiceImpl implements ParkingService {
         }
 
         parkingSessionRepository.save(session);
+        saveAiScanLog(session, "EXIT_GATE", "VIP_EXIT_APPROVAL", session.getExitGate(),
+                DemoVehicleDataset.resolveImageUrl(session.getLicensePlate(), "VIP_EXIT_APPROVAL", session.getMobileCheckoutPhoto()),
+                DemoVehicleDataset.resolveVehicleType(session.getLicensePlate(), null), 99.0, true);
 
         Transaction transaction = new Transaction();
         transaction.setId(UUID.randomUUID());
@@ -322,10 +310,12 @@ public class ParkingServiceImpl implements ParkingService {
             throw new ApiExceptions.ConflictException("Xe nay dang co phien gui xe ACTIVE");
         }
 
-        String vehicleType = pendingEntry.getVehicleType() != null ? pendingEntry.getVehicleType() : "SEDAN_HATCHBACK";
+        String vehicleType = DemoVehicleDataset.resolveVehicleType(
+                pendingEntry.getLicensePlate(),
+                pendingEntry.getVehicleType() != null ? pendingEntry.getVehicleType() : "SEDAN_HATCHBACK");
         Optional<Vehicle> vehicleOpt = vehicleRepository.findByLicensePlate(pendingEntry.getLicensePlate());
         if (vehicleOpt.isPresent() && vehicleOpt.get().getVehicleSize() != null) {
-            vehicleType = vehicleOpt.get().getVehicleSize();
+            vehicleType = DemoVehicleDataset.resolveVehicleType(pendingEntry.getLicensePlate(), vehicleOpt.get().getVehicleSize());
         }
 
         ParkingSession session = new ParkingSession();
@@ -348,6 +338,9 @@ public class ParkingServiceImpl implements ParkingService {
 
         Zone zone = ensureApprovedZone(session, vehicleType);
         parkingSessionRepository.save(session);
+        saveAiScanLog(session, "ENTRY_GATE", "VIP_PENDING_APPROVAL", pendingEntry.getEntryGate(),
+                DemoVehicleDataset.resolveImageUrl(session.getLicensePlate(), "VIP_PENDING_APPROVAL", session.getMobileCheckoutPhoto()),
+                vehicleType, 99.0, true);
 
         return new CheckInResponse(session.getId().toString(), zone.getCode(), "ENTRY_APPROVED");
     }
@@ -551,7 +544,8 @@ public class ParkingServiceImpl implements ParkingService {
     @Override
     @Transactional
     public CheckInResponse visitorCheckIn(VisitorCheckInRequest request) {
-        String plate = request.getPlate();
+        String plate = DemoVehicleDataset.normalizePlate(request.getPlate());
+        String evidenceImageUrl = DemoVehicleDataset.resolveImageUrl(plate, "VISITOR_ENTRY_LPR", request.getImage_url());
         ParkingSession sessionToUpdate = null;
         // Chốt chặn kiểm tra nếu xe là VIP đang hoạt động thì không được cấp thẻ tạm
         // vãng lai
@@ -607,13 +601,18 @@ public class ParkingServiceImpl implements ParkingService {
         if (blacklistRepository.existsByCardId(card.getId())) { // Kiểm tra blacklist
             throw new ApiExceptions.ForbiddenException("Thẻ này đang nằm trong blacklist");
         }
+        String resolvedVehicleType = DemoVehicleDataset.resolveVehicleType(plate, request.getVehicle_type());
+        if (vehicleOpt.isPresent()) {
+            resolvedVehicleType = DemoVehicleDataset.resolveVehicleType(plate, vehicleOpt.get().getVehicleSize());
+        }
+        final String targetVehicleType = normalizeVehicleSize(resolvedVehicleType);
+
         List<Zone> candidates = zoneRepository.findAll(); // tim zone phù hợp
         Zone chosen = null;
 
         List<Zone> availableCandidates = new java.util.ArrayList<>();
         for (Zone z : candidates) {
-            if (z.getAllowedSizes() != null
-                    && z.getAllowedSizes().contains(request.getVehicle_type())
+            if (allowedVehicleSizeCodes(z).contains(targetVehicleType)
                     && z.getTotalSlots() - z.getCurrentOccupied() > 0) {
                 availableCandidates.add(z);
             }
@@ -626,7 +625,7 @@ public class ParkingServiceImpl implements ParkingService {
         if (chosen == null) {
             List<Zone> matchedCandidates = new java.util.ArrayList<>();
             for (Zone z : candidates) {
-                if (z.getAllowedSizes() != null && z.getAllowedSizes().contains(request.getVehicle_type())) {
+                if (allowedVehicleSizeCodes(z).contains(targetVehicleType)) {
                     matchedCandidates.add(z);
                 }
             }
@@ -645,12 +644,13 @@ public class ParkingServiceImpl implements ParkingService {
             throw new ApiExceptions.BadRequestException("Không tìm thấy bất kỳ zone nào trong hệ thống");
         }
 
+        chosen = chooseZoneForPlate(plate, targetVehicleType);
+
         if (sessionToUpdate == null || sessionToUpdate.getEntryGate() != null) {
             zoneRepository.increaseOccupied(chosen.getId());
         }
 
-        Vehicle vehicle = vehicleRepository // chưa có thì tạo và lưu vehicle
-                .findByLicensePlate(plate)
+        Vehicle vehicle = vehicleOpt
                 .orElseGet(() -> {
 
                     Vehicle newVehicle = new Vehicle();
@@ -660,18 +660,27 @@ public class ParkingServiceImpl implements ParkingService {
                     // driver_casual trong seed data
                     newVehicle.setOwnerId(
                             UUID.fromString(
-                                    "a0000000-0000-0000-0000-000000000005"));
+                                     "a0000000-0000-0000-0000-000000000005"));
 
                     newVehicle.setLicensePlate(plate);
 
-                    newVehicle.setVehicleSize(
-                            request.getVehicle_type());
+                    newVehicle.setVehicleSize(targetVehicleType);
 
-                    String requestedFuelType = request.getFuel_type();
-                    newVehicle.setFuelType(
-                            requestedFuelType != null && !requestedFuelType.trim().isEmpty()
-                                    ? requestedFuelType.trim().toUpperCase()
-                                    : "GASOLINE");
+                    DemoVehicleDataset.findByPlate(plate).ifPresent(profile -> {
+                        newVehicle.setBrand(profile.model());
+                        newVehicle.setColor(profile.color());
+                        newVehicle.setColorRgb(profile.colorRgb());
+                        newVehicle.setBodyShape(profile.bodyShape());
+                        newVehicle.setRegistrationDocUrl(profile.registrationDocUrl());
+                        newVehicle.setRegistrationPhotoUrl(profile.registrationPhotoUrl());
+                    });
+                    if (newVehicle.getBrand() == null) {
+                        newVehicle.setBrand(vehicleSizeLabel(targetVehicleType));
+                    }
+                    if (newVehicle.getBodyShape() == null) {
+                        newVehicle.setBodyShape(targetVehicleType);
+                    }
+                    newVehicle.setFuelType(DemoVehicleDataset.resolveFuelType(plate, request.getFuel_type()));
 
                     newVehicle.setActive(true);
 
@@ -693,7 +702,7 @@ public class ParkingServiceImpl implements ParkingService {
             session.setAssignedZoneId(chosen.getId());
             session.setSessionStatus(ParkingSession.SessionStatus.ACTIVE);
             session.setIsVip(false);
-            session.setMobileCheckoutPhoto(request.getImage_url());
+            session.setMobileCheckoutPhoto(evidenceImageUrl);
             session.setEntryGate(request.getGate());
         }
 
@@ -711,6 +720,9 @@ public class ParkingServiceImpl implements ParkingService {
         parkingSessionRepository.save(session); // save vào database
 
         // Đổi trạng thái thẻ
+        saveAiScanLog(session, "ENTRY_GATE", "VISITOR_ENTRY_LPR", request.getGate(), evidenceImageUrl,
+                targetVehicleType, 99.0, true);
+
         card.setStatus(Card.CardStatus.IN_USE);
         card.setUpdatedAt(Instant.now());
         cardRepository.save(card);
@@ -727,7 +739,13 @@ public class ParkingServiceImpl implements ParkingService {
             chosen = zoneRepository.findById(session.getAssignedZoneId()).orElse(null);
         }
         if (chosen == null) {
-            List<Zone> candidates = zoneRepository.findByAllowedSizesContaining(vehicleType);
+            String targetVehicleType = normalizeVehicleSize(vehicleType);
+            List<Zone> candidates = new java.util.ArrayList<>();
+            for (Zone z : zoneRepository.findAll()) {
+                if (allowedVehicleSizeCodes(z).contains(targetVehicleType)) {
+                    candidates.add(z);
+                }
+            }
             List<Zone> availableCandidates = new java.util.ArrayList<>();
             for (Zone z : candidates) {
                 if (z.getTotalSlots() - z.getCurrentOccupied() > 0) {
@@ -824,8 +842,42 @@ public class ParkingServiceImpl implements ParkingService {
             throw new ApiExceptions.ForbiddenException("Thẻ này đang nằm trong blacklist, không thể checkout");
         }
 
-        if (transactionRepository.findBySessionId(session.getId()).isPresent()) {
-            throw new ApiExceptions.ConflictException("Phiên gửi xe này đã có transaction");
+        Optional<Transaction> existingTxnOpt = transactionRepository.findBySessionId(session.getId());
+        if (existingTxnOpt.isPresent()) {
+            Transaction existingTxn = existingTxnOpt.get();
+            if (existingTxn.getPaymentStatus() == Transaction.PaymentStatus.PENDING) {
+                Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
+                        .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin xe để tính phí"));
+
+                Instant checkOutTime = Instant.now();
+                BigDecimal parkingFee = this.calculateParkingFeeSafe(
+                        vehicle.getVehicleSize(),
+                        session.getCheckInTime(),
+                        checkOutTime);
+
+                BigDecimal lostCardPenalty = BigDecimal.ZERO;
+                if (session.getSessionStatus() == ParkingSession.SessionStatus.LOST_CARD) {
+                    PricingRule pricingRule = pricingRuleRepository
+                            .findFirstByVehicleSizeAndIsActiveTrueOrderByEffectiveFromDesc(vehicle.getVehicleSize())
+                            .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy cấu hình bảng giá"));
+                    lostCardPenalty = pricingRule.getLostCardPenalty();
+                }
+
+                BigDecimal violationPenalty = applyPendingViolationPenalties(session, vehicle, false);
+
+                existingTxn.setParkingFee(parkingFee);
+                existingTxn.setLostCardPenalty(lostCardPenalty);
+                existingTxn.setViolationPenalty(violationPenalty);
+                existingTxn.setTotalAmount(parkingFee.add(lostCardPenalty).add(violationPenalty));
+                
+                List<ParkingViolation> pendingViolations = parkingViolationRepository.findBySessionIdAndStatus(session.getId(), "PENDING");
+                existingTxn.setViolationCount(pendingViolations.size());
+                existingTxn.setProcessedAt(checkOutTime);
+
+                return transactionRepository.save(existingTxn);
+            } else {
+                throw new ApiExceptions.ConflictException("Phiên gửi xe này đã có transaction");
+            }
         }
 
         Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
@@ -860,6 +912,9 @@ public class ParkingServiceImpl implements ParkingService {
         transaction.setLostCardPenalty(lostCardPenalty);
         transaction.setViolationPenalty(violationPenalty);
         transaction.setTotalAmount(parkingFee.add(lostCardPenalty).add(violationPenalty));
+        
+        List<ParkingViolation> pendingViolations = parkingViolationRepository.findBySessionIdAndStatus(session.getId(), "PENDING");
+        transaction.setViolationCount(pendingViolations.size());
         transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
         transaction.setPaymentStatus(Transaction.PaymentStatus.PENDING);
         transaction.setIsMobileCheckout(false);
@@ -878,12 +933,7 @@ public class ParkingServiceImpl implements ParkingService {
             return BigDecimal.ZERO;
         }
 
-        PricingRule pricingRule = pricingRuleRepository
-                .findFirstByVehicleSizeAndIsActiveTrueOrderByEffectiveFromDesc(vehicle.getVehicleSize())
-                .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay cau hinh bang gia"));
-        BigDecimal evPenaltyRate = pricingRule.getEvViolationPenalty() != null
-                ? pricingRule.getEvViolationPenalty()
-                : BigDecimal.ZERO;
+        BigDecimal evPenaltyRate = new java.math.BigDecimal("100000");
         BigDecimal totalFines = BigDecimal.ZERO;
 
         for (ParkingViolation violation : pendingViolations) {
@@ -1023,6 +1073,9 @@ public class ParkingServiceImpl implements ParkingService {
             });
         }
         parkingSessionRepository.save(session);
+        saveAiScanLog(session, "EXIT_GATE", "MOBILE_POS_EXIT_CONFIRM", session.getExitGate(),
+                DemoVehicleDataset.resolveImageUrl(session.getLicensePlate(), "MOBILE_POS_EXIT_CONFIRM", session.getMobileCheckoutPhoto()),
+                DemoVehicleDataset.resolveVehicleType(session.getLicensePlate(), null), 99.0, true);
 
         if (session.getCardId() != null) {
             cardRepository.findById(session.getCardId()).ifPresent(card -> {
@@ -1097,6 +1150,9 @@ public class ParkingServiceImpl implements ParkingService {
         }
 
         parkingSessionRepository.save(session); //
+        saveAiScanLog(session, "EXIT_GATE", "CARD_EXIT_CONFIRM", session.getExitGate(),
+                DemoVehicleDataset.resolveImageUrl(session.getLicensePlate(), "CARD_EXIT_CONFIRM", session.getMobileCheckoutPhoto()),
+                DemoVehicleDataset.resolveVehicleType(session.getLicensePlate(), null), 99.0, true);
 
         markPendingViolationsProcessed(session.getId());
 
@@ -1160,6 +1216,7 @@ public class ParkingServiceImpl implements ParkingService {
                 session.getCheckInTime(),
                 checkoutTime);
 
+        List<ParkingViolation> pendingViolations = parkingViolationRepository.findBySessionIdAndStatus(session.getId(), "PENDING");
         BigDecimal violationPenalty = applyPendingViolationPenalties(session, vehicle, true);
 
         Transaction transaction = new Transaction();
@@ -1168,6 +1225,7 @@ public class ParkingServiceImpl implements ParkingService {
 
         transaction.setSessionId(
                 session.getId());
+        transaction.setViolationCount(pendingViolations.size());
 
         transaction.setParkingFee(
                 parkingFee);
@@ -1229,6 +1287,9 @@ public class ParkingServiceImpl implements ParkingService {
 
         parkingSessionRepository.save(
                 session);
+        saveAiScanLog(session, "MOBILE_POS", "MOBILE_POS_PREPAY", "MOBILE_POS",
+                DemoVehicleDataset.resolveImageUrl(session.getLicensePlate(), "MOBILE_POS_PREPAY", request.getProofImageUrl()),
+                DemoVehicleDataset.resolveVehicleType(session.getLicensePlate(), vehicle.getVehicleSize()), 99.0, true);
 
         return transaction;
     }
@@ -1405,6 +1466,71 @@ public class ParkingServiceImpl implements ParkingService {
         return result;
     }
 
+    private Zone chooseZoneForPlate(String plate, String vehicleType) {
+        String targetVehicleType = normalizeVehicleSize(DemoVehicleDataset.resolveVehicleType(plate, vehicleType));
+        String preferredZoneCode = DemoVehicleDataset.resolveZoneCode(plate, targetVehicleType);
+
+        Optional<Zone> preferred = zoneRepository.findAll().stream()
+                .filter(zone -> zone.getCode() != null && zone.getCode().equalsIgnoreCase(preferredZoneCode))
+                .filter(zone -> allowedVehicleSizeCodes(zone).contains(targetVehicleType))
+                .findFirst();
+        if (preferred.isPresent()) {
+            return preferred.get();
+        }
+
+        List<Zone> candidates = new java.util.ArrayList<>();
+        for (Zone zone : zoneRepository.findAll()) {
+            if (allowedVehicleSizeCodes(zone).contains(targetVehicleType)) {
+                candidates.add(zone);
+            }
+        }
+        if (!candidates.isEmpty()) {
+            List<Zone> available = candidates.stream()
+                    .filter(zone -> zone.getTotalSlots() - zone.getCurrentOccupied() > 0)
+                    .collect(java.util.stream.Collectors.toList());
+            List<Zone> pool = !available.isEmpty() ? available : candidates;
+            return pool.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(pool.size()));
+        }
+
+        return zoneRepository.findAll().stream()
+                .findFirst()
+                .orElseThrow(() -> new ApiExceptions.BadRequestException("Khong tim thay zone de cho xe vao bai"));
+    }
+
+    private void saveAiScanLog(ParkingSession session, String scanLocation, String scanType, String cameraId,
+            String imageUrl, String vehicleType, Double confidenceScore, boolean evidence) {
+        if (session == null || session.getLicensePlate() == null || session.getLicensePlate().isBlank()) {
+            return;
+        }
+
+        String plate = DemoVehicleDataset.normalizePlate(session.getLicensePlate());
+        String resolvedVehicleType = normalizeVehicleSize(DemoVehicleDataset.resolveVehicleType(plate, vehicleType));
+        String resolvedImageUrl = DemoVehicleDataset.resolveImageUrl(plate, scanType, imageUrl);
+        Optional<DemoVehicleDataset.Profile> profileOpt = DemoVehicleDataset.findByPlate(plate);
+
+        AiScanLog log = new AiScanLog();
+        log.setId(UUID.randomUUID());
+        log.setSessionId(session.getId());
+        log.setScanLocation(scanLocation != null && !scanLocation.isBlank() ? scanLocation : "GATE");
+        log.setScanType(scanType != null && !scanType.isBlank() ? scanType : "LPR_SCAN");
+        log.setCameraId(cameraId != null && !cameraId.isBlank() ? cameraId : "CAM-DEMO");
+        log.setImageUrl(resolvedImageUrl);
+        log.setDetectedPlate(plate);
+        log.setConfidenceScore(BigDecimal.valueOf(confidenceScore != null ? confidenceScore : 99.0));
+        log.setDetectedVehicleType(resolvedVehicleType);
+        profileOpt.ifPresent(profile -> {
+            log.setDetectedColor(profile.color());
+            log.setDetectedColorRgb(profile.colorRgb());
+            log.setDetectedShape(profile.bodyShape());
+        });
+        log.setMatchScore(BigDecimal.valueOf(98.5));
+        log.setShapeMatch(true);
+        log.setQrMatch(false);
+        log.setEvidence(evidence);
+        log.setScannedAt(Instant.now());
+        aiScanLogRepository.save(log);
+    }
+
     private List<String> allowedVehicleSizeCodes(Zone zone) {
         if (zone == null || zone.getCode() == null) {
             return java.util.List.of("SEDAN_HATCHBACK");
@@ -1413,7 +1539,8 @@ public class ParkingServiceImpl implements ParkingService {
         return switch (code) {
             case "F1" -> java.util.List.of("SEDAN_HATCHBACK");
             case "F2" -> java.util.List.of("SUV_CUV_MPV");
-            case "B1", "G" -> java.util.List.of("LARGE_VAN_MINIBUS");
+            case "B1" -> java.util.List.of("VAN_TRUCK");
+            case "G" -> java.util.List.of("MINIBUS_16");
             default -> parseAllowedSizeCodes(zone.getAllowedSizes());
         };
     }
@@ -1448,10 +1575,11 @@ public class ParkingServiceImpl implements ParkingService {
                 || normalized.contains("7") || normalized.contains("9")) {
             return "SUV_CUV_MPV";
         }
-        if (normalized.contains("LARGE") || normalized.contains("VAN") || normalized.contains("MINIBUS")
-                || normalized.contains("BUS") || normalized.contains("TRUCK") || normalized.contains("12")
-                || normalized.contains("16")) {
-            return "LARGE_VAN_MINIBUS";
+        if (normalized.contains("12") || normalized.contains("16") || normalized.contains("MINIBUS") || normalized.contains("BUS")) {
+            return "MINIBUS_16";
+        }
+        if (normalized.contains("VAN") || normalized.contains("TRUCK") || normalized.contains("TẢI") || normalized.contains("TAI") || normalized.contains("LARGE")) {
+            return "VAN_TRUCK";
         }
         if (normalized.contains("EV")) {
             return "SEDAN_HATCHBACK";
@@ -1462,7 +1590,8 @@ public class ParkingServiceImpl implements ParkingService {
     private String vehicleSizeLabel(String value) {
         return switch (normalizeVehicleSize(value)) {
             case "SUV_CUV_MPV" -> "Xe 7-9 chỗ";
-            case "LARGE_VAN_MINIBUS" -> "Xe lớn";
+            case "VAN_TRUCK" -> "Xe van / Xe tải nhỏ";
+            case "MINIBUS_16" -> "Xe khách 12-16 chỗ";
             default -> "Xe 4-5 chỗ";
         };
     }

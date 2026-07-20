@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons';
 import { notification, Modal, Spin, Segmented } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
+import { getDemoVehicleImages, getDemoVehicleProfile } from '../../data/vehicleDataset';
 
 export const StaffLostCard = () => {
   const navigate = useNavigate();
@@ -29,44 +30,22 @@ export const StaffLostCard = () => {
   );
 
   const getCarImages = (plate) => {
-    const images = [
-      "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1621416953228-868f04179e87?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=400&q=80"
-    ];
-    let sum = 0;
-    const str = plate || "default";
-    for(let i=0; i<str.length; i++) sum += str.charCodeAt(i);
+    const profile = getDemoVehicleProfile(foundVehicle || { plate, vehicleType: foundVehicle?.vehicleType || foundVehicle?.type, imageUrl: foundVehicle?.image || foundVehicle?.imageUrl });
+    const images = getDemoVehicleImages(profile || { plate });
     return {
-      in1: images[sum % images.length],
-      in2: images[(sum + 1) % images.length],
-      out1: images[(sum + 2) % images.length],
-      out2: images[(sum + 3) % images.length]
+      in1: images.entry?.[0] || images.primary,
+      in2: images.entry?.[1] || images.primary,
+      out1: images.exit?.[0] || images.primary,
+      out2: images.exit?.[1] || images.primary
     };
   };
 
   const getIdImages = (plate) => {
-    const cccdImages = [
-      "https://images.unsplash.com/photo-1633265486064-086b219458ce?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1621252179027-94459d278660?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1614064641913-6b110b47ce56?auto=format&fit=crop&w=600&q=80"
-    ];
-    const regImages = [
-      "https://images.unsplash.com/photo-1588681664899-f142ff2dc9b1?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=600&q=80"
-    ];
-    let sum = 0;
-    const str = plate || "default";
-    for(let i=0; i<str.length; i++) sum += str.charCodeAt(i);
+    const profile = getDemoVehicleProfile(foundVehicle || { plate, vehicleType: foundVehicle?.vehicleType || foundVehicle?.type, imageUrl: foundVehicle?.image || foundVehicle?.imageUrl });
+    const images = getDemoVehicleImages(profile || { plate });
     return {
-      cccd: cccdImages[sum % cccdImages.length],
-      reg: regImages[sum % regImages.length]
+      cccd: images.identityDoc,
+      reg: images.registrationDoc
     };
   };
 
@@ -261,7 +240,7 @@ export const StaffLostCard = () => {
               {/* Image 2 */}
               <div className="relative bg-slate-200 rounded-lg aspect-video flex items-center justify-center overflow-hidden border border-slate-300">
                 {foundVehicle ? (
-                  <img src={carImgs.in2} alt="Front Right" className="w-full h-full object-cover opacity-90" />
+                  <img src={carImgs.in2} alt="Front Right" className="w-full h-full object-cover opacity-90 scale-x-[-1]" />
                 ) : (
                   <div className="text-slate-400 text-xs">Chưa có dữ liệu</div>
                 )}
@@ -286,7 +265,7 @@ export const StaffLostCard = () => {
               {/* Image 4 (LIVE) */}
               <div className="relative bg-slate-200 rounded-lg aspect-video flex items-center justify-center overflow-hidden border-2 border-red-300">
                 {foundVehicle ? (
-                  <img src={carImgs.out2} alt="Rear Right Live" className="w-full h-full object-cover opacity-90" />
+                  <img src={carImgs.out2} alt="Rear Right Live" className="w-full h-full object-cover opacity-90 scale-x-[-1]" />
                 ) : (
                   <div className="text-slate-400 text-xs font-medium">Chưa có phương tiện tại cổng</div>
                 )}

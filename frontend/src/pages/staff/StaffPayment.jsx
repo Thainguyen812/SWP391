@@ -17,6 +17,7 @@ import { notification, Input, Button, Modal, Spin } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
 import { apiClient } from '../../api/apiClient';
 import { parkingService } from '../../services/parkingService';
+import { getDemoVehicleImages, getDemoVehicleProfile } from '../../data/vehicleDataset';
 
 export const StaffPayment = () => {
   const navigate = useNavigate();
@@ -51,22 +52,11 @@ export const StaffPayment = () => {
   const [regImage, setRegImage] = useState(null);
 
   const getIdImages = (plate) => {
-    const cccdImages = [
-      "https://images.unsplash.com/photo-1633265486064-086b219458ce?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1621252179027-94459d278660?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1614064641913-6b110b47ce56?auto=format&fit=crop&w=600&q=80"
-    ];
-    const regImages = [
-      "https://images.unsplash.com/photo-1588681664899-f142ff2dc9b1?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=600&q=80",
-      "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=600&q=80"
-    ];
-    let sum = 0;
-    const str = plate || "default";
-    for(let i=0; i<str.length; i++) sum += str.charCodeAt(i);
+    const profile = getDemoVehicleProfile(plate);
+    const images = getDemoVehicleImages(profile || { plate });
     return {
-      cccd: cccdImages[sum % cccdImages.length],
-      reg: regImages[sum % regImages.length]
+      cccd: profile?.identityDocUrl || images.primary,
+      reg: profile?.registrationDocUrl || profile?.registrationPhotoUrl || images.primary
     };
   };
 
@@ -258,7 +248,7 @@ export const StaffPayment = () => {
     const isError = vehicleToPay?.status === 'Lỗi thẻ';
 
     let amount;
-    let evPenalty = backendTxn?.violationPenalty || (lpr && lpr.includes('EV') ? 500000 : 0);
+    let evPenalty = backendTxn?.violationPenalty || (lpr && lpr.includes('EV') ? 100000 : 0);
     
     // Calculate accumulated fines
     const accumulatedFines = lpr ? getVehicleFines(lpr).reduce((sum, fine) => sum + fine.amount, 0) : 0;
@@ -283,24 +273,19 @@ export const StaffPayment = () => {
   }, [lpr, vehicleToPay, isLostCard, backendTxn]);
 
   const getCarImages = (plate) => {
-    const images = [
-      "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1621416953228-868f04179e87?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=400&q=80"
-    ];
-    let sum = 0;
-    const str = plate || "default";
-    for(let i=0; i<str.length; i++) sum += str.charCodeAt(i);
+    const profile = getDemoVehicleProfile({
+      ...(vehicleToPay || {}),
+      plate,
+      vehicleType: vehicleToPay?.vehicleType || vehicleToPay?.vehicleSize || vehicleToPay?.type,
+      fuelType: vehicleToPay?.fuelType,
+      imageUrl: vehicleToPay?.image || vehicleToPay?.imageUrl
+    });
+    const images = getDemoVehicleImages(profile || { plate });
     return {
-      in1: images[sum % images.length],
-      in2: images[(sum + 1) % images.length],
-      out1: images[(sum + 2) % images.length],
-      out2: images[(sum + 3) % images.length]
+      in1: images.entry?.[0] || images.primary,
+      in2: images.entry?.[1] || images.primary,
+      out1: images.exit?.[0] || images.primary,
+      out2: images.exit?.[1] || images.primary
     };
   };
 
@@ -366,8 +351,24 @@ export const StaffPayment = () => {
           ? (scannedMobilePenalty > 0
             ? `Xe đã quá hạn 30 phút. Cần thu phí phát sinh ${scannedMobilePenalty.toLocaleString()} VND trước khi mở cổng.`
             : `Đã xác nhận thẻ xe ${matchedByCard?.plate || lpr}. Staff chỉ cần đối chiếu ảnh và mở cổng, không thu thêm tiền.`)
-          : `Đã mở ảnh đối chiếu và tính phí: ${txn.totalAmount} VND.`
+          : `Đã mở ảnh đối chiếu và tính phí: ${txn.totalAmount.toLocaleString()} VND.`
       });
+
+      if (txn?.violationCount > 0) {
+        if (txn.violationCount === 1) {
+          notification.warning({
+            message: '🚨 Phát hiện vi phạm',
+            description: `Xe ${matchedByCard?.plate || lpr || txn.licensePlate} đã đỗ sai vị trí 1 lần (đã nhắc nhở). Vui lòng nhắc nhở trực tiếp tài xế!`,
+            duration: 10
+          });
+        } else {
+          notification.warning({
+            message: '🚨 Phát hiện vi phạm',
+            description: `Xe ${matchedByCard?.plate || lpr || txn.licensePlate} đã đỗ sai vị trí ${txn.violationCount} lần. Đã áp dụng mức phạt +${(txn.violationPenalty || 100000).toLocaleString()}đ vào tổng tiền thu!`,
+            duration: 10
+          });
+        }
+      }
     } catch (error) {
         notification.error({message: 'Lỗi Check-out', description: error.response?.data?.message || 'Không thể check-out bằng thẻ này'});
         setHasVehicle(false);
@@ -693,7 +694,7 @@ export const StaffPayment = () => {
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc vào (Cam 2 - Góc phải)</span>
                     <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={carImgs.in2} className={reviewImageClass} />
+                      <img src={carImgs.in2} className={`${reviewImageClass} scale-x-[-1]`} />
                       {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">ENT: CAM-02</span>
                     </div>
@@ -709,7 +710,7 @@ export const StaffPayment = () => {
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc ra (Cam 4 - Góc phải)</span>
                     <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={carImgs.out2} className={reviewImageClass} />
+                      <img src={carImgs.out2} className={`${reviewImageClass} scale-x-[-1]`} />
                       {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">EXT: CAM-04</span>
                     </div>
@@ -757,7 +758,23 @@ export const StaffPayment = () => {
                     )}
                     {!canReviewVehicle && <div className="text-[10px] text-blue-600 mt-1 font-bold">Chưa tính phí do chưa xác nhận thẻ</div>}
                     {isLostCard && <div className="text-[10px] text-red-500 mt-1">Đã bao gồm 200k tiền phạt thẻ</div>}
-                    {(backendTxn?.violationPenalty > 0 || (lpr && lpr.includes('EV'))) && <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">⚠️ Bị phạt Đỗ sai vị trí EV (+500k)</div>}
+                    {backendTxn ? (
+                      backendTxn.violationCount > 0 && (
+                        <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">
+                          {backendTxn.violationCount === 1 ? (
+                            <span>⚠️ Đỗ sai vị trí 1 lần (đã nhắc nhở)</span>
+                          ) : (
+                            <span>⚠️ Đỗ sai vị trí {backendTxn.violationCount} lần (phạt +{(backendTxn.violationPenalty || 100000).toLocaleString()}đ)</span>
+                          )}
+                        </div>
+                      )
+                    ) : (
+                      (lpr && lpr.includes('EV')) && (
+                        <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">
+                          ⚠️ Bị phạt Đỗ sai vị trí (+100k)
+                        </div>
+                      )
+                    )}
                     {lpr && getVehicleFines(lpr).length > 0 && <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">⚠️ Đã bao gồm phạt cộng dồn (+{getVehicleFines(lpr).reduce((sum, f) => sum + f.amount, 0).toLocaleString()}đ)</div>}
                   </div>
                 </div>
@@ -977,12 +994,11 @@ export const StaffPayment = () => {
                   const statusColor = txn.statusColor || 'bg-emerald-100 text-emerald-600';
                   const textColor = statusColor.split(' ')[1] || 'text-emerald-600';
                   
-                  let amountDisplay = txn.amount || (txn.totalAmount ? txn.totalAmount.toLocaleString('vi-VN') + 'đ' : '0đ');
-                  if (typeof amountDisplay === 'string') {
-                    amountDisplay = amountDisplay.replace('.00', '').replace('đ', '') + 'đ';
-                    if (!amountDisplay.includes(',') && !amountDisplay.includes('.')) {
-                      amountDisplay = parseInt(amountDisplay).toLocaleString('vi-VN') + 'đ';
-                    }
+                  let amountDisplay = '0đ';
+                  if (txn.amount) {
+                    amountDisplay = txn.amount;
+                  } else if (txn.totalAmount !== undefined && txn.totalAmount !== null) {
+                    amountDisplay = Number(txn.totalAmount).toLocaleString('vi-VN') + 'đ';
                   }
 
                   const formatTime = (isoString) => {
