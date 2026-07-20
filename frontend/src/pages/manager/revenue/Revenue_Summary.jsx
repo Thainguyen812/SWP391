@@ -37,13 +37,13 @@ export const RevenueSummaryCards = ({ summary }) => {
         </div>
       </div>
 
-      {/* Dự kiến năm 2023 */}
+      {/* Doanh thu năm hiện tại */}
       <div className="bg-[#0c1421] rounded-lg p-6 shadow-lg flex flex-col justify-between relative overflow-hidden">
         {/* Decorative background element */}
         <div className="absolute -right-6 -top-6 w-32 h-32 rounded-full bg-[#1e293b]/50 blur-2xl pointer-events-none"></div>
         
         <div className="flex-between mb-4 relative z-10">
-          <span className="text-body-strong text-white uppercase opacity-90">DỰ KIẾN NĂM 2023</span>
+          <span className="text-body-strong text-white uppercase opacity-90">DOANH THU NĂM NAY</span>
           <div className="w-10 h-10 rounded-lg bg-[#1e293b] text-white flex items-center justify-center text-xl border border-white/10">
             <BankOutlined />
           </div>

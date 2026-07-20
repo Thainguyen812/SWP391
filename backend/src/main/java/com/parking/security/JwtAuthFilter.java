@@ -70,6 +70,21 @@ public class JwtAuthFilter extends OncePerRequestFilter { // Đảm bảo chạy
                 // SỬA LỖI AN TOÀN: Nếu Frontend có truyền Token nhưng Token sai/hết hạn,
                 // lập tức chặn đứng tại đây và phản hồi lỗi 401 Unauthorized luôn, không cho
                 // chạy tiếp.
+                // NGOẠI LỆ: Nếu đang truy cập các public endpoint (ví dụ: login, register, swagger...),
+                // cho phép đi tiếp để không bị chặn đứng/không thể đăng nhập lại khi có token cũ bị hết hạn.
+                String path = request.getRequestURI();
+                boolean isPublicPath = (path.startsWith("/api/auth/") && !path.equals("/api/auth/me"))
+                        || path.startsWith("/v3/api-docs")
+                        || path.startsWith("/swagger-ui")
+                        || path.contains("/find-car")
+                        || path.contains("/vnpay-ipn")
+                        || path.contains("/momo-ipn");
+
+                if (isPublicPath) {
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
                 response.setCharacterEncoding("UTF-8");

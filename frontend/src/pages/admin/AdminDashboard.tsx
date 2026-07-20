@@ -69,10 +69,10 @@ import {
 
 import { VipApprovalPanel } from './VipApprovalPanel';
 import { ParkingMonitorView } from './ParkingMonitorView';
-import { adminService } from '../../services/adminService';
-import { parkingService } from '../../services/parkingService';
+import { RevenuePage } from '../manager/revenue/Revenue_Main';
+import { PersonnelMain } from '../manager/personnel/Personnel_Main';
+import { CustomerPage } from '../manager/customers/Customer_Main';
 import { apiClient } from '../../api/apiClient';
-import { getVehicleImageByPlate } from '../../utils/vehicleImages';
 
 interface DashboardProps {
   user: {
@@ -182,31 +182,43 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   const [emergencyLockdown, setEmergencyLockdown] = useState(false);
   const [editingStaffGateId, setEditingStaffGateId] = useState<string | null>(null);
   const [showAddBranchModal, setShowAddBranchModal] = useState(false);
-  const [branches, setBranches] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([{
+      id: 'br-1',
+      name: 'Hệ thống tòa nhà gửi xe',
+      address: 'Bãi đỗ xe thông minh UrbanPark',
+      status: 'Hoạt động',
+      capacity: 0,
+      occupied: 0,
+      cars: '0 / 0',
+      updateTime: 'Đang tải...'
+    }]);
 
+  // Fetch real zone data for overview tab
   useEffect(() => {
-    adminService.getBranches()
-      .then(res => {
-        const items = Array.isArray(res.data) ? res.data : [];
-        const mapped = items.map((b: any) => ({
-          id: b.id || `br-${Math.random().toString(36).slice(2,6)}`,
-          name: b.name || 'Chi nhánh',
-          address: b.location || b.address || '',
-          status: b.status || 'Hoạt động',
-          capacity: b.capacity || 0,
-          occupied: b.occupied || 0,
-          cars: b.cars || '0 / 0',
-          motorbikes: b.motorbikes || '0 / 0',
-          updateTime: 'Vừa cập nhật'
-        }));
-        setBranches(mapped);
-      })
-      .catch((err) => {
-        console.error("Lỗi khi tải danh sách cơ sở từ server:", err);
-        // Do not use fallback mock data; instead, set to empty to reflect reality
-        setBranches([]);
-      });
-  }, []);
+    if (activeMenu === 'overview') {
+      const fetchZoneOverview = async () => {
+        try {
+          const zoneData = await apiClient.get('/v1/parking/zones/overview');
+          const zones = Array.isArray(zoneData) ? zoneData : [];
+          const totalSlots = zones.reduce((s: number, z: any) => s + (z.totalSlots || 0), 0);
+          const totalOccupied = zones.reduce((s: number, z: any) => s + (z.currentOccupied || 0), 0);
+          setBranches([{
+            id: 'br-1',
+            name: 'Hệ thống tòa nhà gửi xe',
+            address: 'Bãi đỗ xe thông minh UrbanPark',
+            status: 'Hoạt động',
+            capacity: totalSlots,
+            occupied: totalOccupied,
+            cars: `${totalOccupied} / ${totalSlots}`,
+            updateTime: `Cập nhật lúc ${new Date().toLocaleTimeString('vi-VN')}`
+          }]);
+        } catch (err) {
+          console.error('Lỗi tải dữ liệu zone overview:', err);
+        }
+      };
+      fetchZoneOverview();
+    }
+  }, [activeMenu]);
 
   // Gate Control Live API States
   const [gatePlate, setGatePlate] = useState('');
@@ -273,6 +285,9 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
       const data = response.data;
       if (data.success) {
         triggerToast(data.message, "success");
+        const plateText = data.data?.vehicle?.plate || gatePlate.trim().toUpperCase() || 'UNKNOWN';
+        const zoneText = data.data?.assignedZoneCode ? ` -> TẦNG ${data.data.assignedZoneCode}` : '';
+        setLedText(`THÔNG XE: ${plateText}${zoneText}`);
         // Reset local gate values
         setGatePlate('');
         setGateCardCode('');
@@ -282,15 +297,19 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
         if (data.error === "VEHICLE_LOCKED") {
           setIsSecurityLockTriggered(true);
           setSecurityViolatorPlate(data.data?.vehicle?.plate || gatePlate);
+          setLedText(`🚨 XE BỊ KHÓA: ${(data.data?.vehicle?.plate || gatePlate).toUpperCase()}`);
           triggerToast("🚨 BẢO ĐỘNG AN NINH: PHÁT HIỆN ĐỘT NHẬP XE ĐANG KHÓA!", "error");
         } else if (data.error === "QR_FALLBACK_REQUIRED") {
+          setLedText(`🚨 YÊU CẦU QR DỰ PHÒNG`);
           triggerToast("Vui lòng xuất trình mã QR dự phòng để ra cổng!", "warning");
         } else {
+          setLedText(`🚨 TỪ CHỐI: ${data.message || data.error}`);
           triggerToast(`Không thành công: ${data.message || data.error}`, "error");
         }
         fetchGateScanLogs();
       }
     } catch (err: any) {
+      setLedText(`🚨 LỖI HỆ THỐNG`);
       triggerToast("Lỗi kết nối API cổng trực Backend!", "error");
     } finally {
       setIsProcessingGateScan(false);
@@ -365,8 +384,9 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   const [selectedSlotForCheckIn, setSelectedSlotForCheckIn] = useState<any | null>(null);
   const [checkInPlate, setCheckInPlate] = useState('');
   const [checkInCardCode, setCheckInCardCode] = useState('');
-  const [checkInVehicleType, setCheckInVehicleType] = useState<'Sedan' | 'SUV' | 'Hatchback' | 'Sang trọng'>('Sedan');
+  const [checkInVehicleType, setCheckInVehicleType] = useState<'Sedan' | 'SUV' | 'Van' | 'Minibus' | 'Sang trọng'>('Sedan');
   const [checkInIsVip, setCheckInIsVip] = useState(false);
+  const [ledText, setLedText] = useState("CHÀO MỪNG BẠN ĐẾN VỚI URBANPARK");
 
   // Detailed selected slot state info card overlay
   const [selectedSlotDetails, setSelectedSlotDetails] = useState<any | null>(null);
@@ -398,60 +418,50 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     }
   }, [isDarkMode]);
 
-  // Parked vehicles – populated from /api/sessions
-  const [vehicles, setVehicles] = useState<ParkedVehicle[]>([]);
+  // Databases initialized with rich mock data
+  const [vehicles, setVehicles] = useState<ParkedVehicle[]>(() => {
+    const saved = localStorage.getItem('urbanpark_manager_parked');
+    if (saved) return JSON.parse(saved);
+    const initial: ParkedVehicle[] = [
+      { plate: '30F-999.78', type: 'VIP', zone: 'Khu A (Tầng 1)', slot: 'A10', entryTime: '24/10/2023 08:30', ownerName: 'Nguyễn Tiến Đạt', phone: '0901234567' },
+      { plate: '29A-888.88', type: 'OTO', zone: 'Khu A (Tầng 1)', slot: 'A12', entryTime: '24/10/2023 09:12', ownerName: 'Lê Hoàng Hải', phone: '0978222111' },
+      { plate: '30A-123.45', type: 'OTO', zone: 'Khu B (Tầng 2)', slot: 'B04', entryTime: '24/10/2023 11:45', ownerName: 'Bùi Minh Phương', phone: '0902222222' },
+      { plate: '29M1-678.90', type: 'XEMAY', zone: 'Khu C (Hầm B1)', slot: 'C22', entryTime: '24/10/2023 12:05', ownerName: 'Lê Văn Cường', phone: '0903333333' },
+      { plate: '30E-245.89', type: 'OTO', zone: 'Khu A (Tầng 1)', slot: 'A03', entryTime: '24/10/2023 13:10', ownerName: 'Phạm Minh Toàn', phone: '0983777555' },
+      { plate: '30K-111.44', type: 'VIP', zone: 'Khu B (Tầng 2)', slot: 'B18', entryTime: '24/10/2023 13:40', ownerName: 'Nguyễn Thị Hoa', phone: '0912444333' },
+      { plate: '29Y5-958.82', type: 'XEMAY', zone: 'Khu C (Hầm B1)', slot: 'C05', entryTime: '24/10/2023 14:02', ownerName: 'Vũ Quốc Trung', phone: '0945999888' },
+    ];
+    localStorage.setItem('urbanpark_manager_parked', JSON.stringify(initial));
+    return initial;
+  });
 
-  const fetchParkedVehicles = () => {
-    apiClient.get('/sessions')
-      .then(res => {
-        const items = Array.isArray(res.data) ? res.data : [];
-        const active = items.filter((s: any) => s.status === 'ACTIVE' || s.checkOutTime === null || s.checkOutTime === undefined);
-        const mapped: ParkedVehicle[] = active.map((s: any) => ({
-          plate: s.licensePlate || s.plate || 'N/A',
-          type: s.vehicleType === 'VIP' ? 'VIP' : s.vehicleType === 'XEMAY' ? 'XEMAY' : 'OTO',
-          zone: s.zone || s.assignedZone || 'Khu A (Tầng 1)',
-          slot: s.slot || s.slotNumber || '-',
-          entryTime: s.checkInTime || s.entryTime || '-',
-          ownerName: s.ownerName || s.driverName || '',
-          phone: s.phone || ''
-        }));
-        setVehicles(mapped);
-      })
-      .catch(() => {/* Keep empty */});
-  };
+  // Keep synced
+  useEffect(() => {
+    localStorage.setItem('urbanpark_manager_parked', JSON.stringify(vehicles));
+  }, [vehicles]);
+
+  // System Logs Database
+  const [logs, setLogs] = useState<any[]>(() => {
+    const saved = localStorage.getItem('urbanpark_manager_logs');
+    if (saved) return JSON.parse(saved);
+    const initial = [
+      { id: 'LOG-001', time: '14:28:10', type: 'SUCCESS', message: 'Xe VIP [30F-999.78] checkout an toàn qua cổng Ra 01. Chi phí: 0 VNĐ (Vé tháng VIP).' },
+      { id: 'LOG-002', time: '14:20:15', type: 'SUCCESS', message: 'Cấp thẻ từ mới cho nhân viên quét ca: Lê Văn C.' },
+      { id: 'LOG-003', time: '14:15:22', type: 'WARNING', message: 'Hệ thống nhận diện (LPR) vạch cảnh báo biển số lấm bẩn tại Cổng Vào 02.' },
+      { id: 'LOG-004', time: '13:58:40', type: 'SUCCESS', message: 'Xe vãng lai [30A-123.45] check-in thành công tại Cổng Vào 01. Vị trí cấp: B04.' },
+      { id: 'LOG-005', time: '13:10:02', type: 'SUCCESS', message: 'Xe [30E-245.89] check-in thành công tại Cổng Vào 02. Vị trí cấp: A03.' },
+      { id: 'LOG-006', time: '13:00:15', type: 'INFO', message: 'Hệ thống tự động đồng bộ giờ NTP bốt đỗ xe toàn khu.' }
+    ];
+    localStorage.setItem('urbanpark_manager_logs', JSON.stringify(initial));
+    return initial;
+  });
 
   useEffect(() => {
-    fetchParkedVehicles();
-    const interval = setInterval(fetchParkedVehicles, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // System Logs – populated from /api/logs (gate scan activity)
-  const [logs, setLogs] = useState<any[]>([]);
+    localStorage.setItem('urbanpark_manager_logs', JSON.stringify(logs));
+  }, [logs]);
 
   useEffect(() => {
-    apiClient.get('/logs', { params: { page: 1 } })
-      .then(res => {
-        const data = res.data;
-        const items = Array.isArray(data?.items) ? data.items
-          : Array.isArray(data) ? data : [];
-        const mapped = items.map((log: any, idx: number) => ({
-          id: log.id || `LOG-${String(idx + 1).padStart(3, '0')}`,
-          time: log.time || log.createdAt || '',
-          type: log.status === 'ERROR' || log.statusColor === 'red' ? 'ERROR'
-              : log.status === 'WARNING' ? 'WARNING' : 'SUCCESS',
-          message: log.message || log.action || log.gate || 'Sự kiện hệ thống'
-        }));
-        setLogs(mapped);
-      })
-      .catch(() => {/* Keep empty */});
-  }, []);
-
-  // Sync branches to localStorage for facility dropdown (UI preference)
-  useEffect(() => {
-    if (branches.length > 0) {
-      localStorage.setItem('urbanpark_manager_branches', JSON.stringify(branches));
-    }
+    localStorage.setItem('urbanpark_manager_branches', JSON.stringify(branches));
   }, [branches]);
 
   useEffect(() => {
@@ -462,55 +472,40 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     }
   }, [activeFacility]);
 
-  // HR Staff List – populated from API
-  const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [isStaffLoading, setIsStaffLoading] = useState(false);
+  // HR Staff List and live performance metrics (Screenshot 5 Replication)
+  const [staff, setStaff] = useState<StaffMember[]>([
+    { id: 'STF-01', name: 'Trần Thị Bé', avatar: 'B', role: 'Giám sát Cổng vào 1', gate: 'Cổng Vào 01', swipes: 342, status: 'ONLINE', leaveHours: '06:00 - 14:00', keyLabel: '8892' },
+    { id: 'STF-02', name: 'Lê Văn Cường', avatar: 'C', role: 'Nhân viên Cổng ra 2', gate: 'Cổng Ra 02', swipes: 315, status: 'ONLINE', leaveHours: '06:00 - 14:00', keyLabel: '4415' },
+    { id: 'STF-03', name: 'Phạm Đức Duy', avatar: 'D', role: 'Đội trưởng Tuần tra', gate: 'Tuần tra hầm B1', swipes: 289, status: 'OFFLINE', leaveHours: 'Ca tiếp: 14:00', keyLabel: '1188', reason: 'Nghỉ ca' },
+    { id: 'STF-04', name: 'Hoàng Yến', avatar: 'Y', role: 'Hỗ trợ Khách hàng', gate: 'Bốt Trung Tâm', swipes: 154, status: 'OFFLINE', leaveHours: 'Ốm (1 ngày)', reason: 'Ốm (1 ngày)' }
+  ]);
 
-  useEffect(() => {
-    setIsStaffLoading(true);
-    adminService.getPersonnelList()
-      .then(res => {
-        const items = Array.isArray(res.data) ? res.data : [];
-        const mapped: StaffMember[] = items.map((p: any, idx: number) => ({
-          id: p.id || `STF-${String(idx + 1).padStart(2, '0')}`,
-          name: p.name || p.username || 'Nhân viên',
-          avatar: (p.name || p.username || 'N').charAt(0).toUpperCase(),
-          role: p.role || 'Nhân viên',
-          gate: p.location || 'Chưa phân công',
-          swipes: p.count || 0,
-          status: (p.status === 'ONLINE' || p.status === 'ACTIVE') ? 'ONLINE' : 'OFFLINE',
-          leaveHours: p.time || '',
-          keyLabel: p.phone ? p.phone.slice(-4) : '',
-          reason: p.status === 'OFFLINE' ? (p.reason || '') : undefined
-        }));
-        setStaff(mapped);
-      })
-      .catch(() => {
-        // Keep empty on error, UI will show empty state
-      })
-      .finally(() => setIsStaffLoading(false));
-  }, []);
-
-  // System Notices – populated from API
-  const [notices, setNotices] = useState<SystemNotice[]>([]);
-
-  useEffect(() => {
-    adminService.getDashboardAlerts()
-      .then(res => {
-        const items = Array.isArray(res.data) ? res.data : [];
-        const mapped: SystemNotice[] = items.map((a: any) => ({
-          id: String(a.id),
-          type: (a.type === 'ERROR' || a.type === 'WARNING' || a.type === 'SUCCESS') ? a.type : 'WARNING',
-          title: a.title || 'Thông báo hệ thống',
-          desc: a.description || a.desc || '',
-          time: a.time || 'Vừa xong',
-          actionText: a.actionText,
-          actionState: 'IDLE' as const
-        }));
-        if (mapped.length > 0) setNotices(mapped);
-      })
-      .catch(() => {/* Keep empty */});
-  }, []);
+  // System Notices in the right-bottom box
+  const [notices, setNotices] = useState<SystemNotice[]>([
+    { 
+      id: 'NTC-01', 
+      type: 'ERROR', 
+      title: 'Mất kết nối Camera LPR Cổng 03', 
+      desc: 'Hệ thống không nhận được tín hiệu từ Camera C03 trong 5 phút qua. Yêu cầu kiểm tra kỹ thuật ngay lập tức.', 
+      time: '10 phút trước', 
+      actionText: 'Chỉ định kỹ thuật',
+      actionState: 'IDLE'
+    },
+    { 
+      id: 'NTC-02', 
+      type: 'WARNING', 
+      title: 'Cảnh báo đầy bãi - Khu vực Tầng hầm 1', 
+      desc: 'Công suất hiện tại đạt 95%. Hệ thống tự động chuyển hướng xe mới xuống Tầng hầm 2.', 
+      time: '45 phút trước' 
+    },
+    { 
+      id: 'NTC-03', 
+      type: 'SUCCESS', 
+      title: 'Cập nhật phần mềm Barrier v2.1 hoàn tất', 
+      desc: 'Tất cả các cổng kiểm soát đã được đồng bộ phiên bản mới nhất.', 
+      time: '2 giờ trước' 
+    }
+  ]);
 
   // Hardware switches status for Technical Config
   const [gateBarriers, setGateBarriers] = useState([
@@ -523,54 +518,19 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     { gateId: 'GATE-OUT-03', name: 'CS2 - Landmark Cổng Ra', open: false, isOperating: false, branchId: 'cs2' }
   ]);
 
-  // Blacklist – populated from /api/customers/blacklist
-  const [blacklist, setBlacklist] = useState<BlacklistedVehicle[]>([]);
+  // Blacklist Database
+  const [blacklist, setBlacklist] = useState<BlacklistedVehicle[]>([
+    { plate: '19A-999.11', reason: 'Xe liên quan đến vụ tranh chấp tài sản chưa giải quyết', dateAdded: '12/10/2023' },
+    { plate: '30F-443.12', reason: 'Nghi ngờ giả mạo phôi thẻ từ VIP tháng nhiều lần', dateAdded: '20/10/2023' }
+  ]);
 
-  useEffect(() => {
-    adminService.getBlacklist()
-      .then(res => {
-        const items = Array.isArray(res.data) ? res.data : [];
-        const mapped: BlacklistedVehicle[] = items.map((b: any) => ({
-          plate: b.plate || b.licensePlate || b.cardId || 'N/A',
-          reason: b.reason || b.notes || 'Không có lý do',
-          dateAdded: b.blacklistedAt
-            ? new Date(b.blacklistedAt).toLocaleDateString('vi-VN')
-            : b.dateAdded || '-'
-        }));
-        setBlacklist(mapped);
-      })
-      .catch(() => {/* Keep empty */});
-  }, []);
-
-  // Revenue transactions – populated from API
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [isTransactionsLoading, setIsTransactionsLoading] = useState(false);
-
-  const fetchTransactions = (page = 1) => {
-    setIsTransactionsLoading(true);
-    adminService.getRevenueTransactions(page)
-      .then(res => {
-        const data = res.data;
-        const items = Array.isArray(data?.items) ? data.items
-          : Array.isArray(data) ? data : [];
-        const mapped = items.map((t: any) => ({
-          id: t.id ? `#TRX-${String(t.id).slice(-4).toUpperCase()}` : `#TRX-${Math.random().toString(36).slice(2,6).toUpperCase()}`,
-          time: t.time || t.createdAt || 'N/A',
-          plate: t.plate || t.licensePlate || '-',
-          type: t.type || t.vehicleType || 'Vãng lai',
-          cost: t.cost || t.fee || t.amount ? `${(t.cost || t.fee || t.amount || 0).toLocaleString('vi-VN')}đ` : '0đ',
-          paymentMethod: t.paymentMethod || t.payment_method || 'Tiền mặt',
-          status: t.status || 'THÀNH CÔNG',
-          invoiceNo: t.invoiceNo || t.invoice_no || '-',
-          note: t.note || ''
-        }));
-        setTransactions(mapped);
-      })
-      .catch(() => {/* Keep empty */})
-      .finally(() => setIsTransactionsLoading(false));
-  };
-
-  useEffect(() => { fetchTransactions(); }, []);
+  // Simulated live billing ledger for Revenue tab
+  const [transactions, setTransactions] = useState([
+    { id: '#TRX-8924', time: '14:32:05 Hôm nay', plate: '30G-123.45', type: 'Ô tô - Vãng lai', cost: '25,000đ', paymentMethod: 'VNPAY', status: 'THÀNH CÔNG', invoiceNo: 'VAT-8924', note: '' },
+    { id: '#TRX-8923', time: '14:28:11 Hôm nay', plate: '29A-999.99', type: 'Vé tháng (VIP)', cost: '0đ', paymentMethod: 'Thẻ từ Auto', status: 'ĐÃ GHI NHẬN', invoiceNo: 'VAT-8923', note: '' },
+    { id: '#TRX-8922', time: '14:15:00 Hôm nay', plate: '15B-678.90', type: 'Xe máy', cost: '5,000đ', paymentMethod: 'Lỗi kết nối', status: 'CẦN XỬ LÝ', invoiceNo: 'VAT-8922', note: 'Lỗi kết nối' },
+    { id: '#TRX-8921', time: '14:10:22 Hôm nay', plate: '30E-555.22', type: 'Ô tô - Vãng lai', cost: '35,000đ', paymentMethod: 'Tiền mặt', status: 'THÀNH CÔNG', invoiceNo: 'VAT-8921', note: '' }
+  ]);
 
   // Customer Management Database
   interface Customer {
@@ -583,32 +543,37 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     expiryDate: string;
   }
 
-  const [customerList, setCustomerList] = useState<Customer[]>([]);
-  const [isCustomersLoading, setIsCustomersLoading] = useState(false);
+  const [customerList, setCustomerList] = useState<Customer[]>(() => {
+    const saved = localStorage.getItem('urbanpark_customers_list');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.some((c: any) => c.expiryDate === '31/12/2024' || c.expiryDate === '15/11/2023' || c.expiryDate === '01/10/2023')) {
+          localStorage.removeItem('urbanpark_customers_list');
+        } else {
+          return parsed;
+        }
+      } catch (err) {
+        console.error("Failed parsing custom customers list:", err);
+      }
+    }
+    const dFuture1 = new Date(); dFuture1.setMonth(dFuture1.getMonth() + 6);
+    const dFuture2 = new Date(); dFuture2.setMonth(dFuture2.getMonth() + 3);
+    const dPast = new Date(); dPast.setMonth(dPast.getMonth() - 2);
+    
+    const fmt = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    
+    return [
+      { id: 'CUST-001', name: 'Nguyễn Văn An', phone: '090 123 4567', plate: '51F-123.45', cardType: 'VIP', status: 'ACTIVE', expiryDate: fmt(dFuture1) },
+      { id: 'CUST-002', name: 'Trần Thị Bích', phone: '091 987 6543', plate: '30A-987.65', cardType: 'Tháng', status: 'ACTIVE', expiryDate: fmt(dFuture2) },
+      { id: 'CUST-003', name: 'Lê Hữu Trí', phone: '093 765 4321', plate: '43C-112.22', cardType: 'Tháng', status: 'EXPIRED', expiryDate: fmt(dPast) },
+      { id: 'CUST-004', name: 'Vãng lai (Ticket #99281)', phone: '-', plate: '60B-555.44', cardType: 'Guest', status: 'IN_PARK', expiryDate: 'N/A' }
+    ];
+  });
 
-  const fetchCustomers = () => {
-    setIsCustomersLoading(true);
-    adminService.getCustomers()
-      .then(res => {
-        const items = Array.isArray(res.data) ? res.data : [];
-        const mapped: Customer[] = items.map((c: any) => ({
-          id: c.id ? `CUST-${String(c.id).slice(0, 8).toUpperCase()}` : 'CUST-???',
-          name: c.name || c.username || 'Khách hàng',
-          phone: c.phone || '-',
-          plate: c.plate || c.licensePlate || '-',
-          cardType: (c.type === 'VIP' || c.type === 'Tháng' || c.type === 'Guest') ? c.type : 'Guest',
-          status: (c.status === 'ACTIVE' || c.status === 'EXPIRED' || c.status === 'IN_PARK') ? c.status : 'ACTIVE',
-          expiryDate: c.expireDate || c.expiryDate || 'N/A'
-        }));
-        setCustomerList(mapped);
-      })
-      .catch(() => {/* Keep empty */})
-      .finally(() => setIsCustomersLoading(false));
-  };
-
-  useEffect(() => { fetchCustomers(); }, []);
-
-  // Removed: no longer syncing customers to localStorage (using real API)
+  useEffect(() => {
+    localStorage.setItem('urbanpark_customers_list', JSON.stringify(customerList));
+  }, [customerList]);
 
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerFilter, setCustomerFilter] = useState<'Tất cả' | 'Tháng' | 'VIP'>('Tất cả');
@@ -629,75 +594,18 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
   const [auditSearch, setAuditSearch] = useState('');
   const [auditModuleFilter, setAuditModuleFilter] = useState('Tất cả');
   const [auditStatusFilter, setAuditStatusFilter] = useState('Tất cả');
-  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [isAuditLoading, setIsAuditLoading] = useState(false);
-
-  const fetchAuditLogs = () => {
-    setIsAuditLoading(true);
-    adminService.getLogs()
-      .then(res => {
-        const data = res.data;
-        const items = Array.isArray(data?.items) ? data.items
-          : Array.isArray(data) ? data : [];
-        const mapped = items.map((log: any, idx: number) => {
-          const ts = log.time || log.createdAt || new Date().toISOString();
-          const dt = new Date(ts);
-          const isValidDate = !isNaN(dt.getTime());
-          const timeStr = isValidDate
-            ? dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-            : (typeof ts === 'string' && ts.includes(':') ? ts : 'N/A');
-          const dateStr = isValidDate
-            ? dt.toLocaleDateString('vi-VN')
-            : new Date().toLocaleDateString('vi-VN');
-          const actor = log.actor || log.staffName || log.plate || 'System';
-          return {
-            id: log.id ? `AUD-${String(log.id).slice(0,8)}` : `AUD-${String(idx + 1).padStart(3, '0')}`,
-            time: timeStr,
-            date: dateStr,
-            actor: actor,
-            actorId: log.actorId || log.staffId || log.id || `ID-${idx}`,
-            avatar: String(actor).charAt(0).toUpperCase(),
-            action: log.action || log.message || log.gate || 'Sự kiện hệ thống',
-            desc: log.desc || log.model || log.type || '',
-            ip: log.ip || log.device || 'N/A',
-            device: log.device || log.ip || 'N/A',
-            status: log.status === 'FAILED' || log.statusColor === 'red' ? 'FAILED'
-              : log.status === 'WARNING' || log.statusColor === 'yellow' ? 'WARNING'
-              : 'SUCCESS',
-            payload: log.payload || null
-          };
-        });
-        setAuditLogs(mapped);
-        if (mapped.length > 0) setSelectedLogId(mapped[0].id);
-      })
-      .catch(() => {/* Keep empty */})
-      .finally(() => setIsAuditLoading(false));
-  };
-
-  // Dashboard summary stats from API
-  const [dashboardSummary, setDashboardSummary] = useState<any>(null);
-
-  useEffect(() => {
-    adminService.getDashboardSummary()
-      .then(res => setDashboardSummary(res.data))
-      .catch(() => {/* Use hardcoded fallbacks */});
-  }, []);
+  const [selectedLogId, setSelectedLogId] = useState<string | null>('AUD-003');
 
   // Facilities data filter multipliers (for total responsiveness when tabs are clicked)
   const statsMultiplier = activeFacility === 'cs1' ? 0.45 : activeFacility === 'cs2' ? 0.55 : 1.0;
-
-  // Stats from API (fallback to computed values if API not available)
-  const rawRevenue = dashboardSummary?.totalRevenue ?? 45.2;
-  const rawOccupancy = dashboardSummary?.occupancyRate ?? 85;
-  const rawSessions = dashboardSummary?.activeSessions ?? 1248;
-  const formattedRevenue = (rawRevenue * statsMultiplier).toFixed(1);
-  const formattedCarsCount = Math.round(rawSessions * statsMultiplier).toLocaleString();
-  const formattedFullCapacityPercent = Math.round(rawOccupancy * (activeFacility === 'cs1' ? 0.91 : activeFacility === 'cs2' ? 1.07 : 1.0));
+  
+  const formattedRevenue = (45.2 * statsMultiplier).toFixed(1);
+  const formattedCarsCount = Math.round(1248 * statsMultiplier).toLocaleString();
+  const formattedFullCapacityPercent = activeFacility === 'cs1' ? 78 : activeFacility === 'cs2' ? 91 : 85;
 
   const filteredBranches = branches.filter(branch => {
     if (activeFacility === 'cs1') {
-      return branch.id === 'br-1' || branch.name.toLowerCase().includes('vincom') || branch.name.toLowerCase().includes('cs 01') || branch.name.toLowerCase().includes('cs1') || branch.name.toLowerCase().includes('cơ sở 01') || branch.name.toLowerCase().includes('cơ sở 1');
+      return branch.id === 'br-1';
     } else if (activeFacility === 'cs2') {
       return branch.id === 'br-2' || branch.name.toLowerCase().includes('landmark') || branch.name.toLowerCase().includes('cs 02') || branch.name.toLowerCase().includes('cs2') || branch.name.toLowerCase().includes('cơ sở 02') || branch.name.toLowerCase().includes('cơ sở 2');
     }
@@ -792,18 +700,23 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
       return;
     }
     try {
-      await parkingService.visitorCheckIn({
+      const response = await parkingService.visitorCheckIn({
         plate: checkInPlate.trim().toUpperCase(),
         vehicle_type: checkInVehicleType,
         card_code: checkInCardCode.trim(),
         image_url: 'https://example.com/fake-lpr.jpg' // Fake image
       });
+      const data = response?.data ?? response;
+      const zoneCode = data?.assigned_zone_code || 'F1';
+      setLedText(`THÔNG XE: ${checkInPlate.toUpperCase()} -> TẦNG ${zoneCode}`);
       triggerToast(`Đã gọi API Check-in xe ${checkInPlate.toUpperCase()} thành công!`, 'success');
       setSelectedSlotForCheckIn(null);
       setCheckInPlate('');
       setCheckInCardCode('');
     } catch (error: any) {
-      triggerToast(error?.response?.data?.message || 'Lỗi khi gọi API Check-in', 'error');
+      const errMsg = error?.response?.data?.message || 'Lỗi khi gọi API Check-in';
+      setLedText(`🚨 TỪ CHỐI: ${checkInPlate.toUpperCase()}`);
+      triggerToast(errMsg, 'error');
     }
   };
 
@@ -834,85 +747,63 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
     }
   };
 
-  const handleManualActionNotice = async (noticeId: string) => {
-    setNotices(prev => prev.map(notice =>
-      notice.id === noticeId ? { ...notice, actionState: 'PENDING' as const } : notice
-    ));
-    triggerToast('Đang xử lý cảnh báo...', 'info');
-    try {
-      await adminService.resolveSecurityAlert(noticeId);
-      setNotices(prev => prev.map(notice =>
-        notice.id === noticeId
-          ? { ...notice, actionState: 'RESOLVED' as const, desc: 'Đã xử lý thành công.' }
-          : notice
-      ));
-      triggerToast('Đã đánh dấu cảnh báo là đã xử lý!', 'success');
-    } catch {
-      // Fallback: mark resolved locally even if API fails
-      setNotices(prev => prev.map(notice =>
-        notice.id === noticeId
-          ? { ...notice, actionState: 'RESOLVED' as const }
-          : notice
-      ));
-      triggerToast('Đã cập nhật trạng thái cảnh báo.', 'success');
-    }
+  const handleManualActionNotice = (noticeId: string) => {
+    setNotices(prev => prev.map(notice => {
+      if (notice.id === noticeId) {
+        return { ...notice, actionState: 'PENDING' };
+      }
+      return notice;
+    }));
+    triggerToast('Đang kết nối tổng đài để chỉ định kỹ thuật viên khẩn cấp...', 'info');
+
+    setTimeout(() => {
+      setNotices(prev => prev.map(notice => {
+        if (notice.id === noticeId) {
+          return { ...notice, actionState: 'RESOLVED', desc: 'Đã hoàn tất khôi phục kết nối. Kỹ thuật viên Nguyễn Hoàng Minh đã sửa chữa phần cứng camera.' };
+        }
+        return notice;
+      }));
+      triggerToast('Kỹ thuật viên đã xử lý lỗi Camera C03 thành công! Trạng thái kết nối: Hoạt động', 'success');
+      
+      const newLog = {
+        id: `LOG-${Date.now()}`,
+        time: new Date().toLocaleTimeString(),
+        type: 'SUCCESS',
+        message: 'Trạng thái Camera LPR Cổng 03 đã khôi phục. Đồng bộ luồng hình ảnh về phòng giám sát.'
+      };
+      setLogs([newLog, ...logs]);
+    }, 2500);
   };
 
-  const handleExportSystemReport = async () => {
+  const handleExportSystemReport = () => {
     setIsGeneratingReport(true);
-    triggerToast('Đang tải xuống báo cáo...', 'info');
-    try {
-      const res = await adminService.exportLogs();
-      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `UrbanPark_Logs_${new Date().toISOString().slice(0,10)}.csv`;
-      link.click();
-      URL.revokeObjectURL(url);
-      triggerToast('Đã tải xuống báo cáo CSV thành công!', 'success');
-    } catch {
-      triggerToast('Lỗi xuất báo cáo. Vui lòng thử lại!', 'error');
-    } finally {
+    triggerToast('Đang biên dịch tệp báo cáo vận hành toàn diện...', 'info');
+    
+    setTimeout(() => {
       setIsGeneratingReport(false);
-    }
+      triggerToast('Đã tải xuống thành công báo cáo: UrbanPark_CS01_24_10_2023.xml (PDF Format)', 'success');
+    }, 1500);
   };
 
-  // Revenue chart data – populated from API
-  const [apiRevenueCharts, setApiRevenueCharts] = useState<any>(null);
-
-  useEffect(() => {
-    if (activeMenu === 'revenue') {
-      adminService.getRevenueCharts()
-        .then(res => setApiRevenueCharts(res.data))
-        .catch(() => {/* Keep null, will use fallback */});
-    }
-  }, [activeMenu]);
-
-  // Fallback data when API not available
-  const fallbackBarData = [
-    { name: 'T2', amount: 35 }, { name: 'T3', amount: 50 }, { name: 'T4', amount: 45 },
-    { name: 'T5', amount: 58 }, { name: 'T6', amount: 40 }, { name: 'T7', amount: 52 },
+  // Recharts Chart Mock Data
+  const chartRevenueData = [
+    { name: 'T2', amount: 35 },
+    { name: 'T3', amount: 50 },
+    { name: 'T4', amount: 45 },
+    { name: 'T5', amount: 58 },
+    { name: 'T6', amount: 40 },
+    { name: 'T7', amount: 52 },
     { name: 'CN', amount: 62 }
-  ];
-  const fallbackPieData = [
-    { name: 'Ô tô', value: 748, color: '#0f172a' },
-    { name: 'Xe vãng lai', value: 312, color: '#3b82f6' },
-    { name: 'Xe VIP', value: 188, color: '#10b981' }
-  ];
-
-  const rawBarData = apiRevenueCharts?.barData || fallbackBarData;
-  const chartRevenueData = rawBarData.map((item: any) => ({
-    name: item.name || item.day || item.label,
-    amount: Math.round((item.amount || item.value || 0) * statsMultiplier)
+  ].map(item => ({
+    ...item,
+    amount: Math.round(item.amount * statsMultiplier)
   }));
 
-  const rawPieData = apiRevenueCharts?.pieData || fallbackPieData;
-  const pieVehicleData = rawPieData.map((item: any, idx: number) => ({
-    name: item.name || item.label,
-    value: Math.round((item.value || 0) * statsMultiplier),
-    color: item.color || ['#0f172a', '#3b82f6', '#10b981'][idx % 3]
-  }));
+  const pieVehicleData = [
+    { name: 'Ô tô', value: Math.round(748 * statsMultiplier), color: '#0f172a' },
+    { name: 'Xe vãng lai', value: Math.round(312 * statsMultiplier), color: '#3b82f6' },
+    { name: 'Xe VIP', value: Math.round(188 * statsMultiplier), color: '#10b981' }
+  ];
 
   return (
     <div id="manager-urbanpark-root" className={`min-h-screen font-sans antialiased text-slate-800 dark:text-slate-100 transition-colors ${isDarkMode ? 'bg-[#030712] text-slate-150' : 'bg-[#f1f5f9] text-slate-850'}`}>
@@ -1025,6 +916,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
           {/* BOTTOM RAIL BUTTONS */}
           <div className="space-y-3 pt-6 border-t border-[#14233c] mt-8">
             {/* Added facility trigger */}
+            {false && (
             <button 
               onClick={() => {
                 const name = `Bãi Xe Phụ ${Math.floor(Math.random() * 100)}`;
@@ -1037,6 +929,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
               <Plus className="w-4 h-4 stroke-[3]" />
               <span>Thêm cơ sở mới</span>
             </button>
+            )}
 
             <button 
               onClick={() => {
@@ -1165,6 +1058,12 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                 </div>
 
                 {/* SEGMENT BRANCH TABS ("Cơ sở 01", "Cơ sở 02", "Toàn hệ thống") */}
+                <div className="flex items-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-300">
+                  <MapPin className="h-4 w-4" />
+                  <span>Hệ thống tòa nhà gửi xe</span>
+                </div>
+
+                {false && (
                 <div className="flex bg-slate-100 dark:bg-[#030712] p-1 rounded-2xl gap-1 items-center shrink-0">
                   {[
                     { id: 'cs1', label: 'Cơ sở 01' },
@@ -1190,6 +1089,8 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                     );
                   })}
                 </div>
+
+                )}
 
                 {/* RIGHT BUTTONS GROUP */}
                 <div className="flex items-center gap-4 ml-auto">
@@ -1272,60 +1173,50 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
           {/* ACTIVE CONTENT WORKSPACE */}
           <div className="p-6 lg:p-8 flex-1 overflow-y-auto space-y-8">
             
-            {['revenue', 'staff', 'technical', 'security', 'system_log'].includes(activeMenu) && user?.role !== 'ADMIN' && !import.meta.env.DEV ? (
-              <div className="flex flex-col items-center justify-center py-20 px-4 text-center max-w-2xl mx-auto space-y-8 animate-fade-in">
-                {/* Premium Animated Icon */}
-                <div className="relative">
-                  <div className="absolute inset-0 bg-rose-500/20 rounded-full blur-2xl animate-pulse" />
-                  <div className="relative p-6 bg-gradient-to-br from-rose-500/10 to-rose-600/5 border border-rose-500/20 text-rose-500 rounded-3xl shadow-[0_8px_32px_rgba(244,63,94,0.15)] backdrop-blur-xl">
-                    <Shield className="w-16 h-16 stroke-[1.5]" />
-                  </div>
+            {['technical', 'security', 'system_log'].includes(activeMenu) && user?.role !== 'ADMIN' ? (
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-xl mx-auto space-y-6 animate-fade-in">
+                <div className="p-5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full animate-bounce">
+                  <Shield className="w-12 h-12 stroke-[1.5]" />
                 </div>
                 
-                {/* Text Content */}
-                <div className="space-y-3 z-10">
-                  <h2 className="text-3xl font-black tracking-tight bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400 bg-clip-text text-transparent font-sans">
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white font-sans">
                     Quyền Truy Cập Bị Hạn Chế
                   </h2>
-                  <p className="text-slate-500 dark:text-slate-400 text-base leading-relaxed font-semibold">
-                    Chức năng <span className="font-extrabold px-3 py-1 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-lg mx-1 shadow-sm border border-rose-100 dark:border-rose-500/20">{
+                  <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed font-semibold leading-relaxed">
+                    Chức năng <span className="font-extrabold text-rose-550 dark:text-rose-455">"{
                       activeMenu === 'revenue' ? 'Doanh thu & Báo cáo' :
                       activeMenu === 'staff' ? 'Quản lý nhân sự' :
                       activeMenu === 'technical' ? 'Cấu hình kỹ thuật' :
                       activeMenu === 'security' ? 'Bảo mật' :
                       activeMenu === 'system_log' ? 'Nhật ký hệ thống' : activeMenu
-                    }</span> yêu cầu quyền tài khoản <span className="text-blue-600 dark:text-blue-400 font-black tracking-wider uppercase">ADMIN</span>.
+                    }"</span> yêu cầu quyền tài khoản <span className="text-blue-500 font-extrabold text-sm uppercase">ADMIN</span>.
                   </p>
-                  <p className="text-sm text-slate-400 max-w-md mx-auto font-medium">
-                    Tài khoản hiện tại của bạn là <strong className="text-slate-700 dark:text-slate-200 px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700">"{user?.role}" ({user?.name})</strong> không có đầy đủ thẩm quyền trực tiếp.
-                  </p>
-                </div>
-
-                {/* Instruction Card */}
-                <div className="bg-white/60 dark:bg-slate-900/40 p-6 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 text-left w-full space-y-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] backdrop-blur-xl relative overflow-hidden group hover:border-blue-500/30 transition-colors">
-                  <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-3xl opacity-50 group-hover:opacity-100 transition-opacity" />
-                  <span className="font-bold text-blue-500 dark:text-blue-400 text-[11px] uppercase tracking-widest block flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Cách khắc phục
-                  </span>
-                  <p className="text-sm text-slate-600 dark:text-slate-350 leading-relaxed font-medium pl-3 border-l border-slate-200 dark:border-slate-700 ml-1">
-                    Vui lòng sử dụng tính năng đăng xuất hoặc truy cập quản lý hệ thống bằng tài khoản có quyền Quản trị tối cao (Admin) để tiếp tục thao tác.
+                  <p className="text-xs text-slate-400 max-w-md mx-auto font-sans">
+                    Tài khoản hiện tại của bạn là <strong className="text-slate-600 dark:text-slate-300">"{user?.role}" ({user?.name})</strong> không có đầy đủ thẩm quyền trực tiếp.
                   </p>
                 </div>
 
-                {/* Actions */}
-                <div className="flex flex-col sm:flex-row gap-4 w-full justify-center pt-2">
+                <div className="bg-slate-50 dark:bg-slate-900/45 p-5 rounded-2xl border border-slate-200 dark:border-slate-800/80 text-left w-full space-y-3.5">
+                  <span className="font-bold text-slate-400 text-[10px] uppercase tracking-wider block">💡 Cách kiểm tra nhanh quyền ADMIN:</span>
+                  <p className="text-[12px] text-slate-600 dark:text-slate-350 leading-relaxed font-semibold">
+                    Vui lòng sử dụng tính năng đăng xuất hoặc truy cập quản lý hệ thống bằng tài khoản phù hợp để dùng tính năng.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
                   <button
                     onClick={onLogout}
-                    className="px-8 py-3.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-2xl text-sm font-bold tracking-wide transition-all shadow-lg hover:shadow-red-500/25 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                    className="px-5 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold tracking-wide transition-all shadow-md active:scale-95 cursor-pointer"
                   >
                     Đăng xuất ngay
                   </button>
                   <button
                     onClick={() => {
                       setActiveMenu('overview');
-                      triggerToast('Đã quay lại Tổng quan', 'info');
+                      triggerToast('Quay lại Tổng quan', 'info');
                     }}
-                    className="px-8 py-3.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold tracking-wide transition-all hover:shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                    className="px-5 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold tracking-wide transition-all active:scale-95 cursor-pointer"
                   >
                     Quay lại Tổng quan
                   </button>
@@ -1394,18 +1285,23 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
                         <button
                           type="button"
-                          onClick={async () => {
-                            // Record Audit Log via API (Step 5 of Flow 6)
+                          onClick={() => {
+                            // Record Audit Log (Step 5 of Flow 6)
                             try {
-                              await apiClient.post('/logs', {
-                                action: 'OVERRIDE KHẨN CẤP',
+                              const savedLogs = JSON.parse(localStorage.getItem('urbanpark_audit_logs') || '[]');
+                              const newLog = {
+                                id: `AUDIT-${Date.now()}`,
+                                timestamp: new Date().toLocaleString('vi-VN'),
                                 actor: 'Bảo vệ Trực Cổng (Staff)',
+                                action: 'OVERRIDE KHẨN CẤP',
                                 target: `Xe ${securityViolatorPlate || '30F-999.78'}`,
-                                details: `Cưỡng chế mở barie cho xe bị khóa chống trộm.`,
-                                status: 'WARNING'
-                              }).catch(() => {
-                                // Silent fallback – action still proceeds
-                              });
+                                details: `Cưỡng chế mở barie và tắt còi báo động khẩn cấp cho xe bị khóa chống trộm do ${
+                                  securityCountdown > 0 ? "Staff xử lý trực tiếp" : "tài xế quá 30 giây không phản hồi"
+                                }.`
+                              };
+                              savedLogs.push(newLog);
+                              localStorage.setItem('urbanpark_audit_logs', JSON.stringify(savedLogs));
+                              window.dispatchEvent(new Event('storage'));
                             } catch (err) {
                               console.error("Error writing audit log:", err);
                             }
@@ -1429,24 +1325,23 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                   <div className="space-y-6 animate-fade-in text-slate-850 dark:text-slate-150" id="guard-checkpoint-view">
                     
                     {/* Page Header */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-200/50 dark:border-slate-800/50 text-left">
-                      <div className="space-y-1.5 block">
-                        <div className="text-[10px] uppercase font-black tracking-widest text-blue-500 dark:text-blue-400">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 border-b border-slate-150 dark:border-slate-800 text-left">
+                      <div className="space-y-1 block">
+                        <div className="text-[10px] uppercase font-black tracking-widest text-slate-400 dark:text-slate-500">
                           Bốt điều hành &gt; {activeFacility === 'cs1' ? 'Cơ sở 01' : activeFacility === 'cs2' ? 'Cơ sở 02' : 'Toàn hệ thống'}
                         </div>
                         <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-sans flex items-center gap-2">
-                          <ShieldAlert className="w-8 h-8 text-blue-600 dark:text-blue-500 drop-shadow-md" />
-                          Tiểu Khu Trực Cổng & Kiểm Soát
+                          <ShieldAlert className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                          Tiểu Khu Trực Cổng & Kiểm Soát Phương Tiện
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-bold font-sans">
-                          Hệ thống nhập liệu thông minh dành cho nhân viên an ninh - {
-                            activeFacility === 'cs1' ? 'Cơ sở 01 (Vincom Center)' : activeFacility === 'cs2' ? 'Cơ sở 02 (Landmark 81)' : 'Toàn hệ thống'
+                          Thiết kế giao diện nhập liệu thông minh cho nhân viên gác cổng - {
+                            'Hệ thống tòa nhà gửi xe'
                           }
                         </p>
                       </div>
                       
-                      <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 text-emerald-600 dark:from-emerald-400/20 dark:to-teal-400/20 dark:text-emerald-400 px-4 py-2 rounded-xl border border-emerald-200/50 dark:border-emerald-800/50 text-xs font-black shadow-sm">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <div className="flex items-center gap-2 bg-blue-600/10 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400 px-3 py-1.5 rounded-full border border-blue-200/40 text-xs font-black">
                         GATE AGENT ACTIVE
                       </div>
                     </div>
@@ -1455,137 +1350,154 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                       
                       {/* Left Column: Swipe Form Gate controller */}
-                      <div className="lg:col-span-5 bg-white/90 dark:bg-slate-900/90 border border-slate-200/50 dark:border-slate-800/50 rounded-[24px] p-7 flex flex-col justify-between space-y-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] text-left relative overflow-hidden backdrop-blur-xl group">
-                        {/* Decorative gradient blur */}
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none transition-opacity group-hover:opacity-100 opacity-50" />
-                        
-                        <div className="space-y-6 relative z-10">
+                      <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 flex flex-col justify-between space-y-6 shadow-sm text-left">
+                        <div className="space-y-5">
                           <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
-                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-1">VẬN HÀNH</span>
-                            <h3 className="text-lg font-black text-slate-850 dark:text-slate-200 tracking-tight font-sans">NHẬP THÔNG TIN KIỂM SOÁT</h3>
+                            <span className="text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 block">VẬN HÀNH</span>
+                            <h3 className="text-sm font-black text-slate-850 dark:text-slate-200 uppercase tracking-wide">Nhập thông tin biển số / Mã thẻ</h3>
                           </div>
 
-                          {/* LED Display Redesigned */}
-                          <div className="bg-[#0f172a] rounded-2xl p-4 shadow-inner border border-slate-800 flex items-center justify-center relative overflow-hidden group/led">
-                            <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4px_4px] opacity-20 pointer-events-none" />
-                            <div className="text-center relative z-10 w-full">
-                              <span className="text-[8px] text-slate-500 font-bold uppercase tracking-[0.2em] block mb-2 opacity-70">LED HIỂN THỊ CỔNG TRỰC</span>
-                              <div className="text-red-500 dark:text-red-500 font-mono text-sm sm:text-base font-black tracking-widest uppercase drop-shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse">
-                                CHÀO MỪNG ĐẾN URBANPARK
-                              </div>
-                            </div>
+                          {/* Virtual Gate LED Board (Flow 6) */}
+                          <div className="bg-black text-[#ff3b30] font-mono p-4 rounded-2xl border border-slate-800 shadow-inner flex flex-col items-center justify-center text-center space-y-1.5 relative overflow-hidden select-none mb-2">
+                            <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-red-600 via-rose-500 to-red-650 opacity-40 animate-pulse" />
+                            <span className="text-[8px] text-slate-500 uppercase tracking-widest block font-sans">BẢNG LED ĐIỆN TỬ CỔNG TRỰC (IoT LED Display)</span>
+                            <strong className="text-[13px] font-black tracking-widest uppercase block animate-pulse">
+                              {isSecurityLockTriggered 
+                                ? "🚨 XE BỊ KHÓA — VUI LÒNG TẮT KHÓA TRÊN APP" 
+                                : ledText}
+                            </strong>
                           </div>
 
-                          <form onSubmit={handlePerformGateScan} className="space-y-5">
+                          <form onSubmit={handlePerformGateScan} className="space-y-4">
                             {/* Gate Select */}
-                            <div className="space-y-1.5 text-left block">
-                              <label className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-400 tracking-wider">CHỌN BỐT GÁC</label>
-                              <select 
+                            <div className="space-y-1.5">
+                              <label className="text-[11px] font-extrabold text-slate-400 dark:text-slate-500 uppercase block tracking-wider">Chọn Bốt Gác Cổng Trực</label>
+                              <select
                                 value={gateActiveName}
                                 onChange={(e) => setGateActiveName(e.target.value)}
-                                className="w-full p-3 font-semibold text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm appearance-none cursor-pointer"
+                                className="w-full p-3 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800/80 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-250 transition-colors focus:ring-2 focus:ring-blue-500 outline-none"
                               >
-                                <option value="CS1 - Bốt Gác Cổng Vào chính B1 (HQ)">CS1 - Bốt Gác Cổng Vào chính B1 (HQ)</option>
-                                <option value="CS1 - Bốt Gác Cổng Ra B2 (HQ)">CS1 - Bốt Gác Cổng Ra B2 (HQ)</option>
-                                <option value="CS2 - Bốt Gác Cổng VIP (VIP)">CS2 - Bốt Gác Cổng VIP (VIP)</option>
-                                <option value="CS3 - Bốt Gác Tầng Hầm (Mega)">CS3 - Bốt Gác Tầng Hầm (Mega)</option>
+                                {(activeFacility === 'all' || activeFacility === 'cs1') && (
+                                  <>
+                                    <option value="Cổng vào 1">CS1 - Bốt Gác Cổng Vào chính B1 (HQ)</option>
+                                    <option value="Cổng vào 2">CS1 - Bốt Gác Cổng Vào phụ G2</option>
+                                    <option value="Cổng ra 1">CS1 - Bốt Gác Cổng Ra chính v1</option>
+                                  </>
+                                )}
+                                {(activeFacility === 'all' || activeFacility === 'cs2') && (
+                                  <>
+                                    <option value="Cổng vào 3">CS2 - Bốt Gác Landmark Cổng Vào A1</option>
+                                    <option value="Cổng ra 2">CS2 - Bốt Gác Landmark Cổng Ra B2</option>
+                                    <option value="Cổng ra 3">CS2 - Bốt Gác Landmark Cổng Ra chính</option>
+                                  </>
+                                )}
                               </select>
                             </div>
 
-                            {/* Plate Input */}
-                            <div className="space-y-1.5 text-left block">
-                              <label className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-400 tracking-wider">BIỂN SỐ XE <span className="text-slate-400 font-normal normal-case">(LPR Backup/Manual)</span></label>
-                              <input 
+                            {/* License Plate Textbox */}
+                            <div className="space-y-1.5">
+                              <label className="text-[11px] font-extrabold text-slate-400 dark:text-slate-500 uppercase block tracking-wider">
+                                Nhập Biển Số Xe (LPR Backup / Manual)
+                              </label>
+                              <input
                                 type="text"
                                 value={gatePlate}
                                 onChange={(e) => setGatePlate(e.target.value)}
-                                placeholder="VD: 30G-123.45 HOẶC 29M1-678.90"
-                                className="w-full p-3 font-mono text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm uppercase"
+                                placeholder="Ví dụ: 30G-123.45 hoặc 29M1-678.90"
+                                className="w-full p-3 font-mono font-bold tracking-widest bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl text-sm text-slate-800 dark:text-slate-250 uppercase placeholder-slate-400 focus:ring-2 focus:ring-blue-500 outline-none"
                               />
                             </div>
 
-                            {/* Card Input */}
-                            <div className="space-y-1.5 text-left block">
-                              <label className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-400 tracking-wider">MÃ THẺ TỪ <span className="text-slate-400 font-normal normal-case">(RFID Key Code)</span></label>
+                            {/* Card Code (Rfid/Physical RFID key option) */}
+                            <div className="space-y-1.5">
+                              <label className="text-[11px] font-extrabold text-slate-400 dark:text-slate-500 uppercase block tracking-wider">
+                                Quét / Nhập mã thẻ từ (RFID Key Code)
+                              </label>
                               <div className="relative">
-                                <input 
+                                <input
                                   type="text"
                                   value={gateCardCode}
                                   onChange={(e) => setGateCardCode(e.target.value)}
-                                  placeholder="Nhập mã thẻ, vd: 8892"
-                                  className="w-full p-3 pr-20 font-mono text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
+                                  placeholder="Nhập mã thẻ, ví dụ: 8892 (Camry), 1188 (SH)..."
+                                  className="w-full p-3 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-250 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 outline-none"
                                 />
-                                <button type="button" onClick={() => setGateCardCode('8892')} className="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-colors cursor-pointer">
-                                  Mẫu thẻ
-                                </button>
+                                <div className="absolute right-2.5 top-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setGateCardCode("8892");
+                                      triggerToast("🔒 Đã dán mã thẻ thử nghiệm Camry VIP (8892)", "info");
+                                    }}
+                                    className="px-2 py-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 rounded text-[9.5px] font-extrabold text-slate-600 dark:text-slate-300"
+                                  >
+                                    Mẫu thẻ
+                                  </button>
+                                </div>
                               </div>
                             </div>
 
-                            {/* QR Input */}
-                            <div className="space-y-1.5 text-left block">
-                              <label className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-400 tracking-wider">MÃ QR VÉ TÀI XẾ</label>
-                              <input 
+                            {/* QR Token copy placeholder */}
+                            <div className="space-y-1.5">
+                              <label className="text-[11px] font-extrabold text-slate-400 dark:text-slate-500 uppercase block tracking-wider">
+                                Dán mã QR Vé (Sao chép từ App tài xế)
+                              </label>
+                              <input
                                 type="text"
                                 value={gateQrToken}
                                 onChange={(e) => setGateQrToken(e.target.value)}
-                                placeholder="Dán mã QR (VD: 30G-123.45|VÀO|1718919191)"
-                                className="w-full p-3 font-mono text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm"
+                                placeholder="Dán chuỗi mã QR (Ví dụ: 30G-123.45|VÀO|1718919191)"
+                                className="w-full p-3 font-mono text-[11px] bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-250 placeholder-slate-450 focus:ring-2 focus:ring-blue-500 outline-none"
                               />
                             </div>
 
                             <button
                               type="submit"
                               disabled={isProcessingGateScan}
-                              className="w-full mt-2 py-4 text-white font-black text-sm uppercase tracking-widest bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_25px_rgba(37,99,235,0.5)] active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 group/btn"
+                              className="w-full py-4 text-white font-extrabold text-xs uppercase tracking-wider bg-gradient-to-r from-blue-600 to-indigo-650 hover:from-blue-700 hover:to-indigo-700 rounded-xl shadow-lg shadow-blue-500/10 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                             >
                               {isProcessingGateScan ? (
                                 <>
-                                  <RefreshCw className="w-5 h-5 animate-spin" />
-                                  <span>ĐANG XỬ LÝ...</span>
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                  <span>Đang liên kết API cổng bốt...</span>
                                 </>
                               ) : (
                                 <>
-                                  <Check className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
-                                  <span>THỰC HIỆN THÔNG XE</span>
+                                  <Check className="w-4 h-4" />
+                                  <span>THỰC HIỆN THÔNG XE CỔNG CHÍNH</span>
                                 </>
                               )}
                             </button>
                           </form>
                         </div>
 
-                        <div className="text-[10px] text-slate-600 dark:text-slate-400 leading-relaxed bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-800/30 block relative z-10">
-                          <strong className="text-blue-600 dark:text-blue-400">💡 Mẹo kiểm thử API:</strong> Thử quét biển số xe <strong className="font-mono bg-white dark:bg-slate-900 px-1 py-0.5 rounded text-blue-700 dark:text-blue-300">30F-999.78</strong> có sẵn trong DB (đang bật khóa) để kích hoạt báo động!
+                        <div className="text-[10px] text-slate-550 dark:text-slate-450 leading-relaxed bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-150 dark:border-slate-800 block">
+                          📢 <strong>Yêu cầu kiểm thử API Thật:</strong> Quét biển số xe <strong>"30F-999.78"</strong> có sẵn trong hệ thống (đang bật Khóa chống trộm mặc định) để tận mắt trông thấy tiếng siren hú bảo động đỏ nứt bốt điều hành!
                         </div>
                       </div>
 
                       {/* Right Column: Dynamic scanning feeds */}
-                      <div className="lg:col-span-7 bg-white/90 dark:bg-slate-900/90 border border-slate-200/50 dark:border-slate-800/50 rounded-[24px] p-7 flex flex-col justify-between space-y-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] text-left relative overflow-hidden backdrop-blur-xl">
-                        <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-                        
-                        <div className="space-y-6 w-full relative z-10">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 gap-3">
+                      <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 flex flex-col justify-between space-y-6 shadow-sm text-left">
+                        <div className="space-y-4 w-full">
+                          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div>
-                              <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-1">NHẬT KÝ KIỂM SOÁT</span>
-                              <h3 className="text-lg font-black text-slate-850 dark:text-slate-200 tracking-tight font-sans">QUÉT THỰC TẾ TỰ ĐỘNG (LIVE API)</h3>
+                              <span className="text-[9px] font-black uppercase text-slate-400 dark:text-slate-500 block">NHẬT KÝ KIỂM SOÁT</span>
+                              <h3 className="text-sm font-black text-slate-850 dark:text-slate-200 uppercase tracking-wide">Nhật ký quét thực tế tự động từ API</h3>
                             </div>
                             <button
                               type="button"
                               onClick={handleClearGateLogs}
-                              className="text-[10px] font-black text-rose-500 hover:text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors"
+                              className="text-[10.5px] font-black text-red-500 hover:text-red-650 flex items-center gap-1 cursor-pointer"
                             >
                               <Archive className="w-3.5 h-3.5" />
-                              DỌN NHẬT KÝ
+                              Dọn nhật ký
                             </button>
                           </div>
 
-                          <div className="space-y-4 max-h-[480px] overflow-y-auto pr-2 custom-scrollbar">
+                          <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
                             {filteredScanLogs.length === 0 ? (
-                              <div className="py-20 text-center flex flex-col items-center justify-center space-y-3">
-                                <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-2">
-                                  <QrCode className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-                                </div>
-                                <p className="text-sm font-bold text-slate-400 dark:text-slate-500">Chưa có dữ liệu thông xe nào hôm nay.</p>
-                                <p className="text-[10px] text-slate-400">Nhật ký sẽ tự động xuất hiện khi có xe qua cổng.</p>
+                              <div className="py-16 text-center text-xs text-slate-400 dark:text-slate-550 space-y-2">
+                                <QrCode className="w-12 h-12 text-slate-200 dark:text-slate-800 mx-auto" />
+                                <p>Chưa có dữ liệu thông xe nào trong bão gác chính của cơ sở ngày hôm nay.</p>
                               </div>
                             ) : (
                               filteredScanLogs.map(log => {
@@ -1593,41 +1505,41 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                                 return (
                                   <div
                                     key={log.id}
-                                    className={`p-5 rounded-2xl border transition-all hover:-translate-y-0.5 ${
+                                    className={`p-4 rounded-2xl border transition-all ${
                                       isBlocked 
-                                        ? "bg-rose-50/50 border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/50 shadow-sm" 
-                                        : "bg-white dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-700/50 hover:shadow-md"
+                                        ? "bg-red-50/70 border-red-200 dark:bg-red-950/15 dark:border-red-900" 
+                                        : "bg-slate-50 border-slate-200/60 dark:bg-slate-950 dark:border-slate-850"
                                     } flex flex-col sm:flex-row justify-between items-start gap-4`}
                                   >
-                                    <div className="space-y-2 flex-1 select-none">
-                                      <div className="flex items-center gap-3">
-                                        <span className={`text-[10px] px-2.5 py-1 rounded-md font-black uppercase tracking-wider ${
+                                    <div className="space-y-1.5 flex-1 select-none">
+                                      <div className="flex items-center gap-2">
+                                        <span className={`text-[9.5px] px-2 py-0.5 rounded-md font-bold ${
                                           log.action === "VÀO" 
-                                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" 
-                                            : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                                            ? "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400" 
+                                            : "bg-blue-500/10 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400"
                                         }`}>
                                           {log.action === "VÀO" ? "CHIỀU VÀO" : "CHIỀU RA"}
                                         </span>
-                                        <span className="text-base font-mono font-black text-slate-850 dark:text-white">
+                                        <span className="text-[11.5px] font-mono font-black text-slate-805 dark:text-slate-205">
                                           {log.plate}
                                         </span>
                                         
                                         {/* Status badge */}
-                                        <span className={`text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider ${
+                                        <span className={`text-[9.5px] font-black px-1.5 py-0.5 rounded ${
                                           isBlocked 
-                                            ? "bg-rose-500 text-white shadow-[0_0_10px_rgba(244,63,94,0.4)] animate-pulse" 
-                                            : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                                            ? "bg-rose-500 text-white animate-pulse" 
+                                            : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-305"
                                         }`}>
                                           {log.status}
                                         </span>
                                       </div>
-                                      <p className="text-[12px] text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                                      <p className="text-[11.5px] text-slate-600 dark:text-slate-400 leading-relaxed font-semibold">
                                         {log.message}
                                       </p>
-                                      <div className="text-[10.5px] text-slate-400 dark:text-slate-500 flex items-center gap-3 font-mono pt-1">
-                                        <span className="flex items-center gap-1"><span className="text-blue-500">📍</span> {log.gate}</span>
-                                        <span className="text-slate-300 dark:text-slate-700">|</span>
-                                        <span className="flex items-center gap-1"><span className="text-blue-500">🕒</span> {log.time}</span>
+                                      <div className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-2 font-mono">
+                                        <span>📍 {log.gate}</span>
+                                        <span>•</span>
+                                        <span>🕒 {log.time}</span>
                                       </div>
                                     </div>
                                   </div>
@@ -1637,9 +1549,8 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                           </div>
                         </div>
 
-                        <div className="text-[10.5px] font-medium text-slate-500 dark:text-slate-500 border-t border-slate-100 dark:border-slate-800 pt-4 text-left flex items-start gap-2 relative z-10">
-                          <span className="animate-spin-slow">🔄</span>
-                          <span><strong>Đồng bộ tự động:</strong> Nhật ký cổng trực đang liên tục đồng bộ với máy chủ Backend UrbanPark theo chu kỳ <span className="font-mono text-blue-500 font-bold">3.5s</span> để luôn cập nhật chuẩn xác nhất các sự cố và thông barie.</span>
+                        <div className="text-[10.5px] font-medium text-slate-450 dark:text-slate-550 border-t border-slate-100 dark:border-slate-800 pt-4 text-left leading-normal italic">
+                          🔄 <strong>Tự động đồng bộ:</strong> Nhật ký cổng trực đang liên tục đồng bộ với máy chủ Backend bãi đỗ UrbanPark theo chu kỳ 3.5 giây để luôn cập nhật chuẩn xác nhất các trường hợp sự cố và thông barie.
                         </div>
                       </div>
 
@@ -1647,196 +1558,127 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                   </div>
                 )}
 
-                                {activeMenu === 'overview' && (
+                {activeMenu === 'overview' && (
                   <div className="space-y-6 animate-fade-in text-slate-850 dark:text-slate-100" id="facility-overview-view">
                     
                     {/* BREADCRUMB HEADER BANNER */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 select-none pb-2 border-b border-slate-150 dark:border-slate-800">
                       <div className="space-y-1 text-left block">
                         <div className="text-[10px] uppercase font-black tracking-widest text-slate-400 dark:text-slate-500">
-                          Trang chủ &gt; Quản lý Cơ sở
+                          Trang chủ &gt; Tổng quan
                         </div>
                         <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-sans">
-                          Quản lý Cơ sở
+                          Tổng quan bãi xe
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-bold font-sans">
-                          Tổng quan 12 bãi xe đang hoạt động trong hệ thống
+                          Thông tin vận hành bãi đỗ xe thông minh
                         </p>
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => setShowAddBranchModal(true)}
-                          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Plus className="w-4 h-4 stroke-[3]" />
-                          <span>+ THÊM CƠ SỞ MỚI</span>
-                        </button>
-                      </div>
                     </div>
 
-                    {/* KPI CARDS ROW */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                      {[
-                        { title: 'TỔNG CƠ SỞ', value: filteredBranches.length, icon: '🏢', sub: 'Cơ sở đang quản lý', color: 'text-blue-500' },
-                        { title: 'TỔNG SỨC CHỨA', value: totalCapacity, icon: '🅿️', sub: 'Chỗ đỗ ô tô & xe máy', color: 'text-emerald-500' },
-                        { title: 'XE ĐANG ĐỖ', value: totalOccupied, icon: '🚗', sub: 'Chiếm ' + (totalCapacity > 0 ? Math.round((totalOccupied/totalCapacity)*100) : 0) + '% tổng sức chứa', color: 'text-indigo-500' },
-                        { title: 'CẢNH BÁO', value: filteredBranches.filter(b => b.status === 'Bảo trì' || (b.capacity > 0 && b.occupied/b.capacity > 0.9)).length, icon: '🚨', sub: 'Cơ sở cần chú ý', color: 'text-rose-500' },
-                      ].map((kpi, i) => (
-                        <div key={i} className="bg-white/90 dark:bg-slate-900/90 border border-slate-200/50 dark:border-slate-800/50 rounded-2xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] backdrop-blur-xl hover:-translate-y-1 transition-transform cursor-default text-left group">
-                          <div className="flex justify-between items-start">
-                            <div className="space-y-1">
-                              <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{kpi.title}</span>
-                              <h4 className="text-3xl font-black text-slate-850 dark:text-white font-mono">{kpi.value}</h4>
-                            </div>
-                            <div className={`text-3xl ${kpi.color} opacity-80 group-hover:scale-110 transition-transform`}>{kpi.icon}</div>
-                          </div>
-                          <div className="mt-3 text-[11px] font-bold text-slate-500">{kpi.sub}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* MAIN FULL-WIDTH MAP HERO */}
-                    <div className="mb-6 bg-white/90 dark:bg-slate-900/90 border border-slate-200/50 dark:border-slate-800/50 rounded-[24px] p-1.5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] backdrop-blur-xl relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+                    {/* MAIN TWO-COLUMN CONTAINER */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                       
-                      {/* HIGH CONTRAST STYLIZED VECTOR MAP */}
-                      <div className="relative h-72 md:h-96 bg-slate-900 dark:bg-[#0f172a] rounded-[20px] overflow-hidden flex items-center justify-center w-full shadow-inner">
-                        {/* Map Gradient Overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent opacity-60 z-10 pointer-events-none" />
-                        
-                        {/* Grid Lines */}
-                        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:24px_24px] opacity-40" />
-                        
-                        {/* Vector Landmass Shapes */}
-                        <div className="absolute w-72 h-72 rounded-full bg-slate-800/50 -top-10 -left-10 blur-[60px]" />
-                        <div className="absolute w-96 h-48 rounded-full bg-blue-900/20 bottom-10 right-20 blur-[60px]" />
+                      {/* LEFT RAIL: OVERALL HEALTH (col-span-4) */}
+                      <div className="lg:col-span-4 flex flex-col gap-6">
 
-                        {/* Street pathways */}
-                        <div className="absolute top-[40%] w-full h-1 bg-slate-800/80 shadow-[0_0_15px_rgba(51,65,85,0.5)]" />
-                        <div className="absolute left-[30%] h-full w-1 bg-slate-800/80 shadow-[0_0_15px_rgba(51,65,85,0.5)]" />
-                        <div className="absolute right-[25%] h-full w-1 bg-slate-800/80 transform rotate-12 shadow-[0_0_15px_rgba(51,65,85,0.5)]" />
+                        {/* OVERALL HEALTH CONTAINER */}
+                        <div className="bg-white dark:bg-slate-905 border border-slate-205 dark:border-slate-800 rounded-2xl p-5 text-left block">
+                          <span className="font-bold text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-3">
+                            Trạng thái Tổng thể
+                          </span>
 
-                        {/* MAP MARKERS DYNAMIC */}
-                        {filteredBranches.map((branch, idx) => {
-                          // Deterministic pseudo-random positions based on index
-                          const positions = [
-                            { top: '35%', left: '28%' },
-                            { bottom: '40%', right: '35%' },
-                            { top: '45%', right: '20%' },
-                            { top: '20%', right: '40%' },
-                            { bottom: '25%', left: '35%' },
-                            { top: '60%', left: '15%' }
-                          ];
-                          const pos = positions[idx % positions.length];
-                          const isWarning = branch.status === 'Bảo trì' || (branch.capacity > 0 && branch.occupied/branch.capacity > 0.9);
-                          
-                          return (
-                            <div key={branch.id} className="absolute text-center cursor-pointer transform -translate-y-1/2 -translate-x-1/2 scale-100 hover:scale-110 transition-all z-20 group/marker" 
-                                 style={pos}
-                                 onClick={() => triggerToast(isWarning ? `${branch.name} đang có cảnh báo!` : `${branch.name} hoạt động ổn định`, isWarning ? 'error' : 'success')}>
-                              <div className={`w-12 h-12 rounded-full absolute -top-4 -left-4 animate-ping ${isWarning ? 'bg-rose-500/30' : 'bg-blue-500/20'}`} />
-                              <span className={`w-3.5 h-3.5 rounded-full absolute -top-0.5 -left-0.5 border-2 border-white dark:border-slate-900 ${isWarning ? 'bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,1)]' : 'bg-blue-400 shadow-[0_0_12px_rgba(96,165,250,1)]'}`} />
-                              <div className={`mt-5 px-3 py-1.5 backdrop-blur-md text-white text-[10px] font-black rounded-lg shadow-xl border whitespace-nowrap ${isWarning ? 'bg-rose-600 border-rose-450 group-hover/marker:-translate-y-1 transition-transform' : 'bg-slate-900/90 border-slate-700/50 opacity-80 group-hover/marker:opacity-100 transition-opacity'}`}>
-                                {isWarning ? '⚠️ ' : ''}{branch.name}
-                              </div>
+                          <div className="space-y-4 block">
+                            <div className="flex justify-between items-end">
+                            <span className="text-xs font-bold text-slate-500">Sức chứa bãi xe</span>
+                              <strong className="text-base font-black text-slate-850 dark:text-white">{branches[0]?.capacity ? Math.round((branches[0].occupied / branches[0].capacity) * 100) : 0}%</strong>
                             </div>
-                          );
-                        })}
 
-                        {/* Floating Health Panel Inside Map */}
-                        <div className="absolute bottom-6 left-6 z-30 bg-white/10 dark:bg-slate-900/60 backdrop-blur-xl border border-white/20 dark:border-slate-700/50 p-5 rounded-2xl w-72 shadow-2xl hidden sm:block text-left">
-                          <span className="font-bold text-[10px] uppercase tracking-widest text-slate-300 block mb-3">Sức chứa toàn hệ thống</span>
-                          <div className="flex justify-between items-end mb-2">
-                            <strong className="text-4xl font-black text-white font-mono leading-none">
-                              {totalCapacity > 0 ? Math.round((totalOccupied / totalCapacity) * 100) : 0}%
-                            </strong>
-                            <span className="text-xs font-bold text-slate-300 mb-1">{totalOccupied} / {totalCapacity}</span>
-                          </div>
-                          <div className="w-full h-2 bg-slate-800/80 rounded-full overflow-hidden">
-                            <div className="h-full bg-blue-500 rounded-full shadow-[0_0_15px_rgba(59,130,246,0.8)] relative overflow-hidden" style={{ width: `${totalCapacity > 0 ? Math.round((totalOccupied / totalCapacity) * 100) : 0}%` }}>
-                              <div className="absolute top-0 right-0 bottom-0 w-10 bg-gradient-to-r from-transparent to-white/30 animate-pulse" />
+                            {/* Indigo Progress gauge bar */}
+                            <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-blue-600 rounded-full" style={{ width: `${branches[0]?.capacity ? Math.round((branches[0].occupied / branches[0].capacity) * 100) : 0}%` }} />
                             </div>
-                          </div>
-                        </div>
-                        
-                        <div className="absolute top-6 left-6 z-30 text-left">
-                          <h2 className="text-white font-black text-2xl tracking-tight drop-shadow-lg font-sans">BẢN ĐỒ THỜI GIAN THỰC</h2>
-                          <p className="text-blue-300/80 text-[10px] font-black tracking-widest uppercase">Hệ thống định vị GPS LBS</p>
-                        </div>
-                        
-                        {/* Map Expand button */}
-                        <button onClick={() => triggerToast('Đã mở rộng bản đồ!', 'info')} className="absolute top-6 right-6 z-30 bg-slate-900/80 hover:bg-blue-600 backdrop-blur-md text-white border border-slate-700/50 p-3 rounded-xl transition-colors cursor-pointer shadow-xl">
-                          <div className="w-4 h-4 border-2 border-white border-t-0 border-l-0 rounded-br-sm" />
-                        </button>
-                      </div>
-                    </div>
 
-                    {/* FACILITY CARDS GRID */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 pb-6">
-                      {branches.map(branch => {
-                        const percentage = branch.capacity === 0 ? 0 : Math.round((branch.occupied / branch.capacity) * 100);
-                        const isWarning = branch.status === 'Bảo trì' || percentage >= 90;
-                        return (
-                          <div key={branch.id} className="bg-white/90 dark:bg-slate-900/90 border border-slate-200/50 dark:border-slate-800/50 rounded-[24px] p-6 text-left flex flex-col justify-between hover:-translate-y-2 hover:border-blue-500/50 hover:shadow-[0_20px_40px_rgb(59,130,246,0.15)] shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] backdrop-blur-xl transition-all duration-300 group">
-                            <div className="space-y-5">
-                              <div className="flex justify-between items-start">
-                                <div className="leading-tight block text-left">
-                                  <h3 className="text-lg font-black text-slate-850 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors font-sans">{branch.name}</h3>
-                                  <span className="text-[11px] text-slate-400 font-bold block mt-1">{branch.address}</span>
+                            {/* Grid of total Active vs Maintenance indicators */}
+                            <div className="grid grid-cols-2 gap-3 pt-2">
+                              {/* Box 1: Active */}
+                              <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850 rounded-xl text-left">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase">Hoạt động</span>
                                 </div>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <span className={`w-2 h-2 rounded-full ${isWarning ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
-                                <span className={`text-[10px] font-black uppercase tracking-wider ${isWarning ? 'text-rose-600 dark:text-rose-450' : 'text-emerald-600 dark:text-emerald-450'}`}>
-                                  {branch.status}
-                                </span>
-                              </div>
-
-                              <div className="space-y-2 pt-2">
-                                <div className="flex justify-between text-xs font-bold text-slate-500">
-                                  <span>Tỷ lệ lấp đầy</span>
-                                  <span className="text-slate-850 dark:text-white font-mono">{percentage}%</span>
-                                </div>
-                                <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                  <div className={`h-full rounded-full transition-all duration-1000 ${isWarning ? 'bg-gradient-to-r from-rose-500 to-red-600' : 'bg-gradient-to-r from-blue-500 to-indigo-600'}`} style={{ width: `${percentage}%` }} />
-                                </div>
-                                <div className="flex justify-between text-[11px] font-bold text-slate-450 pt-1">
-                                  <span>Đang đỗ: {branch.occupied}</span>
-                                  <span>Sức chứa: {branch.capacity}</span>
-                                </div>
+                                <h4 className="text-xl font-black font-mono tracking-tight mt-1">1</h4>
                               </div>
                               
-                              <div className="grid grid-cols-2 gap-2 pt-1">
-                                <div className="bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800 rounded-xl p-2 text-center">
-                                  <span className="block text-[9px] font-bold text-slate-400 uppercase">Ô TÔ</span>
-                                  <span className="block text-xs font-black text-slate-700 dark:text-slate-200 mt-0.5">{branch.cars}</span>
+                              {/* Box 2: Maintenance */}
+                              <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850 rounded-xl text-left">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase">Bảo trì</span>
                                 </div>
-                                <div className="bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800 rounded-xl p-2 text-center">
-                                  <span className="block text-[9px] font-bold text-slate-400 uppercase">XE MÁY</span>
-                                  <span className="block text-xs font-black text-slate-700 dark:text-slate-200 mt-0.5">{branch.motorbikes}</span>
-                                </div>
+                                <h4 className="text-xl font-black font-mono tracking-tight mt-1">0</h4>
                               </div>
                             </div>
-
-                            <div className="flex justify-between items-center pt-5 mt-5 border-t border-slate-100 dark:border-slate-800/80">
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{branch.updateTime}</span>
-                              <button 
-                                onClick={() => {
-                                  setActiveMenu('monitoring');
-                                  triggerToast(`Chuyển đến màn hình giám sát ${branch.name}`, 'info');
-                                }}
-                                className="px-4 py-2 bg-slate-50 hover:bg-blue-50 dark:bg-slate-800/50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1 group-hover:bg-blue-600 group-hover:text-white dark:group-hover:bg-blue-500 cursor-pointer"
-                              >
-                                CHI TIẾT <span className="text-lg leading-none transform group-hover:translate-x-1 transition-transform">&rarr;</span>
-                              </button>
-                            </div>
                           </div>
-                        );
-                      })}
-                    </div>
 
+                        </div>
+
+                      </div>
+
+                      {/* RIGHT RAIL: BRANCH LIST (col-span-8) */}
+                      <div className="lg:col-span-8">
+                        {/* GRID OF COMPREHENSIVE CARD SCHEMES */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {branches.map(branch => {
+                            const percentage = branch.capacity === 0 ? 0 : Math.round((branch.occupied / branch.capacity) * 100);
+                            return (
+                              <div key={branch.id} className="bg-white dark:bg-slate-905 border border-slate-205 dark:border-slate-805 rounded-2xl p-5 text-left block hover:border-blue-500/50 hover:shadow-lg transition-all space-y-4">
+                                <div className="flex justify-between items-start">
+                                  <div className="leading-tight block text-left">
+                                    <h3 className="text-base font-black text-slate-850 dark:text-white">{branch.name}</h3>
+                                    <span className="text-[11px] text-slate-400 font-bold block mt-1 text-left">{branch.address}</span>
+                                  </div>
+                                  <span className="text-[9.5px] font-black text-emerald-600 bg-emerald-55 px-2 py-0.5 rounded uppercase tracking-wider block">
+                                    ● {branch.status}
+                                  </span>
+                                </div>
+
+                                <div className="space-y-2 block">
+                                  <div className="flex justify-between text-xs font-bold text-slate-505">
+                                    <span>Sức chứa xe</span>
+                                    <span className="text-slate-850 dark:text-white">{branch.occupied} / {branch.capacity} ({percentage}%)</span>
+                                  </div>
+                                  {/* Blue bar progress */}
+                                  <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="h-full bg-blue-600 rounded-full" style={{ width: `${percentage}%` }} />
+                                  </div>
+                                  {/* Sub details column */}
+                                  <div className="flex justify-between text-[11px] font-semibold text-slate-400 pt-1 font-sans">
+                                    <span>Ô tô: {branch.cars}</span>
+                                  </div>
+                                </div>
+
+                                <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-450">
+                                  <span>{branch.updateTime}</span>
+                                  <button 
+                                    onClick={() => {
+                                      setActiveMenu('monitoring');
+                                      triggerToast(`Xem bến bãi ${branch.name}!`, 'info');
+                                    }}
+                                    className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-black cursor-pointer"
+                                  >
+                                    <span>CHI TIẾT</span>
+                                    <span>&rarr;</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                      </div>
+
+                    </div>
 
                   </div>
                 )}
@@ -1873,6 +1715,9 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                 setShowFloorDropdown={setShowFloorDropdown}
               />
             )}
+            {activeMenu === 'revenue' && <RevenuePage />}
+            {activeMenu === 'staff' && <PersonnelMain />}
+            {activeMenu === 'customers' && <CustomerPage />}
             {(activeMenu as string) === 'monitoring_DEPRECATED' && (
               <div className="space-y-6 animate-fade-in" id="monitoring-sub-view">
                 
@@ -2264,19 +2109,25 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
                                 <div className="space-y-1">
                                   <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Hạng mục dòng xe</label>
-                                  <div className="flex bg-white dark:bg-slate-950 rounded-xl border border-slate-205 dark:border-slate-850 p-0.5">
-                                    {(['Sedan', 'SUV', 'Sang trọng'] as const).map(type => (
+                                  <div className="flex flex-wrap bg-white dark:bg-slate-950 rounded-xl border border-slate-205 dark:border-slate-850 p-0.5 gap-1">
+                                    {[
+                                      { id: 'Sedan', label: 'Xe 4-5 chỗ' },
+                                      { id: 'SUV', label: 'Xe 7-9 chỗ' },
+                                      { id: 'Van', label: 'Xe van / xe tải' },
+                                      { id: 'Minibus', label: 'Xe 12-16 chỗ' },
+                                      { id: 'Sang trọng', label: 'Sang trọng' }
+                                    ].map(item => (
                                       <button
-                                        key={type}
+                                        key={item.id}
                                         type="button"
-                                        onClick={() => setCheckInVehicleType(type)}
-                                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-extrabold transition-all ${
-                                          checkInVehicleType === type 
+                                        onClick={() => setCheckInVehicleType(item.id as any)}
+                                        className={`flex-1 min-w-[75px] py-1.5 rounded-lg text-[10px] font-extrabold transition-all ${
+                                          checkInVehicleType === item.id 
                                             ? 'bg-blue-600 text-white shadow-xs' 
                                             : 'text-slate-500 hover:text-slate-800'
                                         }`}
                                       >
-                                        {type}
+                                        {item.label}
                                       </button>
                                     ))}
                                   </div>
@@ -2505,7 +2356,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
             )}
 
             {/* SUB-VIEW 3: DOANH THU & VAT DIGITAL E-RECEIPTS (Screenshot 3 Replication) */}
-            {activeMenu === 'revenue' && (
+            {(activeMenu as string) === 'revenue_DEPRECATED' && (
               <div className="space-y-6 animate-fade-in" id="revenue-sub-view">
                 
                 {/* HEADER ROW WITH FACILITIES AND SELECTORS */}
@@ -2607,7 +2458,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                 </div>
 
                 {/* RECENTS TRANSACTION LEDGER (REPLICATED CARD WITH FILTERS & PAGINATOR) */}
-                <div className={`p-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/50 dark:border-slate-800/50 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] space-y-4`}>
+                <div className={`p-6 bg-white dark:bg-slate-905 border rounded-2xl ${isDarkMode ? 'border-slate-800' : 'border-slate-200/60 shadow-xs'} space-y-4`}>
                   
                   {/* LEDGER BAR FOR TRANSACTION SEARCH AND CONTROLS */}
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -2750,7 +2601,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
             )}
 
             {/* SUB-VIEW 4: QUAN LY NHAN SỰ RASTER (Screenshot 5 Replication) */}
-            {activeMenu === 'staff' && (
+            {(activeMenu as string) === 'staff_DEPRECATED' && (
               <div className="space-y-6 animate-fade-in text-left" id="staff-sub-view">
                 
                 {/* HEADER SUBTITLE AND CONTROLS */}
@@ -2760,7 +2611,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                       Quản lý Nhân sự & Ca trực
                     </h2>
                     <p className="text-slate-550 dark:text-slate-400 text-xs font-bold font-sans">
-                      Cơ sở: Trung tâm thương mại Vincom Center (Cơ sở 01)
+                      Hệ thống tòa nhà gửi xe
                     </p>
                   </div>
 
@@ -3133,7 +2984,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
             )}
 
             {/* SUB-VIEW 5: VIP VERIFICATION PANEL INTEGRATION & CUSTOMER MANAGEMENT TABLE (Screenshot 4 Replication) */}
-            {activeMenu === 'customers' && (
+            {(activeMenu as string) === 'customers_DEPRECATED' && (
               <div className="space-y-6 animate-fade-in text-left" id="customers-sub-view">
                 
                 {/* DUAL-TAB SEGMENT HEADERS */}
@@ -3177,7 +3028,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
                 {/* CONDITIONAL RENDER OF CUSTOMERS SUB-TABS */}
                 {customerTab === 'list' ? (
-                  <div className={`p-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/50 dark:border-slate-800/50 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] space-y-4 animate-fade-in`}>
+                  <div className={`p-6 bg-white dark:bg-slate-905 border rounded-2xl ${isDarkMode ? 'border-slate-800 animate-fade-in' : 'border-slate-200/60 shadow-xs animate-fade-in'} space-y-4`}>
                     
                     {/* SEARCH FILTERS AND REGISTER BAR */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -3842,12 +3693,11 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
               </div>
             )}
 
-            {/* SUB-VIEW 8: NHẬT KÝ TELEMETRY AUDIT LOGS */}
+            {/* SUB-VIEW 8: NHẬT KÝ TELEMETRY AUDIT LOGS (Screenshot 2 Replication) */}
             {activeMenu === 'system_log' && (() => {
-              // Load audit logs when this tab becomes active
-              if (auditLogs.length === 0 && !isAuditLoading) fetchAuditLogs();
-
-              const mockAuditLogs = auditLogs.length > 0 ? auditLogs : [
+              
+              {/* STATIC LOGS POOL CORRESPONDING TO SCREENSHOT 2 REPLICATION */}
+              const mockAuditLogs = [
                 {
                   id: 'AUD-001',
                   time: '14:23:05',
@@ -4123,7 +3973,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                   </div>
 
                   {/* LOGS LIST DATA TABLE (Screenshot 2 Replication) */}
-                  <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200/50 dark:border-slate-800/50 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] overflow-hidden`}>
+                  <div className={`bg-white dark:bg-slate-905 border rounded-2xl ${isDarkMode ? 'border-slate-800' : 'border-slate-200/60 shadow-xs'} overflow-hidden`}>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left font-sans text-xs">
                         <thead>
@@ -4401,7 +4251,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
         {/* MODAL ADD BRANCH DIALOG */}
         <AnimatePresence>
-          {showAddBranchModal && (
+          {false && showAddBranchModal && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
               <div className={`w-full max-w-sm rounded-[24px] p-6 border text-slate-850 ${isDarkMode ? 'bg-[#0f172a] border-slate-850 text-white' : 'bg-white border-slate-200'}`}>
                 <div className="space-y-4 block text-left font-sans text-xs">
@@ -4410,7 +4260,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                   <div className="space-y-3">
                     <div className="space-y-1 block">
                       <label className="text-[10px] font-extrabold uppercase text-slate-455">Tên cơ sở</label>
-                      <input id="branch-name-input" type="text" placeholder="Bãi xe ngầm Vincom" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
+                      <input id="branch-name-input" type="text" placeholder="Bãi xe UrbanPark" className="w-full px-4 py-2.5 rounded-xl border border-slate-180 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold" />
                     </div>
                     <div className="space-y-1 block">
                       <label className="text-[10px] font-extrabold uppercase text-slate-455">Địa chỉ</label>

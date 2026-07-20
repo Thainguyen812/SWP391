@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { WalletOutlined, CheckCircleFilled, CreditCardOutlined } from '@ant-design/icons';
 import { apiClient } from '../api/apiClient';
+import { getDemoVehicleByPlate, getDemoVehicleImages, getDemoVehicleProfile } from '../data/vehicleDataset';
 
 const GlobalContext = createContext({});
 
@@ -145,20 +146,20 @@ export const GlobalProvider = ({ children }) => {
                 const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
                 durationStr = `${hours}h ${minutes}m`;
               }
-                const carImages = [
-                  "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80",
-                  "https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=600&q=80",
-                  "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80",
-                  "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80",
-                  "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?auto=format&fit=crop&w=600&q=80",
-                  "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=600&q=80",
-                  "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=600&q=80",
-                  "https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?auto=format&fit=crop&w=600&q=80"
-                ];
-                const charSum = (session.licensePlate || "A").split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
-                const uniqueImage = carImages[charSum % carImages.length];
+              const knownDemoProfile = getDemoVehicleByPlate(session.licensePlate);
+              const demoProfile = getDemoVehicleProfile({
+                plate: session.licensePlate,
+                vehicleType: session.vehicleType || session.vehicleSize,
+                fuelType: session.fuelType,
+                assignedZoneCode: session.assignedZoneCode || session.assignedZoneId,
+                imageUrl: session.mobileCheckoutPhoto || session.imageUrl
+              });
+              const demoImages = getDemoVehicleImages(demoProfile || {
+                plate: session.licensePlate,
+                vehicleType: session.vehicleType || session.vehicleSize
+              });
 
-              const zoneCode = session.assignedZoneCode || session.assignedZoneId || "";
+              const zoneCode = knownDemoProfile?.zoneCode || demoProfile?.zoneCode || session.assignedZoneCode || session.assignedZoneId || "";
               const mapZoneToFloor = (code) => {
                 if (!code) return "Chưa gán";
                 const c = code.toUpperCase();
@@ -187,13 +188,15 @@ export const GlobalProvider = ({ children }) => {
                 inTime: checkInTime && !isNaN(checkInTime.getTime()) ? checkInTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
                 timestamp: checkInTime ? checkInTime.getTime() : 0,
                 outTime: "--:--",
-                image: session.mobileCheckoutPhoto || uniqueImage,
-                model: session.vehicleModel || session.vehicleBrand || "Chưa xác định",
+                image: demoImages.primary,
+                model: session.vehicleModel || session.vehicleBrand || demoProfile?.model || "Chưa xác định",
                 duration: durationStr,
                 assignedZoneCode: zoneCode,
                 floorName: mapZoneToFloor(zoneCode),
-                vehicleType: session.vehicleType || session.vehicleSize || null,
-                cardCode: session.cardCode
+                vehicleType: knownDemoProfile?.vehicleType || session.vehicleType || session.vehicleSize || demoProfile?.vehicleType || null,
+                fuelType: knownDemoProfile?.fuelType || session.fuelType || demoProfile?.fuelType || 'GASOLINE',
+                cardCode: session.cardCode,
+                isLocked: session.isLocked || session.locked || false
               };
             });
 
@@ -285,7 +288,15 @@ export const GlobalProvider = ({ children }) => {
   const addTransaction = (newTx) => setTransactions(prev => [{ ...newTx, isManual: true }, ...prev]);
   const addActivityLog = (newLog) => setActivityLogs(prev => [{ ...newLog, isManual: true, id: Math.random().toString() }, ...prev]);
   const addSecurityAlert = (newAlert) => setSecurityAlerts(prev => [{ ...newAlert, isManual: true }, ...prev]);
-  const removeSecurityAlert = (id) => setSecurityAlerts(prev => prev.filter(alert => alert.id !== id));
+  const removeSecurityAlert = async (id) => {
+    try {
+      await apiClient.put(`/security/alerts/${id}/resolve`);
+      setSecurityAlerts(prev => prev.filter(alert => alert.id !== id));
+    } catch (e) {
+      console.error("Failed to resolve security alert in backend", e);
+      setSecurityAlerts(prev => prev.filter(alert => alert.id !== id));
+    }
+  };
   
   const addVehicleFine = (fine) => setVehicleFines(prev => [...prev, { ...fine, id: Math.random().toString(), date: new Date().toISOString() }]);
   const clearVehicleFines = (plate) => setVehicleFines(prev => prev.filter(f => f.plate !== plate));

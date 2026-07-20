@@ -11,6 +11,7 @@ import com.parking.repository.ZoneRepository;
 import com.parking.repository.CardRepository;
 import com.parking.service.PendingGateVehicleService;
 import com.parking.service.ParkingService;
+import com.parking.service.DemoVehicleDataset;
 import com.parking.dto.ParkingSessionDto;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -46,6 +47,84 @@ public class ParkingSessionController {
         this.pendingGateVehicleService = pendingGateVehicleService;
     }
 
+    private Zone choosePendingZone(String vehicleType, String seed) {
+        String resolvedType = DemoVehicleDataset.resolveVehicleType(seed, vehicleType);
+        String preferredZoneCode = DemoVehicleDataset.resolveZoneCode(seed, resolvedType);
+        List<Zone> preferredZones = zoneRepo.findAll().stream()
+                .filter(zone -> zone.getCode() != null && zone.getCode().equalsIgnoreCase(preferredZoneCode))
+                .collect(Collectors.toList());
+        List<Zone> candidates = !preferredZones.isEmpty()
+                ? preferredZones
+                : zoneRepo.findByAllowedSizesContaining(resolvedType);
+        List<Zone> availableCandidates = candidates.stream()
+                .filter(z -> z.getTotalSlots() - z.getCurrentOccupied() > 0)
+                .collect(Collectors.toList());
+        List<Zone> selectableZones = !availableCandidates.isEmpty() ? availableCandidates : candidates;
+
+        if (selectableZones.isEmpty()) {
+            selectableZones = zoneRepo.findAll();
+        }
+        if (selectableZones.isEmpty()) {
+            return null;
+        }
+
+        int index = Math.floorMod((seed != null ? seed : resolvedType).hashCode(), selectableZones.size());
+        return selectableZones.get(index);
+    }
+
+    private void applyDemoMetadata(ParkingSessionDto dto, ParkingSession session, Vehicle vehicle) {
+        String plate = dto.getLicensePlate();
+        if (plate == null && session != null) {
+            plate = session.getLicensePlate();
+        }
+        String normalizedPlate = DemoVehicleDataset.normalizePlate(plate);
+        if (!normalizedPlate.isBlank()) {
+            dto.setLicensePlate(normalizedPlate);
+        }
+
+        Optional<DemoVehicleDataset.Profile> profileOpt = DemoVehicleDataset.findByPlate(normalizedPlate);
+        String fallbackType = vehicle != null ? vehicle.getVehicleSize() : dto.getVehicleType();
+        String resolvedType = DemoVehicleDataset.resolveVehicleType(normalizedPlate, fallbackType);
+        String fallbackFuel = vehicle != null ? vehicle.getFuelType() : dto.getFuelType();
+        String resolvedFuel = DemoVehicleDataset.resolveFuelType(normalizedPlate, fallbackFuel);
+
+        dto.setVehicleType(resolvedType);
+        dto.setFuelType(resolvedFuel);
+        dto.setImageUrl(DemoVehicleDataset.resolveImageUrl(normalizedPlate, "SESSION_DTO",
+                session != null ? session.getMobileCheckoutPhoto() : dto.getImageUrl()));
+
+        profileOpt.ifPresent(profile -> {
+            dto.setVehicleBrand(profile.brand());
+            dto.setVehicleModel(profile.model());
+            dto.setVehicleColor(profile.color());
+            dto.setRegistrationDocUrl(profile.registrationDocUrl());
+            dto.setRegistrationPhotoUrl(profile.registrationPhotoUrl());
+            dto.setIdentityDocUrl(profile.identityDocUrl());
+        });
+
+        if (vehicle != null) {
+            if (dto.getVehicleBrand() == null) {
+                dto.setVehicleBrand(vehicle.getBrand());
+            }
+            if (dto.getVehicleColor() == null) {
+                dto.setVehicleColor(vehicle.getColor());
+            }
+            if (dto.getVehicleModel() == null) {
+                dto.setVehicleModel(vehicle.getBrand());
+            }
+            if (dto.getRegistrationDocUrl() == null) {
+                dto.setRegistrationDocUrl(vehicle.getRegistrationDocUrl());
+            }
+            if (dto.getRegistrationPhotoUrl() == null) {
+                dto.setRegistrationPhotoUrl(vehicle.getRegistrationPhotoUrl());
+            }
+        }
+
+        if (dto.getAssignedZoneCode() == null || dto.getAssignedZoneCode().isBlank()) {
+            dto.setAssignedZoneCode(DemoVehicleDataset.resolveZoneCode(normalizedPlate, resolvedType));
+        }
+    }
+
     private ParkingSessionDto convertToDto(ParkingSession session) {
         Vehicle vehicle = null;
         if (session.getLicensePlate() != null) {
@@ -60,6 +139,7 @@ public class ParkingSessionController {
         if (session.getCardId() != null) {
             cardRepo.findById(session.getCardId()).ifPresent(card -> dto.setCardCode(card.getCardCode()));
         }
+        applyDemoMetadata(dto, session, vehicle);
         return dto;
     }
 
@@ -98,6 +178,7 @@ public class ParkingSessionController {
             if (session.getCardId() != null) {
                 cardRepo.findById(session.getCardId()).ifPresent(card -> dto.setCardCode(card.getCardCode()));
             }
+            applyDemoMetadata(dto, session, vehicle);
             return dto;
         }).collect(Collectors.toList());
 
@@ -113,17 +194,19 @@ public class ParkingSessionController {
                     pending.getSuspiciousReason()
             );
             dto.setVehicleType(pending.getVehicleType());
-            List<Zone> candidates = zoneRepo.findByAllowedSizesContaining(pending.getVehicleType());
-            if (!candidates.isEmpty()) {
-                Zone chosen = candidates.stream()
-                        .filter(z -> z.getTotalSlots() - z.getCurrentOccupied() > 0)
-                        .findFirst()
-                        .orElse(candidates.get(0));
-                dto.setAssignedZoneCode(chosen.getCode());
-                dto.setAssignedZoneId(chosen.getId());
+            if (pending.getAssignedZoneId() != null || pending.getAssignedZoneCode() != null) {
+                dto.setAssignedZoneId(pending.getAssignedZoneId());
+                dto.setAssignedZoneCode(pending.getAssignedZoneCode());
             } else {
-                dto.setAssignedZoneCode("F1");
+                Zone chosen = choosePendingZone(pending.getVehicleType(), pending.getLicensePlate());
+                if (chosen != null) {
+                    dto.setAssignedZoneCode(chosen.getCode());
+                    dto.setAssignedZoneId(chosen.getId());
+                } else {
+                    dto.setAssignedZoneCode("F1");
+                }
             }
+            applyDemoMetadata(dto, null, null);
             result.add(dto);
         });
 

@@ -27,6 +27,11 @@ public class ParkingSessionDto {
     private String vehicleColor;
     private String vehicleModel;
     private String vehicleType;
+    private String fuelType;
+    private String imageUrl;
+    private String registrationDocUrl;
+    private String registrationPhotoUrl;
+    private String identityDocUrl;
 
     public ParkingSessionDto(ParkingSession session, Vehicle vehicle) {
         this.id = session.getId();
@@ -47,6 +52,10 @@ public class ParkingSessionDto {
             this.vehicleBrand = vehicle.getBrand();
             this.vehicleColor = vehicle.getColor();
             this.vehicleType = vehicle.getVehicleSize();
+            this.fuelType = vehicle.getFuelType();
+            this.imageUrl = vehicle.getRegistrationPhotoUrl();
+            this.registrationDocUrl = vehicle.getRegistrationDocUrl();
+            this.registrationPhotoUrl = vehicle.getRegistrationPhotoUrl();
             this.vehicleModel = (vehicle.getBrand() != null ? vehicle.getBrand() : "") + " " + (vehicle.getBodyShape() != null ? vehicle.getBodyShape() : "");
         }
     }
@@ -66,6 +75,7 @@ public class ParkingSessionDto {
 
     public UUID getId() { return id; }
     public String getLicensePlate() { return licensePlate; }
+    public void setLicensePlate(String licensePlate) { this.licensePlate = licensePlate; }
     public UUID getAssignedZoneId() { return assignedZoneId; }
     public void setAssignedZoneId(UUID assignedZoneId) { this.assignedZoneId = assignedZoneId; }
     public String getAssignedZoneCode() { return assignedZoneCode; }
@@ -83,8 +93,21 @@ public class ParkingSessionDto {
     public Boolean getIsPending() { return isPending; }
     public String getSuspiciousReason() { return suspiciousReason; }
     public String getVehicleBrand() { return vehicleBrand; }
+    public void setVehicleBrand(String vehicleBrand) { this.vehicleBrand = vehicleBrand; }
     public String getVehicleColor() { return vehicleColor; }
+    public void setVehicleColor(String vehicleColor) { this.vehicleColor = vehicleColor; }
     public String getVehicleModel() { return vehicleModel; }
+    public void setVehicleModel(String vehicleModel) { this.vehicleModel = vehicleModel; }
     public String getVehicleType() { return vehicleType; }
     public void setVehicleType(String vehicleType) { this.vehicleType = vehicleType; }
+    public String getFuelType() { return fuelType; }
+    public void setFuelType(String fuelType) { this.fuelType = fuelType; }
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public String getRegistrationDocUrl() { return registrationDocUrl; }
+    public void setRegistrationDocUrl(String registrationDocUrl) { this.registrationDocUrl = registrationDocUrl; }
+    public String getRegistrationPhotoUrl() { return registrationPhotoUrl; }
+    public void setRegistrationPhotoUrl(String registrationPhotoUrl) { this.registrationPhotoUrl = registrationPhotoUrl; }
+    public String getIdentityDocUrl() { return identityDocUrl; }
+    public void setIdentityDocUrl(String identityDocUrl) { this.identityDocUrl = identityDocUrl; }
 }

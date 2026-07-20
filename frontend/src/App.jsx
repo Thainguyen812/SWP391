@@ -25,7 +25,7 @@ import { StaffSettings } from './pages/staff/StaffSettings';
 import { StaffSupport } from './pages/staff/StaffSupport';
 import StaffLayout from './components/layout/StaffLayout';
 import { DriverPwa } from './components/driver/DriverPwa';
-import PaymentResult from './pages/PaymentResult';
+import { PaymentSuccess } from './pages/driver/PaymentSuccess';
 
 import { Dashboard as LegacyDashboard } from './pages/admin/AdminDashboard';
 import { GlobalProvider } from './context/GlobalContext';
@@ -75,8 +75,6 @@ const LegacyAdminWrapper = () => {
 };
 
 const RootRedirect = () => {
-
-
   const isAuthenticated = authService.isAuthenticated();
   const user = authService.getUser();
 
@@ -113,6 +111,7 @@ const DriverAppWrapper = () => {
       }}
       accessToken={sessionStorage.getItem('token') || localStorage.getItem('token')}
       onLogout={() => {
+        localStorage.removeItem('urbanpark_vip_subscriptions');
         authService.logout();
         navigate('/login');
       }}
@@ -135,12 +134,10 @@ function App() {
         <Route path="/register" element={<AuthPage />} />
         <Route path="/" element={<RootRedirect />} />
         <Route path="/admin" element={<LegacyAdminWrapper />} />
-        <Route path="/payment-success" element={<PaymentResult />} />
 
         {/* Protected Routes */}
         
         {/* Nhóm Quản trị */}
-        <Route path="/manager" element={<Navigate to="/overview" replace />} />
         <Route path="/overview" element={
           <ProtectedPage allowedRoles={managementRoles}><SystemOverviewSection /></ProtectedPage>
         } />
@@ -203,6 +200,7 @@ function App() {
 
         {/* Nhóm Khách hàng (Driver) */}
         <Route path="/driver" element={<DriverPage><DriverAppWrapper /></DriverPage>} />
+        <Route path="/payment-success" element={<PaymentSuccess />} />
 
         {/* Catch-all */}
         <Route path="*" element={

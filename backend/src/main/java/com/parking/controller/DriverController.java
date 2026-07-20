@@ -22,7 +22,9 @@ import com.parking.model.Vehicle;
 import com.parking.repository.UserRepository;
 import com.parking.repository.VehicleRepository;
 import com.parking.repository.TransactionRepository;
+import com.parking.repository.SecurityAlertRepository;
 import com.parking.model.Transaction;
+import com.parking.model.SecurityAlert;
 import com.parking.model.VipSubscription;
 import org.springframework.security.core.Authentication;
 import java.util.Optional;
@@ -38,6 +40,7 @@ public class DriverController {
     private final UserRepository userRepository;
     private final VipSubscriptionRepository vipSubscriptionRepository;
     private final TransactionRepository transactionRepository;
+    private final SecurityAlertRepository securityAlertRepository;
 
     public DriverController(
             VipQrIdentifierRepository qrRepo,
@@ -46,7 +49,8 @@ public class DriverController {
             VehicleRepository vehicleRepository,
             UserRepository userRepository,
             VipSubscriptionRepository vipSubscriptionRepository,
-            TransactionRepository transactionRepository) {
+            TransactionRepository transactionRepository,
+            SecurityAlertRepository securityAlertRepository) {
 
         this.qrRepo = qrRepo;
         this.sessionRepo = sessionRepo;
@@ -55,6 +59,7 @@ public class DriverController {
         this.userRepository = userRepository;
         this.vipSubscriptionRepository = vipSubscriptionRepository;
         this.transactionRepository = transactionRepository;
+        this.securityAlertRepository = securityAlertRepository;
     }
 
     @PostMapping("/qr/generate")
@@ -85,17 +90,27 @@ public class DriverController {
             return ResponseEntity.badRequest().body("Chỉ phương tiện có gói VIP đang hoạt động mới được sử dụng tính năng khóa xe!");
         }
 
+        Optional<Vehicle> optVehicle = vehicleRepository.findById(req.getVehicleId());
+        if (optVehicle.isEmpty()) {
+            return ResponseEntity.status(404).body("Không tìm thấy phương tiện này trong hệ thống!");
+        }
+        Vehicle vehicle = optVehicle.get();
+        boolean isLocked = req.getLockStatus() != null && req.getLockStatus();
+
+        // 1. Đồng bộ hóa khóa trên thực thể Vehicle
+        vehicle.setLocked(isLocked);
+        vehicleRepository.save(vehicle);
+
+        // 3. Cập nhật các phiên gửi xe đang hoạt động (active)
         List<ParkingSession> activeSessions = sessionRepo.findByVehicleIdAndSessionStatusIn(
                 req.getVehicleId(),
                 List.of(ParkingSession.SessionStatus.ACTIVE, ParkingSession.SessionStatus.PASSED_CONFIRMED));
 
-        if (activeSessions.isEmpty()) {
-            return ResponseEntity.status(404).body("Không tìm thấy phiên gửi xe hoạt động cho phương tiện này!");
-        }
-
-        for (ParkingSession session : activeSessions) {
-            session.setIsLocked(req.getLockStatus());
-            sessionRepo.save(session);
+        if (!activeSessions.isEmpty()) {
+            for (ParkingSession session : activeSessions) {
+                session.setIsLocked(isLocked);
+                sessionRepo.save(session);
+            }
         }
 
         return ResponseEntity.ok("Cập nhật trạng thái khóa chống trộm thành công!");

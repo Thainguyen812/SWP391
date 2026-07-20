@@ -39,13 +39,14 @@ import {
   KeyRound,
   Coins,
   Sliders,
-  Award
+  Award,
+  Trash2
 } from 'lucide-react';
 import { createContext } from 'react';
 import { VehicleManagementList } from './subcomponents/VehicleManagementList';
 import { VipRegistrationModal } from './subcomponents/VipRegistrationModal';
 import { BillingHistoryTable } from './subcomponents/BillingHistoryTable';
-import { getVehicleImageByPlate } from '../../utils/vehicleImages';
+import { createDemoVehicleFromInput, getDemoVehicleImages, getDemoVehicleProfile } from '../../data/vehicleDataset';
 
 export const DriverContext = createContext<any>(null);
 
@@ -71,6 +72,9 @@ export interface UserVehicle {
   image: string;
   isLocked: boolean;
   fuelType?: string;
+  imageUrl?: string;
+  registrationDocUrl?: string;
+  registrationPhotoUrl?: string;
   activeSubscription?: string;
   subscriptionExpiry?: string;
 }
@@ -85,7 +89,13 @@ export interface TransactionItem {
   status: 'Thành công' | 'Đang xử lý' | 'Thất bại';
 }
 
+const getVehicleImage = (plate: string, type: string) => {
+  const profile = getDemoVehicleProfile({ plate, vehicleType: type });
+  return getDemoVehicleImages(profile || { plate, vehicleType: type }).primary;
+};
+
 const isTxDateInFilter = (txDateStr: string, filter: string) => {
+
   if (!txDateStr || filter === 'Tất cả') return true;
 
   const now = new Date();
@@ -141,19 +151,26 @@ export const VEHICLE_PRICING: Record<string, { day: number; month: number; month
     month6: 5000000,
     year: 9000000
   },
-  'Xe 7 chỗ': {
+  'Xe 7-9 chỗ': {
     day: 70000,
     month: 1400000,
     month3: 3800000,
     month6: 7000000,
     year: 12500000
   },
-  'Xe 9 chỗ': {
+  'Xe van': {
     day: 70000,
     month: 1400000,
     month3: 3800000,
     month6: 7000000,
     year: 12500000
+  },
+  'Xe tải nhỏ': {
+    day: 100000,
+    month: 2000000,
+    month3: 5400000,
+    month6: 10000000,
+    year: 18000000
   },
   'Xe 16 chỗ': {
     day: 100000,
@@ -225,7 +242,12 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   // ----------------------------------------------------
   const [activeTab, setActiveTab] = useState<'home' | 'driver_pnl' | 'vehicles' | 'vip_reg' | 'billing' | 'settings' | 'support'>('driver_pnl');
   const [isOffline, setIsOffline] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'vnpay' | 'momo' | 'bank'>('wallet');
+  const [photoCavet, setPhotoCavet] = useState<string | null>(null);
+  const [photoCccd, setPhotoCccd] = useState<string | null>(null);
+  const [photoXe, setPhotoXe] = useState<string | null>(null);
+  const [isOcrLoading, setIsOcrLoading] = useState<boolean>(false);
+  const [extractedPlate, setExtractedPlate] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'vnpay'>('wallet');
   const [balance, setBalance] = useState<number>(() => {
     const saved = localStorage.getItem(`urbanpark_user_balance_${user?.phone || 'default'}`);
     if (saved) {
@@ -361,16 +383,19 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
             if (v.bodyShape === 'SEDAN') {
               sizeLabel = 'Ô tô gầm thấp 4-5 chỗ';
             } else if (v.bodyShape === 'SUV') {
-              sizeLabel = 'Xe 7 chỗ';
+              sizeLabel = 'Xe 7-9 chỗ';
             } else if (v.bodyShape === 'VAN') {
-              sizeLabel = 'Xe 9 chỗ';
+              sizeLabel = 'Xe van';
+            } else if (v.bodyShape === 'TRUCK') {
+              sizeLabel = 'Xe tải nhỏ';
             } else if (v.bodyShape === 'MINIBUS') {
               sizeLabel = 'Xe 16 chỗ';
-            } else if (v.bodyShape && ['Ô tô gầm thấp 4-5 chỗ', 'Xe 7 chỗ', 'Xe 9 chỗ', 'Xe 16 chỗ'].includes(v.bodyShape)) {
+            } else if (v.bodyShape && ['Ô tô gầm thấp 4-5 chỗ', 'Xe 7-9 chỗ', 'Xe 16 chỗ', 'Xe van', 'Xe tải nhỏ'].includes(v.bodyShape)) {
               sizeLabel = v.bodyShape;
             } else {
-              sizeLabel = sizeType === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' :
-                          sizeType === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' :
+              sizeLabel = sizeType === 'SUV_CUV_MPV' ? 'Xe 7-9 chỗ' :
+                          sizeType === 'MINIBUS_16' ? 'Xe 16 chỗ' :
+                          sizeType === 'VAN_TRUCK' ? 'Xe van / xe tải nhỏ' :
                           'Ô tô gầm thấp 4-5 chỗ';
             }
 
@@ -457,7 +482,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
               type: sizeLabel,
               regDate: regDate,
               isActive: v.isActive !== false && v.active !== false,
-              image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
+              image: getVehicleImage(v.licensePlate || v.plate, sizeLabel),
               isLocked: activeSub ? (v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false)) : false,
               fuelType: v.fuelType || existingLocal?.fuelType || 'GASOLINE',
               activeSubscription: activeSub,
@@ -541,6 +566,40 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     }
   }, [user]);
 
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      if (isOffline) return;
+      try {
+        const response = await fetch('/api/v1/driver/billing-history', {
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}` 
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data)) {
+            const mapped = data.map((item: any) => ({
+              id: item.id.startsWith('#') ? item.id : `#${item.id}`,
+              date: item.date,
+              type: item.type,
+              plate: item.plate,
+              fee: item.fee,
+              isEntry: item.isEntry || false,
+              status: item.status
+            }));
+            setTransactions(mapped);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch driver transactions", err);
+      }
+    };
+    fetchTransactions();
+    const timer = setInterval(fetchTransactions, 5000);
+    return () => clearInterval(timer);
+  }, [user, accessToken, isOffline]);
+
   // Current parked vehicle mock details
   const [currentParked, setCurrentParked] = useState<{
     plate: string;
@@ -562,6 +621,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [editPlate, setEditPlate] = useState('');
   const [editName, setEditName] = useState('');
   const [editType, setEditType] = useState('Ô tô gầm thấp 4-5 chỗ');
+  const [editFuelType, setEditFuelType] = useState('GASOLINE');
 
   // VIP Step Subscription State
   const [regStep, setRegStep] = useState<1 | 2 | 3>(2); // Default on select package for full mockup fidelity
@@ -574,10 +634,6 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [vnpayOtp, setVnpayOtp] = useState('');
   const [vnpayModalOpen, setVnpayModalOpen] = useState(false);
   const [vnpayStep, setVnpayStep] = useState<'info' | 'otp' | 'success'>('info');
-  const [momoModalOpen, setMomoModalOpen] = useState(false);
-  const [momoStep, setMomoStep] = useState<'qr' | 'success'>('qr');
-  const [bankModalOpen, setBankModalOpen] = useState(false);
-  const [bankStep, setBankStep] = useState<'info' | 'success'>('info');
 
   // Alarm & Security Breach state
   const [isSirenMuted, setIsSirenMuted] = useState(false);
@@ -593,6 +649,14 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       setSelectedVehicleForVIP(vehicles[0].plate);
     }
   }, [vehicles, selectedVehicleForVIP]);
+
+  // Reset VIP verification documents when switching selected vehicle
+  useEffect(() => {
+    setPhotoCavet(null);
+    setPhotoCccd(null);
+    setPhotoXe(null);
+    setExtractedPlate(null);
+  }, [selectedVehicleForVIP]);
 
   // Synchronize package price whenever selected vehicle, package label, or vehicles change
   useEffect(() => {
@@ -864,17 +928,21 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     }
 
     let sizeType = 'SEDAN_HATCHBACK';
-    if (newType === 'Xe 7 chỗ' || newType === 'Xe 9 chỗ') {
+    if (newType === 'Xe 7-9 chỗ') {
       sizeType = 'SUV_CUV_MPV';
+    } else if (newType === 'Xe van' || newType === 'Xe tải nhỏ') {
+      sizeType = 'VAN_TRUCK';
     } else if (newType === 'Xe 16 chỗ') {
-      sizeType = 'LARGE_VAN_MINIBUS';
+      sizeType = 'MINIBUS_16';
     }
 
     let bodyShapeDb = 'SEDAN';
-    if (newType === 'Xe 7 chỗ') {
+    if (newType === 'Xe 7-9 chỗ') {
       bodyShapeDb = 'SUV';
-    } else if (newType === 'Xe 9 chỗ') {
+    } else if (newType === 'Xe van') {
       bodyShapeDb = 'VAN';
+    } else if (newType === 'Xe tải nhỏ') {
+      bodyShapeDb = 'TRUCK';
     } else if (newType === 'Xe 16 chỗ') {
       bodyShapeDb = 'MINIBUS';
     }
@@ -883,18 +951,26 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
     });
+    const demoVehicle = createDemoVehicleFromInput({
+      plate: newPlate.toUpperCase().trim(),
+      model: newName.trim(),
+      vehicleType: sizeType,
+      fuelType: newFuelType
+    });
 
     const payload = {
       id: uuid,
       ownerId: ownerId,
-      licensePlate: newPlate.toUpperCase().trim(),
-      vehicleSize: sizeType,
-      brand: newName.trim() || 'Phương tiện mới',
-      color: 'WHITE',
-      colorRgb: '#FFFFFF',
-      bodyShape: bodyShapeDb,
+      licensePlate: demoVehicle.plate,
+      vehicleSize: demoVehicle.vehicleType,
+      brand: demoVehicle.model,
+      color: demoVehicle.color,
+      colorRgb: demoVehicle.colorRgb,
+      bodyShape: demoVehicle.bodyShape || bodyShapeDb,
       isActive: true,
-      fuelType: newFuelType
+      fuelType: demoVehicle.fuelType,
+      registrationDocUrl: demoVehicle.registrationDocUrl,
+      registrationPhotoUrl: demoVehicle.registrationPhotoUrl
     };
 
     try {
@@ -922,14 +998,17 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
       const modelItem: UserVehicle = {
         id: savedVehicle.id,
-        plate: savedVehicle.licensePlate,
-        name: savedVehicle.brand,
+        plate: savedVehicle.licensePlate || savedVehicle.plate || demoVehicle.plate,
+        name: savedVehicle.brand || savedVehicle.name || demoVehicle.model,
         type: newType,
         regDate: new Date().toLocaleDateString('vi-VN'),
         isActive: true,
-        image: '',
+        image: savedVehicle.imageUrl || demoVehicle.imageUrl,
         isLocked: false,
-        fuelType: savedVehicle.fuelType || newFuelType
+        fuelType: savedVehicle.fuelType || demoVehicle.fuelType,
+        imageUrl: savedVehicle.imageUrl || demoVehicle.imageUrl,
+        registrationDocUrl: savedVehicle.registrationDocUrl || demoVehicle.registrationDocUrl,
+        registrationPhotoUrl: savedVehicle.registrationPhotoUrl || demoVehicle.registrationPhotoUrl
       };
 
       setVehicles(prev => [...prev, modelItem]);
@@ -997,17 +1076,21 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     }
 
     let sizeType = 'SEDAN_HATCHBACK';
-    if (editType === 'Xe 7 chỗ' || editType === 'Xe 9 chỗ') {
+    if (editType === 'Xe 7-9 chỗ') {
       sizeType = 'SUV_CUV_MPV';
+    } else if (editType === 'Xe van' || editType === 'Xe tải nhỏ') {
+      sizeType = 'VAN_TRUCK';
     } else if (editType === 'Xe 16 chỗ') {
-      sizeType = 'LARGE_VAN_MINIBUS';
+      sizeType = 'MINIBUS_16';
     }
 
     let bodyShapeDb = 'SEDAN';
-    if (editType === 'Xe 7 chỗ') {
+    if (editType === 'Xe 7-9 chỗ') {
       bodyShapeDb = 'SUV';
-    } else if (editType === 'Xe 9 chỗ') {
+    } else if (editType === 'Xe van') {
       bodyShapeDb = 'VAN';
+    } else if (editType === 'Xe tải nhỏ') {
+      bodyShapeDb = 'TRUCK';
     } else if (editType === 'Xe 16 chỗ') {
       bodyShapeDb = 'MINIBUS';
     }
@@ -1022,7 +1105,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       colorRgb: '#FFFFFF',
       bodyShape: bodyShapeDb,
       isActive: true,
-      fuelType: vehicles.find(v => v.id === editingVehicleId)?.fuelType || 'GASOLINE'
+      fuelType: editFuelType
     };
 
     if (isOffline) {
@@ -1032,7 +1115,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
             ...v,
             plate: editPlate.toUpperCase().trim(),
             name: editName.trim() || 'Phương tiện',
-            type: editType
+            type: editType,
+            fuelType: editFuelType
           };
         }
         return v;
@@ -1083,6 +1167,46 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     }
   };
 
+  const handleDeleteVehicle = async () => {
+    if (!editingVehicleId) return;
+    
+    if (window.confirm("Bạn có chắc chắn muốn xóa phương tiện này không? Hành động này không thể hoàn tác.")) {
+      if (isOffline) {
+        setVehicles(prev => prev.filter(v => v.id !== editingVehicleId));
+        setEditVehicleModalOpen(false);
+        triggerToast('Đã xóa phương tiện thành công (Chế độ Ngoại tuyến)!', 'success');
+        return;
+      }
+      
+      try {
+        const token = accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'));
+        const response = await fetch(`/api/vehicles/${editingVehicleId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          triggerToast('Xóa phương tiện thành công!', 'success');
+          setEditVehicleModalOpen(false);
+          fetchVehiclesFromApi();
+        } else {
+          let errMsg = 'Xóa phương tiện thất bại!';
+          try {
+            const errData = await response.json();
+            if (errData && errData.message) {
+              errMsg = errData.message;
+            }
+          } catch (e) {}
+          triggerToast(errMsg, 'error');
+        }
+      } catch (error: any) {
+        triggerToast(error.message || 'Đã xảy ra lỗi khi kết nối tới máy chủ!', 'error');
+      }
+    }
+  };
+
   // Lock/Unlock Anti-theft vehicle
   const toggleVehicleLock = (id: string, plate: string) => {
     setVehicles(prev => prev.map(v => {
@@ -1130,265 +1254,30 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   };
 
   // Checkout VIP flow
-  const handleStartBank = async () => {
-    if (isOffline) {
-      triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
-      return;
-    }
-    const isTopUp = selectedPackLabel.includes('Nạp tiền');
-    if (isTopUp) {
-      setBankStep('info');
-      setBankModalOpen(true);
-    } else {
-      if (!selectedVehicleForVIP || selectedVehicleForVIP === '') {
-        triggerToast('Vui lòng chọn biển số xe để đăng ký VIP.', 'error');
-        return;
-      }
-      setBankStep('info');
-      setBankModalOpen(true);
-    }
-  };
-
-  const handleSimulateBankTransfer = async () => {
-    if (isOffline) {
-      triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
-      return;
-    }
-    setBankStep('success');
-
-    const isTopUp = selectedPackLabel.includes('Nạp tiền');
-    if (isTopUp) {
-      setBalance(prev => prev + selectedPackPrice);
-      const newTx: TransactionItem = {
-        id: `txn-${Date.now()}`,
-        date: 'Vừa xong',
-        type: 'Nạp ví qua CK Ngân hàng',
-        plate: '-',
-        fee: `+$${selectedPackPrice.toFixed(2)}`,
-        isEntry: true,
-        status: 'Thành công'
-      };
-      setTransactions(prev => [newTx, ...prev]);
-      triggerToast(`Nạp thành công $${selectedPackPrice.toFixed(2)} vào ví điện tử!`, 'success');
-    } else {
-      const formattedPrice = selectedPackPrice.toLocaleString('vi-VN') + '₫';
-      const newTx: TransactionItem = {
-        id: `txn-${Date.now()}`,
-        date: 'Vừa xong',
-        type: `Đăng kí ${selectedPackLabel}`,
-        plate: selectedVehicleForVIP,
-        fee: `-${formattedPrice}`,
-        isEntry: false,
-        status: 'Thành công'
-      };
-      setTransactions(prev => [newTx, ...prev]);
-      
-      const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
-      let expiryDate = new Date();
-      if (targetVeh && targetVeh.activeSubscription && targetVeh.subscriptionExpiry) {
-        const [day, month, year] = targetVeh.subscriptionExpiry.split('/');
-        const currentExp = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        if (currentExp > new Date()) expiryDate = currentExp;
-      }
-      if (selectedPackLabel.includes('Tháng')) expiryDate.setMonth(expiryDate.getMonth() + 1);
-      else if (selectedPackLabel.includes('Quý')) expiryDate.setMonth(expiryDate.getMonth() + 3);
-      else if (selectedPackLabel.includes('Năm')) expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-      else expiryDate.setDate(expiryDate.getDate() + 1);
-
-      const expiryString = expiryDate.toLocaleDateString('vi-VN');
-
-      let subType = 'MONTHLY';
-      if (selectedPackLabel.includes('Vé Ngày')) subType = 'DAILY';
-      else if (selectedPackLabel.includes('Quý')) subType = 'QUARTERLY';
-      else if (selectedPackLabel.includes('Năm')) subType = 'YEARLY';
-
-      const tempId = `sub-${Date.now()}`;
-      const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
-      const docPhotos = (window as any).lastUploadedPhotos?.photos || [];
-      const newSub = {
-        id: tempId,
-        vehicle_plate: selectedVehicleForVIP,
-        type: selectedPackLabel,
-        startDate: new Date().toLocaleDateString('vi-VN'),
-        endDate: expiryString,
-        status: (selectedPackLabel.includes('Vé Ngày') || selectedPackLabel.includes('Ngày')) ? 'ACTIVE' : 'PENDING_APPROVAL',
-        document_photos: docPhotos,
-        explanation: (window as any).lastUploadedPhotos?.explanation || ''
-      };
-      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify([newSub, ...savedSubs]));
-      window.dispatchEvent(new Event('storage'));
-
-      try {
-        apiClient.post('/vip/register', {
-          vehicleId: targetVeh ? targetVeh.id : null,
-          licensePlate: selectedVehicleForVIP,
-          subscriptionType: subType,
-          documentPhotos: JSON.stringify(docPhotos)
-        }).then(response => {
-          const data = response.data;
-          if (data && data.id) {
-            const currentSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
-            const updated = currentSubs.map((s: any) => s.id === tempId ? { ...s, id: data.id } : s);
-            localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updated));
-            window.dispatchEvent(new Event('storage'));
-          }
-        }).catch(err => console.warn("Backend VIP registration failed:", err));
-      } catch (err) {
-        console.error("Lỗi khi đăng ký VIP:", err);
-      }
-
-      setRegStep(3);
-      triggerToast(
-        (selectedPackLabel.includes('Vé Ngày') || selectedPackLabel.includes('Ngày'))
-          ? "✨ Đã kích hoạt vé ngày thành công cho xe " + selectedVehicleForVIP + "!"
-          : "✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe " + selectedVehicleForVIP + ".",
-        'success'
-      );
-    }
-  };
-
-  const handleCloseBank = () => {
-    setBankModalOpen(false);
-    if (bankStep === 'success') {
-      if (selectedPackLabel.includes('Nạp tiền')) {
-        setSelectedPackLabel('');
-        setSelectedPackPrice(0);
-      }
-    }
-  };
-
-  const handleStartMomo = async () => {
-    if (isOffline) {
-      triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
-      return;
-    }
-    const isTopUp = selectedPackLabel.includes('Nạp tiền');
-    if (isTopUp) {
-      setMomoStep('qr');
-      setMomoModalOpen(true);
-    } else {
-      if (!selectedVehicleForVIP || selectedVehicleForVIP === '') {
-        triggerToast('Vui lòng chọn biển số xe để đăng ký VIP.', 'error');
-        return;
-      }
-      setMomoStep('qr');
-      setMomoModalOpen(true);
-    }
-  };
-
-  const handleSimulateMomoScan = async () => {
-    if (isOffline) {
-      triggerToast('Lỗi: Mất kết nối mạng, không thể thực hiện giao dịch!', 'error');
-      return;
-    }
-    setMomoStep('success');
-
-    const isTopUp = selectedPackLabel.includes('Nạp tiền');
-    if (isTopUp) {
-      setBalance(prev => prev + selectedPackPrice);
-      const newTx: TransactionItem = {
-        id: `txn-${Date.now()}`,
-        date: 'Vừa xong',
-        type: 'Nạp ví MoMo',
-        plate: '-',
-        fee: `+$${selectedPackPrice.toFixed(2)}`,
-        isEntry: true,
-        status: 'Thành công'
-      };
-      setTransactions(prev => [newTx, ...prev]);
-      triggerToast(`Nạp thành công $${selectedPackPrice.toFixed(2)} vào ví điện tử!`, 'success');
-    } else {
-      const formattedPrice = selectedPackPrice.toLocaleString('vi-VN') + '₫';
-      const newTx: TransactionItem = {
-        id: `txn-${Date.now()}`,
-        date: 'Vừa xong',
-        type: `Đăng kí ${selectedPackLabel}`,
-        plate: selectedVehicleForVIP,
-        fee: `-${formattedPrice}`,
-        isEntry: false,
-        status: 'Thành công'
-      };
-      setTransactions(prev => [newTx, ...prev]);
-      
-      const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
-      let expiryDate = new Date();
-      if (targetVeh && targetVeh.activeSubscription && targetVeh.subscriptionExpiry) {
-        const [day, month, year] = targetVeh.subscriptionExpiry.split('/');
-        const currentExp = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        if (currentExp > new Date()) expiryDate = currentExp;
-      }
-      if (selectedPackLabel.includes('Tháng')) expiryDate.setMonth(expiryDate.getMonth() + 1);
-      else if (selectedPackLabel.includes('Quý')) expiryDate.setMonth(expiryDate.getMonth() + 3);
-      else if (selectedPackLabel.includes('Năm')) expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-      else expiryDate.setDate(expiryDate.getDate() + 1);
-
-      const expiryString = expiryDate.toLocaleDateString('vi-VN');
-
-      let subType = 'MONTHLY';
-      if (selectedPackLabel.includes('Vé Ngày')) subType = 'DAILY';
-      else if (selectedPackLabel.includes('Quý')) subType = 'QUARTERLY';
-      else if (selectedPackLabel.includes('Năm')) subType = 'YEARLY';
-
-      const tempId = `sub-${Date.now()}`;
-      const savedSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
-      const docPhotos = (window as any).lastUploadedPhotos?.photos || [];
-      const newSub = {
-        id: tempId,
-        vehicle_plate: selectedVehicleForVIP,
-        type: selectedPackLabel,
-        startDate: new Date().toLocaleDateString('vi-VN'),
-        endDate: expiryString,
-        status: (selectedPackLabel.includes('Vé Ngày') || selectedPackLabel.includes('Ngày')) ? 'ACTIVE' : 'PENDING_APPROVAL',
-        document_photos: docPhotos,
-        explanation: (window as any).lastUploadedPhotos?.explanation || ''
-      };
-      localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify([newSub, ...savedSubs]));
-      window.dispatchEvent(new Event('storage'));
-
-      try {
-        apiClient.post('/vip/register', {
-          vehicleId: targetVeh ? targetVeh.id : null,
-          licensePlate: selectedVehicleForVIP,
-          subscriptionType: subType,
-          documentPhotos: JSON.stringify(docPhotos)
-        }).then(response => {
-          const data = response.data;
-          if (data && data.id) {
-            const currentSubs = JSON.parse(localStorage.getItem('urbanpark_vip_subscriptions') || '[]');
-            const updated = currentSubs.map((s: any) => s.id === tempId ? { ...s, id: data.id } : s);
-            localStorage.setItem('urbanpark_vip_subscriptions', JSON.stringify(updated));
-            window.dispatchEvent(new Event('storage'));
-          }
-        }).catch(err => console.warn("Backend VIP registration failed:", err));
-      } catch (err) {
-        console.error("Lỗi khi đăng ký VIP:", err);
-      }
-
-      setRegStep(3);
-      triggerToast(
-        (selectedPackLabel.includes('Vé Ngày') || selectedPackLabel.includes('Ngày'))
-          ? "✨ Đã kích hoạt vé ngày thành công cho xe " + selectedVehicleForVIP + "!"
-          : "✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe " + selectedVehicleForVIP + ".",
-        'success'
-      );
-    }
-  };
-
-  const handleCloseMomo = () => {
-    setMomoModalOpen(false);
-    if (momoStep === 'success') {
-      if (selectedPackLabel.includes('Nạp tiền')) {
-        setSelectedPackLabel('');
-        setSelectedPackPrice(0);
-      }
-    }
-  };
-
   const handleStartVnpay = async () => {
     if (isOffline) {
       triggerToast('Lỗi: Không thể đăng ký Thẻ Tháng VIP ở chế độ Ngoại tuyến!', 'error');
       return;
     }
+    
+    // VIP Validation Checks
+    if (!photoCavet) {
+      triggerToast('Vui lòng cung cấp ảnh Cà vẹt xe để xác thực OCR!', 'warning');
+      return;
+    }
+    if (extractedPlate !== selectedVehicleForVIP) {
+      triggerToast('Lỗi OCR: Biển số trên cà vẹt không trùng khớp với phương tiện đã chọn!', 'error');
+      return;
+    }
+    if (!photoCccd) {
+      triggerToast('Vui lòng tải lên ảnh CMND/CCCD để xác thực!', 'warning');
+      return;
+    }
+    if (!photoXe) {
+      triggerToast('Vui lòng tải lên ảnh đầu xe thực tế để xác thực!', 'warning');
+      return;
+    }
+
     if (paymentMethod === 'wallet') {
       if (balance < selectedPackPrice) {
         triggerToast(`⚠️ Thất bại: Số dư ví không đủ! Cần ${selectedPackPrice.toLocaleString('vi-VN')}₫, Số dư hiện tại: ${balance.toLocaleString('vi-VN')}₫`, 'error');
@@ -1440,10 +1329,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         subType = 'HALF_YEARLY';
       }
 
-      const docPhotos = (window as any).lastUploadedPhotos || {
-        registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-        identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-        frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+      const demoDocs = getDemoVehicleImages(getDemoVehicleProfile(targetVeh) || targetVeh);
+      const docPhotos = {
+        registrationPaper: photoCavet || targetVeh?.registrationDocUrl || demoDocs.registrationDoc,
+        identityCard: photoCccd || demoDocs.identityDoc,
+        frontPhoto: photoXe || targetVeh?.registrationPhotoUrl || demoDocs.primary
       };
 
       try {
@@ -1459,8 +1349,46 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       setRegStep(3); // success step!
       triggerToast(`✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe ${selectedVehicleForVIP}.`, 'success');
     } else {
-      setVnpayStep('info');
-      setVnpayModalOpen(true);
+      try {
+        let subType = 'MONTHLY';
+        if (selectedPackLabel.includes('1 Năm') || selectedPackLabel.includes('1 năm') || selectedPackLabel.includes('Năm')) {
+          subType = 'YEARLY';
+        } else if (selectedPackLabel.includes('3 Tháng') || selectedPackLabel.includes('3 tháng') || selectedPackLabel.includes('Quý')) {
+          subType = 'QUARTERLY';
+        } else if (selectedPackLabel.includes('6 Tháng') || selectedPackLabel.includes('6 tháng') || selectedPackLabel.includes('Nửa')) {
+          subType = 'HALF_YEARLY';
+        }
+
+        const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
+        const demoDocs = getDemoVehicleImages(getDemoVehicleProfile(targetVeh) || targetVeh);
+        const docPhotos = {
+          registrationPaper: photoCavet || targetVeh?.registrationDocUrl || demoDocs.registrationDoc,
+          identityCard: photoCccd || demoDocs.identityDoc,
+          frontPhoto: photoXe || targetVeh?.registrationPhotoUrl || demoDocs.primary
+        };
+        
+        // Save pending payment info to distinguish success message
+        localStorage.setItem('pending_vnpay_tx', JSON.stringify({
+          type: 'vip',
+          amount: selectedPackPrice
+        }));
+
+        const response = await apiClient.post('/vip/register', {
+          licensePlate: targetVeh ? targetVeh.plate : selectedVehicleForVIP,
+          subscriptionType: subType,
+          documentPhotos: JSON.stringify(docPhotos)
+        });
+
+        if (response && response.paymentUrl) {
+          window.location.href = response.paymentUrl;
+          return;
+        } else {
+          triggerToast('Lỗi: Backend không trả về link thanh toán VNPay!', 'error');
+        }
+      } catch (err) {
+        console.error("Lỗi khi tạo liên kết thanh toán VNPay:", err);
+        triggerToast('Lỗi khi kết nối đến cổng thanh toán VNPay!', 'error');
+      }
     }
   };
 
@@ -1550,10 +1478,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         subType = 'HALF_YEARLY';
       }
 
+      const demoDocs = getDemoVehicleImages(getDemoVehicleProfile(targetVeh) || targetVeh);
       const docPhotos = (window as any).lastUploadedPhotos || {
-        registrationPaper: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-        identityCard: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-        frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+        registrationPaper: targetVeh?.registrationDocUrl || demoDocs.registrationDoc,
+        identityCard: demoDocs.identityDoc,
+        frontPhoto: targetVeh?.registrationPhotoUrl || demoDocs.primary
       };
 
       try {
@@ -1710,6 +1639,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       editPlate, setEditPlate,
       editName, setEditName,
       editType, setEditType,
+      editFuelType, setEditFuelType,
       regStep, setRegStep,
       selectedVehicleForVIP, setSelectedVehicleForVIP,
       selectedPackPrice, setSelectedPackPrice,
@@ -1740,7 +1670,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       getRemainingDays,
       setSelectedSubForDetail,
       triggerToast,
-      handleStartVnpay
+      handleStartVnpay,
+      photoCavet, setPhotoCavet,
+      photoCccd, setPhotoCccd,
+      photoXe, setPhotoXe,
+      extractedPlate, setExtractedPlate
     }}>
       <div className="min-h-screen bg-slate-50 relative overflow-hidden font-sans">
 
@@ -2490,94 +2424,31 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                   )}
 
                   {/* Top segment grid columns */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-
-                    {/* Left Card: Trạng thái hiện tại */}
-                    <div className="lg:col-span-7 bg-blue-500/5 hover:bg-blue-500/10 rounded-2xl border border-blue-100 flex flex-col justify-between p-6 transition-all relative overflow-hidden">
-                      <div className="absolute right-0 top-0 w-48 h-48 bg-blue-300/10 rounded-full blur-2xl pointer-events-none" />
-
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <span className="text-[10px] font-black uppercase text-slate-400">TRỌNG ĐIỂM GIÁM SÁT</span>
-                          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Trạng Thái Hiện Tại</h3>
+                  {/* Top segment grid columns */}
+                  <div className="grid grid-cols-1 gap-6">
+                    
+                    <button 
+                      onClick={() => {
+                        setActiveTab('vip_reg');
+                        setRegStep(2);
+                      }}
+                      className="w-full p-6 bg-white hover:bg-slate-50 border border-slate-200 rounded-3xl flex items-center justify-between gap-4 cursor-pointer active:scale-[0.99] transition-all"
+                    >
+                      <div className="flex items-center gap-4 text-left">
+                        <div className="p-4 bg-sky-50 text-sky-600 rounded-2xl">
+                          <Calendar className="w-6 h-6" />
                         </div>
-                        {currentParked ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 text-[#10b981] font-bold text-xs rounded-full uppercase tracking-wide">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            ĐANG ĐỖ
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 border border-slate-200 text-slate-500 font-bold text-xs rounded-full uppercase tracking-wide">
-                            TRỐNG
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-slate-500 text-xs mt-3">
-                        {currentParked ? "Xe đang đỗ trong cơ sở bãi đỗ thông minh" : "Hiện tại không có xe nào đang đỗ trong bãi"}
-                      </p>
-
-                      <div className="grid grid-cols-2 gap-4 mt-6">
-                        <div className="p-4 bg-white border border-slate-200/60 rounded-xl leading-snug">
-                          <span className="text-[9px] font-extrabold text-slate-400 uppercase block tracking-wider">BIỂN SỐ NHẬN DIỆN</span>
-                          <strong className="text-sm sm:text-base font-black text-slate-800 font-mono italic tracking-wide">{currentParked?.plate || 'Chưa ghi nhận'}</strong>
-                        </div>
-                        <div className="p-4 bg-white border border-slate-200/60 rounded-xl leading-snug flex items-center gap-3">
-                          <div className="p-2 bg-red-50 text-red-500 rounded-lg">
-                            <MapPin className="w-4.5 h-4.5" />
-                          </div>
-                          <div>
-                            <span className="text-[9px] font-extrabold text-slate-400 uppercase block tracking-wider">VỊ TRÍ ƯỚC TÍNH</span>
-                            <strong className="text-xs sm:text-sm font-extrabold text-slate-850 block">{currentParked?.location || 'Chưa ghi nhận'}</strong>
-                          </div>
+                        <div>
+                          <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">Gia Hạn Vé Tháng / VIP</h4>
+                          <p className="text-xs text-slate-400 font-semibold leading-normal">
+                            Đăng ký hoặc gia hạn gói giữ xe tháng/năm tiện lợi cho phương tiện của bạn.
+                          </p>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Right Card: Quick billing operations & shortcuts */}
-                    <div className="lg:col-span-5 flex flex-col gap-4">
-
-                      {/* Large Blue payment trigger */}
-                      <button
-                        onClick={() => {
-                          setActiveTab('vip_reg');
-                          setRegStep(2);
-                        }}
-                        className="w-full p-5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-base rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-blue-600/10 cursor-pointer active:scale-[0.99] transition-all"
-                      >
-                        <CreditCard className="w-5 h-5 text-white" />
-                        <span>Thanh Toán Ngay</span>
-                      </button>
-
-                      {/* Beneath grid */}
-                      <div className="grid grid-cols-2 gap-4 flex-1">
-
-                        <button
-                          onClick={handleFindCar}
-                          className="p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center gap-2 select-none group cursor-pointer active:scale-95 transition-all"
-                        >
-                          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-full group-hover:scale-110 transition-transform">
-                            <MapPin className="w-5 h-5" />
-                          </div>
-                          <span className="text-xs font-black text-slate-700 tracking-tight leading-none">Tìm Xe Của Tôi</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setActiveTab('vip_reg');
-                            setRegStep(2);
-                          }}
-                          className="p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center gap-2 select-none group cursor-pointer active:scale-95 transition-all"
-                        >
-                          <div className="p-2.5 bg-sky-50 text-sky-600 rounded-full group-hover:scale-110 transition-transform">
-                            <Calendar className="w-5 h-5" />
-                          </div>
-                          <span className="text-xs font-black text-slate-700 tracking-tight leading-none">Gia Hạn Vé Tháng</span>
-                        </button>
-
+                      <div className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 font-black text-xs rounded-xl uppercase tracking-wider">
+                        Tiếp Tục
                       </div>
-
-                    </div>
+                    </button>
 
                   </div>
 
@@ -2782,74 +2653,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         </div>
                       </div>
 
-                      {/* Notifications settings */}
-                      <div className="bg-white p-6 rounded-[24px] border border-slate-200/60 space-y-4">
-                        <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block">
-                          Tùy chọn thông báo
-                        </strong>
 
-                        <div className="divide-y divide-slate-100 font-sans text-xs">
-                          {/* Row 1 */}
-                          <div className="py-3 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                            <div className="space-y-0.5">
-                              <strong className="text-slate-800 font-extrabold">Sự kiện vào/ra bãi xe</strong>
-                              <p className="text-slate-400 text-[11px] font-semibold leading-normal">
-                                Nhận thông báo thời gian thực khi xe đi qua trạm kiểm soát rào chắn.
-                              </p>
-                            </div>
-                            <div className="flex gap-4 font-black text-[11px]">
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input
-                                  type="checkbox"
-                                  checked={emailNotifyGate}
-                                  onChange={(e) => setEmailNotifyGate(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                />
-                                <span>Email</span>
-                              </label>
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input
-                                  type="checkbox"
-                                  checked={smsNotifyGate}
-                                  onChange={(e) => setSmsNotifyGate(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                />
-                                <span>SMS</span>
-                              </label>
-                            </div>
-                          </div>
-
-                          {/* Row 2 */}
-                          <div className="py-3.5 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                            <div className="space-y-0.5">
-                              <strong className="text-slate-800 font-extrabold">Biên lai thanh toán</strong>
-                              <p className="text-slate-400 text-[11px] font-semibold leading-normal">
-                                Tự động gửi biên lai hóa đơn thuế điện tử về tài khoản sau hành trình.
-                              </p>
-                            </div>
-                            <div className="flex gap-4 font-black text-[11px]">
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input
-                                  type="checkbox"
-                                  checked={emailNotifyReceipt}
-                                  onChange={(e) => setEmailNotifyReceipt(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                />
-                                <span>Email</span>
-                              </label>
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600">
-                                <input
-                                  type="checkbox"
-                                  checked={smsNotifyReceipt}
-                                  onChange={(e) => setSmsNotifyReceipt(e.target.checked)}
-                                  className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                />
-                                <span>SMS</span>
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
 
                     </div>
 
@@ -2916,15 +2720,32 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                               if (isOffline) {
                                 triggerToast('Lỗi: Không thể nạp tiền vào ví ở chế độ Ngoại tuyến!', 'error');
                                 return;
                               }
-                              setSelectedPackPrice(topupAmount);
-                              setSelectedPackLabel('Nạp tiền vào ví điện tử UrbanPark');
-                              setVnpayStep('info');
-                              setVnpayModalOpen(true);
+                              try {
+                                // Save topup metadata to localStorage so when they return, we credit the balance!
+                                localStorage.setItem('pending_vnpay_tx', JSON.stringify({
+                                  type: 'topup',
+                                  amount: topupAmount
+                                }));
+
+                                const response = await apiClient.post('/payment/create-url', {
+                                  amount: topupAmount
+                                });
+
+                                if (response && response.paymentUrl) {
+                                  window.location.href = response.paymentUrl;
+                                  return;
+                                } else {
+                                  triggerToast('Lỗi: Backend không trả về link thanh toán VNPay!', 'error');
+                                }
+                              } catch (err) {
+                                console.error("Lỗi tạo link thanh toán nạp tiền:", err);
+                                triggerToast('Không thể kết nối đến cổng thanh toán VNPay!', 'error');
+                              }
                             }}
                             className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.98]"
                           >
@@ -3398,8 +3219,9 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       className="w-full p-2.5 bg-slate-50 border rounded-lg font-bold border-slate-200 text-slate-850 outline-hidden"
                     >
                       <option value="Ô tô gầm thấp 4-5 chỗ">🚗 Ô tô gầm thấp 4-5 chỗ</option>
-                      <option value="Xe 7 chỗ">🚙 Xe 7 chỗ</option>
-                      <option value="Xe 9 chỗ">🚐 Xe 9 chỗ</option>
+                      <option value="Xe 7-9 chỗ">🚙 Xe 7-9 chỗ</option>
+                      <option value="Xe van">🚐 Xe van</option>
+                      <option value="Xe tải nhỏ">🚚 Xe tải nhỏ</option>
                       <option value="Xe 16 chỗ">🚌 Xe 16 chỗ</option>
                     </select>
                   </div>
@@ -3503,13 +3325,34 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       className="w-full p-2.5 bg-slate-50 border rounded-lg font-bold border-slate-200 text-slate-850 outline-hidden"
                     >
                       <option value="Ô tô gầm thấp 4-5 chỗ">🚗 Ô tô gầm thấp 4-5 chỗ</option>
-                      <option value="Xe 7 chỗ">🚙 Xe 7 chỗ</option>
-                      <option value="Xe 9 chỗ">🚐 Xe 9 chỗ</option>
+                      <option value="Xe 7-9 chỗ">🚙 Xe 7-9 chỗ</option>
+                      <option value="Xe van">🚐 Xe van</option>
+                      <option value="Xe tải nhỏ">🚚 Xe tải nhỏ</option>
                       <option value="Xe 16 chỗ">🚌 Xe 16 chỗ</option>
                     </select>
                   </div>
 
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase font-mono block">Loại động cơ</label>
+                    <select
+                      value={editFuelType}
+                      onChange={e => setEditFuelType(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 border rounded-lg font-bold border-slate-200 text-slate-850 outline-hidden"
+                    >
+                      <option value="GASOLINE">Xe Xăng</option>
+                      <option value="ELECTRIC">Xe Điện</option>
+                    </select>
+                  </div>
+
                   <div className="flex gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleDeleteVehicle}
+                      className="px-4 py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl transition-all cursor-pointer border border-rose-100 flex items-center justify-center gap-1.5"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Xoá xe
+                    </button>
                     <button
                       type="button"
                       onClick={() => setEditVehicleModalOpen(false)}

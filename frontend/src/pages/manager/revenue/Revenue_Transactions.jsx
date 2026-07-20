@@ -65,17 +65,19 @@ export const RecentTransactions = ({ transactions }) => {
           <tbody className="divide-y divide-[#e9e7e9] dark:divide-slate-700">
             {currentItems.map((trx, idx) => {
               let statusBadge = null;
-              if (trx.status === "THÀNH CÔNG") {
+              if (trx.statusCode === "SUCCESS" || trx.status === "THÀNH CÔNG" || trx.status === "Thành công") {
                 statusBadge = <span className="inline-flex items-center px-2 py-1 rounded bg-[#ecfdf5] text-[#10b981] text-xs font-medium"><span className="w-1.5 h-1.5 rounded-full bg-[#10b981] mr-1.5"></span>{trx.status}</span>;
-              } else if (trx.status === "ĐÃ GHI NHẬN") {
+              } else if (trx.statusCode === "RECORDED" || trx.status === "ĐÃ GHI NHẬN") {
                 statusBadge = <span className="inline-flex items-center px-2 py-1 rounded bg-[#f1f5f9] text-[#64748b] text-xs font-medium"><span className="w-1.5 h-1.5 rounded-full bg-[#64748b] mr-1.5"></span>{trx.status}</span>;
-              } else if (trx.status === "CẦN XỬ LÝ") {
+              } else if (trx.statusCode === "PENDING" || trx.status === "CẦN XỬ LÝ") {
                 statusBadge = (
                   <div className="flex items-center gap-2">
                     <span className="inline-flex items-center px-2 py-1 rounded bg-[#fef2f2] text-[#ef4444] text-xs font-medium"><span className="w-1.5 h-1.5 rounded-full bg-[#ef4444] mr-1.5"></span>{trx.status}</span>
                     <button className="text-[#0058be] text-xs font-medium hover:underline">Xử lý</button>
                   </div>
                 );
+              } else {
+                statusBadge = <span className="inline-flex items-center px-2 py-1 rounded bg-[#ecfdf5] text-[#10b981] text-xs font-medium"><span className="w-1.5 h-1.5 rounded-full bg-[#10b981] mr-1.5"></span>{trx.status || 'SUCCESS'}</span>;
               }
 
               return (

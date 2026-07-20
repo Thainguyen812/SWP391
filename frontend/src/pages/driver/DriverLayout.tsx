@@ -37,8 +37,10 @@ import { getVehicleImageByPlate } from '../../utils/vehicleImages';
   AlertTriangle,
   KeyRound,
   Coins,
-  Sliders
+  Sliders,
+  Trash2
 } from 'lucide-react';
+import { createDemoVehicleFromInput, getDemoVehicleImages, getDemoVehicleProfile } from '../../data/vehicleDataset';
 
 interface DriverPwaProps {
   user: {
@@ -61,6 +63,9 @@ interface UserVehicle {
   image: string;
   isLocked: boolean;
   fuelType?: string;
+  imageUrl?: string;
+  registrationDocUrl?: string;
+  registrationPhotoUrl?: string;
   activeSubscription?: string;
   subscriptionExpiry?: string;
 }
@@ -74,6 +79,11 @@ interface TransactionItem {
   isEntry: boolean;
   status: 'Thành công' | 'Đang xử lý' | 'Thất bại';
 }
+
+const getVehicleImage = (plate: string, type: string) => {
+  const profile = getDemoVehicleProfile({ plate, vehicleType: type });
+  return getDemoVehicleImages(profile || { plate, vehicleType: type }).primary;
+};
 
 const isTxDateInFilter = (txDateStr: string, filter: string) => {
   if (!txDateStr || filter === 'Tất cả') return true;
@@ -264,7 +274,8 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               sizeLabel = v.bodyShape;
             } else {
               sizeLabel = sizeType === 'SUV_CUV_MPV' ? 'Xe 7 chỗ' : 
-                          sizeType === 'LARGE_VAN_MINIBUS' ? 'Xe 16 chỗ' : 
+                          sizeType === 'MINIBUS_16' ? 'Xe 16 chỗ' :
+                          sizeType === 'VAN_TRUCK' ? 'Xe van / xe tải nhỏ' :
                           'Ô tô gầm thấp 4-5 chỗ';
             }
 
@@ -351,7 +362,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               type: sizeLabel,
               regDate: '12/10/2023',
               isActive: true,
-              image: index % 2 === 0 ? 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=450&auto=format&fit=crop&q=80' : '',
+              image: getVehicleImage(v.plate, sizeLabel),
               isLocked: activeSub ? (v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false)) : false,
               fuelType: v.fuelType || existingLocal?.fuelType || 'GASOLINE',
               activeSubscription: activeSub,
@@ -394,25 +405,25 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
-        const response = await fetch('/api/logs', {
-          headers: { 'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}` }
+        const response = await fetch('/api/v1/driver/billing-history', {
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}` 
+          }
         });
         if (response.ok) {
           const data = await response.json();
-          if (data && data.items && data.items.length > 0) {
-            const mapped = data.items.map((item: any, index: number) => ({
-              id: `#TRX-${9000 + index}`,
-              date: item.time,
-              type: 'Gửi xe',
+          if (Array.isArray(data)) {
+            const mapped = data.map((item: any) => ({
+              id: item.id.startsWith('#') ? item.id : `#${item.id}`,
+              date: item.date,
+              type: item.type,
               plate: item.plate,
-              fee: item.action === 'Vào bãi' ? '0 đ' : '15,000 đ',
-              isEntry: item.action === 'Vào bãi',
-              status: item.status === 'Thành Công' ? 'Thành công' : 'Đang xử lý'
+              fee: item.fee,
+              isEntry: item.isEntry || false,
+              status: item.status
             }));
-            setTransactions(prev => {
-              const localPayments = prev.filter(tx => !tx.id.startsWith('#TRX-'));
-              return [...localPayments, ...mapped];
-            });
+            setTransactions(mapped);
           }
         }
       } catch (err) {
@@ -420,6 +431,8 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       }
     };
     fetchTransactions();
+    const timer = setInterval(fetchTransactions, 5000);
+    return () => clearInterval(timer);
   }, [user]);
 
   // Current parked vehicle mock details
@@ -665,7 +678,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     if (newType === 'Xe 7 chỗ' || newType === 'Xe 9 chỗ') {
       sizeType = 'SUV_CUV_MPV';
     } else if (newType === 'Xe 16 chỗ') {
-      sizeType = 'LARGE_VAN_MINIBUS';
+      sizeType = 'MINIBUS_16';
     }
 
     let bodyShapeDb = 'SEDAN';
@@ -681,31 +694,42 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
     });
+    const demoVehicle = createDemoVehicleFromInput({
+      plate: newPlate.toUpperCase().trim(),
+      model: newName.trim(),
+      vehicleType: sizeType,
+      fuelType: newFuelType
+    });
 
     const payload = {
       id: uuid,
       ownerId: ownerId,
-      licensePlate: newPlate.toUpperCase().trim(),
-      vehicleSize: sizeType,
-      brand: newName.trim() || 'Phương tiện mới',
-      color: 'WHITE',
-      colorRgb: '#FFFFFF',
-      bodyShape: bodyShapeDb,
+      licensePlate: demoVehicle.plate,
+      vehicleSize: demoVehicle.vehicleType,
+      brand: demoVehicle.model,
+      color: demoVehicle.color,
+      colorRgb: demoVehicle.colorRgb,
+      bodyShape: demoVehicle.bodyShape || bodyShapeDb,
       isActive: true,
-      fuelType: newFuelType
+      fuelType: demoVehicle.fuelType,
+      registrationDocUrl: demoVehicle.registrationDocUrl,
+      registrationPhotoUrl: demoVehicle.registrationPhotoUrl
     };
 
     if (isOffline) {
       const modelItem: UserVehicle = {
         id: uuid,
-        plate: newPlate.toUpperCase().trim(),
-        name: newName.trim() || 'Phương tiện mới',
+        plate: demoVehicle.plate,
+        name: demoVehicle.model,
         type: newType,
         regDate: new Date().toLocaleDateString('vi-VN'),
         isActive: true,
-        image: '',
+        image: demoVehicle.imageUrl,
         isLocked: false,
-        fuelType: newFuelType
+        fuelType: demoVehicle.fuelType,
+        imageUrl: demoVehicle.imageUrl,
+        registrationDocUrl: demoVehicle.registrationDocUrl,
+        registrationPhotoUrl: demoVehicle.registrationPhotoUrl
       };
       setVehicles(prev => [...prev, modelItem]);
       setNewPlate('');
@@ -741,14 +765,17 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       
       const modelItem: UserVehicle = {
         id: savedVehicle.id,
-        plate: savedVehicle.licensePlate || savedVehicle.plate,
-        name: savedVehicle.brand || savedVehicle.name,
+        plate: savedVehicle.licensePlate || savedVehicle.plate || demoVehicle.plate,
+        name: savedVehicle.brand || savedVehicle.name || demoVehicle.model,
         type: newType,
         regDate: new Date().toLocaleDateString('vi-VN'),
         isActive: true,
-        image: '',
+        image: savedVehicle.imageUrl || demoVehicle.imageUrl,
         isLocked: false,
-        fuelType: savedVehicle.fuelType || newFuelType
+        fuelType: savedVehicle.fuelType || demoVehicle.fuelType,
+        imageUrl: savedVehicle.imageUrl || demoVehicle.imageUrl,
+        registrationDocUrl: savedVehicle.registrationDocUrl || demoVehicle.registrationDocUrl,
+        registrationPhotoUrl: savedVehicle.registrationPhotoUrl || demoVehicle.registrationPhotoUrl
       };
 
       setVehicles(prev => [...prev, modelItem]);
@@ -815,7 +842,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     if (editType === 'Xe 7 chỗ' || editType === 'Xe 9 chỗ') {
       sizeType = 'SUV_CUV_MPV';
     } else if (editType === 'Xe 16 chỗ') {
-      sizeType = 'LARGE_VAN_MINIBUS';
+      sizeType = 'MINIBUS_16';
     }
 
     let bodyShapeDb = 'SEDAN';
@@ -895,6 +922,46 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       }
     } catch (err) {
       triggerToast('Lỗi kết nối API Backend!', 'error');
+    }
+  };
+
+  const handleDeleteVehicle = async () => {
+    if (!editingVehicleId) return;
+    
+    if (window.confirm("Bạn có chắc chắn muốn xóa phương tiện này không? Hành động này không thể hoàn tác.")) {
+      if (isOffline) {
+        setVehicles(prev => prev.filter(v => v.id !== editingVehicleId));
+        setEditVehicleModalOpen(false);
+        triggerToast('Đã xóa phương tiện thành công (Chế độ Ngoại tuyến)!', 'success');
+        return;
+      }
+      
+      try {
+        const token = accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'));
+        const response = await fetch(`/api/vehicles/${editingVehicleId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          triggerToast('Xóa phương tiện thành công!', 'success');
+          setEditVehicleModalOpen(false);
+          fetchVehiclesFromApi();
+        } else {
+          let errMsg = 'Xóa phương tiện thất bại!';
+          try {
+            const errData = await response.json();
+            if (errData && errData.message) {
+              errMsg = errData.message;
+            }
+          } catch (e) {}
+          triggerToast(errMsg, 'error');
+        }
+      } catch (error: any) {
+        triggerToast(error.message || 'Đã xảy ra lỗi khi kết nối tới máy chủ!', 'error');
+      }
     }
   };
 
@@ -1295,10 +1362,11 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         subType = 'YEARLY';
       }
 
+      const demoDocs = getDemoVehicleImages(getDemoVehicleProfile(targetVeh) || targetVeh);
       const docPhotos = (window as any).lastUploadedPhotos || {
-        registrationPaper: targetVeh?.registrationDocUrl || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-        identityCard: targetVeh?.registrationPhotoUrl || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-        frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+        registrationPaper: targetVeh?.registrationDocUrl || demoDocs.registrationDoc,
+        identityCard: demoDocs.identityDoc,
+        frontPhoto: targetVeh?.registrationPhotoUrl || demoDocs.primary
       };
 
       // Create subscription in localStorage with PENDING_APPROVAL status
@@ -1437,10 +1505,11 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         subType = 'YEARLY';
       }
 
+      const demoDocs = getDemoVehicleImages(getDemoVehicleProfile(targetVeh) || targetVeh);
       const docPhotos = (window as any).lastUploadedPhotos || {
-        registrationPaper: targetVeh?.registrationDocUrl || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80',
-        identityCard: targetVeh?.registrationPhotoUrl || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80',
-        frontPhoto: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&auto=format&fit=crop&q=80'
+        registrationPaper: targetVeh?.registrationDocUrl || demoDocs.registrationDoc,
+        identityCard: demoDocs.identityDoc,
+        frontPhoto: targetVeh?.registrationPhotoUrl || demoDocs.primary
       };
 
       // Create subscription in localStorage with PENDING_APPROVAL status
@@ -1956,6 +2025,14 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
                   </div>
 
                   <div className="flex gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleDeleteVehicle}
+                      className="px-4 py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl transition-all cursor-pointer border border-rose-100 flex items-center justify-center gap-1.5"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Xoá xe
+                    </button>
                     <button
                       type="button"
                       onClick={() => setEditVehicleModalOpen(false)}

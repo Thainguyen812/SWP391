@@ -12,46 +12,49 @@ import org.springframework.stereotype.Service;
 @Service
 public class VNPayService {
 
-    @Value("${vnp.payurl:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}")
-    private String vnp_PayUrl;
+    @Value("${vnp.payurl}")
+    private String vnpPayUrl;
 
-    @Value("${vnp.returnurl:http://localhost:5173/payment-success}")
-    private String vnp_ReturnUrl;
+    @Value("${vnp.returnurl}")
+    private String vnpReturnUrl;
 
-    @Value("${vnp.tmncode:CGXZLS0Z}")
-    private String vnp_TmnCode;
+    @Value("${vnp.tmncode}")
+    private String vnpTmnCode;
 
-    @Value("${vnp.hashsecret:XNBCJFAKAZQSGTARRLGCHVZWCIOIGSHN}")
-    private String vnp_HashSecret;
+    @Value("${vnp.hashsecret}")
+    private String vnpHashSecret;
 
     public String createPaymentUrl(String orderId, long amount, String ipAddress) throws UnsupportedEncodingException {
+        return createPaymentUrl(orderId, amount, ipAddress, null);
+    }
+
+    public String createPaymentUrl(String orderId, long amount, String ipAddress, String customReturnUrl) throws UnsupportedEncodingException {
         String vnp_Version = "2.1.0";
         String vnp_Command = "pay";
         String vnp_OrderInfo = "Thanh toan dang ky VIP don hang:" + orderId;
-        String vnp_TxnRef = orderId + "_" + System.currentTimeMillis();
-
-        // VNPay yêu cầu số tiền nhân thêm 100 (Ví dụ: 10,000 VND phải gửi là 1000000)
-        String vnp_Amount = String.valueOf(amount * 100);
-
+        String vnp_TxnRef = orderId;
+        
+        // VNPay requires amount multiplied by 100.
+        String vnp_Amount = String.valueOf(amount * 100); 
+ 
         Map<String, String> vnp_Params = new HashMap<>();
         vnp_Params.put("vnp_Version", vnp_Version);
         vnp_Params.put("vnp_Command", vnp_Command);
-        vnp_Params.put("vnp_TmnCode", vnp_TmnCode);
+        vnp_Params.put("vnp_TmnCode", vnpTmnCode);
         vnp_Params.put("vnp_Amount", vnp_Amount);
         vnp_Params.put("vnp_CurrCode", "VND");
         vnp_Params.put("vnp_TxnRef", vnp_TxnRef);
         vnp_Params.put("vnp_OrderInfo", vnp_OrderInfo);
         vnp_Params.put("vnp_OrderType", "other");
         vnp_Params.put("vnp_Locale", "vn");
-        vnp_Params.put("vnp_ReturnUrl", vnp_ReturnUrl);
+        vnp_Params.put("vnp_ReturnUrl", customReturnUrl != null ? customReturnUrl : vnpReturnUrl);
         vnp_Params.put("vnp_IpAddr", ipAddress);
 
-        Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+        Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
         SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
-        formatter.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
         String vnp_CreateDate = formatter.format(cld.getTime());
         vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
-
+        
         cld.add(Calendar.MINUTE, 15);
         String vnp_ExpireDate = formatter.format(cld.getTime());
         vnp_Params.put("vnp_ExpireDate", vnp_ExpireDate);
@@ -68,11 +71,11 @@ public class VNPayService {
                 // Build hash data
                 hashData.append(fieldName);
                 hashData.append('=');
-                hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8.toString()));
                 // Build query
-                query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()));
+                query.append(URLEncoder.encode(fieldName, StandardCharsets.UTF_8.toString()));
                 query.append('=');
-                query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                query.append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8.toString()));
                 if (itr.hasNext()) {
                     query.append('&');
                     hashData.append('&');
@@ -80,12 +83,12 @@ public class VNPayService {
             }
         }
         String queryUrl = query.toString();
-        String vnp_SecureHash = hmacSHA512(vnp_HashSecret, hashData.toString());
-        queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
-        return vnp_PayUrl + "?" + queryUrl;
-    }
+        String vnp_SecureHash = hmacSHA512(vnpHashSecret, hashData.toString());
 
-    // Hàm mã hóa bảo mật SHA512
+        queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
+        return vnpPayUrl + "?" + queryUrl;
+    }
+    // Generates secure HMAC SHA512 signature for VNPay request validation.
     private String hmacSHA512(final String key, final String data) {
         try {
             if (key == null || data == null) return null;

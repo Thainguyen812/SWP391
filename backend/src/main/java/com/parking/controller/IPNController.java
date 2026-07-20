@@ -1,14 +1,10 @@
 package com.parking.controller;
 
-import com.parking.model.Transaction;
 import com.parking.model.VipSubscription;
-import com.parking.repository.TransactionRepository;
 import com.parking.repository.VipSubscriptionRepository;
-import com.parking.service.ParkingService;
-import com.parking.service.VNPayService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,61 +15,21 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/v1/payment")
+@RequestMapping({"/api/v1/payment", "/api/payment"})
 public class IPNController {
 
     private final VipSubscriptionRepository vipRepo;
-    private final TransactionRepository transactionRepo;
-    private final ParkingService parkingService;
-    private final VNPayService vnPayService;
-    private final String vnp_HashSecret = "XNBCJFAKAZQSGTARRLGCHVZWCIOIGSHN"; // Trùng với Service nhé
+    @Value("${vnp.hashsecret}")
+    private String vnpHashSecret;
 
-    public IPNController(VipSubscriptionRepository vipRepo, TransactionRepository transactionRepo, ParkingService parkingService, VNPayService vnPayService) {
+    public IPNController(VipSubscriptionRepository vipRepo) {
         this.vipRepo = vipRepo;
-        this.transactionRepo = transactionRepo;
-        this.parkingService = parkingService;
-        this.vnPayService = vnPayService;
-    }
-
-    @GetMapping("/vnpay-url")
-    public ResponseEntity<?> getVNPayUrl(@RequestParam UUID transactionId, HttpServletRequest request) {
-        try {
-            Optional<Transaction> txnOpt = transactionRepo.findById(transactionId);
-            if (txnOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body("Transaction not found");
-            }
-            Transaction txn = txnOpt.get();
-            if (txn.getPaymentStatus() == Transaction.PaymentStatus.SUCCESS) {
-                return ResponseEntity.badRequest().body("Transaction already paid");
-            }
-
-            long amount = txn.getTotalAmount().longValue();
-            String ipAddress = request.getRemoteAddr();
-            String paymentUrl = vnPayService.createPaymentUrl(transactionId.toString(), amount, ipAddress);
-
-            Map<String, String> response = new HashMap<>();
-            response.put("paymentUrl", paymentUrl);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error generating VNPay URL: " + e.getMessage());
-        }
-    }
-
-    @GetMapping("/transaction/{id}/status")
-    public ResponseEntity<?> getTransactionStatus(@PathVariable UUID id) {
-        Optional<Transaction> txnOpt = transactionRepo.findById(id);
-        if (txnOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        Map<String, String> response = new HashMap<>();
-        response.put("paymentStatus", txnOpt.get().getPaymentStatus().name());
-        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/vnpay-ipn")
     public ResponseEntity<?> receiveIPN(@RequestParam Map<String, String> requestParams) {
         try {
-            // 1. Xác thực chữ ký bảo mật
+            // 1. Xác thực chữ ký bảo mật (Secure Hash) từ VNPay gửi sang để tránh bị hack giả mạo dữ liệu
             String vnp_SecureHash = requestParams.get("vnp_SecureHash");
             requestParams.remove("vnp_SecureHash");
             requestParams.remove("vnp_SecureHashType");
@@ -88,58 +44,54 @@ public class IPNController {
                 if ((fieldValue != null) && (fieldValue.length() > 0)) {
                     hashData.append(fieldName);
                     hashData.append('=');
-                    hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                    hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8.toString()));
                     if (itr.hasNext()) {
                         hashData.append('&');
                     }
                 }
             }
+            String calculatedHash = hmacSHA512(vnpHashSecret, hashData.toString());
 
-            String calculatedHash = hmacSHA512(vnp_HashSecret, hashData.toString());
-
+            // Kiểm tra xem chữ ký trùng khớp không
             if (!calculatedHash.equals(vnp_SecureHash)) {
                 return ResponseEntity.ok("{\"RspCode\":\"97\",\"Message\":\"Invalid Signature\"}");
             }
 
             // 2. Lấy thông tin đơn hàng từ VNPay gửi về
-            String txnRef = requestParams.get("vnp_TxnRef");
-            String orderIdStr = txnRef.contains("_") ? txnRef.split("_")[0] : txnRef;
-            String vnp_ResponseCode = requestParams.get("vnp_ResponseCode");
+            String orderIdStr = requestParams.get("vnp_TxnRef"); // Đây chính là ID của VipSubscription hoặc TOPUP
+            String vnp_ResponseCode = requestParams.get("vnp_ResponseCode"); // Mã trạng thái thanh toán
 
-            UUID orderId = UUID.fromString(orderIdStr);
-            
-            // TH1: Check xem có phải VipSubscription không
-            Optional<VipSubscription> vipOpt = vipRepo.findById(orderId);
+            if (orderIdStr != null && orderIdStr.startsWith("TOPUP-")) {
+                return ResponseEntity.ok("{\"RspCode\":\"00\",\"Message\":\"Confirm Success\"}");
+            }
+
+            UUID subscriptionId = UUID.fromString(orderIdStr);
+            Optional<VipSubscription> vipOpt = vipRepo.findById(subscriptionId);
+
             if (vipOpt.isPresent()) {
                 VipSubscription vip = vipOpt.get();
-                if (vip.getStatus() != VipSubscription.Status.PENDING_APPROVAL) {
+
+                if (!"SUCCESS".equals(vip.getPaymentStatus())) {
+                    
                     if ("00".equals(vnp_ResponseCode)) {
-                        vip.setPaymentStatus("PAID");
+                        // "00" có nghĩa là người dùng đã thanh toán thành công tiền cho VNPay
+                        vip.setPaymentStatus("SUCCESS");
+                        // Chuyển trạng thái gói VIP sang PENDING_APPROVAL (Chờ Admin duyệt cà vẹt)
                         vip.setStatus(VipSubscription.Status.PENDING_APPROVAL); 
                     } else {
+                        // Thanh toán thất bại hoặc người dùng hủy đơn
                         vip.setPaymentStatus("FAILED");
                     }
+                    
                     vip.setUpdatedAt(java.time.Instant.now());
-                    vipRepo.save(vip);
+                    vipRepo.save(vip); // Lưu lại vào Database
                 }
+                
+                // Trả về đúng định dạng VNPay yêu cầu để xác nhận đã xử lý IPN thành công
                 return ResponseEntity.ok("{\"RspCode\":\"00\",\"Message\":\"Confirm Success\"}");
+            } else {
+                return ResponseEntity.ok("{\"RspCode\":\"01\",\"Message\":\"Order Not Found\"}");
             }
-
-            // TH2: Check xem có phải Transaction (phiên đỗ xe) không
-            Optional<Transaction> txnOpt = transactionRepo.findById(orderId);
-            if (txnOpt.isPresent()) {
-                Transaction txn = txnOpt.get();
-                if (txn.getPaymentStatus() != Transaction.PaymentStatus.SUCCESS) {
-                    if ("00".equals(vnp_ResponseCode)) {
-                        txn.setPaymentMethod(Transaction.PaymentMethod.VNPAY_SANDBOX);
-                        transactionRepo.save(txn);
-                        parkingService.confirmCheckout(txn.getId());
-                    }
-                }
-                return ResponseEntity.ok("{\"RspCode\":\"00\",\"Message\":\"Confirm Success\"}");
-            }
-
-            return ResponseEntity.ok("{\"RspCode\":\"01\",\"Message\":\"Order Not Found\"}");
 
         } catch (Exception e) {
             return ResponseEntity.ok("{\"RspCode\":\"99\",\"Message\":\"Unknown Error\"}");

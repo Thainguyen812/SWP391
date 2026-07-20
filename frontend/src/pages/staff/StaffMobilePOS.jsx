@@ -4,12 +4,13 @@ import {
   ArrowLeftOutlined, QrcodeOutlined, SearchOutlined, 
   CheckCircleFilled, CarOutlined, DollarOutlined, 
   BankOutlined, CheckOutlined, MobileOutlined,
-  ClockCircleOutlined, CloseOutlined, ScanOutlined, EnvironmentOutlined, CameraOutlined
+  ClockCircleOutlined, CloseOutlined, ScanOutlined, EnvironmentOutlined
 } from '@ant-design/icons';
-import { notification, Spin, QRCode } from 'antd';
+import { notification, Spin } from 'antd';
 import { apiClient } from '../../api/apiClient';
 import dayjs from 'dayjs';
 import { useGlobalContext } from '../../context/GlobalContext';
+import { getDemoVehicleImages, getDemoVehicleProfile } from '../../data/vehicleDataset';
 
 export const StaffMobilePOS = () => {
   const navigate = useNavigate();
@@ -24,49 +25,44 @@ export const StaffMobilePOS = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [auditData, setAuditData] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [vnpayUrl, setVnpayUrl] = useState('');
-  const [isPollingVnpay, setIsPollingVnpay] = useState(false);
-  const [backendTxn, setBackendTxn] = useState(null);
   const scannerRef = React.useRef(null);
   const scannerStartTimeoutRef = React.useRef(null);
 
-  React.useEffect(() => {
-    let interval;
-    if (paymentMethod === 'vnpay' && backendTxn?.id && !isSuccess) {
-      if (!vnpayUrl) {
-        apiClient.get(`/v1/payment/vnpay-url?transactionId=${backendTxn.id}`)
-          .then(res => setVnpayUrl((res.data || res).paymentUrl))
-          .catch(err => console.error("Error fetching VNPay URL", err));
-      }
-      setIsPollingVnpay(true);
-      interval = setInterval(() => {
-        apiClient.get(`/v1/payment/transaction/${backendTxn.id}/status`)
-          .then(res => {
-            if ((res.data || res).paymentStatus === 'SUCCESS') {
-              clearInterval(interval);
-              setIsPollingVnpay(false);
-              setIsSuccess(true);
-              setAuditData({ gps: "VNPay Auto", time: dayjs().format('HH:mm:ss DD/MM/YYYY') });
-              notification.success({ 
-                message: 'Thanh toán VNPay thành công', 
-                description: `Xe ${vehicle?.plate} đã thanh toán và có thể ra thẳng qua cổng.` 
-              });
-              if (vehicle?.plate) {
-                clearVehicleFines(vehicle.plate);
-                removeActiveVehicle(vehicle.plate);
-              }
-            }
-          });
-      }, 3000);
-    } else {
-      setIsPollingVnpay(false);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [paymentMethod, backendTxn, isSuccess, vnpayUrl, vehicle]);
+  const isVipVehicle = (targetVehicle) => {
+    const normalizedType = (targetVehicle?.type || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase();
+    return Boolean(targetVehicle?.isVip)
+      || normalizedType.includes('VIP')
+      || normalizedType.includes('VE THANG');
+  };
+
+  const normalizePlate = (value) => (value || '').trim().toUpperCase();
+
+  const findLocalVehicles = (value) => {
+    const normalized = normalizePlate(value);
+    if (!normalized || !activeVehicles) return [];
+
+    return activeVehicles.filter((v) => {
+      const localPlate = normalizePlate(v.plate);
+      return localPlate === normalized || localPlate.includes(normalized);
+    });
+  };
+
+  const isActiveMobilePosCandidate = (candidate) =>
+    candidate
+    && !isVipVehicle(candidate)
+    && candidate.sessionStatus === 'ACTIVE'
+    && candidate.isPending !== true
+    && !candidate.gate;
 
   const stopScanner = async () => {
+    if (scannerStartTimeoutRef.current) {
+      clearTimeout(scannerStartTimeoutRef.current);
+      scannerStartTimeoutRef.current = null;
+    }
+
     const scanner = scannerRef.current;
     scannerRef.current = null;
 
@@ -150,43 +146,14 @@ export const StaffMobilePOS = () => {
 
     setIsLoading(true);
     try {
-      const found = activeVehicles?.find(v => v.plate === p.toUpperCase() || v.plate.includes(p.toUpperCase()));
-      
-      if (found) {
-        setVehicle(found);
-        setPlate(found.plate);
-        
-        // Nếu là vé tháng/VIP
-        let baseFee = 0;
-        if (found.type === 'VIP' || found.type === 'Vé tháng' || found.type === 'Khách VIP') {
-          baseFee = 0;
-          setPaymentMethod('card'); // VIP bắt buộc QR động (card)
-        } else {
-          try {
-            const feeResponse = await apiClient.get(`/v1/parking/fee-by-plate/${found.plate}`);
-            baseFee = feeResponse.parkingFee || 0;
-          } catch (feeError) {
-            console.error("Failed to fetch fee from backend:", feeError);
-            baseFee = 10000; // fallback
-          }
-          setPaymentMethod('cash');
-        }
-        
-        // Cộng dồn tiền phạt
-        const accumulatedFines = getVehicleFines(found.plate).reduce((sum, fine) => sum + fine.amount, 0);
-        setFee(baseFee + accumulatedFines);
+      await fetchAllDataFromBackend?.();
 
-        // Pre-create transaction if needed for VNPay
-        if (found.cardCode) {
-          try {
-            const txn = await apiClient.post(`/v1/parking/checkout-by-code/${found.cardCode}`);
-            setBackendTxn(txn.data || txn);
-          } catch (e) {
-            console.error("Failed to pre-create transaction", e);
-          }
-        }
-      } else {
-        notification.error({ message: 'Không tìm thấy xe', description: 'Xe không có trong bãi hoặc đã ra khỏi bãi.' });
+      const localMatches = findLocalVehicles(normalizedPlate);
+      const activeCandidate = localMatches.find(isActiveMobilePosCandidate);
+      const prepaidCandidate = localMatches.find((v) => v.sessionStatus === 'PASSED_CONFIRMED');
+      const vipCandidate = localMatches.find(isVipVehicle);
+
+      if (vipCandidate && !activeCandidate) {
         setVehicle(null);
         notification.warning({
           message: 'Mobile POS chỉ dùng cho khách vãng lai',
@@ -298,6 +265,9 @@ export const StaffMobilePOS = () => {
       const mockLng = (105.8 + Math.random() * 0.1).toFixed(6);
       const mockGps = `${mockLat}, ${mockLng}`;
       const timestamp = new Date().toISOString();
+      const demoProfile = getDemoVehicleProfile(vehicle);
+      const demoImages = getDemoVehicleImages(demoProfile || vehicle);
+      const proofImageUrl = demoProfile?.mobileProofImageUrl || demoImages.primary;
 
       // Gọi API congestion/checkout
       await apiClient.post('/v1/parking/congestion/checkout', {
@@ -305,7 +275,7 @@ export const StaffMobilePOS = () => {
         staffId: currentUser?.id,
         gpsLocation: mockGps,
         timestamp: timestamp,
-        proofImageUrl: 'https://example.com/mobile-proof.jpg', // Mock proof
+        proofImageUrl,
         paymentMethod: paymentMethod === 'cash' ? 'CASH' : 'QR_BANK'
       });
       
@@ -333,8 +303,6 @@ export const StaffMobilePOS = () => {
     setVehicle(null);
     setIsSuccess(false);
     setAuditData(null);
-    setBackendTxn(null);
-    setVnpayUrl('');
   };
 
   // Màn hình Mobile POS
@@ -375,7 +343,7 @@ export const StaffMobilePOS = () => {
                   <div className="flex justify-between items-center py-2 border-b border-slate-100">
                     <span className="text-slate-500 text-sm">Phương thức:</span>
                     <span className="font-bold text-slate-800">
-                      {paymentMethod === 'cash' ? 'Tiền mặt' : 'QR Động'}
+                      {paymentMethod === 'cash' ? 'Tiền mặt' : paymentMethod === 'qr' ? 'VietQR' : 'QR Động'}
                     </span>
                   </div>
                   {/* Audit Data Display */}
@@ -444,14 +412,6 @@ export const StaffMobilePOS = () => {
                       className="min-w-0 flex-1 bg-transparent border-none py-3 px-3 font-bold text-slate-700 focus:outline-none focus:ring-0 uppercase text-base"
                     />
                     <button 
-                      onClick={startScanner}
-                      disabled={isLoading}
-                      className="hidden"
-                      title="Quét mã QR bằng Camera"
-                    >
-                      <CameraOutlined className="text-xl" />
-                    </button>
-                    <button 
                       onClick={() => handleSearchWithPlate(null)}
                       disabled={isLoading}
                       className="shrink-0 bg-slate-800 text-white w-14 h-10 rounded-xl font-bold text-xs active:scale-95 transition-transform cursor-pointer flex items-center justify-center"
@@ -491,7 +451,7 @@ export const StaffMobilePOS = () => {
                     <div className="space-y-3">
                       <h4 className="text-xs font-bold text-slate-500 uppercase">Khách thanh toán qua:</h4>
                       
-                      <div className="grid grid-cols-4 gap-2 mb-4">
+                      <div className="grid grid-cols-2 gap-3">
                         <button 
                           onClick={() => {
                             if (vehicle.type === 'VIP' || vehicle.type === 'Vé tháng') {
@@ -500,77 +460,57 @@ export const StaffMobilePOS = () => {
                             }
                             setPaymentMethod('cash');
                           }}
-                          className={`flex items-center gap-2 p-2 rounded-xl border-2 transition-all cursor-pointer justify-center ${
+                          className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all cursor-pointer ${
                             (vehicle.type === 'VIP' || vehicle.type === 'Vé tháng') ? 'opacity-40 cursor-not-allowed bg-slate-50 border-slate-200' :
                             paymentMethod === 'cash' ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
                           }`}
                         >
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center border-2 ${paymentMethod === 'cash' ? 'border-blue-500' : 'border-slate-300'}`}>
+                            {paymentMethod === 'cash' && <div className="w-2.5 h-2.5 bg-blue-500 rounded-full" />}
+                          </div>
                           <BankOutlined className="text-lg" />
-                          <span className="font-bold text-[11px]">Tiền mặt</span>
+                          <span className="font-bold text-sm">Tiền mặt</span>
                         </button>
                         
-
                         <button 
-                          onClick={() => {
-                            if (vehicle.type === 'VIP' || vehicle.type === 'Vé tháng') {
-                              notification.warning({ message: 'Không khả dụng', description: 'VIP/Vé tháng quét thẻ.'});
-                              return;
-                            }
-                            if (!backendTxn) {
-                              notification.error({ message: 'Không thể tạo mã', description: 'Chưa có thông tin giao dịch.'});
-                              return;
-                            }
-                            setPaymentMethod('vnpay');
-                          }}
-                          className={`flex items-center gap-2 p-2 rounded-xl border-2 transition-all cursor-pointer justify-center ${
-                            (vehicle.type === 'VIP' || vehicle.type === 'Vé tháng') ? 'opacity-40 cursor-not-allowed bg-slate-50 border-slate-200' :
-                            paymentMethod === 'vnpay' ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
+                          onClick={() => setPaymentMethod(vehicle.type === 'VIP' || vehicle.type === 'Vé tháng' ? 'card' : 'qr')}
+                          className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                            (paymentMethod === 'qr' || paymentMethod === 'card') ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
                           }`}
                         >
-                          <img src="/vnpay-logo.png" alt="VNPay" className="h-4 object-contain" onError={(e) => { e.target.onerror = null; e.target.src = 'https://vnpay.vn/s1/vnpay/logo.svg' }} />
-                          <span className="font-bold text-[11px]">VNPay</span>
-                        </button>
-                        <button 
-                          onClick={() => {
-                            if (vehicle.type !== 'VIP' && vehicle.type !== 'Vé tháng') {
-                              notification.warning({ message: 'Không khả dụng', description: 'Chỉ dành cho xe VIP/Vé tháng.'});
-                              return;
-                            }
-                            setPaymentMethod('card');
-                          }}
-                          className={`flex items-center gap-2 p-2 rounded-xl border-2 transition-all cursor-pointer justify-center ${
-                            (vehicle.type !== 'VIP' && vehicle.type !== 'Vé tháng') ? 'opacity-40 cursor-not-allowed bg-slate-50 border-slate-200' :
-                            paymentMethod === 'card' ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
-                          }`}
-                        >
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center border-2 ${(paymentMethod === 'qr' || paymentMethod === 'card') ? 'border-blue-500' : 'border-slate-300'}`}>
+                            {(paymentMethod === 'qr' || paymentMethod === 'card') && <div className="w-2.5 h-2.5 bg-blue-500 rounded-full" />}
+                          </div>
                           <QrcodeOutlined className="text-lg" />
-                          <span className="font-bold text-[11px]">QR VIP</span>
+                          <span className="font-bold text-sm">Mã QR</span>
                         </button>
                       </div>
                     </div>
                   </div>
 
-
-                  {paymentMethod === 'vnpay' && (
+                  {/* Payment Info Area */}
+                  {paymentMethod === 'qr' && (
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col items-center animate-fade-in">
-                      <div className="w-48 h-48 bg-slate-50 rounded-xl mb-4 p-3 relative border border-slate-100 shadow-sm flex items-center justify-center">
-                        {vnpayUrl ? (
-                          <QRCode value={vnpayUrl} size={160} bordered={false} />
-                        ) : (
-                          <Spin />
-                        )}
+                      <div className="w-48 h-48 bg-slate-50 rounded-xl mb-4 p-3 relative border border-slate-100 shadow-sm">
+                        <img 
+                          src={`https://vietqr.app/img?acc=0818756569&bank=VietinBank&amount=${fee}&des=${vehicle.plate}&template=compact&holder=DUONG PHUOC HUNG&store=Urban Park System`} 
+                          alt='QR thanh toán VietQR'
+                          className="w-full h-full object-contain mix-blend-multiply" 
+                        />
                       </div>
-                      <p className="text-sm font-bold text-slate-700 text-center mb-1">VNPay Sandbox</p>
-                      <p className="text-xs font-medium text-slate-500 text-center">
-                        {isPollingVnpay ? "Đang đợi thanh toán VNPay Sandbox..." : "Yêu cầu khách quét mã VNPay Sandbox"}
-                      </p>
+                      <p className="text-sm font-bold text-slate-700 text-center mb-1">Khách hàng quét mã VietQR</p>
+                      <p className="text-xs font-medium text-slate-500 text-center">Đưa màn hình này cho khách để họ dùng App ngân hàng quét thanh toán.</p>
                     </div>
                   )}
 
                   {paymentMethod === 'card' && (
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-yellow-200 flex flex-col items-center animate-fade-in bg-yellow-50/30">
-                      <div className="w-48 h-48 bg-white rounded-xl mb-4 p-3 relative border-2 border-yellow-400 shadow-md flex items-center justify-center">
-                        <QRCode value={`VIP_Checkout_${vehicle.plate || 'Unknown'}`} size={160} bordered={false} />
+                      <div className="w-48 h-48 bg-white rounded-xl mb-4 p-3 relative border-2 border-yellow-400 shadow-md">
+                        <img 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=QR_VIP_${vehicle.plate}`} 
+                          alt="VIP QR Code" 
+                          className="w-full h-full object-contain" 
+                        />
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-yellow-400 rounded-lg px-2 py-0.5 shadow-md border border-yellow-500 flex items-center justify-center">
                           <span className="font-black text-slate-900 text-xs uppercase">VIP</span>
                         </div>
@@ -619,10 +559,10 @@ export const StaffMobilePOS = () => {
                     handleCheckout();
                   }
                 }}
-                disabled={isProcessing || paymentMethod === 'vnpay'}
-                className={`w-full font-black py-4 rounded-xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer uppercase tracking-wider text-sm border-2 ${paymentMethod === 'vnpay' ? 'bg-slate-300 border-slate-300 text-slate-500' : 'bg-slate-900 hover:bg-black text-white border-slate-800'}`}
+                disabled={isProcessing}
+                className="w-full bg-slate-900 hover:bg-black text-white font-black py-4 rounded-xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer uppercase tracking-wider text-sm border-2 border-slate-800"
               >
-                {isProcessing ? <Spin size="small" /> : paymentMethod === 'vnpay' ? 'Hệ thống tự động xác nhận VNPay...' : (
+                {isProcessing ? <Spin size="small" /> : (
                   <>
                     <CheckOutlined className="text-lg" />
                     {(vehicle.type === 'VIP' || vehicle.type === 'Vé tháng' || vehicle.type === 'Khách VIP') 

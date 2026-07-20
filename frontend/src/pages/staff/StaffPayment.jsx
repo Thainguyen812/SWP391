@@ -11,113 +11,20 @@ import {
   WarningFilled,
   CarOutlined,
   WalletOutlined,
-  CameraOutlined,
-  UploadOutlined
+  SafetyCertificateOutlined
 } from '@ant-design/icons';
-import { notification, Input, Button, Modal, Spin, QRCode } from 'antd';
+import { notification, Input, Button, Modal, Spin } from 'antd';
 import { useGlobalContext } from '../../context/GlobalContext';
 import { apiClient } from '../../api/apiClient';
 import { parkingService } from '../../services/parkingService';
-
-const CameraCaptureModal = ({ visible, onCancel, onCapture, title }) => {
-  const videoRef = React.useRef(null);
-  const [stream, setStream] = React.useState(null);
-  const fileInputRef = React.useRef(null);
-
-  const startCamera = React.useCallback(async () => {
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      setStream(mediaStream);
-    } catch (err) {
-      console.error("Lỗi camera", err);
-    }
-  }, []);
-
-  const stopCamera = React.useCallback(() => {
-    setStream(currentStream => {
-      if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
-      }
-      return null;
-    });
-  }, []);
-
-  React.useEffect(() => {
-    if (visible) {
-      startCamera();
-    } else {
-      stopCamera();
-    }
-    return () => stopCamera();
-  }, [visible, startCamera, stopCamera]);
-
-  React.useEffect(() => {
-    if (stream && videoRef.current) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().catch(e => console.log("Lỗi play video", e));
-    }
-  }, [stream]);
-
-  const takePhoto = () => {
-    if (videoRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg');
-      onCapture(dataUrl);
-    }
-  };
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      onCapture(url);
-    }
-  };
-
-  return (
-    <Modal
-      title={title || "Chụp ảnh"}
-      open={visible}
-      onCancel={onCancel}
-      footer={null}
-      destroyOnClose
-      width={400}
-    >
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-full bg-black rounded-lg overflow-hidden aspect-video relative flex items-center justify-center">
-          {stream ? (
-            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-          ) : (
-            <div className="text-white text-sm">Không tìm thấy Camera hoặc đang tải...</div>
-          )}
-        </div>
-        <div className="flex gap-2 w-full">
-          <Button type="primary" icon={<CameraOutlined />} size="large" className="flex-1 bg-blue-600" onClick={takePhoto}>
-            Chụp ảnh
-          </Button>
-          <Button icon={<UploadOutlined />} size="large" onClick={() => fileInputRef.current?.click()}>
-            Tải file
-          </Button>
-          <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-        </div>
-      </div>
-    </Modal>
-  );
-};
+import { getDemoVehicleImages, getDemoVehicleProfile } from '../../data/vehicleDataset';
 
 export const StaffPayment = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { transactions, fetchAllDataFromBackend, addTransaction, updateShiftStats, shiftStats, addActivityLog, currentVehicle, activeVehicles, removeActiveVehicle, isEmergency, currentUser, getVehicleFines, clearVehicleFines } = useGlobalContext();
   
-  const [captureTarget, setCaptureTarget] = useState(null);
-  const [capturedImages, setCapturedImages] = useState({ in1: null, in2: null, out1: null, out2: null });
-
-  const totalSlots = 500; // Static capacity for now until API provides it
+  const totalSlots = 400; // Static capacity for now until API provides it
   const activeCount = activeVehicles ? activeVehicles.filter(v => !v.gate).length : 0;
   const emptyCount = Math.max(0, totalSlots - activeCount);
   const occupancyPercent = totalSlots > 0 ? Math.round((activeCount / totalSlots) * 100) : 0;
@@ -141,8 +48,35 @@ export const StaffPayment = () => {
   const [backendTxn, setBackendTxn] = useState(null);
   const [identityVerified, setIdentityVerified] = useState(isLostCard ? true : false);
   const [nowTick, setNowTick] = useState(Date.now());
-  const [vnpayUrl, setVnpayUrl] = useState('');
-  const [isPollingVnpay, setIsPollingVnpay] = useState(false);
+  const [cccdImage, setCccdImage] = useState(null);
+  const [regImage, setRegImage] = useState(null);
+
+  const getIdImages = (plate) => {
+    const profile = getDemoVehicleProfile(plate);
+    const images = getDemoVehicleImages(profile || { plate });
+    return {
+      cccd: profile?.identityDocUrl || images.primary,
+      reg: profile?.registrationDocUrl || profile?.registrationPhotoUrl || images.primary
+    };
+  };
+
+  const idImgs = useMemo(() => getIdImages(lpr), [lpr]);
+
+  const handleCaptureCccd = () => {
+    notification.info({ message: 'Đang mở camera...', duration: 1 });
+    setTimeout(() => {
+      setCccdImage(idImgs.cccd);
+      notification.success({ message: 'Đã chụp CCCD/CMND', placement: 'topRight' });
+    }, 1000);
+  };
+
+  const handleCaptureReg = () => {
+    notification.info({ message: 'Đang mở camera...', duration: 1 });
+    setTimeout(() => {
+      setRegImage(idImgs.reg);
+      notification.success({ message: 'Đã chụp Giấy Đăng ký', placement: 'topRight' });
+    }, 1000);
+  };
 
   const calculateVisitorFee = (durationStr) => {
     if (!durationStr || durationStr === 'Đang vào') return 30000; // Default minimum fee
@@ -187,7 +121,8 @@ export const StaffPayment = () => {
   const canReviewVehicle = identityVerified || isLostCard;
   const backendPaymentStatus = backendTxn?.paymentStatus || backendTxn?.status;
   const backendAlreadyPaid = backendPaymentStatus === 'SUCCESS';
-  const isMobileCheckoutTxn = Boolean(backendTxn) && (backendTxn?.isMobileCheckout === true || backendTxn?.mobileCheckout === true || backendTxn?.sessionStatus === 'PASSED_CONFIRMED');
+  const isMobileCheckoutTxn = Boolean(backendTxn)
+    && (backendTxn?.isMobileCheckout === true || backendTxn?.mobileCheckout === true);
   const isMobilePrepaidCheckout = backendAlreadyPaid && isMobileCheckoutTxn;
   const mobileOverstayPenalty = Number(backendTxn?.mobileCheckoutOverstayPenalty || 0);
   const hasMobileOverstayPenalty = isMobileCheckoutTxn && mobileOverstayPenalty > 0;
@@ -207,7 +142,8 @@ export const StaffPayment = () => {
     return null;
   }, [backendTxn, isMobileCheckoutTxn]);
   const mobileRemainingMs = mobileCheckoutExpiresAt ? mobileCheckoutExpiresAt - nowTick : null;
-  const mobileGraceExpired = isMobileCheckoutTxn && (backendTxn?.mobileCheckoutGraceExpired === true || (mobileRemainingMs !== null && mobileRemainingMs <= 0));
+  const mobileGraceExpired = isMobileCheckoutTxn
+    && (backendTxn?.mobileCheckoutGraceExpired === true || (mobileRemainingMs !== null && mobileRemainingMs <= 0));
   const mobileCountdownLabel = useMemo(() => {
     if (!isMobileCheckoutTxn || mobileRemainingMs === null) return '30 phút';
     if (mobileRemainingMs <= 0) return 'đã quá hạn';
@@ -245,55 +181,6 @@ export const StaffPayment = () => {
     return `${hours} giờ ${minutes} phút`;
   }, [mobileGraceExpired, mobileRemainingMs]);
   const displayAmount = canReviewVehicle ? (isMobileCheckoutTxn ? mobileOverstayPenalty : totalAmount) : 0;
-  
-  useEffect(() => {
-    if (!isMobileCheckoutTxn || !mobileCheckoutExpiresAt || !canReviewVehicle) {
-      return undefined;
-    }
-
-    setNowTick(Date.now());
-    const timer = window.setInterval(() => {
-      setNowTick(Date.now());
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [isMobileCheckoutTxn, mobileCheckoutExpiresAt, canReviewVehicle]);
-
-  useEffect(() => {
-    let interval;
-    if (paymentMethod === 'vnpay' && backendTxn?.id && canReviewVehicle && !isPaid) {
-      if (!vnpayUrl) {
-        apiClient.get(`/v1/payment/vnpay-url?transactionId=${backendTxn.id}`)
-          .then(res => setVnpayUrl((res.data || res).paymentUrl))
-          .catch(err => {
-            console.error("Error fetching VNPay URL", err);
-            notification.error({ message: 'Lỗi', description: 'Không thể tạo mã QR VNPay. Vui lòng chọn Tiền mặt.' });
-            setPaymentMethod('cash');
-          });
-      }
-        
-      setIsPollingVnpay(true);
-      interval = setInterval(() => {
-        apiClient.get(`/v1/payment/transaction/${backendTxn.id}/status`)
-          .then(res => {
-            if ((res.data || res).paymentStatus === 'SUCCESS') {
-              clearInterval(interval);
-              setIsPollingVnpay(false);
-              notification.success({message: 'Khách đã thanh toán VNPay thành công!'});
-              setIsPaid(true);
-              setLan1Status('free');
-              if (fetchAllDataFromBackend) fetchAllDataFromBackend();
-              setTimeout(() => handleCancel(), 2000);
-            }
-          });
-      }, 3000);
-    } else {
-      setIsPollingVnpay(false);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [paymentMethod, backendTxn, canReviewVehicle, isPaid, vnpayUrl]);
   const ticketNumber = useMemo(() => {
     if (!lpr) return 1000;
     let hash = 0;
@@ -361,7 +248,7 @@ export const StaffPayment = () => {
     const isError = vehicleToPay?.status === 'Lỗi thẻ';
 
     let amount;
-    let evPenalty = backendTxn?.violationPenalty || (lpr && lpr.includes('EV') ? 500000 : 0);
+    let evPenalty = backendTxn?.violationPenalty || (lpr && lpr.includes('EV') ? 100000 : 0);
     
     // Calculate accumulated fines
     const accumulatedFines = lpr ? getVehicleFines(lpr).reduce((sum, fine) => sum + fine.amount, 0) : 0;
@@ -386,24 +273,19 @@ export const StaffPayment = () => {
   }, [lpr, vehicleToPay, isLostCard, backendTxn]);
 
   const getCarImages = (plate) => {
-    const images = [
-      "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1621416953228-868f04179e87?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1550355291-bbee04a92027?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=400&q=80"
-    ];
-    let sum = 0;
-    const str = plate || "default";
-    for(let i=0; i<str.length; i++) sum += str.charCodeAt(i);
+    const profile = getDemoVehicleProfile({
+      ...(vehicleToPay || {}),
+      plate,
+      vehicleType: vehicleToPay?.vehicleType || vehicleToPay?.vehicleSize || vehicleToPay?.type,
+      fuelType: vehicleToPay?.fuelType,
+      imageUrl: vehicleToPay?.image || vehicleToPay?.imageUrl
+    });
+    const images = getDemoVehicleImages(profile || { plate });
     return {
-      in1: images[sum % images.length],
-      in2: images[(sum + 1) % images.length],
-      out1: images[(sum + 2) % images.length],
-      out2: images[(sum + 3) % images.length]
+      in1: images.entry?.[0] || images.primary,
+      in2: images.entry?.[1] || images.primary,
+      out1: images.exit?.[0] || images.primary,
+      out2: images.exit?.[1] || images.primary
     };
   };
 
@@ -417,27 +299,12 @@ export const StaffPayment = () => {
       notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể quét thẻ lúc này.' });
       return;
     }
-
-    if (isVip) {
-      setIdentityVerified(true);
-      setHasVehicle(true);
-      setLan1Status('busy');
-      setTotalAmount(0);
-      setCashGiven(0);
-      notification.success({
-        message: 'Đã xác nhận VIP',
-        description: 'Ảnh vào/ra đã được mở để staff đối chiếu trước khi cho xe ra.'
-      });
-      return;
-    }
-
     const normalizedCode = cardCode.trim();
     if (!normalizedCode) return notification.warning({message: 'Vui lòng nhập hoặc quét mã thẻ/định danh'});
-    
-    if (expectedCredential && normalizedCode !== expectedCredential && normalizedCode !== lpr) {
+    if (expectedCredential && normalizedCode !== expectedCredential) {
       notification.error({
         message: 'Sai mã xác nhận',
-        description: `Mã vừa quét không khớp với thẻ vãng lai hoặc biển số của xe ${lpr}.`
+        description: `Mã vừa quét không khớp với ${isVip ? 'định danh VIP' : 'thẻ vãng lai'} của xe ${lpr}.`
       });
       setIdentityVerified(false);
       return;
@@ -445,8 +312,20 @@ export const StaffPayment = () => {
 
     setIsCheckingOut(true);
     try {
+      if (isVip) {
+        setIdentityVerified(true);
+        setHasVehicle(true);
+        setLan1Status('busy');
+        setTotalAmount(0);
+        setCashGiven(0);
+        notification.success({
+          message: 'Đã xác nhận VIP',
+          description: 'Ảnh vào/ra đã được mở để staff đối chiếu trước khi cho xe ra.'
+        });
+        return;
+      }
 
-      const matchedByCard = activeVehicles?.find(v => v.cardCode === normalizedCode || v.plate === normalizedCode);
+      const matchedByCard = activeVehicles?.find(v => v.cardCode === normalizedCode);
       if (matchedByCard?.plate && matchedByCard.plate !== lpr) {
         setLpr(matchedByCard.plate);
       }
@@ -459,10 +338,8 @@ export const StaffPayment = () => {
       
       setBackendTxn(txn);
       if (!lpr) setLpr(matchedByCard?.plate || `THẺ: ${normalizedCode}`); // Only fallback to card code if plate is unknown
-      setTotalAmount(txn.totalAmount);
-      setCashGiven(txn.totalAmount);
-      setPaymentMethod('cash'); // Reset payment method
-      setVnpayUrl('');
+      setTotalAmount(isMobilePaidTxn ? scannedMobilePenalty : txn.totalAmount);
+      setCashGiven(isMobilePaidTxn ? scannedMobilePenalty : txn.totalAmount);
       setHasVehicle(true);
       setIdentityVerified(true);
       setLan1Status('busy');
@@ -474,8 +351,24 @@ export const StaffPayment = () => {
           ? (scannedMobilePenalty > 0
             ? `Xe đã quá hạn 30 phút. Cần thu phí phát sinh ${scannedMobilePenalty.toLocaleString()} VND trước khi mở cổng.`
             : `Đã xác nhận thẻ xe ${matchedByCard?.plate || lpr}. Staff chỉ cần đối chiếu ảnh và mở cổng, không thu thêm tiền.`)
-          : `Đã mở ảnh đối chiếu và tính phí: ${txn.totalAmount} VND.`
+          : `Đã mở ảnh đối chiếu và tính phí: ${txn.totalAmount.toLocaleString()} VND.`
       });
+
+      if (txn?.violationCount > 0) {
+        if (txn.violationCount === 1) {
+          notification.warning({
+            message: '🚨 Phát hiện vi phạm',
+            description: `Xe ${matchedByCard?.plate || lpr || txn.licensePlate} đã đỗ sai vị trí 1 lần (đã nhắc nhở). Vui lòng nhắc nhở trực tiếp tài xế!`,
+            duration: 10
+          });
+        } else {
+          notification.warning({
+            message: '🚨 Phát hiện vi phạm',
+            description: `Xe ${matchedByCard?.plate || lpr || txn.licensePlate} đã đỗ sai vị trí ${txn.violationCount} lần. Đã áp dụng mức phạt +${(txn.violationPenalty || 100000).toLocaleString()}đ vào tổng tiền thu!`,
+            duration: 10
+          });
+        }
+      }
     } catch (error) {
         notification.error({message: 'Lỗi Check-out', description: error.response?.data?.message || 'Không thể check-out bằng thẻ này'});
         setHasVehicle(false);
@@ -490,6 +383,14 @@ export const StaffPayment = () => {
     if (isPaid || isCheckingOut) return;
     if (isEmergency) {
       notification.error({ message: 'Hệ thống đang dừng khẩn cấp', description: 'Không thể thanh toán và mở cổng lúc này.' });
+      return;
+    }
+    if (vehicleToPay?.isLocked && (!cccdImage || !regImage)) {
+      notification.warning({
+        message: 'Chưa xác minh hồ sơ chống trộm',
+        description: 'Vui lòng thực hiện chụp ảnh CCCD của người lái và Cà vẹt xe để xác minh trùng khớp thông tin trước khi thanh toán và mở cổng xuất bãi!',
+        placement: 'topRight'
+      });
       return;
     }
     if (!canReviewVehicle) {
@@ -532,6 +433,9 @@ export const StaffPayment = () => {
       async onOk() {
         let checkoutAlreadyConfirmed = false;
         try {
+          if (vehicleToPay?.isLocked) {
+            await apiClient.post('/vehicles/lock', { plate: lpr, isLocked: false });
+          }
           if (isVip && !isLostCard) {
             await apiClient.post('/sessions/approve-exit', { plate: lpr });
           } else if (backendTxn && backendTxn.id) {
@@ -625,7 +529,7 @@ export const StaffPayment = () => {
 
         removeActiveVehicle(lpr);
         if (lpr) clearVehicleFines(lpr);
-        
+
         setHasVehicle(false);
         setBackendTxn(null);
         setIdentityVerified(false);
@@ -637,7 +541,7 @@ export const StaffPayment = () => {
     });
   };
 
-  function handleCancel() {
+  const handleCancel = () => {
     Modal.confirm({
       title: 'Xác nhận huỷ giao dịch',
       content: 'Bạn có chắc chắn muốn huỷ bỏ giao dịch này? Phương tiện sẽ không được phép qua cổng.',
@@ -664,7 +568,43 @@ export const StaffPayment = () => {
 
   return (
     <div className="p-6 w-full">
-      {/* Header Tags removed as requested */}
+      {/* Header Tags */}
+      <div className="flex justify-end items-center mb-6">
+        <div className="flex gap-3">
+          <button 
+            onClick={() => setLan1Status(lan1Status === 'free' ? 'busy' : 'free')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer border ${
+              lan1Status === 'free' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${lan1Status === 'free' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+            Làn ra 1: {lan1Status === 'free' ? 'Đang rảnh' : 'Đang bận'}
+          </button>
+          <button 
+            onClick={() => setLan2Status(lan2Status === 'free' ? 'busy' : 'free')}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer border ${
+              lan2Status === 'free' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${lan2Status === 'free' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+            Làn ra 2: {lan2Status === 'free' ? 'Đang rảnh' : 'Đang bận'}
+          </button>
+        </div>
+      </div>
+
+      {vehicleToPay?.isLocked && (
+        <div className="bg-red-55 p-4 rounded-xl mb-6 border-l-4 border-red-600 shadow-sm flex items-start gap-3">
+          <WarningFilled className="text-red-600 text-lg mt-0.5" />
+          <div>
+            <h4 className="font-black text-sm text-red-800 uppercase tracking-wide m-0">⚠️ XE ĐANG KHÓA CHỐNG TRỘM / BÁO MẤT</h4>
+            <p className="text-xs text-red-700 mt-1 mb-0 font-bold">
+              Phương tiện mang biển số <span className="font-mono font-black text-red-900 bg-red-100 px-1.5 py-0.5 rounded">{lpr}</span> đang kích hoạt chế độ khóa an toàn từ xa. 
+              CẤM MỞ CỔNG XUẤT BÃI cho đến khi đối chiếu đầy đủ giấy tờ tùy thân (CCCD) và Cà vẹt chính chủ trùng khớp.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column */}
         <div className="lg:col-span-8 flex flex-col gap-6">
@@ -704,7 +644,7 @@ export const StaffPayment = () => {
                 <div className={`border rounded-lg p-3 ${canReviewVehicle ? 'border-emerald-200 bg-emerald-50/70' : 'border-blue-200 bg-blue-50/70'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">
-                      {isVip ? 'Xác nhận định danh VIP' : 'Quét mã thẻ / Nhập biển số'}
+                      {isVip ? 'Xác nhận định danh VIP' : 'Quét mã thẻ / ID thẻ'}
                     </h4>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${canReviewVehicle ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
                       {canReviewVehicle ? 'ĐÃ XÁC NHẬN' : 'BẮT BUỘC'}
@@ -718,7 +658,7 @@ export const StaffPayment = () => {
                         setIdentityVerified(false);
                         if (!isVip) setBackendTxn(null);
                       }}
-                      placeholder={isVip ? 'Mã VIP tự động' : 'Quét mã thẻ hoặc nhập biển số xe...'}
+                      placeholder={isVip ? 'Mã VIP tự động' : 'Nhấn vào đây và dùng máy quét thẻ...'}
                       className="font-mono font-bold"
                     />
                     <Button
@@ -745,32 +685,32 @@ export const StaffPayment = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc vào (Cam 1 - Góc trái)</span>
-                    <div onClick={() => canReviewVehicle && setCaptureTarget('in1')} className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={capturedImages.in1 || carImgs.in1} className={reviewImageClass} />
+                    <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
+                      <img src={carImgs.in1} className={reviewImageClass} />
                       {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">ENT: CAM-01</span>
                     </div>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc vào (Cam 2 - Góc phải)</span>
-                    <div onClick={() => canReviewVehicle && setCaptureTarget('in2')} className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={capturedImages.in2 || carImgs.in2} className={reviewImageClass} />
+                    <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
+                      <img src={carImgs.in2} className={`${reviewImageClass} scale-x-[-1]`} />
                       {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">ENT: CAM-02</span>
                     </div>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc ra (Cam 3 - Góc trái)</span>
-                    <div onClick={() => canReviewVehicle && setCaptureTarget('out1')} className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={capturedImages.out1 || carImgs.out1} className={reviewImageClass} />
+                    <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
+                      <img src={carImgs.out1} className={reviewImageClass} />
                       {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">EXT: CAM-03</span>
                     </div>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 mb-1 block">Lúc ra (Cam 4 - Góc phải)</span>
-                    <div onClick={() => canReviewVehicle && setCaptureTarget('out2')} className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
-                      <img src={capturedImages.out2 || carImgs.out2} className={reviewImageClass} />
+                    <div className="bg-black rounded aspect-[4/3] flex items-end justify-end p-1 relative overflow-hidden group cursor-pointer">
+                      <img src={carImgs.out2} className={`${reviewImageClass} scale-x-[-1]`} />
                       {!canReviewVehicle && <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-bold text-slate-200 bg-slate-950/30 text-center px-2">Xác nhận thẻ để xem ảnh</span>}
                       <span className="bg-black/60 text-white text-[8px] px-1 rounded z-10 font-mono">EXT: CAM-04</span>
                     </div>
@@ -818,7 +758,23 @@ export const StaffPayment = () => {
                     )}
                     {!canReviewVehicle && <div className="text-[10px] text-blue-600 mt-1 font-bold">Chưa tính phí do chưa xác nhận thẻ</div>}
                     {isLostCard && <div className="text-[10px] text-red-500 mt-1">Đã bao gồm 200k tiền phạt thẻ</div>}
-                    {(backendTxn?.violationPenalty > 0 || (lpr && lpr.includes('EV'))) && <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">⚠️ Bị phạt Đỗ sai vị trí EV (+500k)</div>}
+                    {backendTxn ? (
+                      backendTxn.violationCount > 0 && (
+                        <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">
+                          {backendTxn.violationCount === 1 ? (
+                            <span>⚠️ Đỗ sai vị trí 1 lần (đã nhắc nhở)</span>
+                          ) : (
+                            <span>⚠️ Đỗ sai vị trí {backendTxn.violationCount} lần (phạt +{(backendTxn.violationPenalty || 100000).toLocaleString()}đ)</span>
+                          )}
+                        </div>
+                      )
+                    ) : (
+                      (lpr && lpr.includes('EV')) && (
+                        <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">
+                          ⚠️ Bị phạt Đỗ sai vị trí (+100k)
+                        </div>
+                      )
+                    )}
                     {lpr && getVehicleFines(lpr).length > 0 && <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">⚠️ Đã bao gồm phạt cộng dồn (+{getVehicleFines(lpr).reduce((sum, f) => sum + f.amount, 0).toLocaleString()}đ)</div>}
                   </div>
                 </div>
@@ -834,39 +790,30 @@ export const StaffPayment = () => {
                         }
                         setPaymentMethod('cash');
                       }}
-                      className={`relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer overflow-hidden group ${
-                        isVip ? 'opacity-40 cursor-not-allowed bg-slate-50 border-slate-100 text-slate-400' :
-                        paymentMethod === 'cash' ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50/50 shadow-sm text-blue-700 scale-[1.02]' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-300 hover:shadow-sm hover:-translate-y-0.5'
+                      className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                        isVip ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400' :
+                        paymentMethod === 'cash' ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-slate-200 text-slate-500 hover:border-blue-300'
                       }`}
                     >
-                      {paymentMethod === 'cash' && <div className="absolute top-0 right-0 w-8 h-8 bg-blue-500 rounded-bl-xl flex items-center justify-center"><CheckCircleFilled className="text-white text-xs" /></div>}
-                      <BankOutlined className="text-3xl mb-2 transition-transform group-hover:scale-110" />
-                      <span className="text-xs font-black tracking-wide">TIỀN MẶT</span>
+                      <BankOutlined className="text-2xl mb-1" />
+                      <span className="text-[11px] font-bold">Tiền mặt</span>
                     </button>
-
                     <button 
                       onClick={() => {
                         if (isVip) {
                           notification.warning({ message: 'Không khả dụng', description: 'Khách VIP bắt buộc thanh toán bằng QR Động theo quy trình.' });
                           return;
                         }
-                        if (displayAmount === 0) {
-                          notification.warning({ message: 'Không khả dụng', description: 'Giao dịch 0đ không hỗ trợ thanh toán qua VNPAY.' });
-                          return;
-                        }
-                        setPaymentMethod('vnpay');
-                        setVnpayUrl('');
+                        setPaymentMethod('qr');
                       }}
-                      className={`relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer overflow-hidden group ${
-                        isVip ? 'opacity-40 cursor-not-allowed bg-slate-50 border-slate-100 text-slate-400' :
-                        paymentMethod === 'vnpay' ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50/50 shadow-sm text-blue-700 scale-[1.02]' : 'border-slate-200 bg-white text-slate-500 hover:border-blue-300 hover:shadow-sm hover:-translate-y-0.5'
+                      className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                        isVip ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400' :
+                        paymentMethod === 'qr' ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-slate-200 text-slate-500 hover:border-blue-300'
                       }`}
                     >
-                      {paymentMethod === 'vnpay' && <div className="absolute top-0 right-0 w-8 h-8 bg-blue-500 rounded-bl-xl flex items-center justify-center"><CheckCircleFilled className="text-white text-xs" /></div>}
-                      <WalletOutlined className="text-3xl mb-2 transition-transform group-hover:scale-110" />
-                      <span className="text-xs font-black tracking-wide">VNPAY</span>
+                      <QrcodeOutlined className="text-2xl mb-1" />
+                      <span className="text-[11px] font-bold">VietQR</span>
                     </button>
-                    
                     <button 
                       onClick={() => {
                         if (!isVip) {
@@ -875,72 +822,55 @@ export const StaffPayment = () => {
                         }
                         setPaymentMethod('card');
                       }}
-                      className={`relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-300 overflow-hidden group ${
-                        !isVip ? 'opacity-40 cursor-not-allowed bg-slate-50 border-slate-100 text-slate-400' :
-                        paymentMethod === 'card' ? 'border-amber-500 bg-gradient-to-br from-amber-50 to-orange-50/50 shadow-sm text-amber-700 cursor-pointer scale-[1.02]' : 'border-slate-200 bg-white text-slate-500 hover:border-amber-300 hover:shadow-sm hover:-translate-y-0.5 cursor-pointer'
+                      className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all ${
+                        !isVip ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400' :
+                        paymentMethod === 'card' ? 'border-blue-500 bg-blue-50 text-blue-600 cursor-pointer' : 'border-slate-200 text-slate-500 hover:border-blue-300 cursor-pointer'
                       }`}
                     >
-                      {paymentMethod === 'card' && <div className="absolute top-0 right-0 w-8 h-8 bg-amber-500 rounded-bl-xl flex items-center justify-center"><CheckCircleFilled className="text-white text-xs" /></div>}
-                      <QrcodeOutlined className="text-3xl mb-2 transition-transform group-hover:scale-110" />
-                      <span className="text-xs font-black tracking-wide">QR VIP</span>
+                      <QrcodeOutlined className="text-2xl mb-1" />
+                      <span className="text-[11px] font-bold">QR VIP</span>
                     </button>
                   </div>
                 </div>
 
                 <div className="mb-6 flex-1 flex flex-col justify-center">
                   {paymentMethod === 'cash' && (
-                    <div className="bg-slate-50/80 border border-slate-200/60 rounded-xl p-5 shadow-inner backdrop-blur-sm animate-fadeIn">
-                      <div className="flex justify-between items-center mb-4">
-                        <span className="text-sm font-semibold text-slate-600">Tiền khách đưa:</span>
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 animate-fadeIn">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm font-medium text-slate-600">Tiền khách đưa:</span>
                         <Input 
-                          className="w-40 text-right font-black text-lg bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all rounded-lg" 
+                          className="w-32 text-right font-bold" 
                           disabled={!canReviewVehicle}
                           value={canReviewVehicle && cashGiven ? parseInt(cashGiven).toLocaleString('en-US') : ''}
                           onChange={(e) => setCashGiven(e.target.value.replace(/\D/g, ''))}
-                          suffix={<span className="text-slate-400 font-medium text-sm">₫</span>}
                         />
                       </div>
-                      <div className="h-0 w-full border-b-[2px] border-dashed border-slate-300/70 mb-4"></div>
-                      <div className="flex justify-between items-end">
-                        <span className="text-sm font-semibold text-slate-600 mb-1">Tiền thối lại:</span>
-                        <div className="text-right">
-                        <span className="text-3xl font-black text-slate-800 tracking-tight">
-                          {!canReviewVehicle ? '0' : Math.max(0, parseInt(cashGiven || 0) - displayAmount).toLocaleString('en-US')}
+                      <div className="h-px w-full bg-slate-200 mb-3"></div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-slate-600">Tiền thối lại:</span>
+                        <span className="text-lg font-black text-slate-800">
+                          {Math.max(0, parseInt(cashGiven || 0) - displayAmount).toLocaleString('en-US')} <span className="text-xs font-bold text-slate-500">VND</span>
                         </span>
-                          <span className="text-sm font-bold text-slate-500 ml-1">VND</span>
-                        </div>
                       </div>
                     </div>
                   )}
-
-                  {paymentMethod === 'vnpay' && (
+                  {paymentMethod === 'qr' && (
                     <div className="bg-white border border-blue-200 rounded-lg p-4 flex flex-col items-center justify-center animate-fadeIn shadow-sm relative overflow-hidden">
-                      <div className="bg-slate-50 rounded-lg flex items-center justify-center mb-3 border border-slate-200 overflow-hidden relative p-4">
-                        {!canReviewVehicle ? (
-                          <div className="text-center w-[150px] h-[150px] flex items-center justify-center">
-                            <span className="text-[10px] font-bold text-slate-400 block px-2">CHỜ XÁC NHẬN</span>
-                          </div>
-                        ) : vnpayUrl ? (
-                          <a href={vnpayUrl} target="_blank" rel="noreferrer" className="block cursor-pointer hover:opacity-80 transition-opacity" title="Bấm vào đây để mở trang thanh toán VNPAY">
-                            <QRCode value={vnpayUrl} size={150} bordered={false} />
-                          </a>
-                        ) : (
-                          <div className="w-[150px] h-[150px] flex items-center justify-center">
-                            <Spin />
-                          </div>
-                        )}
+                      <div className="w-28 h-28 bg-slate-50 rounded-lg flex items-center justify-center mb-3 border border-slate-200 overflow-hidden relative">
+                        <img src={`https://vietqr.app/img?acc=0818756569&bank=VietinBank&amount=${displayAmount}&des=${lpr}&template=compact&holder=DUONG PHUOC HUNG&store=Urban Park System`}
+                          alt='QR thanh toán VietQR' className="w-24 h-24 object-contain" />
                         <div className="absolute inset-0 bg-blue-500/10 animate-pulse pointer-events-none"></div>
                       </div>
-                      <span className="text-xs font-medium text-slate-500 text-center mb-3">
-                        {!canReviewVehicle ? "Vui lòng 'Xác nhận thẻ' trước để lấy mã QR" : isPollingVnpay ? "Đang đợi thanh toán VNPay Sandbox..." : "Yêu cầu khách quét mã VNPay Sandbox"}
-                        {canReviewVehicle && vnpayUrl && <span className="block mt-1 text-[10px] text-blue-500 cursor-pointer" onClick={() => window.open(vnpayUrl, '_blank')}>(Hoặc click vào mã QR để thanh toán test)</span>}
-                      </span>
+                      <span className="text-xs font-medium text-slate-500 text-center mb-3">Vui lòng yêu cầu khách hàng quét mã QR<br/>bằng ứng dụng Ngân hàng</span>
+                      <button onClick={handlePayment} disabled={!canReviewVehicle} className={`w-full border text-xs font-bold py-2 rounded transition-colors ${canReviewVehicle ? 'bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200 cursor-pointer' : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'}`}>
+                        Giả lập khách đã thanh toán thành công
+                      </button>
                     </div>
                   )}
                   {paymentMethod === 'card' && (
                     <div className="bg-white border border-blue-200 rounded-lg p-4 flex flex-col items-center justify-center animate-fadeIn shadow-sm relative overflow-hidden">
                       <div className="w-28 h-28 bg-slate-50 rounded-lg flex items-center justify-center mb-3 border border-slate-200 overflow-hidden relative">
-                        <QRCode value={`VIP_Checkout_${lpr || 'Unknown'}`} size={100} bordered={false} />
+                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=VIP_Checkout_${lpr || 'Unknown'}`} alt="QR Code VIP" className="w-24 h-24 object-contain" />
                         <div className="absolute inset-0 bg-amber-500/10 animate-pulse pointer-events-none"></div>
                       </div>
                       <span className="text-xs font-medium text-slate-500 text-center mb-3">Mã QR dành cho Thành viên VIP<br/>(Dùng app hệ thống để quét)</span>
@@ -951,26 +881,95 @@ export const StaffPayment = () => {
                   )}
                 </div>
 
-                <div className="flex gap-4 mt-auto">
-                  <button onClick={handleCancel} className="flex-[0.8] bg-white border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-600 font-bold py-3.5 rounded-xl transition-all duration-300 cursor-pointer shadow-sm hover:shadow active:scale-95">
+                <div className="flex gap-3 mt-auto">
+                  <button onClick={handleCancel} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-lg transition-colors cursor-pointer">
                     Huỷ bỏ
                   </button>
                   <button 
                     onClick={handlePayment} 
                     disabled={isPaid || isCheckingOut || !canReviewVehicle}
-                    className={`flex-[2] text-white font-bold py-3.5 rounded-xl transition-all duration-300 flex items-center justify-center gap-3 text-sm tracking-wide ${
-                      isPaid || isCheckingOut || !canReviewVehicle 
-                        ? 'bg-slate-300 text-slate-100 cursor-not-allowed shadow-none' 
-                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] hover:-translate-y-0.5 cursor-pointer active:scale-95'
+                    className={`flex-[2] text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md ${
+                      isPaid || isCheckingOut || !canReviewVehicle ? 'bg-slate-400 cursor-not-allowed shadow-none' : 'bg-[#1677ff] hover:bg-blue-600 shadow-blue-500/20 cursor-pointer'
                     }`}
                   >
-                    <CheckCircleFilled className="text-lg" />
-                    {!canReviewVehicle ? 'CẦN XÁC NHẬN THẺ' : (displayAmount === 0 ? 'XÁC NHẬN & MỞ CỔNG' : 'THANH TOÁN & MỞ CỔNG')}
+                    <CheckCircleFilled />
+                    {!canReviewVehicle
+                      ? 'Cần xác nhận thẻ'
+                      : (hasMobileOverstayPenalty ? 'Thu Phí Quá Hạn & Mở Cổng' : (displayAmount === 0 ? 'Xác nhận & Mở Cổng' : 'Thanh Toán & Mở Cổng'))}
                   </button>
                 </div>
               </div>
             </div>
           </div>
+
+          {vehicleToPay?.isLocked && (
+            <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 flex flex-col gap-4">
+              <h3 className="text-base font-bold text-slate-800 m-0 flex items-center gap-2 text-red-600">
+                <SafetyCertificateOutlined /> Hồ sơ Xác minh chống trộm
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed m-0">
+                Yêu cầu nhân viên chụp ảnh CCCD của người lái và Cà vẹt xe để lưu hồ sơ xác minh trùng khớp thông tin xe VIP.
+              </p>
+              
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">CCCD / CMND người lái <span className="text-red-500">*</span></label>
+                  <button 
+                    type="button" 
+                    onClick={handleCaptureCccd} 
+                    className="w-full bg-slate-50 hover:bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg aspect-[2.2/1] flex flex-col items-center justify-center text-slate-400 hover:text-blue-500 hover:border-blue-300 transition-all cursor-pointer group overflow-hidden relative"
+                  >
+                    {cccdImage ? (
+                      <>
+                        <img src={cccdImage} alt="CCCD" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity font-bold text-xs gap-1.5">
+                          Thay đổi
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <CarOutlined className="text-xl mb-0.5 group-hover:scale-110 transition-transform" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Chụp CCCD</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-slate-555 uppercase tracking-wider">Cà vẹt xe chính chủ <span className="text-red-500">*</span></label>
+                  <button 
+                    type="button" 
+                    onClick={handleCaptureReg} 
+                    className="w-full bg-slate-50 hover:bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg aspect-[2.2/1] flex flex-col items-center justify-center text-slate-400 hover:text-blue-500 hover:border-blue-300 transition-all cursor-pointer group overflow-hidden relative"
+                  >
+                    {regImage ? (
+                      <>
+                        <img src={regImage} alt="Cà vẹt" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity font-bold text-xs gap-1.5">
+                          Thay đổi
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <CarOutlined className="text-xl mb-0.5 group-hover:scale-110 transition-transform" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Chụp Cà vẹt</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+              
+              {cccdImage && regImage ? (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-2 mt-1">
+                  ✓ Giấy tờ hợp lệ. Sẵn sàng cho phép thanh toán và mở cổng xuất bãi.
+                </div>
+              ) : (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold px-3 py-2 rounded-lg mt-1">
+                  ⚠️ Chưa hoàn thành chụp ảnh CCCD & Cà vẹt xe để xác minh danh tính.
+                </div>
+              )}
+            </div>
+          )}
+
           {/* History Table */}
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center">
@@ -995,12 +994,11 @@ export const StaffPayment = () => {
                   const statusColor = txn.statusColor || 'bg-emerald-100 text-emerald-600';
                   const textColor = statusColor.split(' ')[1] || 'text-emerald-600';
                   
-                  let amountDisplay = txn.amount || (txn.totalAmount ? txn.totalAmount.toLocaleString('vi-VN') + 'đ' : '0đ');
-                  if (typeof amountDisplay === 'string') {
-                    amountDisplay = amountDisplay.replace('.00', '').replace('đ', '') + 'đ';
-                    if (!amountDisplay.includes(',') && !amountDisplay.includes('.')) {
-                      amountDisplay = parseInt(amountDisplay).toLocaleString('vi-VN') + 'đ';
-                    }
+                  let amountDisplay = '0đ';
+                  if (txn.amount) {
+                    amountDisplay = txn.amount;
+                  } else if (txn.totalAmount !== undefined && txn.totalAmount !== null) {
+                    amountDisplay = Number(txn.totalAmount).toLocaleString('vi-VN') + 'đ';
                   }
 
                   const formatTime = (isoString) => {
@@ -1148,16 +1146,6 @@ export const StaffPayment = () => {
 
         </div>
       </div>
-      
-      <CameraCaptureModal
-        visible={!!captureTarget}
-        onCancel={() => setCaptureTarget(null)}
-        onCapture={(imgUrl) => {
-          setCapturedImages(prev => ({ ...prev, [captureTarget]: imgUrl }));
-          setCaptureTarget(null);
-        }}
-        title="Chụp ảnh đối chiếu"
-      />
     </div>
   );
 };

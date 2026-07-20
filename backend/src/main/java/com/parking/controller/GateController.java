@@ -15,6 +15,7 @@ import java.util.UUID;
 
 import com.parking.repository.VipSubscriptionRepository;
 import com.parking.repository.ZoneRepository;
+import com.parking.service.DemoVehicleDataset;
 import com.parking.service.ParkingService;
 import com.parking.service.PendingGateVehicleService;
 import com.parking.model.Transaction;
@@ -56,6 +57,7 @@ public class GateController {
         public String gate;
         public String vehicleType;
         public String fuelType;
+        public String imageUrl;
         public String direction;
     }
 
@@ -64,8 +66,10 @@ public class GateController {
         Map<String, Object> response = new HashMap<>();
 
         // Anti-theft logic
-        if (request.plate != null && !request.plate.isEmpty()) {
-            Optional<Vehicle> optVehicle = vehicleRepo.findByLicensePlate(request.plate);
+        String normalizedPlate = DemoVehicleDataset.normalizePlate(request.plate);
+
+        if (!normalizedPlate.isEmpty()) {
+            Optional<Vehicle> optVehicle = vehicleRepo.findByLicensePlate(normalizedPlate);
             if (optVehicle.isPresent() && optVehicle.get().isLocked()) {
                 
                 // --- ADDED ANTI-THEFT LOG ---
@@ -88,7 +92,7 @@ public class GateController {
                 response.put("success", false);
                 response.put("error", "VEHICLE_LOCKED");
                 Map<String, Object> vehicleData = new HashMap<>();
-                vehicleData.put("plate", request.plate);
+                vehicleData.put("plate", normalizedPlate);
                 Map<String, Object> dataMap = new HashMap<>();
                 dataMap.put("vehicle", vehicleData);
                 response.put("data", dataMap);
@@ -113,8 +117,8 @@ public class GateController {
                 // Entrance Gate Logic
                 boolean isVip = false;
                 Optional<Vehicle> optVehicle = Optional.empty();
-                if (request.plate != null && !request.plate.trim().isEmpty()) {
-                    String plateStr = request.plate.trim();
+                if (!normalizedPlate.isEmpty()) {
+                    String plateStr = normalizedPlate;
                     optVehicle = vehicleRepo.findByLicensePlate(plateStr);
                     if (optVehicle.isPresent()) {
                         Vehicle vehicle = optVehicle.get();
@@ -134,13 +138,19 @@ public class GateController {
                     }
                 }
 
-                String resolvedVehicleType = (request.vehicleType != null && !request.vehicleType.trim().isEmpty())
-                        ? request.vehicleType.trim()
-                        : (optVehicle.isPresent() ? optVehicle.get().getVehicleSize() : "SEDAN_HATCHBACK");
+                String fallbackVehicleType = optVehicle.isPresent() ? optVehicle.get().getVehicleSize() : request.vehicleType;
+                String resolvedVehicleType = DemoVehicleDataset.resolveVehicleType(normalizedPlate, fallbackVehicleType);
+                String resolvedFuelType = DemoVehicleDataset.resolveFuelType(
+                        normalizedPlate,
+                        optVehicle.isPresent() ? optVehicle.get().getFuelType() : request.fuelType);
+                String resolvedImageUrl = DemoVehicleDataset.resolveImageUrl(
+                        normalizedPlate,
+                        "GATE_SCAN",
+                        request.imageUrl);
 
                 if (isVip) {
                     // Case A: VIP Check-in
-                    String plateStr = request.plate.trim();
+                    String plateStr = normalizedPlate;
                     Optional<ParkingSession> existingVipSession = sessionRepo.findByLicensePlateAndSessionStatus(plateStr, ParkingSession.SessionStatus.ACTIVE);
 
                     if (existingVipSession.isPresent() && existingVipSession.get().getEntryGate() != null) {
@@ -171,7 +181,7 @@ public class GateController {
                         aiReq.setPlate(plateStr);
                         aiReq.setConfidence_score(95.0);
                         aiReq.setCamera_id(request.gate);
-                        aiReq.setImage_url("https://camera-storage.com/live/gate_scan.jpg");
+                        aiReq.setImage_url(resolvedImageUrl);
                         aiReq.setVehicle_type(resolvedVehicleType);
 
                         com.parking.dto.CheckInResponse checkInResponse = parkingService.aiCheckIn(aiReq);
@@ -192,12 +202,12 @@ public class GateController {
                         throw new IllegalArgumentException("Yêu cầu mã thẻ cho khách vãng lai");
                     }
                     com.parking.dto.VisitorCheckInRequest visitorReq = new com.parking.dto.VisitorCheckInRequest();
-                    String plateStr = (request.plate != null && !request.plate.trim().isEmpty()) ? request.plate.trim() : "UNKNOWN_PLATE";
+                    String plateStr = !normalizedPlate.isEmpty() ? normalizedPlate : "UNKNOWN_PLATE";
                     visitorReq.setPlate(plateStr);
                     visitorReq.setCard_code(request.cardCode.trim());
-                    visitorReq.setImage_url("https://camera-storage.com/live/gate_scan.jpg");
+                    visitorReq.setImage_url(resolvedImageUrl);
                     visitorReq.setVehicle_type(resolvedVehicleType);
-                    visitorReq.setFuel_type(request.fuelType);
+                    visitorReq.setFuel_type(resolvedFuelType);
                     visitorReq.setGate(request.gate);
 
                     com.parking.dto.CheckInResponse checkInResponse = parkingService.visitorCheckIn(visitorReq);
@@ -218,12 +228,12 @@ public class GateController {
                 // Exit Gate Logic
                 if (request.qrToken != null && !request.qrToken.trim().isEmpty()) {
                     // Case A: VIP QR Exit
-                    parkingService.verifyExitQr(request.plate != null ? request.plate.trim() : "", request.qrToken.trim());
+                    parkingService.verifyExitQr(normalizedPlate, request.qrToken.trim());
                     response.put("success", true);
                     response.put("message", "VIP QR Exit thành công tại " + request.gate);
 
                     Map<String, Object> vehicleData = new HashMap<>();
-                    vehicleData.put("plate", request.plate);
+                    vehicleData.put("plate", normalizedPlate);
                     Map<String, Object> dataMap = new HashMap<>();
                     dataMap.put("vehicle", vehicleData);
                     response.put("data", dataMap);
@@ -234,7 +244,7 @@ public class GateController {
                     response.put("message", "Visitor Checkout thành công tại " + request.gate);
 
                     Map<String, Object> vehicleData = new HashMap<>();
-                    vehicleData.put("plate", request.plate);
+                    vehicleData.put("plate", normalizedPlate);
                     Map<String, Object> dataMap = new HashMap<>();
                     dataMap.put("vehicle", vehicleData);
                     
