@@ -1,12 +1,14 @@
 import React, { useContext, useState } from 'react';
 import { motion } from 'motion/react';
-import { AlertTriangle, Car, CheckCircle, Lock, Plus, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, Car, CheckCircle, Lock, Plus, RefreshCw, X, ZoomIn } from 'lucide-react';
 import { DriverContext, VEHICLE_PRICING } from '../DriverPwa';
 import { getDemoVehicleImages, getDemoVehicleProfile } from '../../../data/vehicleDataset';
  
 export const VipRegistrationModal: React.FC = () => {
   const context = useContext(DriverContext);
   if (!context) return null;
+
+  const [previewModalImage, setPreviewModalImage] = useState<string | null>(null);
  
   const {
     vehicles,
@@ -220,12 +222,18 @@ export const VipRegistrationModal: React.FC = () => {
                       <div className="space-y-2">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">1. Cà vẹt / Đăng ký xe</span>
                         {photoCavet ? (
-                          <div className="relative h-28 rounded-xl overflow-hidden border border-slate-200 group">
+                          <div 
+                            onClick={() => setPreviewModalImage(photoCavet)}
+                            className="relative h-28 rounded-xl overflow-hidden border border-slate-200 group cursor-pointer hover:border-blue-500 transition-all"
+                          >
                             <img src={photoCavet} alt="Cà vẹt" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                              <ZoomIn className="text-white w-6 h-6 drop-shadow-md" />
+                            </div>
                             <button
                               type="button"
-                              onClick={() => { setPhotoCavet(null); setExtractedPlate(null); }}
-                              className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                              onClick={(e) => { e.stopPropagation(); setPhotoCavet(null); setExtractedPlate(null); }}
+                              className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer z-10"
                             >
                               <X className="w-3 h-3" />
                             </button>
@@ -272,12 +280,18 @@ export const VipRegistrationModal: React.FC = () => {
                       <div className="space-y-2">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">2. CMND / CCCD chủ xe</span>
                         {photoCccd ? (
-                          <div className="relative h-28 rounded-xl overflow-hidden border border-slate-200 group">
+                          <div 
+                            onClick={() => setPreviewModalImage(photoCccd)}
+                            className="relative h-28 rounded-xl overflow-hidden border border-slate-200 group cursor-pointer hover:border-blue-500 transition-all"
+                          >
                             <img src={photoCccd} alt="CCCD" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                              <ZoomIn className="text-white w-6 h-6 drop-shadow-md" />
+                            </div>
                             <button
                               type="button"
-                              onClick={() => setPhotoCccd(null)}
-                              className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                              onClick={(e) => { e.stopPropagation(); setPhotoCccd(null); }}
+                              className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer z-10"
                             >
                               <X className="w-3 h-3" />
                             </button>
@@ -297,12 +311,18 @@ export const VipRegistrationModal: React.FC = () => {
                       <div className="space-y-2">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">3. Ảnh thực tế đầu xe</span>
                         {photoXe ? (
-                          <div className="relative h-28 rounded-xl overflow-hidden border border-slate-200 group">
+                          <div 
+                            onClick={() => setPreviewModalImage(photoXe)}
+                            className="relative h-28 rounded-xl overflow-hidden border border-slate-200 group cursor-pointer hover:border-blue-500 transition-all"
+                          >
                             <img src={photoXe} alt="Ảnh đầu xe" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                              <ZoomIn className="text-white w-6 h-6 drop-shadow-md" />
+                            </div>
                             <button
                               type="button"
-                              onClick={() => setPhotoXe(null)}
-                              className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                              onClick={(e) => { e.stopPropagation(); setPhotoXe(null); }}
+                              className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer z-10"
                             >
                               <X className="w-3 h-3" />
                             </button>
@@ -545,6 +565,32 @@ export const VipRegistrationModal: React.FC = () => {
  
           </div>
         </>
+      )}
+
+      {/* Image Zoom Preview Modal */}
+      {previewModalImage && (
+        <div 
+          className="fixed inset-0 z-[99999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4"
+          onClick={() => setPreviewModalImage(null)}
+        >
+          <div 
+            className="relative max-w-4xl max-h-[90vh] bg-white rounded-2xl overflow-hidden shadow-2xl p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewModalImage(null)}
+              className="absolute top-4 right-4 z-10 p-2 bg-slate-900/80 hover:bg-black text-white rounded-full transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img 
+              src={previewModalImage} 
+              alt="Preview Zoom" 
+              className="max-w-full max-h-[85vh] object-contain rounded-xl"
+            />
+          </div>
+        </div>
       )}
     </motion.div>
   );

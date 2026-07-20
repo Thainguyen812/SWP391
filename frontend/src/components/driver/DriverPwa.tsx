@@ -650,19 +650,13 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     }
   }, [vehicles, selectedVehicleForVIP]);
 
-  // Auto-sync VIP verification documents whenever selected vehicle for VIP changes
+  // Reset VIP verification documents when switching selected vehicle
   useEffect(() => {
-    if (!selectedVehicleForVIP) return;
-    const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
-    const profile = getDemoVehicleProfile(targetVeh || { plate: selectedVehicleForVIP });
-    const docs = getDemoVehicleImages(profile || { plate: selectedVehicleForVIP });
-    if (docs) {
-      setPhotoCavet(docs.registrationDoc);
-      setPhotoCccd(docs.identityDoc);
-      setPhotoXe(docs.registrationPhoto);
-      setExtractedPlate(selectedVehicleForVIP);
-    }
-  }, [selectedVehicleForVIP, vehicles]);
+    setPhotoCavet(null);
+    setPhotoCccd(null);
+    setPhotoXe(null);
+    setExtractedPlate(null);
+  }, [selectedVehicleForVIP]);
 
   // Synchronize package price whenever selected vehicle, package label, or vehicles change
   useEffect(() => {
