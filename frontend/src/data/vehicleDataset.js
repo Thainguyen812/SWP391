@@ -66,19 +66,101 @@ export const normalizePlate = (value) =>
 
 const docSvg = (profile, title, subtitle) => {
   const plate = profile?.plate || 'DEMO-PLATE';
-  const model = profile?.model || 'Demo vehicle';
-  const text = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560">
-      <rect width="900" height="560" rx="28" fill="#f8fafc"/>
-      <rect x="44" y="44" width="812" height="472" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/>
-      <text x="80" y="118" font-family="Arial" font-size="38" font-weight="700" fill="#0f172a">${title}</text>
-      <text x="80" y="170" font-family="Arial" font-size="24" fill="#475569">${subtitle}</text>
-      <rect x="80" y="220" width="740" height="128" rx="12" fill="#eff6ff" stroke="#60a5fa" stroke-width="2"/>
-      <text x="116" y="300" font-family="Arial" font-size="52" font-weight="800" fill="#1d4ed8">${plate}</text>
-      <text x="80" y="414" font-family="Arial" font-size="28" font-weight="700" fill="#111827">${model}</text>
-      <text x="80" y="458" font-family="Arial" font-size="22" fill="#64748b">${profile?.brand || 'UrbanPark'} - ${getVehicleTypeMeta(profile?.vehicleType).label} - ${profile?.fuelType || 'GASOLINE'}</text>
-    </svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(text)}`;
+  const model = profile?.model || 'Demo Vehicle';
+  const brand = profile?.brand || 'UrbanPark';
+  const ownerName = profile?.ownerName || 'NGUYỄN HỒNG THÁI';
+  const isCcCd = String(title || '').toUpperCase().includes('CĂN CƯỚC') || String(title || '').toUpperCase().includes('CCCD') || String(title || '').toUpperCase().includes('CMND');
+
+  let svgText = '';
+
+  if (isCcCd) {
+    // Generate realistic CCCD chip card layout
+    svgText = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560">
+        <defs>
+          <linearGradient id="bgCc" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#1e3a8a"/>
+            <stop offset="50%" stop-color="#0284c7"/>
+            <stop offset="100%" stop-color="#0f172a"/>
+          </linearGradient>
+          <linearGradient id="goldChip" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fde047"/>
+            <stop offset="100%" stop-color="#ca8a04"/>
+          </linearGradient>
+        </defs>
+        <rect width="900" height="560" rx="28" fill="url(#bgCc)"/>
+        <rect x="24" y="24" width="852" height="512" rx="20" fill="none" stroke="#38bdf8" stroke-width="2" stroke-dasharray="6 4" opacity="0.4"/>
+        
+        <!-- Header -->
+        <text x="450" y="72" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#f8fafc" text-anchor="middle">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</text>
+        <text x="450" y="100" font-family="Arial, sans-serif" font-size="16" fill="#cbd5e1" text-anchor="middle">Độc lập - Tự do - Hạnh phúc</text>
+        <text x="450" y="150" font-family="Arial, sans-serif" font-size="34" font-weight="800" fill="#fef08a" text-anchor="middle">CĂN CƯỚC CÔNG DÂN</text>
+        <text x="450" y="180" font-family="Arial, sans-serif" font-size="16" fill="#93c5fd" text-anchor="middle">IDENTITY CARD</text>
+
+        <!-- Gold Chip -->
+        <rect x="70" y="170" width="90" height="70" rx="10" fill="url(#goldChip)" stroke="#b45309" stroke-width="2"/>
+        <line x1="70" y1="205" x2="160" y2="205" stroke="#b45309" stroke-width="1.5"/>
+        <line x1="115" y1="170" x2="115" y2="240" stroke="#b45309" stroke-width="1.5"/>
+
+        <!-- Details -->
+        <text x="210" y="240" font-family="Arial, sans-serif" font-size="18" fill="#93c5fd">Số / No.:</text>
+        <text x="320" y="240" font-family="Arial, sans-serif" font-size="26" font-weight="800" fill="#ffffff">034202019842</text>
+
+        <text x="210" y="295" font-family="Arial, sans-serif" font-size="18" fill="#93c5fd">Họ và tên / Full name:</text>
+        <text x="210" y="335" font-family="Arial, sans-serif" font-size="30" font-weight="800" fill="#fef08a">${ownerName.toUpperCase()}</text>
+
+        <text x="210" y="390" font-family="Arial, sans-serif" font-size="18" fill="#93c5fd">Phương tiện đăng ký:</text>
+        <text x="210" y="430" font-family="Arial, sans-serif" font-size="28" font-weight="800" fill="#38bdf8">${plate} — ${brand} ${model}</text>
+
+        <!-- Watermark Footer -->
+        <rect x="70" y="465" width="760" height="50" rx="8" fill="#0f172a" opacity="0.6"/>
+        <text x="90" y="498" font-family="monospace" font-size="18" fill="#38bdf8">URBANPARK ID VERIFIED || PLATE: ${plate}</text>
+      </svg>`;
+  } else {
+    // Generate realistic Ca Vet xe layout
+    svgText = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560">
+        <defs>
+          <linearGradient id="bgReg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fefce8"/>
+            <stop offset="50%" stop-color="#fef9c3"/>
+            <stop offset="100%" stop-color="#fef08a"/>
+          </linearGradient>
+        </defs>
+        <rect width="900" height="560" rx="28" fill="url(#bgReg)"/>
+        <rect x="30" y="30" width="840" height="500" rx="16" fill="none" stroke="#ca8a04" stroke-width="3"/>
+        <rect x="42" y="42" width="816" height="476" rx="12" fill="none" stroke="#eab308" stroke-width="1" stroke-dasharray="4 4"/>
+        
+        <!-- National Emblem Header -->
+        <text x="450" y="80" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#713f12" text-anchor="middle">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</text>
+        <text x="450" y="108" font-family="Arial, sans-serif" font-size="16" fill="#854d0e" text-anchor="middle">Độc lập - Tự do - Hạnh phúc</text>
+        <line x1="320" y1="122" x2="580" y2="122" stroke="#ca8a04" stroke-width="2"/>
+
+        <text x="450" y="170" font-family="Arial, sans-serif" font-size="32" font-weight="800" fill="#9a3412" text-anchor="middle">GIẤY CHỨNG NHẬN ĐĂNG KÝ XE Ô TÔ</text>
+
+        <!-- Information Box -->
+        <rect x="70" y="200" width="760" height="110" rx="12" fill="#ffffff" stroke="#eab308" stroke-width="2"/>
+        <text x="95" y="245" font-family="Arial, sans-serif" font-size="20" fill="#713f12">Biển số đăng ký / Plate No.:</text>
+        <text x="400" y="255" font-family="Arial, sans-serif" font-size="44" font-weight="900" fill="#1e3a8a">${plate}</text>
+        <text x="95" y="290" font-family="Arial, sans-serif" font-size="18" fill="#854d0e">Tên chủ xe / Owner: <tspan font-weight="700" fill="#1e293b">${ownerName.toUpperCase()}</tspan></text>
+
+        <!-- Vehicle Details -->
+        <text x="95" y="350" font-family="Arial, sans-serif" font-size="20" fill="#713f12">Nhãn hiệu / Brand:</text>
+        <text x="300" y="350" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#0f172a">${brand}</text>
+
+        <text x="95" y="395" font-family="Arial, sans-serif" font-size="20" fill="#713f12">Số loại / Model:</text>
+        <text x="300" y="395" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#0f172a">${model}</text>
+
+        <text x="95" y="440" font-family="Arial, sans-serif" font-size="20" fill="#713f12">Loại xe / Type:</text>
+        <text x="300" y="440" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#0f172a">${getVehicleTypeMeta(profile?.vehicleType).label} (${profile?.fuelType || 'GASOLINE'})</text>
+
+        <!-- Stamp simulation -->
+        <circle cx="750" cy="420" r="50" fill="none" stroke="#dc2626" stroke-width="3" opacity="0.8"/>
+        <text x="750" y="415" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#dc2626" text-anchor="middle" opacity="0.8">CÔNG AN TP</text>
+        <text x="750" y="435" font-family="Arial, sans-serif" font-size="14" font-weight="900" fill="#dc2626" text-anchor="middle" opacity="0.8">ĐÃ ĐĂNG KÝ</text>
+      </svg>`;
+  }
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgText.trim())}`;
 };
 
 export const getVehicleTypeMeta = (vehicleType) => {
