@@ -9,7 +9,7 @@ import {
 } from '@ant-design/icons';
 import { useState, useEffect, useRef } from 'react';
 import { notification, Modal, Dropdown, Input, Button } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { apiClient } from '../../api/apiClient';
 import { useGlobalContext } from '../../context/GlobalContext';
 import {
@@ -21,14 +21,21 @@ import {
 
 export const StaffGateControl = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { activityLogs, addActivityLog, activeVehicles, currentVehicle, setCurrentVehicle, addActiveVehicle, removeActiveVehicle, processEntryVehicle, addTransaction, updateShiftStats, dailyVolume, setDailyVolume, fetchAllDataFromBackend, totalGates, isEmergency, setIsEmergency, gates, setGates, gateLogs, setGateLogs, addSecurityAlert } = useGlobalContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('Tất cả');
 
-  const [manualPlate, setManualPlate] = useState('');
+  const [manualPlate, setManualPlate] = useState(location.state?.manualPlate || '');
   const [manualCardCode, setManualCardCode] = useState('');
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [isScanningSampleCard, setIsScanningSampleCard] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.manualPlate) {
+      setManualPlate(location.state.manualPlate);
+    }
+  }, [location.state?.manualPlate]);
   const [lastCheckInResult, setLastCheckInResult] = useState(null);
   
   const [terminalTime, setTerminalTime] = useState(new Date().toLocaleTimeString('en-GB') + ' GMT+7');
@@ -202,11 +209,18 @@ export const StaffGateControl = () => {
       });
 
       if (availableCards.length === 0) {
-        notification.error({
-          message: 'Không còn thẻ khả dụng',
-          description: 'Tất cả thẻ mẫu đang được dùng, đã mất hoặc bị khóa.'
-        });
-        return;
+        // Fallback mock cards if database is empty or all cards are used
+        const mockCards = ['000021', '000022', '000023', '000024', '000025'];
+        const availableMocks = mockCards.filter(c => !inUseCardCodes.has(c));
+        if (availableMocks.length > 0) {
+          availableCards.push(...availableMocks.map(c => ({ cardCode: c, status: 'AVAILABLE' })));
+        } else {
+          notification.error({
+            message: 'Không còn thẻ khả dụng',
+            description: 'Tất cả thẻ mẫu đang được dùng, đã mất hoặc bị khóa.'
+          });
+          return;
+        }
       }
 
       const selectedCard = availableCards[Math.floor(Math.random() * availableCards.length)];
@@ -798,9 +812,9 @@ export const StaffGateControl = () => {
             <div className="flex items-baseline gap-1 flex-wrap">
               <span className="text-4xl font-extrabold text-slate-800">{activeVehicles ? activeVehicles.filter(v => !v.gate).length : 0}</span>
               <span className="text-xl text-slate-400 font-medium">xe</span>
-              {activeVehicles && activeVehicles.filter(v => v.gate).length > 0 && (
+              {gates && gates.filter(g => g.vehicleId).length > 0 && (
                 <span className="text-xs text-orange-500 font-medium ml-1">
-                  ({activeVehicles.filter(v => v.gate).length} xe đang ở cổng)
+                  ({gates.filter(g => g.vehicleId).length} xe đang ở cổng)
                 </span>
               )}
             </div>
