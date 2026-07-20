@@ -650,6 +650,20 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     }
   }, [vehicles, selectedVehicleForVIP]);
 
+  // Auto-sync VIP verification documents whenever selected vehicle for VIP changes
+  useEffect(() => {
+    if (!selectedVehicleForVIP) return;
+    const targetVeh = vehicles.find(v => v.plate === selectedVehicleForVIP);
+    const profile = getDemoVehicleProfile(targetVeh || { plate: selectedVehicleForVIP });
+    const docs = getDemoVehicleImages(profile || { plate: selectedVehicleForVIP });
+    if (docs) {
+      setPhotoCavet(docs.registrationDoc);
+      setPhotoCccd(docs.identityDoc);
+      setPhotoXe(docs.registrationPhoto);
+      setExtractedPlate(selectedVehicleForVIP);
+    }
+  }, [selectedVehicleForVIP, vehicles]);
+
   // Synchronize package price whenever selected vehicle, package label, or vehicles change
   useEffect(() => {
     if (!selectedVehicleForVIP) return;
