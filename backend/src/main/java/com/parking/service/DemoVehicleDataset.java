@@ -195,8 +195,14 @@ public final class DemoVehicleDataset {
         if (lower.contains("carnival")) return "/images/carnival.png";
         if (lower.contains("granvia")) return "/images/granvia.png";
         if (lower.contains("sprinter")) return "/images/sprinter.png";
-        if (lower.contains("minibus")) return "/images/minibus_ev.png";
         return "/images/raize.png";
+    }
+
+    public static String drawPlateOnImage(String baseImageUrl, String plate) {
+        if (plate == null || plate.isBlank() || "UNKNOWN_PLATE".equalsIgnoreCase(plate)) {
+            return baseImageUrl;
+        }
+        return generateCropImageIfMissing(plate, baseImageUrl);
     }
 
     private static String generateCropImageIfMissing(String plate, String baseImageUrl) {
