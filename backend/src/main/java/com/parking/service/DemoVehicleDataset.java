@@ -199,9 +199,26 @@ public final class DemoVehicleDataset {
         return "/images/raize.png";
     }
 
-    public static String drawPlateOnImage(String baseImageUrl, String plate) {
-        if (plate == null || plate.isBlank() || "UNKNOWN_PLATE".equalsIgnoreCase(plate)) {
+    private static String generateCropImageIfMissing(String plate, String baseImageUrl) {
+        if (plate == null || plate.isBlank()) {
             return baseImageUrl;
+        }
+        
+        String displayPlate = plate.toUpperCase(Locale.ROOT);
+        if (displayPlate.endsWith(".SIM")) {
+            displayPlate = displayPlate.substring(0, displayPlate.length() - 4);
+        }
+        String safePlateName = displayPlate.replaceAll("[^A-Z0-9-]", "_");
+        String outputFileName = "plate_" + safePlateName + ".png";
+        
+        File uploadDir = new File("c:/SWP391/frontend/public/uploads");
+        if (!uploadDir.exists()) {
+            uploadDir.mkdirs();
+        }
+        
+        File outputFile = new File(uploadDir, outputFileName);
+        if (outputFile.exists()) {
+            return "/uploads/" + outputFileName;
         }
         
         try {
@@ -259,11 +276,6 @@ public final class DemoVehicleDataset {
             Font plateFont = new Font("Arial", Font.BOLD, 22);
             g.setFont(plateFont);
             
-            String displayPlate = plate.toUpperCase(Locale.ROOT);
-            if (displayPlate.endsWith(".SIM")) {
-                displayPlate = displayPlate.substring(0, displayPlate.length() - 4);
-            }
-            
             FontMetrics fm = g.getFontMetrics(plateFont);
             int textW = fm.stringWidth(displayPlate);
             int textH = fm.getAscent();
@@ -272,15 +284,6 @@ public final class DemoVehicleDataset {
             
             g.drawString(displayPlate, textX, textY);
             g.dispose();
-            
-            File uploadDir = new File("c:/SWP391/frontend/public/uploads");
-            if (!uploadDir.exists()) {
-                uploadDir.mkdirs();
-            }
-            
-            String safePlateName = displayPlate.replaceAll("[^A-Z0-9-]", "_");
-            String outputFileName = "plate_" + safePlateName + "_" + System.currentTimeMillis() + ".png";
-            File outputFile = new File(uploadDir, outputFileName);
             
             ImageIO.write(drawnImg, "png", outputFile);
             
