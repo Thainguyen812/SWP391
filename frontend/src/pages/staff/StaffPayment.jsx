@@ -340,10 +340,10 @@ export const StaffPayment = () => {
     const isError = vehicleToPay?.status === 'Lỗi thẻ';
 
     let amount;
-    let evPenalty = backendTxn?.violationPenalty || (lpr && lpr.includes('EV') ? 100000 : 0);
+    let evPenalty = backendTxn?.violationPenalty != null ? Number(backendTxn.violationPenalty) : 0;
     
-    // Calculate accumulated fines
-    const accumulatedFines = lpr ? getVehicleFines(lpr).reduce((sum, fine) => sum + fine.amount, 0) : 0;
+    // Calculate accumulated fines only if backendTxn is missing
+    const accumulatedFines = (!backendTxn && lpr) ? getVehicleFines(lpr).reduce((sum, fine) => sum + fine.amount, 0) : 0;
     
     if (isLostCard) {
       amount = calculateVisitorFee(lostCardData?.duration) + penaltyAmount + evPenalty;
@@ -408,12 +408,50 @@ export const StaffPayment = () => {
         setIdentityVerified(true);
         setHasVehicle(true);
         setLan1Status('busy');
-        setTotalAmount(0);
-        setCashGiven(0);
-        notification.success({
-          message: 'Đã xác nhận VIP',
-          description: 'Ảnh vào/ra đã được mở để staff đối chiếu trước khi cho xe ra.'
-        });
+
+        let vipPenalty = 0;
+        let vipViolationCount = 0;
+        try {
+          const res = await apiClient.get(`/v1/parking/fee-by-plate/${encodeURIComponent(lpr)}`);
+          const data = res?.data || res;
+          if (data) {
+            vipViolationCount = data.violationCount || 0;
+            vipPenalty = data.violationPenalty || 0;
+            setBackendTxn(prev => ({
+              ...(prev || {}),
+              ticketType: 'VIP',
+              violationCount: vipViolationCount,
+              violationPenalty: vipPenalty,
+              totalAmount: vipPenalty
+            }));
+          }
+        } catch (e) {
+          console.warn("Lỗi lấy thông tin vi phạm VIP:", e);
+        }
+
+        setTotalAmount(vipPenalty);
+        setCashGiven(vipPenalty);
+
+        if (vipViolationCount > 0) {
+          if (vipViolationCount === 1) {
+            notification.warning({
+              message: '🚨 Cảnh báo Xe VIP Đỗ Sai Vị Trí (Lần 1)',
+              description: `Xe VIP ${lpr} đã đỗ sai vị trí quy định 1 lần (cảnh báo nhắc nhở). Vui lòng trực tiếp nhắc nhở tài xế!`,
+              duration: 10
+            });
+          } else {
+            notification.warning({
+              message: '🔴 Phạt Xe VIP Đỗ Sai Vị Trí Lần 2+',
+              description: `Xe VIP ${lpr} đỗ sai vị trí ${vipViolationCount} lần! Đã áp dụng phí phạt +${vipPenalty.toLocaleString()}đ vào tổng tiền thu xuất bãi!`,
+              duration: 10
+            });
+          }
+        } else {
+          notification.success({
+            message: 'Đã xác nhận VIP',
+            description: 'Ảnh vào/ra đã được mở để staff đối chiếu trước khi cho xe ra.'
+          });
+        }
         return;
       }
 
@@ -449,13 +487,13 @@ export const StaffPayment = () => {
       if (txn?.violationCount > 0) {
         if (txn.violationCount === 1) {
           notification.warning({
-            message: '🚨 Phát hiện vi phạm',
-            description: `Xe ${matchedByCard?.plate || lpr || txn.licensePlate} đã đỗ sai vị trí 1 lần (đã nhắc nhở). Vui lòng nhắc nhở trực tiếp tài xế!`,
+            message: '🚨 Cảnh báo đỗ sai vị trí (Lần 1)',
+            description: `Xe ${matchedByCard?.plate || lpr || txn.licensePlate} đã đỗ sai vị trí 1 lần (cảnh báo nhắc nhở). Vui lòng trực tiếp nhắc nhở tài xế!`,
             duration: 10
           });
         } else {
           notification.warning({
-            message: '🚨 Phát hiện vi phạm',
+            message: '🔴 Phạt vi phạm đỗ sai vị trí (Lần 2+)',
             description: `Xe ${matchedByCard?.plate || lpr || txn.licensePlate} đã đỗ sai vị trí ${txn.violationCount} lần. Đã áp dụng mức phạt +${(txn.violationPenalty || 100000).toLocaleString()}đ vào tổng tiền thu!`,
             duration: 10
           });
@@ -732,6 +770,30 @@ export const StaffPayment = () => {
             <p className="text-xs text-red-700 mt-1 mb-0 font-bold">
               Phương tiện mang biển số <span className="font-mono font-black text-red-900 bg-red-100 px-1.5 py-0.5 rounded">{lpr}</span> đang kích hoạt chế độ khóa an toàn từ xa. 
               CẤM MỞ CỔNG XUẤT BÃI cho đến khi đối chiếu đầy đủ giấy tờ tùy thân (CCCD) và Cà vẹt chính chủ trùng khớp.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {backendTxn?.violationCount > 0 && (
+        <div className={`p-4 rounded-xl mb-6 border-l-4 shadow-sm flex items-start gap-3 ${
+          backendTxn.violationCount === 1 ? 'bg-amber-50 border-amber-500' : 'bg-red-50 border-red-600'
+        }`}>
+          <WarningFilled className={`text-lg mt-0.5 ${backendTxn.violationCount === 1 ? 'text-amber-600' : 'text-red-600'}`} />
+          <div>
+            <h4 className={`font-black text-sm uppercase tracking-wide m-0 ${
+              backendTxn.violationCount === 1 ? 'text-amber-800' : 'text-red-800'
+            }`}>
+              {backendTxn.violationCount === 1 
+                ? '⚠️ CẢNH BÁO VI PHẠM ĐỖ SAI VỊ TRÍ (LẦN 1)'
+                : `🔴 VI PHẠM ĐỖ SAI VỊ TRÍ LẦN ${backendTxn.violationCount}: CỘNG TIỀN PHẠT +${(backendTxn.violationPenalty || 100000).toLocaleString()}đ`}
+            </h4>
+            <p className={`text-xs mt-1 mb-0 font-bold ${
+              backendTxn.violationCount === 1 ? 'text-amber-700' : 'text-red-700'
+            }`}>
+              {backendTxn.violationCount === 1
+                ? `Phương tiện mang biển số ${lpr} đã đỗ sai ô/tầng quy định 1 lần (Cảnh báo nhắc nhở). Staff vui lòng trực tiếp nhắc nhở tài xế chú ý đỗ đúng vị trí!`
+                : `Phương tiện mang biển số ${lpr} đỗ sai ô quy định lần ${backendTxn.violationCount}! Đã tự động cộng +${(backendTxn.violationPenalty || 100000).toLocaleString()}đ phí phạt vào tổng tiền thu xuất bãi.`}
             </p>
           </div>
         </div>

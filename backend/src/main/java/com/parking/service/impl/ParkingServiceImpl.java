@@ -1401,6 +1401,11 @@ public class ParkingServiceImpl implements ParkingService {
                     checkOutTime);
         }
 
+        List<ParkingViolation> sessionViolations = parkingViolationRepository.findBySessionId(session.getId());
+        int violationCount = sessionViolations.size();
+        BigDecimal violationPenalty = applyPendingViolationPenalties(session, vehicle, false);
+        BigDecimal totalAmount = parkingFee.add(violationPenalty);
+
         java.util.Map<String, Object> response = new java.util.HashMap<>();
         response.put("sessionId", session.getId().toString());
         response.put("cardId", cardId.toString());
@@ -1408,6 +1413,10 @@ public class ParkingServiceImpl implements ParkingService {
         response.put("checkInTime", session.getCheckInTime());
         response.put("checkOutTime", checkOutTime);
         response.put("parkingFee", parkingFee);
+        response.put("violationCount", violationCount);
+        response.put("violationPenalty", violationPenalty);
+        response.put("totalAmount", totalAmount);
+        response.put("hasViolation", violationCount > 0);
         response.put("isVip", session.getIsVip() != null && session.getIsVip());
         return response;
     }
@@ -1436,12 +1445,21 @@ public class ParkingServiceImpl implements ParkingService {
             card = cardRepository.findById(session.getCardId()).orElse(null);
         }
 
+        List<ParkingViolation> sessionViolations = parkingViolationRepository.findBySessionId(session.getId());
+        int violationCount = sessionViolations.size();
+        BigDecimal violationPenalty = applyPendingViolationPenalties(session, vehicle, false);
+        BigDecimal totalAmount = parkingFee.add(violationPenalty);
+
         java.util.Map<String, Object> response = new java.util.HashMap<>();
         response.put("sessionId", session.getId().toString());
         response.put("licensePlate", session.getLicensePlate());
         response.put("checkInTime", session.getCheckInTime());
         response.put("checkOutTime", checkOutTime);
         response.put("parkingFee", parkingFee);
+        response.put("violationCount", violationCount);
+        response.put("violationPenalty", violationPenalty);
+        response.put("totalAmount", totalAmount);
+        response.put("hasViolation", violationCount > 0);
         response.put("isVip", session.getIsVip() != null && session.getIsVip());
         response.put("cardCode", card != null ? card.getCardCode() : "");
         return response;
@@ -1697,8 +1715,8 @@ public class ParkingServiceImpl implements ParkingService {
         long historyViolations = parkingViolationRepository.countByVehicleId(vehicle.getId());
         boolean firstViolation = historyViolations == 0;
 
-        // Lần 1: chỉ nhắc nhở, không phạt tiền. Lần 2+: phạt 50,000đ mỗi lần
-        BigDecimal penaltyAmount = firstViolation ? BigDecimal.ZERO : new BigDecimal("50000");
+        // Lần 1: chỉ nhắc nhở, không phạt tiền. Lần 2+: phạt 100,000đ mỗi lần
+        BigDecimal penaltyAmount = firstViolation ? BigDecimal.ZERO : new BigDecimal("100000");
         boolean penaltyApplied = !firstViolation;
 
         ParkingViolation violation = new ParkingViolation();
