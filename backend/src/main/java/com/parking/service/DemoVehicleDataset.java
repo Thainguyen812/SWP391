@@ -121,8 +121,8 @@ public final class DemoVehicleDataset {
     public static String zoneForType(String vehicleType) {
         return switch (normalizeVehicleType(vehicleType)) {
             case "SUV_CUV_MPV" -> "F2";
-            case "VAN_TRUCK" -> "B1";
-            case "MINIBUS_16" -> "G";
+            case "VAN_TRUCK" -> "B2";
+            case "MINIBUS_16" -> "B1";
             default -> "F1";
         };
     }

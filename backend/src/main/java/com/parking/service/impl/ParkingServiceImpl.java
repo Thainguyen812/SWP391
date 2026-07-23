@@ -1673,6 +1673,10 @@ public class ParkingServiceImpl implements ParkingService {
         long historyViolations = parkingViolationRepository.countByVehicleId(vehicle.getId());
         boolean firstViolation = historyViolations == 0;
 
+        // Lần 1: chỉ nhắc nhở, không phạt tiền. Lần 2+: phạt 50,000đ mỗi lần
+        BigDecimal penaltyAmount = firstViolation ? BigDecimal.ZERO : new BigDecimal("50000");
+        boolean penaltyApplied = !firstViolation;
+
         ParkingViolation violation = new ParkingViolation();
         violation.setSessionId(session.getId());
         violation.setSlotId(slot.getId());
@@ -1680,9 +1684,9 @@ public class ParkingServiceImpl implements ParkingService {
         violation.setDetectedBy(detectedBy);
         violation.setDetectedAt(Instant.now());
         violation.setFirstViolation(firstViolation);
-        violation.setPenaltyApplied(false);
-        violation.setPenaltyAmount(BigDecimal.ZERO);
-        violation.setStatus("PENDING");
+        violation.setPenaltyApplied(penaltyApplied);
+        violation.setPenaltyAmount(penaltyAmount);
+        violation.setStatus(firstViolation ? "WARNING" : "FINED");
         violation.setNotes(notes);
         violation.setPhotoUrls(imageUrl != null && !imageUrl.isBlank()
                 ? "[\"" + imageUrl.replace("\"", "") + "\"]"
@@ -1697,6 +1701,8 @@ public class ParkingServiceImpl implements ParkingService {
         result.put("type", saved.getViolationType());
         result.put("firstViolation", saved.isFirstViolation());
         result.put("penaltyAmount", saved.getPenaltyAmount());
+        result.put("penaltyApplied", penaltyApplied);
+        result.put("status", saved.getStatus());
         result.put("notes", saved.getNotes());
         return result;
     }
@@ -1845,16 +1851,28 @@ public class ParkingServiceImpl implements ParkingService {
         java.util.List<java.util.Map<String, Object>> createdViolations = new java.util.ArrayList<>();
 
         if (zoneMismatch || vehicleTypeMismatch) {
+            String correctZoneCode = DemoVehicleDataset.zoneForType(effectiveVehicleType);
+            String correctFloorName = switch (correctZoneCode.toUpperCase()) {
+                case "F1" -> "Tầng F1 (Xe 4-5 chỗ)";
+                case "F2" -> "Tầng F2 (Xe 7-9 chỗ)";
+                case "B1" -> "Tầng B1 (Xe 16 chỗ)";
+                case "B2" -> "Tầng B2 (Xe tải/Van)";
+                default -> correctZoneCode;
+            };
+            String violationNote = "⚠️ Xe " + vehicleSizeLabel(effectiveVehicleType)
+                    + " (" + session.getLicensePlate() + ")"
+                    + " đang đỗ sai tầng " + slotZone.getCode()
+                    + ". Xe phải di chuyển đến " + correctFloorName + ".";
             java.util.Map<String, Object> violation = createSensorViolationIfAbsent(
                     session,
                     vehicle,
                     slot,
                     "DOUBLE_PARKING",
-                    "Sensor phát hiện xe đỗ sai tầng/khu vực. Biển số " + session.getLicensePlate()
-                            + ", loại xe " + vehicleSizeLabel(effectiveVehicleType)
-                            + ", khu vực hiện tại " + slotZone.getCode(),
+                    violationNote,
                     request.getImageUrl());
             if (violation != null) {
+                violation.put("correctFloor", correctFloorName);
+                violation.put("currentFloor", slotZone.getCode());
                 createdViolations.add(violation);
             }
         }
