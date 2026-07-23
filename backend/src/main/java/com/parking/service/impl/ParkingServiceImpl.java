@@ -481,6 +481,21 @@ public class ParkingServiceImpl implements ParkingService {
             }
         }
 
+        // Check vi phạm chưa xử lý (Pending Violations)
+        List<ParkingViolation> sessionViolations = parkingViolationRepository.findBySessionId(session.getId());
+        boolean hasUnprocessedFines = sessionViolations.stream().anyMatch(v -> "FINED".equals(v.getStatus()));
+        
+        if (hasUnprocessedFines) {
+            throw new ApiExceptions.ForbiddenException("Xe VIP đang có vi phạm đỗ sai tầng cần nộp phạt! Vui lòng liên hệ nhân viên để xử lý trước khi xuất bãi.");
+        }
+
+        // Nếu chỉ có WARNING thì bỏ qua và tự động mark PROCESSED
+        sessionViolations.stream().filter(v -> "WARNING".equals(v.getStatus())).forEach(v -> {
+            v.setStatus("PROCESSED");
+            v.setPenaltyApplied(true);
+            parkingViolationRepository.save(v);
+        });
+
         // 6. Check gói cước VIP (VipSubscription) của xe đó phải đang ở trạng thái
         // 'ACTIVE'
         VipSubscription sub = vipSubscriptionRepository
@@ -884,7 +899,8 @@ public class ParkingServiceImpl implements ParkingService {
                 existingTxn.setViolationPenalty(violationPenalty);
                 existingTxn.setTotalAmount(parkingFee.add(lostCardPenalty).add(violationPenalty));
                 
-                List<ParkingViolation> pendingViolations = parkingViolationRepository.findBySessionIdAndStatus(session.getId(), "PENDING");
+                List<ParkingViolation> pendingViolations = parkingViolationRepository.findBySessionId(session.getId())
+                        .stream().filter(v -> "FINED".equals(v.getStatus())).collect(java.util.stream.Collectors.toList());
                 existingTxn.setViolationCount(pendingViolations.size());
                 existingTxn.setProcessedAt(checkOutTime);
 
@@ -927,7 +943,8 @@ public class ParkingServiceImpl implements ParkingService {
         transaction.setViolationPenalty(violationPenalty);
         transaction.setTotalAmount(parkingFee.add(lostCardPenalty).add(violationPenalty));
         
-        List<ParkingViolation> pendingViolations = parkingViolationRepository.findBySessionIdAndStatus(session.getId(), "PENDING");
+        List<ParkingViolation> pendingViolations = parkingViolationRepository.findBySessionId(session.getId())
+                .stream().filter(v -> "FINED".equals(v.getStatus())).collect(java.util.stream.Collectors.toList());
         transaction.setViolationCount(pendingViolations.size());
         transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
         transaction.setPaymentStatus(Transaction.PaymentStatus.PENDING);
@@ -941,24 +958,23 @@ public class ParkingServiceImpl implements ParkingService {
 
     private BigDecimal applyPendingViolationPenalties(ParkingSession session, Vehicle vehicle, boolean markProcessed) {
         List<ParkingViolation> pendingViolations = parkingViolationRepository
-                .findBySessionIdAndStatus(session.getId(), "PENDING");
+                .findBySessionId(session.getId())
+                .stream()
+                .filter(v -> "PENDING".equals(v.getStatus()) || "WARNING".equals(v.getStatus()) || "FINED".equals(v.getStatus()))
+                .collect(java.util.stream.Collectors.toList());
 
         if (pendingViolations.isEmpty()) {
             return BigDecimal.ZERO;
         }
 
-        BigDecimal evPenaltyRate = new java.math.BigDecimal("100000");
         BigDecimal totalFines = BigDecimal.ZERO;
 
         for (ParkingViolation violation : pendingViolations) {
-            if (violation.isFirstViolation()) {
-                violation.setPenaltyAmount(BigDecimal.ZERO);
-            } else {
-                violation.setPenaltyAmount(evPenaltyRate);
-                totalFines = totalFines.add(evPenaltyRate);
+            if (violation.getPenaltyAmount() != null) {
+                totalFines = totalFines.add(violation.getPenaltyAmount());
             }
-            violation.setPenaltyApplied(true);
             if (markProcessed) {
+                violation.setPenaltyApplied(true);
                 violation.setStatus("PROCESSED");
             }
         }
@@ -969,12 +985,17 @@ public class ParkingServiceImpl implements ParkingService {
 
     private void markPendingViolationsProcessed(UUID sessionId) {
         List<ParkingViolation> pendingViolations = parkingViolationRepository
-                .findBySessionIdAndStatus(sessionId, "PENDING");
+                .findBySessionId(sessionId)
+                .stream()
+                .filter(v -> "PENDING".equals(v.getStatus()) || "WARNING".equals(v.getStatus()) || "FINED".equals(v.getStatus()))
+                .collect(java.util.stream.Collectors.toList());
+
         if (pendingViolations.isEmpty()) {
             return;
         }
         for (ParkingViolation violation : pendingViolations) {
             violation.setStatus("PROCESSED");
+            violation.setPenaltyApplied(true);
         }
         parkingViolationRepository.saveAll(pendingViolations);
     }
@@ -1186,14 +1207,15 @@ public class ParkingServiceImpl implements ParkingService {
 
         markPendingViolationsProcessed(session.getId());
 
-        Card card = cardRepository
-                .findById(session.getCardId())
-                .orElseThrow(() -> new ApiExceptions.NotFoundException(
-                        "Không tìm thấy thẻ"));
+        if (session.getCardId() != null) {
+            Card card = cardRepository
+                    .findById(session.getCardId())
+                    .orElseThrow(() -> new ApiExceptions.NotFoundException(
+                            "Không tìm thấy thẻ"));
 
-        card.setStatus(Card.CardStatus.AVAILABLE);
-
-        cardRepository.save(card);
+            card.setStatus(Card.CardStatus.AVAILABLE);
+            cardRepository.save(card);
+        }
 
         if (session.getAssignedZoneId() != null) {
             zoneRepository.decreaseOccupied(
@@ -1798,22 +1820,7 @@ public class ParkingServiceImpl implements ParkingService {
                 .orElse(null);
 
         if (vehicle != null) {
-            if (!"ELECTRIC".equalsIgnoreCase(vehicle.getFuelType()) && slotZone.isHasEvCharger()) {
-                throw new ApiExceptions.BadRequestException("Khu vực này có trạm sạc chỉ dành riêng cho xe điện (EV). Xe xăng/dầu vui lòng đỗ ở khu vực khác!");
-            }
-
-            java.util.List<String> allowedSizes = allowedVehicleSizeCodes(slotZone);
-            if (!allowedSizes.contains(vehicle.getVehicleSize())) {
-                String vehicleSizeName = "SEDAN_HATCHBACK".equals(vehicle.getVehicleSize()) ? "4-5 chỗ" : 
-                                        "SUV_CUV_MPV".equals(vehicle.getVehicleSize()) ? "7-9 chỗ" : 
-                                        "MINIBUS_16".equals(vehicle.getVehicleSize()) ? "16 chỗ" : "tải/van";
-                
-                String zoneSizeName = allowedSizes.contains("SEDAN_HATCHBACK") ? "4-5 chỗ" : 
-                                      allowedSizes.contains("SUV_CUV_MPV") ? "7-9 chỗ" : 
-                                      allowedSizes.contains("MINIBUS_16") ? "16 chỗ" : "tải/van";
-                
-                throw new ApiExceptions.BadRequestException("Sai luồng đỗ xe: Xe " + vehicleSizeName + " không được đỗ tại khu vực dành cho xe " + zoneSizeName + "!");
-            }
+            // Sensor vẫn ghi nhận đỗ, vi phạm sẽ được tính ở bước dưới thay vì throw lỗi.
         }
 
         parkingSessionRepository
@@ -2038,6 +2045,33 @@ public class ParkingServiceImpl implements ParkingService {
             ParkingSession session = sessionOpt.get();
             if (session.getCardId() != null) {
                 return this.checkoutCard(session.getCardId());
+            } else if (session.getIsVip() != null && session.getIsVip()) {
+                Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
+                        .orElseThrow(() -> new ApiExceptions.NotFoundException("Không tìm thấy thông tin xe để tính phí"));
+                Instant checkOutTime = Instant.now();
+                BigDecimal violationPenalty = applyPendingViolationPenalties(session, vehicle, false);
+
+                if (violationPenalty.compareTo(BigDecimal.ZERO) == 0) {
+                    throw new ApiExceptions.BadRequestException("Xe VIP này không có vi phạm cần thanh toán.");
+                }
+
+                Transaction transaction = new Transaction();
+                transaction.setId(UUID.randomUUID());
+                transaction.setSessionId(session.getId());
+                transaction.setParkingFee(BigDecimal.ZERO);
+                transaction.setLostCardPenalty(BigDecimal.ZERO);
+                transaction.setViolationPenalty(violationPenalty);
+                transaction.setTotalAmount(violationPenalty);
+                
+                List<ParkingViolation> pendingViolations = parkingViolationRepository.findBySessionId(session.getId())
+                    .stream().filter(v -> "FINED".equals(v.getStatus())).toList();
+                transaction.setViolationCount(pendingViolations.size());
+                transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
+                transaction.setPaymentStatus(Transaction.PaymentStatus.PENDING);
+                transaction.setIsMobileCheckout(false);
+                transaction.setProcessedAt(checkOutTime);
+
+                return transactionRepository.save(transaction);
             }
         }
 

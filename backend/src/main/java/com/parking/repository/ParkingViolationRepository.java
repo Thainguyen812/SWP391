@@ -16,4 +16,5 @@ public interface ParkingViolationRepository extends JpaRepository<ParkingViolati
     long countByVehicleId(@Param("vehicleId") UUID vehicleId);
 
     List<ParkingViolation> findBySessionIdAndStatus(UUID sessionId, String status);
+    List<ParkingViolation> findBySessionId(UUID sessionId);
 }
