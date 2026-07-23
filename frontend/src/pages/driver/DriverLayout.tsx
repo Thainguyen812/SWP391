@@ -360,7 +360,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
 
             const vehPlate = v.licensePlate || v.plate;
             return {
-              id: vehPlate || v.id,
+              id: v.id || vehPlate,
               plate: vehPlate,
               name: v.name || v.brand || 'Phương tiện',
               type: sizeLabel,
