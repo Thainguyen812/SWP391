@@ -11,9 +11,11 @@ import {
   WarningFilled,
   CarOutlined,
   WalletOutlined,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
+  CameraOutlined
 } from '@ant-design/icons';
 import { notification, Input, Button, Modal, Spin } from 'antd';
+import { Html5Qrcode } from 'html5-qrcode';
 import { useGlobalContext } from '../../context/GlobalContext';
 import { apiClient } from '../../api/apiClient';
 import { parkingService } from '../../services/parkingService';
@@ -50,6 +52,96 @@ export const StaffPayment = () => {
   const [nowTick, setNowTick] = useState(Date.now());
   const [cccdImage, setCccdImage] = useState(null);
   const [regImage, setRegImage] = useState(null);
+
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
+  const [manualQrInput, setManualQrInput] = useState('');
+
+  const processScannedQrCode = (qrText) => {
+    if (!qrText) return;
+    
+    let raw = qrText.trim();
+    let extracted = '';
+    const plateRegex = /^[0-9]{2}[A-Z0-9]{1,2}-[0-9]{4,5}(\.SIM)?$/i;
+
+    if (raw.includes('|')) {
+      extracted = raw.split('|')[0].trim();
+    } else if (raw.startsWith('VIP_Checkout_')) {
+      extracted = raw.replace('VIP_Checkout_', '').trim();
+    } else if (plateRegex.test(raw)) {
+      extracted = raw;
+    }
+
+    // Case 1: External random QR code (not matching parking token structure or plate format)
+    if (!extracted) {
+      notification.error({
+        message: '❌ Mã QR không hợp lệ!',
+        description: 'Mã QR vừa quét không chứa thông tin vé/xe hệ thống. Vui lòng quét lại đúng Mã QR ra vào cổng từ App Tài xế!',
+        duration: 5
+      });
+      return;
+    }
+
+    const currentLanePlate = (lpr || '').trim().toUpperCase();
+    const scannedPlate = extracted.trim().toUpperCase();
+
+    // Case 2: QR code is for a DIFFERENT vehicle than the one at the gate
+    if (currentLanePlate && scannedPlate !== currentLanePlate) {
+      notification.error({
+        message: '❌ Lỗi xác thực Mã QR VIP!',
+        description: `Mã QR vừa quét (Xe ${scannedPlate}) KHÔNG TRÙNG KHỚP với biển số xe (${currentLanePlate}) đang ở làn thanh toán! Vui lòng kiểm tra lại.`,
+        duration: 6
+      });
+      return;
+    }
+
+    // Case 3: Success match!
+    setIsQrScannerOpen(false);
+    setManualQrInput('');
+    notification.success({
+      message: '✓ Xác thực Mã QR VIP Thành Công!',
+      description: `Biển số xe: ${scannedPlate} - Khớp 100% với thông tin xe đang ở làn thanh toán.`
+    });
+    
+    setTimeout(() => {
+      handlePayment();
+    }, 400);
+  };
+
+  useEffect(() => {
+    if (!isQrScannerOpen) return;
+
+    let html5QrCode = null;
+    const timer = setTimeout(() => {
+      try {
+        const element = document.getElementById("qr-reader");
+        if (element) {
+          html5QrCode = new Html5Qrcode("qr-reader");
+          html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 220, height: 220 } },
+            (decodedText) => {
+              processScannedQrCode(decodedText);
+              if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop().catch(err => console.error("Error stopping scanner:", err));
+              }
+            },
+            () => {}
+          ).catch(err => {
+            console.warn("Camera access warning:", err);
+          });
+        }
+      } catch (e) {
+        console.error("Html5Qrcode error:", e);
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+      if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().catch(err => console.error("Scanner cleanup error:", err));
+      }
+    };
+  }, [isQrScannerOpen]);
 
   const getIdImages = (plate) => {
     const profile = getDemoVehicleProfile(plate);
@@ -617,7 +709,7 @@ export const StaffPayment = () => {
                 <span className="bg-slate-100 text-slate-500 font-mono text-xs px-3 py-1 rounded">TICKET #{ticketNumber}</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* LPR and Cameras */}
               <div className="flex flex-col gap-6">
                 <div>
@@ -719,7 +811,7 @@ export const StaffPayment = () => {
               </div>
 
               {/* Payment Details */}
-              <div className="flex flex-col border-l border-slate-100 pl-8">
+              <div className="flex flex-col border-t md:border-t-0 md:border-l border-slate-100 pt-6 md:pt-0 md:pl-8">
                 <div className="flex justify-between items-start mb-8">
                   <div>
                     <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
@@ -868,15 +960,30 @@ export const StaffPayment = () => {
                     </div>
                   )}
                   {paymentMethod === 'card' && (
-                    <div className="bg-white border border-blue-200 rounded-lg p-4 flex flex-col items-center justify-center animate-fadeIn shadow-sm relative overflow-hidden">
-                      <div className="w-28 h-28 bg-slate-50 rounded-lg flex items-center justify-center mb-3 border border-slate-200 overflow-hidden relative">
+                    <div className="bg-white border border-blue-200 rounded-lg p-4 flex flex-col items-center justify-center animate-fadeIn shadow-sm relative overflow-hidden space-y-2">
+                      <div className="w-28 h-28 bg-slate-50 rounded-lg flex items-center justify-center mb-1 border border-slate-200 overflow-hidden relative">
                         <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=VIP_Checkout_${lpr || 'Unknown'}`} alt="QR Code VIP" className="w-24 h-24 object-contain" />
                         <div className="absolute inset-0 bg-amber-500/10 animate-pulse pointer-events-none"></div>
                       </div>
-                      <span className="text-xs font-medium text-slate-500 text-center mb-3">Mã QR dành cho Thành viên VIP<br/>(Dùng app hệ thống để quét)</span>
-                      <button onClick={handlePayment} disabled={!canReviewVehicle} className={`w-full border text-xs font-bold py-2 rounded transition-colors flex items-center justify-center gap-2 ${canReviewVehicle ? 'bg-amber-50 hover:bg-amber-100 text-amber-600 border-amber-200 cursor-pointer' : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'}`}>
-                        <QrcodeOutlined /> Giả lập đã quét mã VIP
-                      </button>
+                      <span className="text-xs font-medium text-slate-500 text-center mb-2">Mã QR dành cho Thành viên VIP<br/>(Quét bằng Camera thật hoặc giả lập)</span>
+
+                      <div className="w-full space-y-2">
+                        <button 
+                          type="button"
+                          onClick={() => setIsQrScannerOpen(true)}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-98"
+                        >
+                          <CameraOutlined /> 📷 Quét mã QR thật qua Camera / Webcam
+                        </button>
+
+                        <button 
+                          onClick={handlePayment} 
+                          disabled={!canReviewVehicle} 
+                          className={`w-full border text-xs font-bold py-2 rounded transition-colors flex items-center justify-center gap-2 ${canReviewVehicle ? 'bg-amber-50 hover:bg-amber-100 text-amber-600 border-amber-200 cursor-pointer' : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'}`}
+                        >
+                          <QrcodeOutlined /> ⚡ Giả lập đã quét mã VIP
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1146,6 +1253,63 @@ export const StaffPayment = () => {
 
         </div>
       </div>
+
+      {/* MODAL QUÉT MÃ QR THẬT BẰNG WEBCAM / CAMERA */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-blue-600 font-bold text-base">
+            <QrcodeOutlined /> Quét mã QR VIP bằng Camera / Webcam
+          </div>
+        }
+        open={isQrScannerOpen}
+        onCancel={() => setIsQrScannerOpen(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setIsQrScannerOpen(false)}>
+            Đóng Camera
+          </Button>
+        ]}
+        destroyOnClose
+        centered
+        width={480}
+      >
+        <div className="space-y-4 py-2 text-left">
+          <p className="text-xs text-slate-500 leading-relaxed m-0">
+            Giơ điện thoại tài xế (màn hình xuất mã QR từ App) trước Camera máy tính để quét tự động, hoặc dán chuỗi mã QR vào ô bên dưới:
+          </p>
+
+          <div className="border-2 border-dashed border-blue-200 rounded-2xl p-3 bg-slate-50 flex flex-col items-center justify-center min-h-[240px] relative overflow-hidden shadow-inner">
+            <div id="qr-reader" className="w-full max-w-[320px] overflow-hidden rounded-xl bg-black" />
+            <span className="text-[11px] text-blue-600 mt-2 font-bold text-center flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping inline-block" />
+              Camera đang hoạt động... Hướng mã QR vào khung vuông.
+            </span>
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-slate-100">
+            <label className="text-xs font-bold text-slate-700 block">Hoặc dán/nhập chuỗi mã QR trực tiếp:</label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Ví dụ: 65A-28412|RA|1721731920"
+                value={manualQrInput}
+                onChange={(e) => setManualQrInput(e.target.value)}
+                className="font-mono text-xs"
+              />
+              <Button
+                type="primary"
+                onClick={() => {
+                  if (!manualQrInput.trim()) {
+                    notification.error({ message: 'Vui lòng nhập chuỗi mã QR!' });
+                    return;
+                  }
+                  processScannedQrCode(manualQrInput);
+                }}
+              >
+                Xác nhận
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

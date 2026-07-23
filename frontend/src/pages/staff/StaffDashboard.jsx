@@ -411,9 +411,11 @@ export const StaffDashboard = () => {
               const isSelected = vehicle && currentVehicle?.id === vehicle.id;
               
               // Helper to map status to color
-              const getStatusBadge = (type, status) => {
+              const getStatusBadge = (type, status, confidence) => {
                 if (type === 'VIP') return <span className="bg-black border border-amber-500 text-amber-400 text-[10px] font-bold px-2 py-1 rounded">VIP</span>;
                 if (status === 'Lỗi thẻ' || status === 'Chờ thanh toán') return <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase">{status}</span>;
+                const numConf = parseInt(confidence) || 99;
+                if (numConf < 70) return <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-1 rounded animate-pulse shadow-sm">⚠️ CẦN XÁC NHẬN</span>;
                 return <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded">HỢP LỆ</span>;
               };
 
@@ -489,7 +491,7 @@ export const StaffDashboard = () => {
                             {vehicle.type === 'VIP' ? 'Khách VIP' : 'Khách Vãng Lai'} • {vehicle.type === 'Vé tháng' && vehicle.status === 'Lỗi thẻ' ? 'Khớp đặt chỗ: LỖI' : `Độ tin cậy: ${vehicle.confidence}`}
                           </div>
                         </div>
-                        {getStatusBadge(vehicle.type, vehicle.status)}
+                        {getStatusBadge(vehicle.type, vehicle.status, vehicle.confidence)}
                       </div>
                     </div>
                   ) : (

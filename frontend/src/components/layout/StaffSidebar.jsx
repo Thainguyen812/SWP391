@@ -28,7 +28,7 @@ const navItems = [
   { path: '/staff-settings', label: 'Bàn giao ca', icon: <SwapOutlined /> },
 ];
 
-export const StaffSidebar = () => {
+export const StaffSidebar = ({ onItemClick }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser } = useGlobalContext();
@@ -74,6 +74,7 @@ export const StaffSidebar = () => {
                 <li key={index} className="mb-1">
                   <Link 
                     to={item.path}
+                    onClick={() => { if (onItemClick) onItemClick(); }}
                     className={`sidebar-nav-item ${isActive ? 'sidebar-nav-item-active' : 'text-slate-300 hover:bg-white/5'}`}
                   >
                     <span className={`sidebar-nav-icon ${isActive ? 'sidebar-nav-icon-active' : ''}`}>{item.icon}</span>

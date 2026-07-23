@@ -41,6 +41,7 @@ public class DriverController {
     private final VipSubscriptionRepository vipSubscriptionRepository;
     private final TransactionRepository transactionRepository;
     private final SecurityAlertRepository securityAlertRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     public DriverController(
             VipQrIdentifierRepository qrRepo,
@@ -50,7 +51,8 @@ public class DriverController {
             UserRepository userRepository,
             VipSubscriptionRepository vipSubscriptionRepository,
             TransactionRepository transactionRepository,
-            SecurityAlertRepository securityAlertRepository) {
+            SecurityAlertRepository securityAlertRepository,
+            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
 
         this.qrRepo = qrRepo;
         this.sessionRepo = sessionRepo;
@@ -60,6 +62,35 @@ public class DriverController {
         this.vipSubscriptionRepository = vipSubscriptionRepository;
         this.transactionRepository = transactionRepository;
         this.securityAlertRepository = securityAlertRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    // API đổi mật khẩu tài khoản Driver (xác thực BCrypt DB)
+    @PostMapping("/change-password")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> request, Authentication authentication) {
+        String username = authentication.getName();
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+
+        String oldPassword = request.get("oldPassword");
+        String newPassword = request.get("newPassword");
+
+        if (oldPassword == null || oldPassword.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Vui lòng nhập mật khẩu hiện tại!"));
+        }
+        if (newPassword == null || newPassword.trim().length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Mật khẩu mới phải có ít nhất 6 ký tự!"));
+        }
+
+        if (!passwordEncoder.matches(oldPassword, currentUser.getPasswordHash())) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Mật khẩu hiện tại không chính xác!"));
+        }
+
+        currentUser.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(currentUser);
+
+        return ResponseEntity.ok(Map.of("success", true, "message", "Đổi mật khẩu tài khoản thành công!"));
     }
 
     @PostMapping("/qr/generate")
@@ -267,9 +298,26 @@ public class DriverController {
                 history.add(item);
             }
             
-            // 2. Lấy thông tin các lần trả phí gửi xe (Check-out) của xe
+            // 2. Lấy thông tin lượt đỗ (Check-in & Check-out) của xe
             List<ParkingSession> sessions = sessionRepo.findByLicensePlate(v.getLicensePlate());
             for (ParkingSession session : sessions) {
+                // a. Sự kiện Xe Vào (Check-in)
+                if (session.getCheckInTime() != null) {
+                    java.util.Map<String, Object> inItem = new java.util.HashMap<>();
+                    inItem.put("id", session.getId().toString().substring(0, 8).toUpperCase());
+                    String dateInStr = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
+                            .withZone(java.time.ZoneId.systemDefault())
+                            .format(session.getCheckInTime());
+                    inItem.put("date", dateInStr);
+                    inItem.put("type", "Xe vào");
+                    inItem.put("plate", v.getLicensePlate());
+                    inItem.put("fee", "0₫");
+                    inItem.put("isEntry", true);
+                    inItem.put("status", "Thành công");
+                    history.add(inItem);
+                }
+
+                // b. Sự kiện Xe Ra (Check-out)
                 Optional<Transaction> txOpt = transactionRepository.findBySessionId(session.getId());
                 if (txOpt.isPresent()) {
                     Transaction tx = txOpt.get();
@@ -282,7 +330,7 @@ public class DriverController {
                             .format(tx.getProcessedAt())
                         : "01/07/2026 00:00:00";
                     item.put("date", dateStr);
-                    item.put("type", "Gửi xe");
+                    item.put("type", "Xe ra");
                     item.put("plate", v.getLicensePlate());
                     
                     String feeVal = tx.getTotalAmount() != null ? tx.getTotalAmount().toString() : "0";
@@ -291,12 +339,16 @@ public class DriverController {
                     }
                     try {
                         long feeLong = Long.parseLong(feeVal);
-                        feeVal = String.format("%,d", feeLong).replace(',', '.') + "₫";
+                        if (feeLong == 0) {
+                            feeVal = "0₫";
+                        } else {
+                            feeVal = "-" + String.format("%,d", feeLong).replace(',', '.') + "₫";
+                        }
                     } catch (Exception e) {
-                        feeVal = feeVal + "₫";
+                        feeVal = "-" + feeVal + "₫";
                     }
                     
-                    item.put("fee", "-" + feeVal);
+                    item.put("fee", feeVal);
                     item.put("isEntry", false);
                     item.put("status", tx.getPaymentStatus() == Transaction.PaymentStatus.SUCCESS ? "Thành công" : "Đang xử lý");
                     history.add(item);

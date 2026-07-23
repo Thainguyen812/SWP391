@@ -262,7 +262,11 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
     return 0; // Default to 0 for new users
   });
 
-  const [selectedVehId, setSelectedVehId] = useState<string>('veh-1');
+  const [selectedVehId, setSelectedVehId] = useState<string>('');
+  const selectedVehIdRef = useRef(selectedVehId);
+  useEffect(() => {
+    selectedVehIdRef.current = selectedVehId;
+  }, [selectedVehId]);
   const [qrDirection, setQrDirection] = useState<'VÀO' | 'RA'>('VÀO');
   const [isTogglingLock, setIsTogglingLock] = useState<string | null>(null);
 
@@ -283,10 +287,91 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   const [isGeneratingQr, setIsGeneratingQr] = useState<boolean>(false);
   const [countdownSec, setCountdownSec] = useState<number>(300);
 
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [isChangingPw, setIsChangingPw] = useState(false);
+
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('100000');
+  const [withdrawBank, setWithdrawBank] = useState('Vietcombank');
+  const [withdrawAccNo, setWithdrawAccNo] = useState('');
+
+  const handleChangePassword = async () => {
+    if (!oldPassword.trim()) {
+      triggerToast('Vui lòng nhập mật khẩu hiện tại!', 'error');
+      return;
+    }
+    if (!newPassword.trim() || newPassword.length < 6) {
+      triggerToast('Mật khẩu mới phải có ít nhất 6 ký tự!', 'error');
+      return;
+    }
+
+    setIsChangingPw(true);
+    try {
+      const response = await fetch('/api/v1/driver/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}`
+        },
+        body: JSON.stringify({ oldPassword, newPassword })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        triggerToast('✓ Đổi mật khẩu tài khoản thành công 100%!', 'success');
+        setOldPassword('');
+        setNewPassword('');
+      } else {
+        triggerToast(`Lỗi: ${data.message || 'Không thể đổi mật khẩu'}`, 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Lỗi kết nối máy chủ khi đổi mật khẩu!', 'error');
+    } finally {
+      setIsChangingPw(false);
+    }
+  };
+
+  const handleWithdraw = () => {
+    const val = parseFloat(withdrawAmount);
+    if (isNaN(val) || val <= 0) {
+      triggerToast('Vui lòng nhập số tiền hợp lệ!', 'error');
+      return;
+    }
+    if (val > balance) {
+      triggerToast('Số tiền rút vượt quá số dư khả dụng!', 'error');
+      return;
+    }
+    if (!withdrawAccNo.trim()) {
+      triggerToast('Vui lòng nhập số tài khoản ngân hàng!', 'error');
+      return;
+    }
+
+    const newBal = balance - val;
+    setBalance(newBal);
+    const phoneKey = user?.phone || (user?.username && !user?.username.includes('@') ? user?.username : 'default');
+    localStorage.setItem(`urbanpark_user_balance_${phoneKey}`, newBal.toString());
+
+    const newTx = {
+      id: `#WD${Date.now().toString().slice(-6)}`,
+      date: new Date().toLocaleString('vi-VN'),
+      type: `Rút tiền về ${withdrawBank} (${withdrawAccNo})`,
+      plate: '-',
+      fee: `-${val.toLocaleString('vi-VN')}₫`,
+      isEntry: false,
+      status: 'Thành công'
+    };
+
+    setTransactions((prev: any) => [newTx, ...prev]);
+    setWithdrawModalOpen(false);
+    setWithdrawAccNo('');
+    triggerToast(`✓ Đã gửi lệnh rút ${val.toLocaleString('vi-VN')}₫ về ${withdrawBank} thành công!`, 'success');
+  };
+
   const generateQrToken = async (vehicleId: string, direction: 'VÀO' | 'RA') => {
     if (isOffline) return;
     if (!vehicleId || vehicleId.startsWith('veh-')) {
-      const activeVeh = vehicles.find(v => v.id === vehicleId) || vehicles[0];
+      const activeVeh = vehicles.find(v => v.id === vehicleId || v.plate === vehicleId) || vehicles[0];
       const plateStr = activeVeh ? activeVeh.plate : '34G56789';
       setActiveQrToken(`MOCK_${plateStr}|${direction}|${Date.now()}`);
       setQrExpiryTime(Date.now() + 300000);
@@ -328,7 +413,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   // Tự động generate/refresh token khi thay đổi
   useEffect(() => {
     if (isQrRequested) {
-      const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+      const activeVeh = vehicles.find(v => v.id === selectedVehId || v.plate === selectedVehId) || vehicles[0];
       if (activeVeh) {
         generateQrToken(activeVeh.id, qrDirection);
       }
@@ -354,7 +439,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         const diff = Math.max(0, Math.round((qrExpiryTime - Date.now()) / 1000));
         setCountdownSec(diff);
         if (diff <= 5 && !isGeneratingQr) {
-          const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+          const activeVeh = vehicles.find(v => v.id === selectedVehId || v.plate === selectedVehId) || vehicles[0];
           if (activeVeh) {
             generateQrToken(activeVeh.id, qrDirection);
           }
@@ -475,25 +560,39 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
               } catch (err) {}
             }
 
+            const isVipBool = subStatus === 'ACTIVE' || v.isVip === true || v.isVipVehicle === true || Boolean(activeSub);
+
+            const vehPlate = v.licensePlate || v.plate;
             return {
-              id: v.id || `veh-${v.licensePlate || v.plate}`,
-              plate: v.licensePlate || v.plate,
+              id: vehPlate || v.id,
+              plate: vehPlate,
               name: v.brand || v.name || 'Phương tiện',
               type: sizeLabel,
               regDate: regDate,
               isActive: v.isActive !== false && v.active !== false,
-              image: getVehicleImage(v.licensePlate || v.plate, sizeLabel),
-              isLocked: activeSub ? (v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false)) : false,
+              isVip: isVipBool,
+              expiry: expiry,
+              image: getVehicleImage(vehPlate, sizeLabel),
+              isLocked: isVipBool ? (v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false)) : false,
               fuelType: v.fuelType || existingLocal?.fuelType || 'GASOLINE',
               activeSubscription: activeSub,
               subscriptionExpiry: expiry,
-              subscriptionStatus: subStatus
+              subscriptionStatus: subStatus,
+              registrationDocUrl: v.registrationDocUrl || v.registrationPaperUrl,
+              registrationPhotoUrl: v.registrationPhotoUrl || v.frontPhotoUrl
             };
           });
 
           // Cập nhật selectedVehId bên ngoài nhưng dựa trên mapped list
-          if (mapped.length > 0 && (!selectedVehId || !mapped.some(mv => mv.id === selectedVehId))) {
-            setTimeout(() => setSelectedVehId(mapped[0].id), 0);
+          if (mapped.length > 0) {
+            if (!selectedVehIdRef.current) {
+              setTimeout(() => setSelectedVehId(mapped[0].plate || mapped[0].id), 0);
+            } else {
+              const exists = mapped.some(mv => mv.id === selectedVehIdRef.current || mv.plate === selectedVehIdRef.current);
+              if (!exists) {
+                setTimeout(() => setSelectedVehId(mapped[0].plate || mapped[0].id), 0);
+              }
+            }
           }
 
           return mapped;
@@ -2093,24 +2192,36 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                         </div>
 
                         {/* Dropdown vehicle selector */}
-                        <div className="space-y-2">
-                          <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Chọn phương tiện đang điều khiển</label>
-                          <select
-                            value={selectedVehId}
-                            onChange={(e) => setSelectedVehId(e.target.value)}
-                            className="w-full p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 transition-colors focus:ring-2 focus:ring-blue-500 outline-none"
-                          >
-                            {vehicles.map(v => (
-                              <option key={v.id} value={v.id}>
-                                {v.plate} - {v.name} ({v.isLocked ? "ĐÃ KHÓA" : "MỞ KHÓA"})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                        {(() => {
+                          const vipVehicles = vehicles.filter(v => v.isVip === true);
+                          return (
+                            <div className="space-y-2">
+                              <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Chọn phương tiện VIP đang điều khiển</label>
+                              {vipVehicles.length > 0 ? (
+                                <select
+                                  value={selectedVehId || (vipVehicles[0]?.plate || vipVehicles[0]?.id || '')}
+                                  onChange={(e) => setSelectedVehId(e.target.value)}
+                                  className="w-full p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 transition-colors focus:ring-2 focus:ring-blue-500 outline-none"
+                                >
+                                  {vipVehicles.map(v => (
+                                    <option key={v.plate || v.id} value={v.plate || v.id}>
+                                      {v.plate} - {v.name} ({v.isLocked ? "ĐÃ KHÓA" : "MỞ KHÓA"})
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-800">
+                                  Chưa có phương tiện nào đăng ký/được duyệt Thẻ Tháng VIP.
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Big visual lock feedback area */}
                         {(() => {
-                          const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+                          const vipVehicles = vehicles.filter(v => v.isVip === true);
+                          const activeVeh = vipVehicles.find(v => v.id === selectedVehId || v.plate === selectedVehId) || vipVehicles[0];
                           if (!activeVeh) {
                             return (
                               <div className="p-8 text-center text-xs text-slate-400">
@@ -2230,6 +2341,33 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                           <QrCode className="w-5 h-5 text-blue-600" />
                         </div>
 
+                        {/* Vehicle selector for QR code generation */}
+                        {(() => {
+                          const vipVehicles = vehicles.filter(v => v.isVip === true);
+                          return (
+                            <div className="space-y-1.5">
+                              <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">Chọn phương tiện VIP sinh Mã QR</label>
+                              {vipVehicles.length > 0 ? (
+                                <select
+                                  value={selectedVehId || (vipVehicles[0]?.plate || vipVehicles[0]?.id || '')}
+                                  onChange={(e) => setSelectedVehId(e.target.value)}
+                                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                >
+                                  {vipVehicles.map((v) => (
+                                    <option key={v.plate || v.id} value={v.plate || v.id}>
+                                      🚘 {v.plate} - {v.name} (THẺ THÁNG VIP)
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-800">
+                                  Chưa có phương tiện nào đăng ký/được duyệt Thẻ Tháng VIP.
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
                         {/* Flow direction selector */}
                         <div className="space-y-2">
                           <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Chiều Ra/Vào của Phương Tiện</label>
@@ -2261,19 +2399,30 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
                         {/* Rendering dynamic custom QR design vector mapping */}
                         {(() => {
-                          const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+                          const vipVehicles = vehicles.filter(v => v.isVip === true);
+                          const activeVeh = vipVehicles.find(v => v.id === selectedVehId || v.plate === selectedVehId) || vipVehicles[0];
                           if (!activeVeh) {
                             return (
-                              <div className="bg-orange-50/50 rounded-2xl border border-dashed border-orange-200 p-8 flex flex-col items-center justify-center text-center space-y-3 mt-4 animate-fade-in">
-                                <div className="p-3 bg-orange-100 rounded-full text-orange-600">
-                                  <QrCode className="w-8 h-8 animate-pulse" />
+                              <div className="bg-amber-50/80 rounded-2xl border border-amber-200 p-6 flex flex-col items-center justify-center text-center space-y-3 mt-2">
+                                <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-amber-700 font-bold text-xl shadow-inner">
+                                  🔒
                                 </div>
                                 <div className="space-y-1">
-                                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide">Chưa có phương tiện</h4>
-                                  <p className="text-[11px] text-slate-500 max-w-[240px] leading-relaxed">
-                                    Vui lòng nhấn nút <strong>"Thêm xe mới"</strong> ở cột bên trái để đăng ký biển số xe của bạn và hiển thị mã QR.
+                                  <h4 className="text-xs font-black text-amber-900 uppercase tracking-wide">BẠN CHƯA CÓ XE VIP NÀO</h4>
+                                  <p className="text-[11px] text-amber-800 max-w-[280px] leading-relaxed">
+                                    Tính năng Tạo Mã QR động ra vào cổng chỉ dành riêng cho phương tiện đã đăng ký <strong>Thẻ tháng VIP</strong> và được duyệt thành công.
                                   </p>
                                 </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (vehicles.length > 0) setSelectedVehicleForVIP(vehicles[0]);
+                                    setIsVipModalOpen(true);
+                                  }}
+                                  className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer active:scale-95"
+                                >
+                                  ⚡ Đăng ký VIP ngay để tạo mã QR
+                                </button>
                               </div>
                             );
                           }
@@ -2357,7 +2506,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                       </div>
 
                       <div className="text-[10.5px] font-medium text-slate-500 leading-relaxed text-left p-3.5 bg-blue-50/55 rounded-2xl border border-blue-100">
-                        📄 <strong>Nhập mã chữ ký trên ở bốt kiểm soát:</strong> Nhân viên bốt gác có thể trực tiếp sao chép mã chữ ký xe trên hoặc nhập tay biển số {vehicles.find(v => v.id === selectedVehId)?.plate || '"30G-123.45"'} của bạn để tạo dọn xe và nâng barie tự động một cách chân thực nhất!
+                        📄 <strong>Nhập mã chữ ký trên ở bốt kiểm soát:</strong> Nhân viên bốt gác có thể trực tiếp sao chép mã chữ ký xe trên hoặc nhập tay biển số {vehicles.find(v => v.id === selectedVehId || v.plate === selectedVehId)?.plate || '"30G-123.45"'} của bạn để tạo dọn xe và nâng barie tự động một cách chân thực nhất!
                       </div>
                     </div>
 
@@ -2718,139 +2867,166 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
                             </div>
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (isOffline) {
-                                triggerToast('Lỗi: Không thể nạp tiền vào ví ở chế độ Ngoại tuyến!', 'error');
-                                return;
-                              }
-                              try {
-                                // Save topup metadata to localStorage so when they return, we credit the balance!
-                                localStorage.setItem('pending_vnpay_tx', JSON.stringify({
-                                  type: 'topup',
-                                  amount: topupAmount
-                                }));
-
-                                const response = await apiClient.post('/payment/create-url', {
-                                  amount: topupAmount
-                                });
-
-                                if (response && response.paymentUrl) {
-                                  window.location.href = response.paymentUrl;
-                                  return;
-                                } else {
-                                  triggerToast('Lỗi: Backend không trả về link thanh toán VNPay!', 'error');
-                                }
-                              } catch (err) {
-                                console.error("Lỗi tạo link thanh toán nạp tiền:", err);
-                                triggerToast('Không thể kết nối đến cổng thanh toán VNPay!', 'error');
-                              }
-                            }}
-                            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.98]"
-                          >
-                            <Plus className="w-4 h-4" />
-                            <span>Nạp tiền ngay</span>
-                          </button>
-                        </div>
-
-                        {/* Linked bank status */}
-                        <div className="space-y-3 pt-1">
-                          <span className="text-[9.5px] font-black text-slate-400 uppercase tracking-widest block leading-none">
-                            LIÊN KẾT NGÂN HÀNG
-                          </span>
-
-                          <div className="flex items-center justify-between p-3 border border-slate-100 rounded-xl">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-600 text-[10px] font-black flex items-center justify-center font-mono">
-                                VCB
-                              </div>
-                              <div>
-                                <strong className="text-[11.5px] font-black text-slate-800 block">Vietcombank **** 1234</strong>
-                                <span className="text-[10px] text-emerald-600 font-extrabold flex items-center gap-1">
-                                  <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                                  Mặc định thanh toán
-                                </span>
-                              </div>
-                            </div>
+                          <div className="mt-4 flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => triggerToast('Đã huỷ liên kết tài khoản Vietcombank thành công.', 'info')}
-                              className="text-[11px] font-black text-slate-400 hover:text-red-500 cursor-pointer"
+                              onClick={async () => {
+                                if (isOffline) {
+                                  triggerToast('Lỗi: Không thể nạp tiền vào ví ở chế độ Ngoại tuyến!', 'error');
+                                  return;
+                                }
+                                try {
+                                  const response = await apiClient.post('/payment/create-url', {
+                                    amount: topupAmount
+                                  });
+
+                                  if (response && response.paymentUrl) {
+                                    window.location.href = response.paymentUrl;
+                                    return;
+                                  } else {
+                                    triggerToast('Lỗi: Backend không trả về link thanh toán VNPay!', 'error');
+                                  }
+                                } catch (err) {
+                                  console.error("Lỗi tạo link thanh toán nạp tiền:", err);
+                                  triggerToast('Không thể kết nối đến cổng thanh toán VNPay!', 'error');
+                                }
+                              }}
+                              className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.98]"
                             >
-                              Gỡ
+                              <Plus className="w-4 h-4" />
+                              <span>Nạp tiền ngay</span>
+                            </button>
+
+                            <button 
+                              type="button"
+                              onClick={() => setWithdrawModalOpen(true)}
+                              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-xs uppercase tracking-wider rounded-xl transition-all border border-slate-700 cursor-pointer inline-flex items-center gap-1.5"
+                            >
+                              <Coins className="w-4 h-4" />
+                              <span>Rút tiền về NGÂN HÀNG</span>
                             </button>
                           </div>
-
-                          <button
-                            type="button"
-                            onClick={() => triggerToast('Chức năng liên kết ngân hàng mở rộng đang chuẩn bị ra mắt!', 'info')}
-                            className="w-full py-2.5 border border-dashed border-slate-350 hover:border-blue-400 text-slate-500 hover:text-blue-600 font-bold text-xs rounded-xl cursor-pointer text-center select-none"
-                          >
-                            + Thêm phương thức mới
-                          </button>
                         </div>
                       </div>
 
                       {/* Security Card */}
                       <div className="bg-white p-6 rounded-[24px] border border-slate-200/60 space-y-4">
                         <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block font-sans">
-                          Bảo mật
+                          Bảo mật tài khoản
                         </strong>
 
                         <div className="space-y-3.5 text-xs font-sans">
-                          {/* 2FA switcher */}
-                          <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-                            <div>
-                              <strong className="text-slate-800 font-extrabold block">Xác thực 2 lớp (2FA)</strong>
-                              <span className="text-slate-450 text-[10px] leading-normal block max-w-[180px]">
-                                Xác minh mã OTP thứ cấp bảo vệ truy cập từ thiết bị mới.
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIs2faEnabled(!is2faEnabled);
-                                triggerToast(is2faEnabled ? 'Đã tắt bảo vệ 2FA.' : 'Xác thực hai lớp (2FA) hỗ trợ thành công!', 'info');
-                              }}
-                              className={`w-10 h-6 shrink-0 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer ${
-                                is2faEnabled ? 'bg-blue-600' : 'bg-slate-200'
-                              }`}
-                            >
-                              <div className={`w-5 h-5 rounded-full bg-white transition-all shadow-md ${
-                                is2faEnabled ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
-                            </button>
-                          </div>
-
                           {/* Quick Password inputs */}
                           <div className="space-y-2">
-                            <strong className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Đổi mật khẩu tài khoản</strong>
+                            <strong className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Đổi mật khẩu tài khoản (Cập nhật DB thật)</strong>
 
                             <div className="space-y-1.5">
                               <input
                                 type="password"
+                                value={oldPassword}
+                                onChange={(e) => setOldPassword(e.target.value)}
                                 placeholder="Mật khẩu hiện tại..."
-                                className="w-full p-2.5 border rounded-lg bg-slate-50 border-slate-200 focus:bg-white text-xs outline-none"
+                                className="w-full p-2.5 border rounded-lg bg-slate-50 border-slate-200 focus:bg-white text-xs outline-none font-mono"
                               />
                               <input
                                 type="password"
-                                placeholder="Mật khẩu mới..."
-                                className="w-full p-2.5 border rounded-lg bg-slate-50 border-slate-200 focus:bg-white text-xs outline-none"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                placeholder="Mật khẩu mới (ít nhất 6 ký tự)..."
+                                className="w-full p-2.5 border rounded-lg bg-slate-50 border-slate-200 focus:bg-white text-xs outline-none font-mono"
                               />
                             </div>
 
                             <button
                               type="button"
-                              onClick={() => triggerToast('Mật khẩu tài khoản đã được thay đổi an toàn!', 'success')}
-                              className="pt-1.5 text-[10.5px] font-black text-blue-600 hover:underline cursor-pointer inline-block"
+                              disabled={isChangingPw}
+                              onClick={handleChangePassword}
+                              className="pt-1.5 text-[10.5px] font-black text-blue-600 hover:underline cursor-pointer inline-block disabled:opacity-50"
                             >
-                              Cập nhật mật khẩu ngay →
+                              {isChangingPw ? 'Đang cập nhật DB...' : 'Cập nhật mật khẩu ngay →'}
                             </button>
                           </div>
 
                         </div>
                       </div>
+
+                      {/* MODAL RÚT TIỀN VỀ NGÂN HÀNG */}
+                      {withdrawModalOpen && (
+                        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-200 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
+                            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                              <div className="flex items-center gap-2">
+                                <Coins className="w-5 h-5 text-blue-600" />
+                                <h3 className="text-base font-black text-slate-800">Rút tiền từ Ví về Ngân hàng</h3>
+                              </div>
+                              <button onClick={() => setWithdrawModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                                <X className="w-5 h-5" />
+                              </button>
+                            </div>
+
+                            <div className="space-y-3.5 text-xs">
+                              <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl space-y-1">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase block">Số dư khả dụng hiện tại</span>
+                                <strong className="text-lg font-black font-mono text-blue-700">{balance.toLocaleString('vi-VN')}₫</strong>
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Ngân hàng thụ hưởng</label>
+                                <select 
+                                  value={withdrawBank} 
+                                  onChange={(e) => setWithdrawBank(e.target.value)}
+                                  className="w-full p-2.5 border rounded-xl bg-slate-50 border-slate-200 text-xs font-bold outline-none"
+                                >
+                                  <option value="Vietcombank">Vietcombank (Ngân hàng TMCP Ngoại thương)</option>
+                                  <option value="MBBank">MBBank (Ngân hàng Quân Đội)</option>
+                                  <option value="Techcombank">Techcombank (Ngân hàng Kỹ thương)</option>
+                                  <option value="VietinBank">VietinBank (Ngân hàng Công thương)</option>
+                                  <option value="BIDV">BIDV (Ngân hàng Đầu tư và Phát triển)</option>
+                                </select>
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Số tài khoản nhận tiền</label>
+                                <input 
+                                  type="text" 
+                                  value={withdrawAccNo} 
+                                  onChange={(e) => setWithdrawAccNo(e.target.value)}
+                                  placeholder="Ví dụ: 1029384756..."
+                                  className="w-full p-2.5 border rounded-xl bg-slate-50 border-slate-200 text-xs font-mono font-bold outline-none focus:bg-white"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Số tiền muốn rút (VNĐ)</label>
+                                <input 
+                                  type="number" 
+                                  value={withdrawAmount} 
+                                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                                  placeholder="Nhập số tiền..."
+                                  className="w-full p-2.5 border rounded-xl bg-slate-50 border-slate-200 text-xs font-mono font-bold outline-none focus:bg-white"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                              <button 
+                                type="button" 
+                                onClick={() => setWithdrawModalOpen(false)}
+                                className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 font-bold text-xs rounded-xl cursor-pointer"
+                              >
+                                Hủy bỏ
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={handleWithdraw}
+                                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl cursor-pointer shadow-md"
+                              >
+                                Xác nhận rút tiền
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                     </div>
 

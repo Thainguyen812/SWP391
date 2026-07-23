@@ -74,96 +74,111 @@ export function DriverDashboardPanel() {
                         </div>
 
                         {/* Dropdown vehicle selector */}
-                        <div className="space-y-2">
-                          <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Chọn phương tiện đang điều khiển</label>
-                          <select
-                            value={selectedVehId}
-                            onChange={(e) => setSelectedVehId(e.target.value)}
-                            className="w-full p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 transition-colors focus:ring-2 focus:ring-blue-500 outline-none"
-                          >
-                            {vehicles.map(v => (
-                              <option key={v.id} value={v.id}>
-                                {v.plate} - {v.name} ({v.isLocked ? "ĐÃ KHÓA" : "MỞ KHÓA"})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                        {(() => {
+                          const vipVehicles = vehicles.filter(v => v.isVip === true);
+                          return (
+                            <div className="space-y-2">
+                              <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Chọn phương tiện VIP đang điều khiển</label>
+                              {vipVehicles.length > 0 ? (
+                                <select
+                                  value={selectedVehId || (vipVehicles[0]?.plate || vipVehicles[0]?.id || '')}
+                                  onChange={(e) => setSelectedVehId(e.target.value)}
+                                  className="w-full p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 transition-colors focus:ring-2 focus:ring-blue-500 outline-none"
+                                >
+                                  {vipVehicles.map(v => (
+                                    <option key={v.plate || v.id} value={v.plate || v.id}>
+                                      {v.plate} - {v.name} ({v.isLocked ? "ĐÃ KHÓA" : "MỞ KHÓA"})
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-800">
+                                  Chưa có phương tiện nào đăng ký/được duyệt Thẻ Tháng VIP.
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Big visual lock feedback area */}
                         {(() => {
-                          const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
-                          if (!activeVeh) {
-                            return (
-                              <div className="p-8 text-center text-xs text-slate-400">
-                                Chưa đăng ký bất kỳ chiếc xe nào. Vui lòng thêm xe ở tab "Xe của tôi"!
-                              </div>
-                            );
-                          }
-                          const isLocked = activeVeh.isLocked;
+                          const vipVehicles = vehicles.filter(v => v.isVip === true);
+                          const activeVeh = vipVehicles.find(v => v.id === selectedVehId || v.plate === selectedVehId) || vipVehicles[0];
+                          if (!activeVeh) return null;
                           return (
-                            <div className="p-6 bg-slate-50 rounded-2xl border border-slate-150 flex flex-col items-center justify-center text-center space-y-4 relative overflow-hidden">
-                              <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${isLocked ? 'from-rose-500 to-red-600' : 'from-emerald-400 to-teal-500'}`} />
-                              
-                              <div className={`w-16 h-16 rounded-full flex items-center justify-center relative z-10 transition-all ${
-                                isLocked ? 'bg-red-50 text-red-600 shadow-lg shadow-red-200' : 'bg-emerald-50 text-emerald-600 shadow-lg shadow-emerald-100'
-                              }`}>
-                                {isLocked ? (
-                                  <Lock className="w-8 h-8 animate-pulse" />
+                            <div className="bg-slate-50 rounded-2xl border border-slate-150 p-6 flex flex-col items-center justify-center text-center space-y-4">
+                              <div className="p-4 bg-[#f8fafc] rounded-full border border-slate-200/80 shadow-sm text-slate-700">
+                                {activeVeh.isLocked ? (
+                                  <Lock className="w-10 h-10 text-red-600 animate-bounce" />
                                 ) : (
-                                  <Unlock className="w-8 h-8" />
+                                  <Unlock className="w-10 h-10 text-amber-500" />
                                 )}
                               </div>
 
                               <div className="space-y-1">
-                                <h4 className={`text-sm font-black uppercase tracking-wider ${isLocked ? 'text-red-700' : 'text-emerald-700'}`}>
-                                  {isLocked ? "Đang Khóa Chống Trộm" : "Mở Khóa - Sẵn Sàng Chạy"}
-                                </h4>
-                                <span className="text-[10px] bg-slate-200/60 font-mono text-slate-500 px-2 py-1 rounded font-bold uppercase tracking-wider select-all">
-                                  {activeVeh.plate}
-                                </span>
-                              </div>
-
-                              <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                                {isLocked 
-                                  ? "Ví bốt và Barrier của bãi đỗ sẽ giữ rào đóng cứng và kẹp phanh hơi bánh xe nếu phát hiện xe di chuyển ra ngoài bốt gác lúc này."
-                                  : "Bốt an ninh sẽ cho phép xe ra vào thoải mái, tự động đối khớp thông tin từ camera LPR và QR số."
-                                }
-                              </p>
-
-                              <button
-                                type="button"
-                                disabled={isTogglingLock === activeVeh.id}
-                                onClick={() => handleToggleLockInPwa(activeVeh.id, activeVeh.plate, isLocked)}
-                                className={`w-full py-3.5 rounded-xl font-extrabold text-xs uppercase tracking-wider text-white shadow-md active:scale-95 transition-all text-center cursor-pointer flex items-center justify-center gap-2 ${
-                                  isLocked 
-                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-200' 
-                                    : 'bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 shadow-red-100'
-                                }`}
-                              >
-                                {isTogglingLock === activeVeh.id ? (
+                                {activeVeh.isVip ? (
                                   <>
-                                    <RefreshCw className="w-4 h-4 animate-spin" />
-                                    <span>Đang cấu hình khóa...</span>
-                                  </>
-                                ) : isLocked ? (
-                                  <>
-                                    <Unlock className="w-4 h-4" />
-                                    <span>Bấm để Mở Khóa (Unlock Vehicle)</span>
+                                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wide">
+                                      {activeVeh.isLocked ? "THIẾT BỊ ĐÃ KÍCH HOẠT KHÓA AN TOÀN" : "BẢO VỆ PHƯƠNG TIỆN ĐANG MỞ"}
+                                    </h4>
+                                    <p className="text-[10.5px] text-slate-500 max-w-[280px] leading-relaxed">
+                                      {activeVeh.isLocked
+                                        ? "Bánh xe đang được kẹp phanh bảo vệ. Nếu có xe di chuyển trái phép qua barie, siren bốt trực sẽ tự động phát cảnh báo báo động đỏ!"
+                                        : "Nhấn nút bên dưới để kích hoạt chế độ kẹp phanh an toàn từ xa khi đỗ xe trong bãi."}
+                                    </p>
                                   </>
                                 ) : (
                                   <>
-                                    <Lock className="w-4 h-4" />
-                                    <span>Kích hoạt Khóa Bánh Radar Ô tô</span>
+                                    <h4 className="text-xs font-black text-amber-800 uppercase tracking-wide">
+                                      DÀNH RIÊNG CHO HỘI VIÊN VIP
+                                    </h4>
+                                    <p className="text-[10.5px] text-slate-500 max-w-[280px] leading-relaxed">
+                                      Tính năng khóa bánh bảo vệ radar và kẹp phanh hơi thông minh chống trộm từ xa chỉ áp dụng cho phương tiện có vé tháng VIP đang hoạt động.
+                                    </p>
                                   </>
                                 )}
-                              </button>
+                              </div>
+
+                              {activeVeh.isVip ? (
+                                <button
+                                  type="button"
+                                  disabled={isTogglingLock === activeVeh.id}
+                                  onClick={() => handleToggleLock(activeVeh)}
+                                  className={`w-full py-3.5 px-4 font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                                    activeVeh.isLocked
+                                      ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
+                                      : "bg-red-600 hover:bg-red-700 text-white shadow-red-600/20"
+                                  }`}
+                                >
+                                  {isTogglingLock === activeVeh.id ? (
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                  ) : activeVeh.isLocked ? (
+                                    <>
+                                      <Unlock className="w-4 h-4" />
+                                      <span>MỞ KHÓA BÁNH XE</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Lock className="w-4 h-4" />
+                                      <span>KÍCH HOẠT KHÓA BÁNH AN TOÀN</span>
+                                    </>
+                                  )}
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedVehicleForVIP(activeVeh);
+                                    setIsVipModalOpen(true);
+                                  }}
+                                  className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer"
+                                >
+                                  ĐĂNG KÝ VIP NGAY ĐỂ KÍCH HOẠT
+                                </button>
+                              )}
                             </div>
                           );
                         })()}
-                      </div>
-
-                      <div className="text-[10px] text-slate-400 bg-slate-50 border border-slate-150 p-3 rounded-xl mt-4 leading-relaxed italic">
-                        💡 <strong>Gợi ý kiểm thử lỗi (Bad flow):</strong> Bật <strong>"Kích hoạt Khóa Bánh"</strong> ở đây, sau đó sang <strong>Trực cổng (nhập biển số)</strong> và bấm thông quét xe có biển số này. Bạn sẽ kích hoạt ngay kịch bản báo động đột nhập bốt trực!
                       </div>
                     </div>
 
@@ -178,6 +193,33 @@ export function DriverDashboardPanel() {
                           </div>
                           <QrCode className="w-5 h-5 text-blue-600" />
                         </div>
+
+                        {/* Vehicle selector for QR code generation */}
+                        {(() => {
+                          const vipVehicles = vehicles.filter(v => v.isVip === true);
+                          return (
+                            <div className="space-y-1.5">
+                              <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider block">Chọn phương tiện VIP sinh Mã QR</label>
+                              {vipVehicles.length > 0 ? (
+                                <select
+                                  value={selectedVehId || (vipVehicles[0]?.plate || vipVehicles[0]?.id || '')}
+                                  onChange={(e) => setSelectedVehId(e.target.value)}
+                                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                >
+                                  {vipVehicles.map((v) => (
+                                    <option key={v.plate || v.id} value={v.plate || v.id}>
+                                      🚘 {v.plate} - {v.name} (THẺ THÁNG VIP)
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-800">
+                                  Chưa có phương tiện nào đăng ký/được duyệt Thẻ Tháng VIP.
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Flow direction selector */}
                         <div className="space-y-2">
@@ -210,8 +252,33 @@ export function DriverDashboardPanel() {
 
                         {/* Rendering dynamic custom QR design vector mapping */}
                         {(() => {
-                          const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
-                          if (!activeVeh) return null;
+                          const vipVehicles = vehicles.filter(v => v.isVip === true);
+                          const activeVeh = vipVehicles.find(v => v.id === selectedVehId || v.plate === selectedVehId) || vipVehicles[0];
+                          if (!activeVeh) {
+                            return (
+                              <div className="bg-amber-50/80 rounded-2xl border border-amber-200 p-6 flex flex-col items-center justify-center text-center space-y-3 mt-2">
+                                <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-amber-700 font-bold text-xl shadow-inner">
+                                  🔒
+                                </div>
+                                <div className="space-y-1">
+                                  <h4 className="text-xs font-black text-amber-900 uppercase tracking-wide">BẠN CHƯA CÓ XE VIP NÀO</h4>
+                                  <p className="text-[11px] text-amber-800 max-w-[280px] leading-relaxed">
+                                    Tính năng Tạo Mã QR động ra vào cổng chỉ dành riêng cho phương tiện đã đăng ký <strong>Thẻ tháng VIP</strong> và được duyệt thành công.
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (vehicles.length > 0) setSelectedVehicleForVIP(vehicles[0]);
+                                    setIsVipModalOpen(true);
+                                  }}
+                                  className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer active:scale-95"
+                                >
+                                  ⚡ Đăng ký VIP ngay để tạo mã QR
+                                </button>
+                              </div>
+                            );
+                          }
                           const qrValueString = `${activeVeh.plate}|${qrDirection}|${Date.now()}`;
                           if (!isQrRequested) {
                             return (
@@ -292,7 +359,7 @@ export function DriverDashboardPanel() {
                       </div>
 
                       <div className="text-[10.5px] font-medium text-slate-500 leading-relaxed text-left p-3.5 bg-blue-50/55 rounded-2xl border border-blue-100">
-                        📄 <strong>Nhập mã chữ ký trên ở bốt kiểm soát:</strong> Nhân viên bốt gác có thể trực tiếp sao chép mã chữ ký xe trên hoặc nhập tay biển số {vehicles.find(v => v.id === selectedVehId)?.plate || '"30G-123.45"'} của bạn để tạo dọn xe và nâng barie tự động một cách chân thực nhất!
+                        📄 <strong>Nhập mã chữ ký trên ở bốt kiểm soát:</strong> Nhân viên bốt gác có thể trực tiếp sao chép mã chữ ký xe trên hoặc nhập tay biển số {vehicles.find(v => v.id === selectedVehId || v.plate === selectedVehId)?.plate || '"30G-123.45"'} của bạn để tạo dọn xe và nâng barie tự động một cách chân thực nhất!
                       </div>
                     </div>
 

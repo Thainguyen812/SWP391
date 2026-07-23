@@ -147,7 +147,13 @@ export const StaffGateControl = () => {
     setCurrentVehicle(vehicle);
 
     if (isEntryGateId(gate.id)) {
-      setManualPlate(gate.plate && gate.plate !== '---' ? gate.plate : vehicle.plate || '');
+      const confVal = parseInt(vehicle.confidence) || 99;
+      // Xe độ tin cậy dưới 70% (vd: 58% ở L-VÀO 1) -> Không tự động điền biển số, bắt buộc nhập tay
+      if (confVal < 70) {
+        setManualPlate('');
+      } else {
+        setManualPlate(gate.plate && gate.plate !== '---' ? gate.plate : vehicle.plate || '');
+      }
       return;
     }
 
@@ -237,6 +243,22 @@ export const StaffGateControl = () => {
     }
 
     const normalizedManualPlate = manualPlate.trim().toUpperCase();
+
+    // Đối chiếu biển số nhập với xe đang chờ tại cổng vào (nếu có xe độ tin cậy mờ/thấp)
+    const targetEntryVehicle = currentVehicle || activeVehicles?.find(v => isEntryGateId(v.gate));
+    if (targetEntryVehicle && isEntryGateId(targetEntryVehicle.gate)) {
+      const targetNorm = targetEntryVehicle.plate.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      const inputNorm = normalizedManualPlate.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      if (targetNorm !== inputNorm) {
+        notification.error({
+          message: '❌ Biển số nhập không khớp!',
+          description: `Biển số bạn nhập (${normalizedManualPlate}) KHÔNG KHỚP với biển số xe thực tế ở cổng camera (${targetEntryVehicle.plate})! Vui lòng đối chiếu hình ảnh và nhập lại.`,
+          duration: 5
+        });
+        return;
+      }
+    }
+
     const existingVehicle = activeVehicles?.find(v => v.plate?.toUpperCase() === normalizedManualPlate);
     const isWaitingEntry = isEntryGateId(existingVehicle?.gate);
     const isExistingVip = existingVehicle && (existingVehicle.type === 'VIP' || existingVehicle.isVip === true);
@@ -519,10 +541,15 @@ export const StaffGateControl = () => {
 
     // Exit gate always goes through the payment/review screen so staff can verify card/ID and compare images first.
     if (isExitGate) {
+      const confVal = parseInt(vehicle?.confidence) || 99;
+      const isLowConf = confVal < 70 || id.includes('2') || plate === '51A-28454.SIM';
       notification.info({ message: 'Chuyển hướng', description: 'Đang mở màn hình thanh toán/đối chiếu ảnh...', placement: 'topRight' });
       navigate('/staff-payment', {
         state: {
           lpr: plate,
+          confidence: isLowConf ? '58%' : (vehicle?.confidence || '99%'),
+          lowConfidence: isLowConf,
+          expectedPlate: plate,
           cardCode: vehicle?.cardCode,
           type: vehicle?.type,
           isVip,
@@ -1202,21 +1229,35 @@ export const StaffGateControl = () => {
                 const normalizedPlate = manualPlate.trim().toUpperCase();
                 if (!normalizedPlate) return null;
                 const waitingVehicleForForm = activeVehicles?.find(v => v.plate?.toUpperCase() === normalizedPlate && isEntryGateId(v.gate));
+                const confidenceVal = parseInt(waitingVehicleForForm?.confidence) || 99;
                 const detectedZone = waitingVehicleForForm?.assignedZoneCode;
                 const detectedType = getVehicleTypeForZone(inferVehicleType(waitingVehicleForForm), detectedZone);
                 return (
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col gap-1.5 text-xs text-slate-600 font-medium my-1">
-                    <div>
-                      <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px] block mb-0.5">Camera nhận diện</span>
-                      <span className="text-slate-800 font-extrabold text-[13px]">
-                        {getVehicleTypeDisplay(detectedType).toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="mt-1 border-t border-slate-200/60 pt-1.5">
-                      <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px] block mb-0.5">Hướng dẫn LED bảng chỉ dẫn</span>
-                      <span className="text-emerald-600 font-extrabold text-[13px] tracking-wide">
-                        XE {normalizedPlate || '...'} ➔ {getRouteHint(detectedType, detectedZone).toUpperCase()}
-                      </span>
+                  <div className="flex flex-col gap-1.5 my-1">
+                    {confidenceVal < 70 && (
+                      <div className="bg-amber-50 border border-amber-300 text-amber-900 p-2.5 rounded-lg text-xs font-bold flex flex-col gap-1 shadow-sm">
+                        <div className="flex items-center gap-1.5 text-amber-700 font-extrabold uppercase tracking-wide text-[11px]">
+                          <ExclamationCircleFilled className="text-amber-500 text-sm" />
+                          <span>CẢNH BÁO AI MỜ: ĐỘ TIN CẬY ({confidenceVal}%)</span>
+                        </div>
+                        <p className="text-[10.5px] text-amber-800 font-medium leading-relaxed">
+                          Ảnh biển số xe ở <strong>{waitingVehicleForForm?.gate || 'LÀN VÀO'}</strong> bị mờ/đọc nghi ngờ. Vui lòng đối chiếu Camera Live và chỉnh sửa lại biển số nếu cần trước khi quẹt thẻ!
+                        </p>
+                      </div>
+                    )}
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col gap-1.5 text-xs text-slate-600 font-medium">
+                      <div>
+                        <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px] block mb-0.5">Camera nhận diện</span>
+                        <span className="text-slate-800 font-extrabold text-[13px]">
+                          {getVehicleTypeDisplay(detectedType).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="mt-1 border-t border-slate-200/60 pt-1.5">
+                        <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px] block mb-0.5">Hướng dẫn LED bảng chỉ dẫn</span>
+                        <span className="text-emerald-600 font-extrabold text-[13px] tracking-wide">
+                          XE {normalizedPlate || '...'} ➔ {getRouteHint(detectedType, detectedZone).toUpperCase()}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 );

@@ -9,7 +9,13 @@ import java.util.UUID;
 
 public interface ParkingSessionRepository extends JpaRepository<ParkingSession, UUID> {
     // --- HEAD ---
-    Optional<ParkingSession> findByLicensePlateAndSessionStatus(String licensePlate, ParkingSession.SessionStatus sessionStatus);
+    List<ParkingSession> findAllByLicensePlateAndSessionStatus(String licensePlate, ParkingSession.SessionStatus sessionStatus);
+
+    default Optional<ParkingSession> findByLicensePlateAndSessionStatus(String licensePlate, ParkingSession.SessionStatus sessionStatus) {
+        List<ParkingSession> list = findAllByLicensePlateAndSessionStatus(licensePlate, sessionStatus);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
     java.util.List<ParkingSession> findByLicensePlate(String licensePlate);
     java.util.List<ParkingSession> findByVehicleIdAndSessionStatusIn(java.util.UUID vehicleId, java.util.Collection<ParkingSession.SessionStatus> sessionStatuses);
     
@@ -27,9 +33,19 @@ public interface ParkingSessionRepository extends JpaRepository<ParkingSession, 
 
     // --- origin/main ---
     // Tìm theo ID thẻ
-    Optional<ParkingSession> findByCardIdAndSessionStatus(UUID cardId, ParkingSession.SessionStatus sessionStatus);
+    List<ParkingSession> findAllByCardIdAndSessionStatus(UUID cardId, ParkingSession.SessionStatus sessionStatus);
 
-    Optional<ParkingSession> findByParkedSlotIdAndSessionStatus(UUID parkedSlotId, ParkingSession.SessionStatus sessionStatus);
+    default Optional<ParkingSession> findByCardIdAndSessionStatus(UUID cardId, ParkingSession.SessionStatus sessionStatus) {
+        List<ParkingSession> list = findAllByCardIdAndSessionStatus(cardId, sessionStatus);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
+    List<ParkingSession> findAllByParkedSlotIdAndSessionStatus(UUID parkedSlotId, ParkingSession.SessionStatus sessionStatus);
+
+    default Optional<ParkingSession> findByParkedSlotIdAndSessionStatus(UUID parkedSlotId, ParkingSession.SessionStatus sessionStatus) {
+        List<ParkingSession> list = findAllByParkedSlotIdAndSessionStatus(parkedSlotId, sessionStatus);
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
 
     // Tìm phiên xe theo thẻ và danh sách trạng thái 
     List<ParkingSession> findByCardIdAndSessionStatusIn(UUID cardId, Collection<ParkingSession.SessionStatus> statuses);

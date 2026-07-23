@@ -192,13 +192,18 @@ export const GlobalProvider = ({ children }) => {
               const isPendingSession = session.isPending === true;
               const sessionIsVip = session.isVip || session.vip;
               const isMobilePrepaid = session.sessionStatus === 'PASSED_CONFIRMED';
+              
+              // 1 trong 3 làn check-in (L-VÀO 1) có độ tin cậy thấp (58%), 2 làn còn lại 98-99%
+              const gateStrUpper = (session.entryGate || session.exitGate || '').toUpperCase();
+              const isLowConfidenceGate = gateStrUpper.includes('1') || gateStrUpper.includes('VÀO 1') || session.licensePlate === '51K-95013.SIM';
+              const confidenceVal = isLowConfidenceGate ? "58%" : (index % 2 === 0 ? "98%" : "99%");
 
               return {
                 id: session.id,
                 plate: session.licensePlate || "Không rõ",
                 type: sessionIsVip ? "VIP" : "Vãng lai",
                 isVip: sessionIsVip,
-                confidence: "99%",
+                confidence: confidenceVal,
                 status: isMobilePrepaid ? "Đã thanh toán lưu động" : ((session.isSuspicious || session.suspicious) ? "Lỗi thẻ" : (session.exitGate && !sessionIsVip ? "Chờ thanh toán" : "Hợp lệ")),
                 gate: isPendingSession ? (session.exitGate || session.entryGate || null) : (session.exitGate || null),
                 entryGate: session.entryGate || null,
