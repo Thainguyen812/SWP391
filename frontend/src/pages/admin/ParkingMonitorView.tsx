@@ -154,13 +154,23 @@ export function ParkingMonitorView({ triggerToast, isDarkMode }: ParkingMonitorV
       });
 
       if (result?.violationCreated) {
-        const firstOnly = Array.isArray(result.violations) && result.violations.every((v: any) => v.firstViolation);
-        notify(
-          firstOnly
-            ? 'Đã ghi nhận vi phạm lần 1: nhắc nhở 0đ.'
-            : 'Đã ghi nhận vi phạm lặp lại: sẽ cộng phí phạt khi checkout.',
-          'info'
-        );
+        const violations = Array.isArray(result.violations) ? result.violations : [];
+        const firstOnly = violations.every((v: any) => v.firstViolation);
+        const correctFloor = violations.find((v: any) => v.correctFloor)?.correctFloor || '';
+        const currentFloor = violations.find((v: any) => v.currentFloor)?.currentFloor || '';
+        const penaltyAmount = violations.reduce((sum: number, v: any) => sum + Number(v.penaltyAmount || 0), 0);
+
+        if (firstOnly) {
+          notify(
+            `⚠️ Vi phạm lần 1: Xe đỗ sai tầng ${currentFloor}${correctFloor ? ` — Phải di chuyển đến ${correctFloor}` : ''}. Nhắc nhở, chưa tính phí.`,
+            'info'
+          );
+        } else {
+          notify(
+            `🚨 Vi phạm lặp lại: Xe đỗ sai tầng ${currentFloor}${correctFloor ? ` — Phải di chuyển đến ${correctFloor}` : ''}. Cộng phạt ${penaltyAmount.toLocaleString('vi-VN')}đ vào hóa đơn!`,
+            'error'
+          );
+        }
       } else {
         notify('Đã cập nhật dữ liệu sensor ô đỗ.', 'success');
       }
