@@ -12,7 +12,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/users")
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN', 'STAFF')")
 public class UserController {
     private final UserRepository repo;
 

@@ -402,12 +402,16 @@ export const StaffDashboard = () => {
                 defaultImage: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80'
               };
               
-              // Chỉ hiển thị xe trên màn hình Camera nếu xe ĐANG TRONG QUÁ TRÌNH XỬ LÝ tại đúng cổng đó.
-              // Nếu trạng thái là 'Hợp lệ', nghĩa là xe đã đi qua cổng và đang đỗ trong bãi -> Không hiển thị trên Camera nữa.
-              const vehicle = activeVehicles?.find(v => 
-                v.gate && 
-                v.gate.toUpperCase() === cam.name.toUpperCase()
-              );
+              // Helper to check gate match (e.g. L-VÀO 1 vs CỔNG VÀO 1, L-RA 1 vs CỔNG RA 1)
+              const vehicle = activeVehicles?.find(v => {
+                if (!v.gate) return false;
+                const gUpper = v.gate.toUpperCase();
+                const isMatchDirection = isEntry 
+                  ? (gUpper.includes('VÀO') || gUpper.includes('IN')) 
+                  : (gUpper.includes('RA') || gUpper.includes('OUT'));
+                const isMatchNum = gUpper.endsWith(String(gateNum)) || gUpper.includes(` ${gateNum}`) || gUpper.includes(`-${gateNum}`);
+                return isMatchDirection && isMatchNum;
+              });
               const isSelected = vehicle && currentVehicle?.id === vehicle.id;
               
               // Helper to map status to color
@@ -723,10 +727,8 @@ export const StaffDashboard = () => {
                 plate: submittedPlate,
                 reason: submittedReason,
                 time: 'Vừa xong',
-                image: matchedVehicle?.image
-              });
-              
-              navigate('/staff-security');
+                });
+              notification.success({ message: 'Đã gửi thông tin xe vi phạm', placement: 'topRight' });
             }} 
             className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 shadow-md font-bold cursor-pointer"
           >
@@ -827,7 +829,6 @@ export const StaffDashboard = () => {
                   <button 
                     onClick={() => {
                       setIsAlertModalVisible(false);
-                      navigate('/staff-security');
                     }}
                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors cursor-pointer"
                   >

@@ -528,13 +528,24 @@ export const StaffPayment = () => {
           if (vehicleToPay?.isLocked) {
             await apiClient.post('/vehicles/lock', { plate: lpr, isLocked: false });
           }
-          if (isVip && !isLostCard) {
-            await apiClient.post('/sessions/approve-exit', { plate: lpr });
-          } else if (backendTxn && backendTxn.id) {
-            const alreadyConfirmed = backendTxn.paymentStatus === 'SUCCESS' || backendTxn.status === 'SUCCESS';
-            if (!alreadyConfirmed || isMobileCheckoutTxn) {
-              await parkingService.confirmCheckout(backendTxn.id);
+          let currentTxn = backendTxn;
+          if ((!currentTxn || !currentTxn.id) && !isVip && !isLostCard) {
+            try {
+              const codeToUse = cardCode || lpr;
+              if (codeToUse) {
+                const res = await apiClient.post(`/v1/parking/checkout-by-code/${codeToUse}`);
+                currentTxn = res?.data || res;
+              }
+            } catch (err) {
+              console.log("Could not fetch txn before confirmation", err);
             }
+          }
+
+          const selectedMethodParam = paymentMethod === 'qr' ? 'QR_BANK' : (paymentMethod === 'card' ? 'WALLET' : 'CASH');
+          if (isVip && !isLostCard) {
+            await apiClient.post('/sessions/approve-exit', { plate: lpr, paymentMethod: selectedMethodParam });
+          } else if (currentTxn && currentTxn.id) {
+            await parkingService.confirmCheckout(currentTxn.id, selectedMethodParam);
           } else {
             // NEW LOGIC FOR LOST CARD
             if (isLostCard) {

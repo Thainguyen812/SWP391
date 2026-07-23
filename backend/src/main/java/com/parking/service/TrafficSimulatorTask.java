@@ -38,8 +38,8 @@ public class TrafficSimulatorTask {
         this.pendingGateVehicleService = pendingGateVehicleService;
     }
 
-    private final List<String> IN_GATES = Arrays.asList("CỔNG VÀO 1", "CỔNG VÀO 2", "CỔNG VÀO 3");
-    private final List<String> OUT_GATES = Arrays.asList("CỔNG RA 1", "CỔNG RA 2", "CỔNG RA 3");
+    private final List<String> IN_GATES = Arrays.asList("L-VÀO 1", "L-VÀO 2", "L-VÀO 3");
+    private final List<String> OUT_GATES = Arrays.asList("L-RA 1", "L-RA 2", "L-RA 3");
 
     private static final double VIP_ENTRY_RATIO = 0.40;
 
@@ -104,7 +104,9 @@ public class TrafficSimulatorTask {
             if (!emptyInGates.isEmpty()) {
                 List<String> unavailablePlates = new ArrayList<>();
                 processingIns.forEach(p -> unavailablePlates.add(DemoVehicleDataset.normalizePlate(p.getLicensePlate())));
-                allSessions.forEach(s -> unavailablePlates.add(DemoVehicleDataset.normalizePlate(s.getLicensePlate())));
+                allSessions.stream()
+                        .filter(s -> s.getSessionStatus() == ParkingSession.SessionStatus.ACTIVE || s.getSessionStatus() == ParkingSession.SessionStatus.PASSED_CONFIRMED)
+                        .forEach(s -> unavailablePlates.add(DemoVehicleDataset.normalizePlate(s.getLicensePlate())));
 
                 List<DemoVehicleDataset.Profile> availableVisitors = DemoVehicleDataset.profiles().stream()
                         .filter(profile -> !profile.vip())
@@ -114,6 +116,19 @@ public class TrafficSimulatorTask {
                         .filter(DemoVehicleDataset.Profile::vip)
                         .filter(profile -> !unavailablePlates.contains(DemoVehicleDataset.normalizePlate(profile.plate())))
                         .collect(Collectors.toCollection(ArrayList::new));
+                
+                // Fallback: If all specific profiles are currently inside, allow completed profiles to cycle back
+                if (availableVisitors.isEmpty()) {
+                    availableVisitors = DemoVehicleDataset.profiles().stream()
+                            .filter(profile -> !profile.vip())
+                            .collect(Collectors.toCollection(ArrayList::new));
+                }
+                if (availableVips.isEmpty()) {
+                    availableVips = DemoVehicleDataset.profiles().stream()
+                            .filter(DemoVehicleDataset.Profile::vip)
+                            .collect(Collectors.toCollection(ArrayList::new));
+                }
+
                 java.util.Collections.shuffle(availableVisitors);
                 java.util.Collections.shuffle(availableVips);
 

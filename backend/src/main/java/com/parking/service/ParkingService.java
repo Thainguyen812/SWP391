@@ -18,7 +18,8 @@ public interface ParkingService {
     CheckInResponse aiCheckIn(AiCheckInRequest request);
     CheckInResponse approveEntry(String plate);
     CheckInResponse approvePendingEntry(PendingGateVehicleService.PendingEntry pendingEntry);
-    Transaction approveExit(String plate);
+    Transaction approveExit(String plate, String paymentMethodStr);
+    default Transaction approveExit(String plate) { return approveExit(plate, null); }
     void verifyExitQr(String detectedPlate, String qrToken);
     
     CheckInResponse visitorCheckIn(VisitorCheckInRequest request);//task 5 check in vãn lai
@@ -32,7 +33,8 @@ public interface ParkingService {
     CongestionCheckoutRequest request
     );
 
-    Transaction confirmCheckout(UUID transactionId); // confirm check out
+    Transaction confirmCheckout(UUID transactionId, String paymentMethod); // confirm check out
+    default Transaction confirmCheckout(UUID transactionId) { return confirmCheckout(transactionId, null); }
 
     void cleanupTestData();
 

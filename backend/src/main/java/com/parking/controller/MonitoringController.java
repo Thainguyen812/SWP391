@@ -44,7 +44,7 @@ public class MonitoringController {
         long vipVehicles = sessionRepo.countBySessionStatusAndIsVipTrueAndEntryGateIsNull(ParkingSession.SessionStatus.ACTIVE);
         
         // Tỷ lệ và chỗ trống
-        int parkedPercentage = totalCapacity == 0 ? 0 : (int) ((double) currentlyParked / totalCapacity * 100);
+        double parkedPercentage = totalCapacity == 0 ? 0.0 : ((double) currentlyParked / totalCapacity * 100.0);
         long availableSpots = Math.max(0, totalCapacity - currentlyParked);
         
         response.put("totalCapacity", totalCapacity);

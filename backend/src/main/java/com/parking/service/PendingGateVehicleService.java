@@ -14,14 +14,28 @@ import java.util.concurrent.ConcurrentMap;
 public class PendingGateVehicleService {
     private final ConcurrentMap<String, PendingEntry> byPlate = new ConcurrentHashMap<>();
 
+    private static String normalizeKey(String str) {
+        if (str == null) return "";
+        return str.trim().toUpperCase().replaceAll("[^A-Z0-9]", "");
+    }
+
+    private static String normalizeGateName(String gate) {
+        if (gate == null) return "";
+        String g = gate.trim().toUpperCase();
+        if (g.startsWith("CỔNG VÀO")) return g.replace("CỔNG VÀO", "L-VÀO");
+        if (g.startsWith("CỔNG RA")) return g.replace("CỔNG RA", "L-RA");
+        return g;
+    }
+
     public boolean add(PendingEntry entry) {
         if (entry == null || entry.getLicensePlate() == null || entry.getEntryGate() == null) {
             return false;
         }
-        if (isGateOccupied(entry.getEntryGate())) {
+        String normGate = normalizeGateName(entry.getEntryGate());
+        if (isGateOccupied(normGate)) {
             return false;
         }
-        return byPlate.putIfAbsent(entry.getLicensePlate(), entry) == null;
+        return byPlate.putIfAbsent(normalizeKey(entry.getLicensePlate()), entry) == null;
     }
 
     public List<PendingEntry> findAll() {
@@ -32,14 +46,31 @@ public class PendingGateVehicleService {
         if (plate == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(byPlate.remove(plate));
+        String key = normalizeKey(plate);
+        PendingEntry removed = byPlate.remove(key);
+        if (removed == null) {
+            for (String k : byPlate.keySet()) {
+                if (k.equals(key) || k.contains(key) || key.contains(k)) {
+                    removed = byPlate.remove(k);
+                    break;
+                }
+            }
+        }
+        return Optional.ofNullable(removed);
+    }
+
+    public void removeByGate(String gate) {
+        if (gate == null) return;
+        String normGate = normalizeGateName(gate);
+        byPlate.entrySet().removeIf(e -> normalizeGateName(e.getValue().getEntryGate()).equalsIgnoreCase(normGate));
     }
 
     public boolean isGateOccupied(String gate) {
         if (gate == null) {
             return false;
         }
-        return byPlate.values().stream().anyMatch(entry -> gate.equalsIgnoreCase(entry.getEntryGate()));
+        String normGate = normalizeGateName(gate);
+        return byPlate.values().stream().anyMatch(entry -> normalizeGateName(entry.getEntryGate()).equalsIgnoreCase(normGate));
     }
 
     public static class PendingEntry {

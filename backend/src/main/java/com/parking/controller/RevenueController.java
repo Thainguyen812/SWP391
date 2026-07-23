@@ -36,10 +36,12 @@ public class RevenueController {
 
     private final TransactionRepository transactionRepo;
     private final ParkingSessionRepository sessionRepo;
+    private final com.parking.repository.VehicleRepository vehicleRepo;
 
-    public RevenueController(TransactionRepository transactionRepo, ParkingSessionRepository sessionRepo) {
+    public RevenueController(TransactionRepository transactionRepo, ParkingSessionRepository sessionRepo, com.parking.repository.VehicleRepository vehicleRepo) {
         this.transactionRepo = transactionRepo;
         this.sessionRepo = sessionRepo;
+        this.vehicleRepo = vehicleRepo;
     }
 
     @GetMapping("/summary")
@@ -166,11 +168,20 @@ public class RevenueController {
                 item.put("duration", "1h 30m");
             }
 
-            item.put("plate", sessionOpt.map(ParkingSession::getLicensePlate).orElse("---"));
+            String plate = sessionOpt.map(ParkingSession::getLicensePlate).orElse("---");
+            item.put("plate", plate);
+            
+            String vehicleTypeStr = "SEDAN_HATCHBACK";
+            if (!"---".equals(plate)) {
+                java.util.Optional<com.parking.model.Vehicle> vOpt = vehicleRepo.findByLicensePlate(plate);
+                if (vOpt.isPresent() && vOpt.get().getBodyShape() != null) {
+                    vehicleTypeStr = vOpt.get().getBodyShape();
+                }
+            }
             item.put("type", sessionOpt
                     .map(session -> Boolean.TRUE.equals(session.getIsVip()) ? "VIP" : "Vãng lai")
                     .orElse("Vãng lai"));
-            item.put("vehicleType", "SEDAN_HATCHBACK");
+            item.put("vehicleType", vehicleTypeStr);
             item.put("amount", formatMoney(amount(transaction)));
             item.put("rawAmount", amount(transaction));
             item.put("method", paymentMethodLabel(transaction.getPaymentMethod()));
@@ -256,13 +267,13 @@ public class RevenueController {
 
     private String paymentMethodLabel(Transaction.PaymentMethod method) {
         if (method == null) {
-            return "Không xác định";
+            return "Chuyển khoản VietQR / Banking";
         }
         return switch (method) {
             case CASH -> "Tiền mặt";
             case VNPAY_SANDBOX -> "VNPAY Sandbox";
             case MOMO_SANDBOX -> "MoMo Sandbox";
-            case QR_BANK -> "VietQR";
+            case QR_BANK -> "Chuyển khoản VietQR / Banking";
         };
     }
 }

@@ -18,7 +18,6 @@ export const TopAppBarSection = ({ onMenuClick }) => {
     { path: '/staff-gate-control', label: 'Điều khiển Cổng', keywords: ['điều khiển', 'cổng', 'gate', 'mở cổng'] },
     { path: '/staff-monitoring', label: 'Giám sát Camera', keywords: ['giám sát', 'camera', 'ai', 'video'] },
     { path: '/staff-payment', label: 'Quản lý Đỗ xe / Thanh toán', keywords: ['thanh toán', 'đỗ xe', 'thu tiền', 'phí'] },
-    { path: '/staff-security', label: 'Cảnh báo An ninh', keywords: ['an ninh', 'cảnh báo', 'security', 'vi phạm'] },
     { path: '/staff-lost-card', label: 'Báo mất thẻ', keywords: ['mất thẻ', 'báo mất', 'lost card'] },
     { path: '/staff-transactions', label: 'Lịch sử giao dịch', keywords: ['giao dịch', 'lịch sử', 'history', 'hóa đơn'] },
     { path: '/staff-settings', label: 'Cài đặt hệ thống', keywords: ['cài đặt', 'settings', 'hệ thống', 'cấu hình', 'giao ca'] }
