@@ -46,10 +46,10 @@ public class RevenueController {
 
     @GetMapping("/summary")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public Map<String, Object> getSummary(@RequestParam(required = false) String month) {
+    public Map<String, Object> getSummary(@RequestParam(required = false) String month, @RequestParam(required = false) String date) {
         List<Transaction> successTransactions = successfulTransactions();
-        LocalDate today = LocalDate.now(APP_ZONE);
-        YearMonth currentMonth = YearMonth.from(today);
+        LocalDate today = date != null && !date.isEmpty() ? LocalDate.parse(date) : LocalDate.now(APP_ZONE);
+        YearMonth currentMonth = month != null && !month.isEmpty() ? YearMonth.parse(month) : YearMonth.from(today);
 
         BigDecimal todayTotal = sum(successTransactions.stream()
                 .filter(t -> today.equals(transactionDate(t)))
@@ -78,19 +78,22 @@ public class RevenueController {
 
     @GetMapping("/charts")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public Map<String, Object> getCharts(@RequestParam(required = false) String month) {
+    public Map<String, Object> getCharts(@RequestParam(required = false) String month, @RequestParam(required = false) String dateParam) {
         List<Transaction> successTransactions = successfulTransactions();
-        LocalDate today = LocalDate.now(APP_ZONE);
+        LocalDate today = dateParam != null && !dateParam.isEmpty() ? LocalDate.parse(dateParam) : LocalDate.now(APP_ZONE);
         LocalDate start = today.minusDays(13);
 
         Map<LocalDate, BigDecimal> byDate = new LinkedHashMap<>();
+        Map<LocalDate, Integer> countByDate = new LinkedHashMap<>();
         for (LocalDate day = start; !day.isAfter(today); day = day.plusDays(1)) {
             byDate.put(day, BigDecimal.ZERO);
+            countByDate.put(day, 0);
         }
         for (Transaction transaction : successTransactions) {
             LocalDate date = transactionDate(transaction);
             if (date != null && !date.isBefore(start) && !date.isAfter(today)) {
                 byDate.put(date, byDate.get(date).add(amount(transaction)));
+                countByDate.put(date, countByDate.get(date) + 1);
             }
         }
 
@@ -101,6 +104,7 @@ public class RevenueController {
             item.put("date", DATE_LABEL.format(date));
             item.put("value", value);
             item.put("revenue", value);
+            item.put("count", countByDate.get(date));
             barData.add(item);
         });
 

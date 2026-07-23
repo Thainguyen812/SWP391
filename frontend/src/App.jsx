@@ -39,7 +39,7 @@ const ProtectedPage = ({ children, allowedRoles }) => (
 );
 
 const StaffProtectedPage = ({ children }) => (
-  <ProtectedRoute allowedRoles={['STAFF']}>
+  <ProtectedRoute allowedRoles={['STAFF', 'MANAGER', 'ADMIN']}>
     <StaffLayout>
       {children}
     </StaffLayout>
@@ -48,7 +48,7 @@ const StaffProtectedPage = ({ children }) => (
 
 // Helper component cho Driver Web App (Không cần MainLayout của Admin)
 const DriverPage = ({ children }) => (
-  <ProtectedRoute allowedRoles={['DRIVER']}>
+  <ProtectedRoute allowedRoles={['DRIVER', 'MANAGER', 'ADMIN']}>
     {children}
   </ProtectedRoute>
 );
@@ -56,15 +56,21 @@ const DriverPage = ({ children }) => (
 const LegacyAdminWrapper = () => {
   const navigate = useNavigate();
   const rawUser = authService.getUser();
-  const currentUser = rawUser 
-    ? { name: rawUser.fullName || rawUser.username, phone: rawUser.username, role: rawUser.role }
-    : { name: 'Admin', phone: '0901234567', role: 'ADMIN' };
+
+  // Bắt buộc redirect về /login nếu chưa xác thực
+  if (!rawUser) {
+    navigate('/login', { replace: true });
+    return null;
+  }
+
+  const currentUser = { name: rawUser.fullName || rawUser.username, phone: rawUser.phone || rawUser.username, role: rawUser.role };
+  const token = sessionStorage.getItem('token') || localStorage.getItem('token') || '';
   
   return (
     <ProtectedRoute allowedRoles={['MANAGER', 'ADMIN']}>
       <LegacyDashboard 
         user={currentUser}
-        accessToken="mock-access"
+        accessToken={token}
         onLogout={() => {
           authService.logout();
           navigate('/login');
@@ -87,19 +93,19 @@ const RootRedirect = () => {
   } else if (user.role === 'STAFF') {
     return <Navigate to="/staff-dashboard" replace />;
   } else {
-    return <Navigate to="/admin" replace />;
+    return <Navigate to="/overview" replace />;
   }
 };
 
 const DriverAppWrapper = () => {
-  const user = authService.getUser() || { 
-    username: 'driver', 
-    fullName: 'Tài xế', 
-    role: 'DRIVER',
-    email: 'driver@urbanpark.com',
-    phone: '0912345678'
-  };
   const navigate = useNavigate();
+  const user = authService.getUser();
+
+  // Bắt buộc redirect về /login nếu chưa xác thực
+  if (!user) {
+    navigate('/login', { replace: true });
+    return null;
+  }
   
   return (
     <DriverPwa 
@@ -111,7 +117,6 @@ const DriverAppWrapper = () => {
       }}
       accessToken={sessionStorage.getItem('token') || localStorage.getItem('token')}
       onLogout={() => {
-        localStorage.removeItem('urbanpark_vip_subscriptions');
         authService.logout();
         navigate('/login');
       }}
@@ -153,17 +158,19 @@ function App() {
         <Route path="/staff" element={
           <ProtectedPage allowedRoles={managementRoles}><PersonnelMain /></ProtectedPage>
         } />
+        
         <Route path="/transactions" element={
           <ProtectedPage allowedRoles={managementRoles}><TransactionHistory /></ProtectedPage>
         } />
+       
         <Route path="/security" element={
-          <ProtectedPage allowedRoles={managementRoles}><SecurityMain /></ProtectedPage>
+          <ProtectedPage allowedRoles={['ADMIN']}><SecurityMain /></ProtectedPage>
         } />
         <Route path="/settings" element={
-            <ProtectedPage allowedRoles={managementRoles}><SettingsMain /></ProtectedPage>
+            <ProtectedPage allowedRoles={['ADMIN']}><SettingsMain /></ProtectedPage>
           } />
         <Route path="/logs" element={
-            <ProtectedPage allowedRoles={managementRoles}><LogsMain /></ProtectedPage>
+            <ProtectedPage allowedRoles={['ADMIN']}><LogsMain /></ProtectedPage>
           } />
         <Route path="/handover" element={
             <ProtectedPage allowedRoles={managementRoles}><HandoverMain /></ProtectedPage>
@@ -185,9 +192,7 @@ function App() {
         <Route path="/staff-mobile-pos" element={
           <StaffProtectedPage><StaffMobilePOS /></StaffProtectedPage>
         } />
-        <Route path="/staff-monitoring" element={
-          <StaffProtectedPage><StaffMonitoring /></StaffProtectedPage>
-        } />
+
         <Route path="/staff-security" element={<Navigate to="/staff-dashboard" replace />} />
         <Route path="/staff-lost-card" element={
           <StaffProtectedPage><StaffLostCard /></StaffProtectedPage>
@@ -202,7 +207,7 @@ function App() {
 
         {/* Catch-all */}
         <Route path="*" element={
-          <ProtectedRoute allowedRoles={['STAFF', 'MANAGER', 'ADMIN']}>
+          <ProtectedRoute allowedRoles={['STAFF', 'MANAGER', 'ADMIN', 'DRIVER']}>
             <div className="flex flex-col items-center justify-center w-full h-screen p-8 bg-slate-50">
               <h2 className="text-2xl font-bold text-gray-700">Trang không tồn tại hoặc tính năng đang phát triển</h2>
               <p className="text-gray-500 mt-2">Vui lòng quay lại sau hoặc sử dụng thanh điều hướng.</p>

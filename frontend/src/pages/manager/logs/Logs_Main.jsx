@@ -11,6 +11,7 @@ import {
   Info, 
   ShieldAlert 
 } from 'lucide-react';
+import { PageLayout } from '../../../components/common/PageLayout';
 
 export const LogsMain = () => {
   const [logs, setLogs] = useState([]);
@@ -47,32 +48,45 @@ export const LogsMain = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    setPage(1);
-    fetchLogs();
+    if (page === 1) {
+      fetchLogs();
+    } else {
+      setPage(1);
+    }
   };
 
   const handleExport = async () => {
     try {
       const res = await logService.exportLogs({ keyword, eventType });
-      if (res && res.fileUrl) {
-        alert('Xuất báo cáo thành công! Tải xuống: ' + res.fileUrl);
+      if (res) {
+        const blob = res instanceof Blob ? res : new Blob([res]);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `System_Logs_${new Date().toISOString().slice(0,10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       }
     } catch (error) {
-      alert('Lỗi xuất báo cáo');
+      alert('Lỗi xuất báo cáo: ' + error.message);
     }
   };
 
   const getStatusIcon = (status) => {
-    switch (status) {
-      case 'success':
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
-      case 'warning':
-        return <AlertTriangle className="w-5 h-5 text-amber-500" />;
-      case 'error':
-        return <ShieldAlert className="w-5 h-5 text-red-500" />;
-      default:
-        return <Info className="w-5 h-5 text-blue-500" />;
+    // Chuẩn hóa: hỗ trợ cả tiếng Anh (English enum) lẫn tiếng Việt (Backend response)
+    const s = (status || '').toLowerCase();
+    if (s === 'success' || s === 'thành công' || s === 'thanh cong') {
+      return <CheckCircle className="w-5 h-5 text-green-500" />;
     }
+    if (s === 'warning' || s === 'cảnh báo' || s === 'canh bao') {
+      return <AlertTriangle className="w-5 h-5 text-amber-500" />;
+    }
+    if (s === 'error' || s === 'thất bại' || s === 'that bai' || s === 'lỗi') {
+      return <ShieldAlert className="w-5 h-5 text-red-500" />;
+    }
+    return <Info className="w-5 h-5 text-blue-500" />;
   };
 
   const getEventTypeBadge = (type) => {
@@ -86,34 +100,28 @@ export const LogsMain = () => {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <FileText className="w-7 h-7 text-indigo-600" />
-            Nhật ký hệ thống
-          </h1>
-          <p className="text-gray-500 text-sm">Ghi nhận toàn bộ hoạt động, lỗi hệ thống và thao tác của quản trị viên.</p>
-        </div>
-        <div className="flex gap-2">
+    <PageLayout
+      title="Nhật ký hệ thống"
+      subtitle="Ghi nhận toàn bộ hoạt động, lỗi hệ thống và thao tác của quản trị viên."
+      actions={
+        <>
           <button 
             onClick={fetchLogs}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-sm"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Làm mới
           </button>
           <button 
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-[#1677ff] hover:bg-[#0058be] text-white rounded-lg transition-colors shadow-sm"
           >
             <Download className="w-4 h-4" />
             Xuất báo cáo
           </button>
-        </div>
-      </div>
-
+        </>
+      }
+    >
       {/* Filter Section */}
       <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
         <form onSubmit={handleSearch} className="w-full md:w-96 relative">
@@ -235,6 +243,6 @@ export const LogsMain = () => {
           </div>
         )}
       </div>
-    </div>
+    </PageLayout>
   );
 };

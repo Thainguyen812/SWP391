@@ -5,11 +5,16 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
   const isAuthenticated = authService.isAuthenticated();
   const user = authService.getUser();
 
+  /* 
+  BỎ CHẶN LUÔN CẢ MÀN HÌNH LOGIN ĐỂ TEST
   if (!isAuthenticated) {
     // Nếu chưa đăng nhập, đá về trang /login
     return <Navigate to="/login" replace />;
   }
+  */
 
+  // BỎ CHẶN QUYỀN ĐỂ DỄ TEST - Bất kỳ role nào cũng vào được tất cả các trang
+  /*
   if (allowedRoles && (!user || !authService.hasRole(allowedRoles))) {
     // Nếu đã đăng nhập nhưng không có quyền truy cập trang này
     return (
@@ -51,6 +56,7 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
       </div>
     );
   }
+  */
 
   // Nếu hợp lệ, cho phép render component con
   return children;

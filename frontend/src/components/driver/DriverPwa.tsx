@@ -1068,8 +1068,8 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       bodyShape: demoVehicle.bodyShape || bodyShapeDb,
       isActive: true,
       fuelType: demoVehicle.fuelType,
-      registrationDocUrl: demoVehicle.registrationDocUrl,
-      registrationPhotoUrl: demoVehicle.registrationPhotoUrl
+      registrationDocUrl: "https://example.com/demo-doc.jpg",
+      registrationPhotoUrl: "https://example.com/demo-photo.jpg"
     };
 
     try {

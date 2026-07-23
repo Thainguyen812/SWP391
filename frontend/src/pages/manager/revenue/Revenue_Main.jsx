@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { DownloadOutlined, CalendarOutlined, DownOutlined } from "@ant-design/icons";
+import { DownloadOutlined } from "@ant-design/icons";
 import { DatePicker, notification } from "antd";
 import dayjs from "dayjs";
 import { dashboardService } from '../../../services/dashboardService';
+import { exportToCSV } from '../../../utils/exportUtils';
 import { RevenueSummaryCards } from "./Revenue_Summary";
 import { RevenueCharts } from "./Revenue_Charts";
 import { RecentTransactions } from "./Revenue_Transactions";
@@ -15,15 +16,17 @@ export const RevenuePage = () => {
   const [summary, setSummary] = useState(null);
   const [charts, setCharts] = useState(null);
   const [transactions, setTransactions] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(dayjs());
 
   useEffect(() => {
     const fetchAllData = async () => {
       setLoading(true);
       try {
+        const dateStr = selectedDate ? selectedDate.format('YYYY-MM-DD') : null;
         const [sumRes, chartsRes, transRes] = await Promise.all([
-          dashboardService.getRevenueSummary(),
-          dashboardService.getRevenueCharts(),
-          dashboardService.getRevenueTransactions()
+          dashboardService.getRevenueSummary(null, dateStr),
+          dashboardService.getRevenueCharts(null, dateStr),
+          dashboardService.getRevenueTransactions(1)
         ]);
         
         setSummary(sumRes);
@@ -38,7 +41,7 @@ export const RevenuePage = () => {
       }
     };
     fetchAllData();
-  }, []);
+  }, [selectedDate]);
 
   return (
     <PageLayout
@@ -47,7 +50,8 @@ export const RevenuePage = () => {
       actions={
         <>
           <DatePicker 
-            defaultValue={dayjs()} 
+            value={selectedDate} 
+            onChange={(date) => date && setSelectedDate(date)}
             format="DD/MM/YYYY"
             allowClear={false}
             className="px-4 py-2 bg-white dark:bg-slate-800 rounded border border-[#c4c6cd] dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors font-bold text-[#1b1c1d] dark:text-slate-200 text-xs shadow-sm focus:outline-none focus:border-blue-500"
@@ -55,6 +59,16 @@ export const RevenuePage = () => {
           <button 
             className="gap-2 px-4 py-[9px] bg-[#1677ff] hover:bg-[#0058be] transition-colors rounded flex items-center focus:outline-none"
             onClick={() => {
+              if (!transactions || !transactions.items) return;
+              exportToCSV(transactions.items, `Bao_cao_doanh_thu_${dayjs().format('YYYY-MM-DD')}.csv`, {
+                id: 'Mã GD',
+                type: 'Loại GD',
+                customerName: 'Khách hàng',
+                amount: 'Số tiền',
+                status: 'Trạng thái',
+                time: 'Thời gian',
+                paymentMethod: 'PTTT'
+              });
               notification.success({ 
                 message: "Xuất báo cáo thành công", 
                 description: "Tệp báo cáo doanh thu đã được tải xuống.", 

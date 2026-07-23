@@ -1,5 +1,10 @@
 package com.parking.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.parking.model.SystemSetting;
+import com.parking.repository.SystemSettingRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
@@ -7,8 +12,15 @@ import java.util.*;
 @RequestMapping("/api/settings")
 public class SettingsController {
 
-    @GetMapping("/system")
-    public Map<String, Object> getSystemSettings() {
+    @Autowired
+    private SystemSettingRepository settingRepo;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private static final String SETTING_KEY = "SYSTEM_CONFIG";
+
+    private Map<String, Object> getDefaultSettings() {
         Map<String, Object> result = new HashMap<>();
 
         Map<String, Object> camera = new HashMap<>();
@@ -61,8 +73,44 @@ public class SettingsController {
         return result;
     }
 
+    @GetMapping("/system")
+    public Map<String, Object> getSystemSettings() {
+        SystemSetting setting = settingRepo.findBySettingKey(SETTING_KEY);
+        if (setting == null) {
+            return getDefaultSettings();
+        }
+        try {
+            return objectMapper.readValue(setting.getSettingValue(), new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            return getDefaultSettings();
+        }
+    }
+
     @PutMapping("/system")
     public Map<String, Object> updateSystemSettings(@RequestBody Map<String, Object> settingsData) {
-        return Map.of("success", true, "message", "C?p nh?t cài d?t h? th?ng thành công");
+        SystemSetting setting = settingRepo.findBySettingKey(SETTING_KEY);
+        if (setting == null) {
+            setting = new SystemSetting();
+            setting.setId(java.util.UUID.randomUUID());
+            setting.setSettingKey(SETTING_KEY);
+            setting.setDescription("System Configurations");
+        }
+        try {
+            setting.setSettingValue(objectMapper.writeValueAsString(settingsData));
+            setting.setUpdatedAt(java.time.LocalDateTime.now());
+            settingRepo.save(setting);
+            return Map.of("success", true, "message", "Cap nhat cai dat he thong thanh cong");
+        } catch (Exception e) {
+            return Map.of("success", false, "message", "Loi luu cau hinh");
+        }
+    }
+
+    @PostMapping("/system/restore")
+    public Map<String, Object> restoreDefaultSettings() {
+        SystemSetting setting = settingRepo.findBySettingKey(SETTING_KEY);
+        if (setting != null) {
+            settingRepo.delete(setting);
+        }
+        return Map.of("success", true, "message", "Khoi phuc cai dat he thong thanh cong");
     }
 }

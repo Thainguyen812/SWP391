@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Modal } from 'antd';
+import { Modal, Input } from 'antd';
 import { CheckOutlined, CloseOutlined, ZoomInOutlined } from '@ant-design/icons';
+import { authService } from '../../../services/authService';
 
 const PHOTO_LABELS = [
   '1. CÀ VẸT / ĐĂNG KÝ XE',
@@ -10,18 +11,15 @@ const PHOTO_LABELS = [
 
 export const VipApprovalModal = ({ isOpen, onClose, customer, onApprove, onReject, processing }) => {
   const [previewImg, setPreviewImg] = useState(null);
+  const [showRejectInput, setShowRejectInput] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   if (!customer) return null;
 
-  const userStr = localStorage.getItem('user');
-  let userRole = '';
-  if (userStr) {
-    try {
-      userRole = JSON.parse(userStr).role;
-    } catch (e) {}
-  }
-
-  const canApprove = userRole === 'MANAGER' || userRole === 'ADMIN';
+  // Dùng authService.getUser() để hỗ trợ cả localStorage lẫn sessionStorage
+  const currentUser = authService.getUser();
+  const normalizedRole = currentUser?.role?.replace('ROLE_', '').toUpperCase() || '';
+  const canApprove = normalizedRole === 'MANAGER' || normalizedRole === 'ADMIN';
   const photos = customer.photos_urls || [];
 
   return (
@@ -29,7 +27,11 @@ export const VipApprovalModal = ({ isOpen, onClose, customer, onApprove, onRejec
     <Modal
       title={<span className="text-lg font-bold text-gray-800 dark:text-gray-100">Duyệt Đăng ký VIP</span>}
       open={isOpen}
-      onCancel={onClose}
+      onCancel={() => {
+        setShowRejectInput(false);
+        setRejectReason('');
+        onClose();
+      }}
       footer={null}
       width={820}
       className="dark:bg-slate-800"
@@ -121,23 +123,58 @@ export const VipApprovalModal = ({ isOpen, onClose, customer, onApprove, onRejec
 
         {/* Nút hành động */}
         {canApprove ? (
-          <div className="flex justify-end gap-3 mt-4 border-t border-gray-200 dark:border-slate-600 pt-4">
-            <button
-              type="button"
-              onClick={() => onReject(customer.subscriptionId || customer.id)}
-              disabled={processing}
-              className="flex items-center gap-2 px-5 py-2 border border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg font-medium transition-colors disabled:opacity-50"
-            >
-              <CloseOutlined /> Từ chối
-            </button>
-            <button
-              type="button"
-              onClick={() => onApprove(customer.subscriptionId || customer.id)}
-              disabled={processing}
-              className="flex items-center gap-2 px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 shadow-sm shadow-green-200 dark:shadow-none"
-            >
-              <CheckOutlined /> Phê duyệt VIP
-            </button>
+          <div className="flex flex-col gap-3 mt-4 border-t border-gray-200 dark:border-slate-600 pt-4">
+            {showRejectInput && (
+              <Input.TextArea 
+                rows={2} 
+                placeholder="Nhập lý do từ chối..." 
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                className="w-full"
+              />
+            )}
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!showRejectInput) {
+                    setShowRejectInput(true);
+                  } else {
+                    const finalReason = rejectReason.trim() ? rejectReason : "Không đủ điều kiện phê duyệt";
+                    onReject(customer.subscriptionId || customer.id, finalReason);
+                    setShowRejectInput(false);
+                    setRejectReason('');
+                  }
+                }}
+                disabled={processing}
+                className="flex items-center gap-2 px-5 py-2 border border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                <CloseOutlined /> {showRejectInput ? "Xác nhận từ chối" : "Từ chối"}
+              </button>
+              
+              {!showRejectInput ? (
+                <button
+                  type="button"
+                  onClick={() => onApprove(customer.subscriptionId || customer.id)}
+                  disabled={processing}
+                  className="flex items-center gap-2 px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 shadow-sm shadow-green-200 dark:shadow-none"
+                >
+                  <CheckOutlined /> Phê duyệt VIP
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRejectInput(false);
+                    setRejectReason('');
+                  }}
+                  disabled={processing}
+                  className="flex items-center gap-2 px-5 py-2 border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition-colors disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="flex justify-end mt-4 border-t border-gray-200 dark:border-slate-600 pt-4 text-sm text-gray-500 font-medium italic">

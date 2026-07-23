@@ -71,12 +71,19 @@ export const SettingsMain = () => {
       okText: 'Khôi phục',
       okType: 'danger',
       cancelText: 'Hủy',
-      onOk() {
-        notification.success({ 
-          message: 'Khôi phục thành công', 
-          description: 'Hệ thống đã được trả về trạng thái mặc định ban đầu.',
-          placement: 'topRight'
-        });
+      onOk: async () => {
+        try {
+          await settingsService.restoreDefaultSettings();
+          const data = await settingsService.getSystemSettings();
+          setSettings(data);
+          notification.success({ 
+            message: 'Khôi phục thành công', 
+            description: 'Hệ thống đã được trả về trạng thái mặc định ban đầu.',
+            placement: 'topRight'
+          });
+        } catch (error) {
+          notification.error({ message: 'Lỗi khôi phục mặc định' });
+        }
       },
     });
   };

@@ -5,10 +5,6 @@ import { getDemoVehicleByPlate, getDemoVehicleImages, getDemoVehicleProfile } fr
 
 const GlobalContext = createContext({});
 
-// No more mock data. Completely API driven.
-
-
-
 export const GlobalProvider = ({ children }) => {
   const [searchValue, setSearchValue] = useState("");
   const [totalGates, setTotalGates] = useState(6);
@@ -164,10 +160,19 @@ export const GlobalProvider = ({ children }) => {
           const active = dataArray
             .filter(s => ['ACTIVE', 'PASSED_CONFIRMED'].includes(s.sessionStatus))
             .map((session, index) => {
-              const checkInTime = session.checkInTime ? new Date(session.checkInTime) : null;
+              // Ensure checkInTime is parsed as UTC (append Z if missing timezone info)
+              const parseUtc = (str) => {
+                if (!str) return null;
+                const s = str.trim();
+                // Already has timezone info (Z or +/-offset)
+                if (s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s)) return new Date(s);
+                // No timezone — backend likely sent UTC without Z, force UTC
+                return new Date(s + 'Z');
+              };
+              const checkInTime = parseUtc(session.checkInTime);
               let durationStr = "Đang vào";
               if (checkInTime && !isNaN(checkInTime.getTime())) {
-                const diffMs = Date.now() - checkInTime.getTime();
+                const diffMs = Math.max(0, Date.now() - checkInTime.getTime());
                 const hours = Math.floor(diffMs / (1000 * 60 * 60));
                 const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
                 durationStr = `${hours}h ${minutes}m`;

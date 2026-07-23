@@ -26,6 +26,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     @Query("SELECT COALESCE(SUM(t.totalAmount), 0) FROM Transaction t WHERE t.paymentStatus = :status")
     BigDecimal sumTotalRevenueByStatus(@Param("status") Transaction.PaymentStatus status);
 
+    @Query("SELECT COALESCE(SUM(t.totalAmount), 0) FROM Transaction t WHERE t.paymentStatus = :status AND DATE(t.processedAt) = DATE(:date)")
+    BigDecimal sumTotalRevenueByStatusAndDate(@Param("status") Transaction.PaymentStatus status, @Param("date") Instant date);
+
     @Query(value = """
             SELECT
                 DATE(processed_at) AS revenue_date,

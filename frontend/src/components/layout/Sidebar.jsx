@@ -12,7 +12,8 @@ import {
   PlusOutlined,
   QuestionCircleOutlined,
   LogoutOutlined,
-  SwapOutlined
+  SwapOutlined,
+  FileTextOutlined
 } from '@ant-design/icons';
 import './Sidebar.css';
 
@@ -22,14 +23,26 @@ const navItems = [
   { path: '/revenue', label: 'Doanh thu', icon: <DollarOutlined /> },
   { path: '/staff', label: 'Quản lý nhân sự', icon: <TeamOutlined /> },
   { path: '/customers', label: 'Khách hàng', icon: <UserOutlined /> },
-  { path: '/transactions', label: 'Lịch sử giao dịch', icon: <HistoryOutlined /> },
-  { path: '/security', label: 'Bảo mật', icon: <SafetyOutlined /> },
+  { path: '/transactions', label: 'Giao dịch', icon: <HistoryOutlined /> },
+  { path: '/security', label: 'Bảo mật', icon: <SafetyOutlined />, adminOnly: true },
   { path: '/handover', label: 'Bàn giao ca', icon: <SwapOutlined /> },
+  { path: '/logs', label: 'Nhật ký', icon: <FileTextOutlined />, adminOnly: true },
+  { path: '/settings', label: 'Cài đặt', icon: <SettingOutlined />, adminOnly: true },
 ];
 
 export const Sidebar = ({ onOpenAddBranch }) => {
   const location = useLocation();
   const navigate = useNavigate();
+
+  const user = authService.getUser();
+  // Chuẩn hóa role: strip ROLE_ prefix và uppercase để so sánh chính xác
+  const role = user?.role?.replace('ROLE_', '').toUpperCase() || '';
+  const isAdmin = role === 'ADMIN';
+
+  const visibleNavItems = navItems.filter(item => {
+    if (item.adminOnly) return isAdmin;
+    return true;
+  });
 
   const handleLogout = () => {
     authService.logout();
@@ -52,7 +65,7 @@ export const Sidebar = ({ onOpenAddBranch }) => {
       {/* Navigation */}
       <nav className="sidebar-nav">
         <ul className="sidebar-nav-list">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = location.pathname === item.path || (location.pathname === '/' && item.path === '/overview');
             return (
               <li key={item.path}>
@@ -75,13 +88,15 @@ export const Sidebar = ({ onOpenAddBranch }) => {
 
       {/* Bottom Area */}
       <div className="sidebar-bottom-area">
-        <button 
-          onClick={onOpenAddBranch}
-          className="sidebar-add-btn"
-        >
-          <PlusOutlined />
-          Thêm cơ sở mới
-        </button>
+        {isAdmin && (
+          <button 
+            onClick={onOpenAddBranch}
+            className="sidebar-add-btn"
+          >
+            <PlusOutlined />
+            Thêm cơ sở mới
+          </button>
+        )}
         <ul className="sidebar-bottom-list">
           <li>
             <button className="sidebar-bottom-item" onClick={() => navigate('/support')}>

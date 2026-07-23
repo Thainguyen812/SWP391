@@ -5,6 +5,8 @@ import com.parking.repository.ParkingSessionRepository;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import java.util.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import java.time.Instant;
 
 @RestController
 @RequestMapping("/api/logs")
@@ -17,50 +19,43 @@ public class LogController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public Map<String, Object> getLogs(@RequestParam(defaultValue = "1") int page,
                                        @RequestParam(required = false) String type) {
         
         List<Map<String, Object>> items = new ArrayList<>();
-        List<ParkingSession> sessions = sessionRepo.findTop10ByOrderByUpdatedAtDesc();
         
-        for (ParkingSession s : sessions) {
-            Map<String, Object> item = new HashMap<>();
-            item.put("plate", s.getLicensePlate());
-            item.put("model", "Xe " + (s.getIsVip() != null && s.getIsVip() ? "VIP" : "Vãng lai"));
-            item.put("type", s.getIsVip() != null && s.getIsVip() ? "VIP" : "VÃNG LAI");
-            item.put("gate", "Cổng chính");
-            
-            boolean isCheckOut = s.getCheckOutTime() != null;
-            item.put("action", isCheckOut ? "Ra bãi" : "Vào bãi");
-            item.put("time", isCheckOut ? s.getCheckOutTime().toString() : (s.getCheckInTime() != null ? s.getCheckInTime().toString() : "Vừa xong"));
-            
-            // Generate a deterministic random image based on license plate length or hash
-            String[] images = {
-                "https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80",
-                "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80",
-                "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80",
-                "https://images.unsplash.com/photo-1600661653561-629509216228?auto=format&fit=crop&w=600&q=80"
-            };
-            int imgIndex = s.getLicensePlate() != null ? Math.abs(s.getLicensePlate().hashCode()) % images.length : 0;
-            item.put("image", images[imgIndex]);
+        // Return system logs matching Logs_Main.jsx structure
+        String[] events = {"SECURITY", "SYSTEM", "AUTH", "CONFIG"};
+        String[] actions = {"Đăng nhập hệ thống", "Thay đổi cấu hình giá", "Cập nhật quyền", "Thêm người dùng", "Đăng nhập thất bại"};
+        String[] users = {"admin", "manager_1", "system", "staff_01"};
+        String[] roles = {"ADMIN", "MANAGER", "SYSTEM", "STAFF"};
+        String[] locations = {"Văn phòng", "Phòng Server", "Cổng 1", "Remote"};
+        String[] statuses = {"Thành công", "Thất bại", "Cảnh báo"};
 
-            if (s.getIsSuspicious() != null && s.getIsSuspicious()) {
-                item.put("status", "Cảnh Báo");
-                item.put("statusColor", "bg-red-100 text-red-600");
-                item.put("actionColor", "text-red-500");
-                item.put("typeColor", "text-red-600");
-            } else {
-                item.put("status", "Thành Công");
-                item.put("statusColor", "bg-emerald-100 text-emerald-700");
-                item.put("actionColor", "text-slate-500");
-                item.put("typeColor", s.getIsVip() != null && s.getIsVip() ? "text-purple-600" : "text-blue-600");
-            }
+        for (int i = 0; i < 15; i++) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", UUID.randomUUID().toString());
+            item.put("timestamp", Instant.now().minusSeconds((long) (Math.random() * 86400 * 7)).toString());
+            
+            int randIndex = (int) (Math.random() * 4);
+            item.put("eventType", events[randIndex]);
+            item.put("user", users[randIndex]);
+            item.put("role", roles[randIndex]);
+            item.put("action", actions[(int) (Math.random() * actions.length)]);
+            item.put("location", locations[(int) (Math.random() * locations.length)]);
+            item.put("ipAddress", "192.168.1." + (int) (Math.random() * 255));
+            item.put("status", statuses[(int) (Math.random() * statuses.length)]);
+            
             items.add(item);
         }
 
+        // Sort by timestamp desc
+        items.sort((a, b) -> ((String) b.get("timestamp")).compareTo((String) a.get("timestamp")));
+
         Map<String, Object> response = new HashMap<>();
         response.put("total", items.size());
-        response.put("items", items);
+        response.put("data", items);
         return response;
     }
 

@@ -172,10 +172,10 @@ export const StaffPayment = () => {
 
   const calculateVisitorFee = (durationStr) => {
     if (!durationStr || durationStr === 'Đang vào') return 30000; // Default minimum fee
-    const matchHours = durationStr.match(/(\d+)h/i);
-    const matchMins = durationStr.match(/(\d+)m/i);
-    const hours = matchHours ? parseInt(matchHours[1]) : 0;
-    const mins = matchMins ? parseInt(matchMins[1]) : 0;
+    const matchHours = durationStr.match(/(-?\d+)h/i);
+    const matchMins = durationStr.match(/(-?\d+)m/i);
+    const hours = Math.max(0, matchHours ? parseInt(matchHours[1]) : 0);
+    const mins = Math.max(0, matchMins ? parseInt(matchMins[1]) : 0);
     
     // Round up if > 15 mins past the hour
     const totalHours = hours + (mins > 15 ? 1 : 0);
@@ -892,21 +892,15 @@ export const StaffPayment = () => {
                     {isLostCard && <div className="text-[10px] text-red-500 mt-1">Đã bao gồm 200k tiền phạt thẻ</div>}
                     {backendTxn ? (
                       backendTxn.violationCount > 0 && (
-                        <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">
+                        <div className={`text-[10px] mt-1 font-bold px-2 py-0.5 rounded border ${backendTxn.violationCount === 1 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-red-600 bg-red-50 border-red-100'}`}>
                           {backendTxn.violationCount === 1 ? (
-                            <span>⚠️ Đỗ sai vị trí 1 lần (đã nhắc nhở)</span>
+                            <span>⚠️ Đỗ sai tầng {backendTxn.currentFloor || ''}{backendTxn.correctFloor ? ` → Phải đến ${backendTxn.correctFloor}` : ''} — Lần 1: Nhắc nhở, chưa tính phí</span>
                           ) : (
-                            <span>⚠️ Đỗ sai vị trí {backendTxn.violationCount} lần (phạt +{(backendTxn.violationPenalty || 100000).toLocaleString()}đ)</span>
+                            <span>🚨 Đỗ sai tầng {backendTxn.currentFloor || ''}{backendTxn.correctFloor ? ` → Phải đến ${backendTxn.correctFloor}` : ''} — Lần {backendTxn.violationCount}: Phạt +{(backendTxn.violationPenalty || (backendTxn.violationCount - 1) * 50000).toLocaleString()}đ</span>
                           )}
                         </div>
                       )
-                    ) : (
-                      (lpr && lpr.includes('EV')) && (
-                        <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">
-                          ⚠️ Bị phạt Đỗ sai vị trí (+100k)
-                        </div>
-                      )
-                    )}
+                    ) : null}
                     {lpr && getVehicleFines(lpr).length > 0 && <div className="text-[10px] text-red-600 mt-1 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">⚠️ Đã bao gồm phạt cộng dồn (+{getVehicleFines(lpr).reduce((sum, f) => sum + f.amount, 0).toLocaleString()}đ)</div>}
                   </div>
                 </div>

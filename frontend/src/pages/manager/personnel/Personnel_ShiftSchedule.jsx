@@ -1,10 +1,66 @@
-import { useState } from "react";
-import { ArrowRightOutlined } from "@ant-design/icons";
-import { Drawer, Table, Tag } from "antd";
+import { useState, useEffect } from "react";
+import { ArrowRightOutlined, SaveOutlined } from "@ant-design/icons";
+import { Drawer, Table, Tag, Select, notification } from "antd";
 import { Card } from '../../../components/common/Card';
+import { personnelService } from '../../../services/personnelService';
 
-export const PersonnelShiftSchedule = ({ data, loading }) => {
+const SHIFT_OPTIONS = [
+  { label: 'Ca Sáng', value: 'Ca Sáng' },
+  { label: 'Ca Chiều', value: 'Ca Chiều' },
+  { label: 'Ca Đêm', value: 'Ca Đêm' },
+  { label: 'Nghỉ', value: 'Nghỉ' },
+  { label: 'Chưa phân ca', value: 'Chưa phân ca' }
+];
+
+export const PersonnelShiftSchedule = ({ data, loading, employees, onUpdateSuccess }) => {
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+  const [weeklyData, setWeeklyData] = useState([]);
+  const [weeklyLoading, setWeeklyLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (isDrawerVisible) {
+      fetchWeeklyData();
+    }
+  }, [isDrawerVisible]);
+
+  const fetchWeeklyData = async () => {
+    setWeeklyLoading(true);
+    try {
+      const res = await personnelService.getWeeklyShifts();
+      setWeeklyData(res);
+    } catch (err) {
+      console.error(err);
+      notification.error({ message: 'Lỗi tải lịch trực tuần' });
+    } finally {
+      setWeeklyLoading(false);
+    }
+  };
+
+  const handleShiftChange = (userId, day, value) => {
+    setWeeklyData(prev => prev.map(item => 
+      item.key === userId ? { ...item, [day]: value } : item
+    ));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload = weeklyData.map(item => ({
+        ...item,
+        userId: item.key
+      }));
+      await personnelService.updateWeeklyShifts(payload);
+      notification.success({ message: 'Lưu lịch tuần thành công' });
+      setIsDrawerVisible(false);
+      if (onUpdateSuccess) onUpdateSuccess();
+    } catch (err) {
+      console.error(err);
+      notification.error({ message: 'Không thể lưu lịch tuần' });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -18,23 +74,27 @@ export const PersonnelShiftSchedule = ({ data, loading }) => {
 
   if (!data || data.length === 0) return null;
 
-  // Mock data for weekly schedule
+  const renderSelect = (text, record, day) => (
+    <Select
+      value={text}
+      size="small"
+      style={{ width: 110 }}
+      onChange={(val) => handleShiftChange(record.key, day, val)}
+      options={SHIFT_OPTIONS}
+      bordered={false}
+      className={`rounded ${text === 'Nghỉ' ? 'bg-gray-100' : text === 'Chưa phân ca' ? 'bg-red-50' : 'bg-blue-50'}`}
+    />
+  );
+
   const weeklyColumns = [
     { title: 'Nhân viên', dataIndex: 'name', key: 'name', fixed: 'left', width: 150 },
-    { title: 'Thứ 2', dataIndex: 'mon', key: 'mon', render: (text) => <Tag color={text === 'Nghỉ' ? 'default' : 'blue'}>{text}</Tag> },
-    { title: 'Thứ 3', dataIndex: 'tue', key: 'tue', render: (text) => <Tag color={text === 'Nghỉ' ? 'default' : 'blue'}>{text}</Tag> },
-    { title: 'Thứ 4', dataIndex: 'wed', key: 'wed', render: (text) => <Tag color={text === 'Nghỉ' ? 'default' : 'blue'}>{text}</Tag> },
-    { title: 'Thứ 5', dataIndex: 'thu', key: 'thu', render: (text) => <Tag color={text === 'Nghỉ' ? 'default' : 'blue'}>{text}</Tag> },
-    { title: 'Thứ 6', dataIndex: 'fri', key: 'fri', render: (text) => <Tag color={text === 'Nghỉ' ? 'default' : 'blue'}>{text}</Tag> },
-    { title: 'Thứ 7', dataIndex: 'sat', key: 'sat', render: (text) => <Tag color={text === 'Nghỉ' ? 'default' : 'orange'}>{text}</Tag> },
-    { title: 'Chủ Nhật', dataIndex: 'sun', key: 'sun', render: (text) => <Tag color={text === 'Nghỉ' ? 'default' : 'red'}>{text}</Tag> },
-  ];
-
-  const weeklyData = [
-    { key: 1, name: 'Nguyễn Văn A', mon: 'Ca Sáng', tue: 'Ca Sáng', wed: 'Ca Chiều', thu: 'Nghỉ', fri: 'Ca Sáng', sat: 'Ca Sáng', sun: 'Nghỉ' },
-    { key: 2, name: 'Trần Thị B', mon: 'Ca Chiều', tue: 'Ca Chiều', wed: 'Nghỉ', thu: 'Ca Sáng', fri: 'Ca Chiều', sat: 'Nghỉ', sun: 'Ca Sáng' },
-    { key: 3, name: 'Lê Văn C', mon: 'Nghỉ', tue: 'Ca Sáng', wed: 'Ca Sáng', thu: 'Ca Chiều', fri: 'Nghỉ', sat: 'Ca Chiều', sun: 'Ca Chiều' },
-    { key: 4, name: 'Phạm Minh D', mon: 'Ca Sáng', tue: 'Nghỉ', wed: 'Ca Chiều', thu: 'Ca Sáng', fri: 'Ca Chiều', sat: 'Ca Sáng', sun: 'Nghỉ' },
+    { title: 'Thứ 2', dataIndex: 'mon', key: 'mon', render: (t, r) => renderSelect(t, r, 'mon') },
+    { title: 'Thứ 3', dataIndex: 'tue', key: 'tue', render: (t, r) => renderSelect(t, r, 'tue') },
+    { title: 'Thứ 4', dataIndex: 'wed', key: 'wed', render: (t, r) => renderSelect(t, r, 'wed') },
+    { title: 'Thứ 5', dataIndex: 'thu', key: 'thu', render: (t, r) => renderSelect(t, r, 'thu') },
+    { title: 'Thứ 6', dataIndex: 'fri', key: 'fri', render: (t, r) => renderSelect(t, r, 'fri') },
+    { title: 'Thứ 7', dataIndex: 'sat', key: 'sat', render: (t, r) => renderSelect(t, r, 'sat') },
+    { title: 'Chủ Nhật', dataIndex: 'sun', key: 'sun', render: (t, r) => renderSelect(t, r, 'sun') },
   ];
 
   return (
@@ -42,7 +102,7 @@ export const PersonnelShiftSchedule = ({ data, loading }) => {
       <Card className="w-full flex flex-col p-5 bg-white dark:bg-slate-800 border border-[#e9e7e9] dark:border-slate-700 shadow-sm rounded-lg mb-6">
         <div className="w-full flex items-center justify-between mb-4 pb-2">
           <h3 className="text-lg font-bold text-[#041627] dark:text-slate-100">
-            Phân ca hôm nay (14/11)
+            Phân ca hôm nay
           </h3>
           <button 
             onClick={() => setIsDrawerVisible(true)}
@@ -81,16 +141,20 @@ export const PersonnelShiftSchedule = ({ data, loading }) => {
                     <span className="flex items-center justify-center gap-1.5">
                       {shift.morning !== 'Trống ca' ? (
                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                      ) : null}
-                      {shift.morning}
+                      ) : (
+                         <Tag color="error">Trống</Tag>
+                      )}
+                      {shift.morning !== 'Trống ca' ? shift.morning : null}
                     </span>
                   </td>
                   <td className="py-3 px-2 text-sm text-[#475569] dark:text-slate-400 text-center">
                     <span className="flex items-center justify-center gap-1.5">
                       {shift.afternoon !== 'Trống ca' ? (
                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                      ) : null}
-                      {shift.afternoon}
+                      ) : (
+                         <Tag color="error">Trống</Tag>
+                      )}
+                      {shift.afternoon !== 'Trống ca' ? shift.afternoon : null}
                     </span>
                   </td>
                 </tr>
@@ -101,9 +165,20 @@ export const PersonnelShiftSchedule = ({ data, loading }) => {
       </Card>
 
       <Drawer
-        title="Lịch trực chi tiết tuần (13/11 - 19/11)"
+        title={
+          <div className="flex items-center justify-between">
+            <span>Lịch trực chi tiết tuần</span>
+            <button 
+              onClick={handleSave} 
+              disabled={saving}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm flex items-center gap-2 mr-6"
+            >
+              <SaveOutlined /> {saving ? 'Đang lưu...' : 'Lưu lịch'}
+            </button>
+          </div>
+        }
         placement="right"
-        width={800}
+        width={950}
         onClose={() => setIsDrawerVisible(false)}
         open={isDrawerVisible}
       >
@@ -111,9 +186,10 @@ export const PersonnelShiftSchedule = ({ data, loading }) => {
           columns={weeklyColumns} 
           dataSource={weeklyData} 
           pagination={false}
-          scroll={{ x: 700 }}
+          scroll={{ x: 800 }}
           bordered
           size="middle"
+          loading={weeklyLoading}
         />
       </Drawer>
     </>

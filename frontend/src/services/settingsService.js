@@ -9,5 +9,10 @@ export const settingsService = {
   // Lưu cấu hình hệ thống thật xuống backend
   saveSystemSettings: async (settingsData) => {
     return apiClient.put('/settings/system', settingsData);
+  },
+
+  // Khôi phục cấu hình mặc định
+  restoreDefaultSettings: async () => {
+    return apiClient.post('/settings/system/restore');
   }
 };

@@ -7,7 +7,7 @@ export const SystemNotifications = ({ notifications, loading }) => {
       <CardHeader 
         title="Thông báo hệ thống" 
         action={
-          <Badge type="danger">2 QUAN TRỌNG</Badge>
+          <Badge type="danger">QUAN TRỌNG</Badge>
         }
       />
       <CardBody className="p-4 gap-4">

@@ -11,7 +11,9 @@ import com.parking.repository.UserRepository;
 import com.parking.repository.VehicleRepository;
 import com.parking.repository.VipSubscriptionRepository;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -22,30 +24,31 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/customers")
 public class CustomerController {
-
-    private static final DateTimeFormatter DATE_LABEL = DateTimeFormatter.ofPattern("dd/MM/yyyy")
-            .withZone(ZoneId.systemDefault());
 
     private final UserRepository userRepo;
     private final VipSubscriptionRepository vipRepo;
     private final BlacklistRepository blacklistRepo;
     private final VehicleRepository vehicleRepo;
     private final ParkingSessionRepository parkingSessionRepo;
+    private final PasswordEncoder passwordEncoder;
 
     public CustomerController(UserRepository userRepo,
             VipSubscriptionRepository vipRepo,
             BlacklistRepository blacklistRepo,
             VehicleRepository vehicleRepo,
-            ParkingSessionRepository parkingSessionRepo) {
+            ParkingSessionRepository parkingSessionRepo,
+            PasswordEncoder passwordEncoder) {
         this.userRepo = userRepo;
         this.vipRepo = vipRepo;
         this.blacklistRepo = blacklistRepo;
         this.vehicleRepo = vehicleRepo;
         this.parkingSessionRepo = parkingSessionRepo;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @GetMapping("/stats")
@@ -125,6 +128,214 @@ public class CustomerController {
         return new ArrayList<>();
     }
 
+    @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public org.springframework.http.ResponseEntity<Map<String, String>> addCustomer(
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> payload) {
+
+        String name = (String) payload.get("name");
+        String phone = (String) payload.get("phone");
+        String plate = (String) payload.get("plate");
+        String type = (String) payload.get("type");
+        String email = (String) payload.get("email");
+
+        // Validate required fields
+        if (name == null || name.isBlank()) {
+            Map<String, String> err = new LinkedHashMap<>();
+            err.put("message", "Ten khach hang khong duoc de trong");
+            return org.springframework.http.ResponseEntity.badRequest().body(err);
+        }
+        if (plate == null || plate.isBlank()) {
+            Map<String, String> err = new LinkedHashMap<>();
+            err.put("message", "Bien so xe khong duoc de trong");
+            return org.springframework.http.ResponseEntity.badRequest().body(err);
+        }
+        if (email == null || email.isBlank()) {
+            Map<String, String> err = new LinkedHashMap<>();
+            err.put("message", "Email dang nhap khong duoc de trong");
+            return org.springframework.http.ResponseEntity.badRequest().body(err);
+        }
+
+        if (userRepo.findByEmail(email).isPresent()) {
+            Map<String, String> err = new LinkedHashMap<>();
+            err.put("message", "Email da duoc su dung tren he thong");
+            return org.springframework.http.ResponseEntity.badRequest().body(err);
+        }
+
+        if (vehicleRepo.findByLicensePlate(plate).isPresent()) {
+            Map<String, String> err = new LinkedHashMap<>();
+            err.put("message", "Bien so xe da ton tai trong he thong");
+            return org.springframework.http.ResponseEntity.badRequest().body(err);
+        }
+
+        User newUser = new User();
+        newUser.setId(java.util.UUID.randomUUID());
+        newUser.setUsername(name.replaceAll("\\s+", "").toLowerCase() + System.currentTimeMillis());
+        newUser.setFullName(name);
+        newUser.setPhone(phone);
+        newUser.setEmail(email);
+        newUser.setRole(User.Role.DRIVER);
+        newUser.setStatus(User.Status.ACTIVE);
+        
+        String randomPassword = java.util.UUID.randomUUID().toString().substring(0, 8);
+        newUser.setPasswordHash(passwordEncoder.encode(randomPassword));
+        userRepo.save(newUser);
+
+        Vehicle vehicle = new Vehicle();
+        vehicle.setId(java.util.UUID.randomUUID());
+        vehicle.setOwnerId(newUser.getId());
+        vehicle.setLicensePlate(plate);
+        vehicle.setActive(true);
+        vehicleRepo.save(vehicle);
+
+        if ("VIP".equals(type) || "Thang".equals(type)) {
+            VipSubscription vip = new VipSubscription();
+            vip.setId(java.util.UUID.randomUUID());
+            vip.setVehicleId(vehicle.getId());
+            String status = (String) payload.get("status");
+            if ("PENDING".equals(status)) {
+                vip.setStatus(VipSubscription.Status.PENDING_APPROVAL);
+            } else {
+                vip.setStatus(VipSubscription.Status.ACTIVE);
+            }
+            vip.setCreatedAt(java.time.Instant.now());
+            // Parse expiry date from frontend (YYYY-MM-DD) or default to +1 month
+            String expiryStr = (String) payload.get("expiry");
+            if (expiryStr != null && !expiryStr.isBlank()) {
+                try {
+                    vip.setEndDate(java.time.LocalDate.parse(expiryStr));
+                } catch (Exception e) {
+                    vip.setEndDate(java.time.Instant.now().atZone(ZoneId.systemDefault()).plusMonths(1).toLocalDate());
+                }
+            } else {
+                vip.setEndDate(java.time.Instant.now().atZone(ZoneId.systemDefault()).plusMonths(1).toLocalDate());
+            }
+            vipRepo.save(vip);
+        }
+
+        Map<String, String> res = new LinkedHashMap<>();
+        res.put("message", "Them khach hang thanh cong");
+        return org.springframework.http.ResponseEntity.ok(res);
+    }
+
+    @PostMapping("/renew/{subscriptionId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public org.springframework.http.ResponseEntity<Map<String, String>> renewCustomer(@org.springframework.web.bind.annotation.PathVariable UUID subscriptionId) {
+        java.util.Optional<VipSubscription> vipOpt = vipRepo.findById(subscriptionId);
+        if (vipOpt.isEmpty()) {
+            return org.springframework.http.ResponseEntity.badRequest().body(Map.of("message", "Khong tim thay the VIP"));
+        }
+        VipSubscription vip = vipOpt.get();
+        if (vip.getEndDate() != null) {
+            vip.setEndDate(vip.getEndDate().plusMonths(1)); // Renew for 1 month
+        } else {
+            vip.setEndDate(java.time.LocalDate.now().plusMonths(1));
+        }
+        vip.setStatus(VipSubscription.Status.ACTIVE);
+        vipRepo.save(vip);
+        return org.springframework.http.ResponseEntity.ok(Map.of("message", "Gia han the thanh cong"));
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public org.springframework.http.ResponseEntity<Map<String, String>> updateCustomer(
+            @org.springframework.web.bind.annotation.PathVariable UUID id,
+            @org.springframework.web.bind.annotation.RequestBody Map<String, Object> payload) {
+        
+        java.util.Optional<User> userOpt = userRepo.findById(id);
+        if (userOpt.isEmpty()) {
+            return org.springframework.http.ResponseEntity.badRequest().body(Map.of("message", "Khong tim thay khach hang"));
+        }
+        User user = userOpt.get();
+
+        String name = (String) payload.get("name");
+        String phone = (String) payload.get("phone");
+        String plate = (String) payload.get("plate");
+
+        if (name != null && !name.isBlank()) {
+            user.setFullName(name);
+        }
+        if (phone != null) {
+            user.setPhone(phone);
+        }
+        userRepo.save(user);
+
+        if (plate != null && !plate.isBlank()) {
+            List<Vehicle> vehicles = vehicleRepo.findByOwnerIdIn(List.of(id));
+            if (!vehicles.isEmpty()) {
+                Vehicle v = vehicles.get(0);
+                // Check if new plate already exists for a DIFFERENT vehicle
+                java.util.Optional<Vehicle> existing = vehicleRepo.findByLicensePlate(plate);
+                if (existing.isPresent() && !existing.get().getId().equals(v.getId())) {
+                    return org.springframework.http.ResponseEntity.badRequest().body(Map.of("message", "Bien so xe da ton tai trong he thong"));
+                }
+                v.setLicensePlate(plate);
+                vehicleRepo.save(v);
+            }
+        }
+        
+        return org.springframework.http.ResponseEntity.ok(Map.of("message", "Cap nhat khach hang thanh cong"));
+    }
+
+    @GetMapping("/{id}/history")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public org.springframework.http.ResponseEntity<List<Map<String, Object>>> getCustomerHistory(
+            @org.springframework.web.bind.annotation.PathVariable UUID id) {
+        
+        List<Vehicle> vehicles = vehicleRepo.findByOwnerIdIn(List.of(id));
+        if (vehicles.isEmpty()) {
+            return org.springframework.http.ResponseEntity.ok(new ArrayList<>());
+        }
+        
+        List<String> plates = vehicles.stream().map(Vehicle::getLicensePlate).toList();
+        List<ParkingSession> sessions = parkingSessionRepo.findAll().stream()
+                .filter(s -> plates.contains(s.getLicensePlate()))
+                .sorted(Comparator.comparing(ParkingSession::getCheckInTime, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+                .limit(50)
+                .toList();
+        
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (ParkingSession session : sessions) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("sessionId", session.getId().toString());
+            map.put("plate", session.getLicensePlate());
+            map.put("checkInTime", session.getCheckInTime() != null ? session.getCheckInTime().toString() : null);
+            map.put("checkOutTime", session.getCheckOutTime() != null ? session.getCheckOutTime().toString() : null);
+            map.put("fee", 0); // Need to fetch from Transaction if required later
+            map.put("status", session.getSessionStatus() != null ? session.getSessionStatus().toString() : null);
+            result.add(map);
+        }
+        
+        return org.springframework.http.ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/pending-vips")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public List<Map<String, Object>> getPendingVips() {
+        List<VipSubscription> pendingVips = vipRepo.findByStatus(VipSubscription.Status.PENDING_APPROVAL);
+        List<UUID> vehicleIds = pendingVips.stream().map(VipSubscription::getVehicleId).toList();
+        List<Vehicle> vehicles = vehicleIds.isEmpty() ? new ArrayList<>() : vehicleRepo.findAllById(vehicleIds);
+        List<UUID> ownerIds = vehicles.stream().map(Vehicle::getOwnerId).toList();
+        List<User> owners = ownerIds.isEmpty() ? new ArrayList<>() : userRepo.findAllById(ownerIds);
+        
+        java.util.Map<UUID, User> ownerMap = owners.stream().collect(java.util.stream.Collectors.toMap(User::getId, u -> u));
+        java.util.Map<UUID, Vehicle> vehicleMap = vehicles.stream().collect(java.util.stream.Collectors.toMap(Vehicle::getId, v -> v));
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (VipSubscription vip : pendingVips) {
+            Vehicle v = vehicleMap.get(vip.getVehicleId());
+            if (v != null) {
+                User u = ownerMap.get(v.getOwnerId());
+                if (u != null) {
+                    Map<String, Object> row = baseCustomerRow(u, v);
+                    applyVipInfo(row, vip);
+                    result.add(row);
+                }
+            }
+        }
+        return result;
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public List<Map<String, Object>> getCustomersList() {
@@ -135,8 +346,18 @@ public class CustomerController {
                 .sorted(Comparator.comparing(this::displayName))
                 .toList();
 
+        List<UUID> driverIds = drivers.stream().map(User::getId).toList();
+        List<Vehicle> allVehicles = vehicleRepo.findByOwnerIdIn(driverIds);
+        java.util.Map<UUID, List<Vehicle>> vehiclesByOwner = allVehicles.stream().collect(java.util.stream.Collectors.groupingBy(Vehicle::getOwnerId));
+
+        List<UUID> vehicleIds = allVehicles.stream().map(Vehicle::getId).toList();
+        List<VipSubscription> allVips = vehicleIds.isEmpty() ? new ArrayList<>() : vipRepo.findByVehicleIdIn(vehicleIds);
+        java.util.Map<UUID, List<VipSubscription>> vipsByVehicle = allVips.stream()
+                .sorted(Comparator.comparing(VipSubscription::getCreatedAt).reversed())
+                .collect(java.util.stream.Collectors.groupingBy(VipSubscription::getVehicleId));
+
         for (User user : drivers) {
-            List<Vehicle> vehicles = vehicleRepo.findByOwnerId(user.getId());
+            List<Vehicle> vehicles = vehiclesByOwner.getOrDefault(user.getId(), new ArrayList<>());
             if (vehicles.isEmpty()) {
                 Map<String, Object> row = baseCustomerRow(user, null);
                 row.put("type", "Driver");
@@ -149,7 +370,7 @@ public class CustomerController {
 
             for (Vehicle vehicle : vehicles) {
                 Map<String, Object> row = baseCustomerRow(user, vehicle);
-                List<VipSubscription> subscriptions = vipRepo.findByVehicleIdOrderByCreatedAtDesc(vehicle.getId());
+                List<VipSubscription> subscriptions = vipsByVehicle.getOrDefault(vehicle.getId(), new ArrayList<>());
                 if (!subscriptions.isEmpty()) {
                     applyVipInfo(row, subscriptions.get(0));
                 } else {

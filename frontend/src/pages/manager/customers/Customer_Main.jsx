@@ -4,8 +4,13 @@ import { CustomerStats } from './Customer_Stats';
 import { CustomerFilter } from './Customer_Filter';
 import { CustomerTable } from './Customer_Table';
 import { VipApprovalModal } from './Customer_VipModal';
+import { CustomerEditModal } from './Customer_EditModal';
+import { CustomerHistoryModal } from './Customer_HistoryModal';
+import { VipApprovalPanel } from '../../admin/VipApprovalPanel';
 import { customerService } from '../../../services/customerService';
+import { exportToCSV } from '../../../utils/exportUtils';
 import { notification, Modal, Form, Input, Select, DatePicker } from 'antd';
+import dayjs from 'dayjs';
 import { PageLayout } from '../../../components/common/PageLayout';
 
 export const CustomerPage = () => {
@@ -20,18 +25,38 @@ export const CustomerPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
 
+  // Edit/History Modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+
   // Add Customer Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addForm] = Form.useForm();
 
-  const handleAddSubmit = (values) => {
-    notification.success({
-      message: 'Thêm khách hàng thành công',
-      description: `Khách hàng ${values.name} đã được thêm vào hệ thống.`,
-      placement: 'topRight',
-    });
-    setIsAddModalOpen(false);
-    addForm.resetFields();
+  const handleAddSubmit = async (values) => {
+    try {
+      const payload = {
+        ...values,
+        expiry: values.expiry ? values.expiry.format('YYYY-MM-DD') : null,
+      };
+      await customerService.addCustomer(payload);
+      notification.success({
+        message: 'Thêm khách hàng thành công',
+        description: `Khách hàng ${values.name} đã được thêm vào hệ thống.`,
+        placement: 'topRight',
+      });
+      setIsAddModalOpen(false);
+      addForm.resetFields();
+      fetchCustomers(filter);
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || error.message || 'Vui lòng kiểm tra lại thông tin.';
+      notification.error({
+        message: 'Lỗi thêm khách hàng',
+        description: errorMsg,
+        placement: 'topRight',
+      });
+    }
   };
 
   const fetchStats = async () => {
@@ -82,37 +107,49 @@ export const CustomerPage = () => {
     }
   };
 
+  const handleApprove = async () => {
+    if (!selectedVip) return;
+    try {
+      setProcessing(true);
+      await customerService.approveVipSubscription(selectedVip.subscriptionId, true);
+      notification.success({ message: "Phê duyệt thành công", placement: "topRight" });
+      setIsModalOpen(false);
+      fetchCustomers(filter);
+    } catch (error) {
+      notification.error({ message: "Lỗi phê duyệt", placement: "topRight" });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleReject = async (reason) => {
+    if (!selectedVip) return;
+    try {
+      setProcessing(true);
+      await customerService.approveVipSubscription(selectedVip.subscriptionId, false, reason);
+      notification.success({ message: "Từ chối thành công", placement: "topRight" });
+      setIsModalOpen(false);
+      fetchCustomers(filter);
+    } catch (error) {
+      notification.error({ message: "Lỗi từ chối", placement: "topRight" });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const openVipApproval = (customer) => {
     setSelectedVip(customer);
     setIsModalOpen(true);
   };
 
-  const handleApprove = async (id) => {
-    setProcessing(true);
-    try {
-      await customerService.approveVipSubscription(id, true);
-      notification.success({ message: 'Phê duyệt thẻ VIP thành công!' });
-      setIsModalOpen(false);
-      fetchCustomers(filter); // Refresh data
-    } catch {
-      notification.error({ message: 'Có lỗi xảy ra khi phê duyệt.' });
-    } finally {
-      setProcessing(false);
-    }
+  const openEditCustomer = (customer) => {
+    setSelectedCustomer(customer);
+    setIsEditModalOpen(true);
   };
 
-  const handleReject = async (id) => {
-    setProcessing(true);
-    try {
-      await customerService.approveVipSubscription(id, false);
-      notification.success({ message: 'Đã từ chối thẻ VIP.' });
-      setIsModalOpen(false);
-      fetchCustomers(filter); // Refresh data
-    } catch {
-      notification.error({ message: 'Có lỗi xảy ra khi từ chối.' });
-    } finally {
-      setProcessing(false);
-    }
+  const openCustomerHistory = (customer) => {
+    setSelectedCustomer(customer);
+    setIsHistoryModalOpen(true);
   };
 
   return (
@@ -124,6 +161,15 @@ export const CustomerPage = () => {
           <button 
             className="gap-2 px-4 py-[9px] bg-[#1677ff] hover:bg-[#0058be] transition-colors rounded flex items-center focus:outline-none"
             onClick={() => {
+              exportToCSV(customers, `Danh_sach_khach_hang_${dayjs().format('YYYY-MM-DD')}.csv`, {
+                id: 'Mã KH',
+                name: 'Tên Khách Hàng',
+                phone: 'Số điện thoại',
+                plate: 'Biển số xe',
+                type: 'Loại thẻ',
+                statusLabel: 'Trạng thái',
+                expireDate: 'Ngày hết hạn'
+              });
               notification.success({ 
                 message: "Xuất báo cáo thành công", 
                 description: "Tệp báo cáo khách hàng đã được tải xuống.", 
@@ -154,11 +200,20 @@ export const CustomerPage = () => {
           setFilter={setFilter} 
           onSearch={handleSearch} 
         />
-        <CustomerTable 
-          customers={customers} 
-          loading={loadingTable} 
-          onOpenVipApproval={openVipApproval}
-        />
+        {filter === 'pending' ? (
+          <div className="mt-4">
+            <VipApprovalPanel isDarkMode={false} triggerToast={(msg, type) => notification[type]({message: msg, placement: 'topRight'})} />
+          </div>
+        ) : (
+          <CustomerTable 
+            customers={customers} 
+            loading={loadingTable} 
+            onOpenVipApproval={openVipApproval}
+            onOpenEdit={openEditCustomer}
+            onOpenHistory={openCustomerHistory}
+            onRefresh={() => fetchCustomers(filter)}
+          />
+        )}
       </div>
 
       {/* VIP Approval Modal */}
@@ -182,6 +237,11 @@ export const CustomerPage = () => {
         okButtonProps={{ className: "bg-[#1677ff]" }}
       >
         <Form form={addForm} layout="vertical" onFinish={handleAddSubmit} className="mt-4">
+          <div className="mb-4">
+            <Form.Item name="email" label="Email đăng nhập" rules={[{ required: true, type: 'email', message: 'Vui lòng nhập email hợp lệ!' }]}>
+              <Input placeholder="Nhập địa chỉ email của khách hàng" />
+            </Form.Item>
+          </div>
           <div className="grid grid-cols-2 gap-x-4">
             <Form.Item name="name" label="Họ và tên" rules={[{ required: true, message: 'Vui lòng nhập họ tên!' }]}>
               <Input placeholder="Nhập họ và tên khách hàng" />
@@ -208,6 +268,7 @@ export const CustomerPage = () => {
             <Form.Item name="status" label="Trạng thái thẻ" initialValue="ACTIVE" rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}>
               <Select placeholder="Chọn trạng thái">
                 <Select.Option value="ACTIVE">ACTIVE (Đang hoạt động)</Select.Option>
+                <Select.Option value="PENDING">PENDING (Chờ duyệt)</Select.Option>
                 <Select.Option value="EXPIRED">EXPIRED (Hết hạn)</Select.Option>
                 <Select.Option value="IN_PARK">IN_PARK (Đang trong bãi)</Select.Option>
               </Select>
@@ -218,6 +279,21 @@ export const CustomerPage = () => {
           </div>
         </Form>
       </Modal>
+
+      {/* Edit Customer Modal */}
+      <CustomerEditModal 
+        isOpen={isEditModalOpen} 
+        onClose={() => setIsEditModalOpen(false)} 
+        customer={selectedCustomer}
+        onRefresh={() => fetchCustomers(filter)}
+      />
+
+      {/* History Customer Modal */}
+      <CustomerHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        customer={selectedCustomer}
+      />
     </PageLayout>
   );
 };

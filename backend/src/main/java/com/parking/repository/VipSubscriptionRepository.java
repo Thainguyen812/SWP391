@@ -17,6 +17,7 @@ public interface VipSubscriptionRepository extends JpaRepository<VipSubscription
     List<VipSubscription> findByVehicleIdOrderByCreatedAtDesc(UUID vehicleId);
 
     List<VipSubscription> findByVehicleId(UUID vehicleId);
+    List<VipSubscription> findByVehicleIdIn(List<UUID> vehicleIds);
 
     List<VipSubscription> findByStatus(
             VipSubscription.Status status);

@@ -13,7 +13,9 @@ export const TopAppBarSection = ({ onMenuClick }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
 
-  const searchRoutes = currentUser?.role === 'STAFF' ? [
+  const searchRoutes = (() => {
+    const normalizedRole = currentUser?.role?.replace('ROLE_', '').toUpperCase();
+    return normalizedRole === 'STAFF' ? [
     { path: '/staff-dashboard', label: 'Bảng điều khiển', keywords: ['bảng điều khiển', 'dashboard', 'trang chủ'] },
     { path: '/staff-gate-control', label: 'Điều khiển Cổng', keywords: ['điều khiển', 'cổng', 'gate', 'mở cổng'] },
     { path: '/staff-monitoring', label: 'Giám sát Camera', keywords: ['giám sát', 'camera', 'ai', 'video'] },
@@ -32,13 +34,15 @@ export const TopAppBarSection = ({ onMenuClick }) => {
     { path: '/support', label: 'Hỗ trợ khách hàng', keywords: ['hỗ trợ', 'support', 'cskh', 'ticket'] },
     { path: '/admin', label: 'Quản trị (Legacy)', keywords: ['admin', 'quản trị'] }
   ];
+  })();
 
   const filteredRoutes = searchValue 
     ? searchRoutes.filter(r => r.keywords.some(kw => kw.includes(searchValue.toLowerCase()) || searchValue.toLowerCase().includes(kw)))
     : [];
 
   if (searchValue) {
-    const isStaff = currentUser?.role === 'STAFF';
+    const normalizedRole = currentUser?.role?.replace('ROLE_', '').toUpperCase();
+    const isStaff = normalizedRole === 'STAFF';
     filteredRoutes.push({
       path: isStaff ? '/staff-transactions' : '/transactions',
       label: `Tra cứu biển số / mã giao dịch "${searchValue}"`,
@@ -167,14 +171,23 @@ export const TopAppBarSection = ({ onMenuClick }) => {
         <div className="flex items-center gap-2 ml-2">
           <div className="hidden md:flex flex-col items-end">
             <span className="text-sm font-bold text-slate-800">
-              {(currentUser?.name === 'Operations Staff' || currentUser?.fullName === 'Operations Staff' || (!currentUser?.name && !currentUser?.fullName)) ? 'Phạm Hải Đăng' : (currentUser?.fullName || currentUser?.name || "Nhân viên")}
+              {currentUser?.fullName || currentUser?.name || currentUser?.username || 'Người dùng'}
             </span>
             <span className="text-xs text-slate-500 max-w-[120px] truncate" title={currentUser?.id}>
-              {currentUser?.username === 'staff' ? 'NV015' : (currentUser?.username || (currentUser?.id ? currentUser.id.substring(0, 8).toUpperCase() : "NV-0000"))}
+              {currentUser?.username || (currentUser?.id ? currentUser.id.substring(0, 8).toUpperCase() : 'NV-0000')}
             </span>
           </div>
-          <button className="w-9 h-9 rounded-full overflow-hidden border border-slate-200 cursor-pointer shadow-sm flex-shrink-0">
-            <img src={(currentUser?.username === 'staff' || currentUser?.name === 'Operations Staff') ? 'https://i.pravatar.cc/150?img=11' : (currentUser?.avatar || "https://i.pravatar.cc/150?img=11")} alt="Avatar" className="w-full h-full object-cover" />
+          <button className="w-9 h-9 rounded-full overflow-hidden border border-slate-200 cursor-pointer shadow-sm flex-shrink-0 bg-slate-100 flex items-center justify-center">
+            {currentUser?.avatar
+              ? <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
+              : (
+                <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                  <rect width="36" height="36" fill="#e2e8f0"/>
+                  <circle cx="18" cy="13" r="6" fill="#94a3b8"/>
+                  <ellipse cx="18" cy="28" rx="10" ry="6" fill="#94a3b8"/>
+                </svg>
+              )
+            }
           </button>
         </div>
       </div>
