@@ -37,6 +37,87 @@ export function DriverSettings() {
     ticketAttachedFiles, setTicketAttachedFiles, triggerToast, isTxDateInFilter, handleLogout
   } = ctx;
 
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [isChangingPw, setIsChangingPw] = useState(false);
+
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('100000');
+  const [withdrawBank, setWithdrawBank] = useState('Vietcombank');
+  const [withdrawAccNo, setWithdrawAccNo] = useState('');
+
+  const handleChangePassword = async () => {
+    if (!oldPassword.trim()) {
+      triggerToast('Vui lòng nhập mật khẩu hiện tại!', 'error');
+      return;
+    }
+    if (!newPassword.trim() || newPassword.length < 6) {
+      triggerToast('Mật khẩu mới phải có ít nhất 6 ký tự!', 'error');
+      return;
+    }
+
+    setIsChangingPw(true);
+    try {
+      const response = await fetch('/api/v1/driver/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(sessionStorage.getItem('token') || localStorage.getItem('token'))}`
+        },
+        body: JSON.stringify({ oldPassword, newPassword })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        triggerToast('✓ Đổi mật khẩu tài khoản thành công 100%!', 'success');
+        setOldPassword('');
+        setNewPassword('');
+      } else {
+        triggerToast(`Lỗi: ${data.message || 'Không thể đổi mật khẩu'}`, 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast('Lỗi kết nối máy chủ khi đổi mật khẩu!', 'error');
+    } finally {
+      setIsChangingPw(false);
+    }
+  };
+
+  const handleWithdraw = () => {
+    const val = parseFloat(withdrawAmount);
+    if (isNaN(val) || val <= 0) {
+      triggerToast('Vui lòng nhập số tiền hợp lệ!', 'error');
+      return;
+    }
+    if (val > balance) {
+      triggerToast('Số tiền rút vượt quá số dư khả dụng!', 'error');
+      return;
+    }
+    if (!withdrawAccNo.trim()) {
+      triggerToast('Vui lòng nhập số tài khoản ngân hàng!', 'error');
+      return;
+    }
+
+    const newBal = balance - val;
+    setBalance(newBal);
+    const phoneKey = user?.phone || (user?.username && !user?.username.includes('@') ? user?.username : 'default');
+    localStorage.setItem(`urbanpark_user_balance_${phoneKey}`, newBal.toString());
+
+    const newTx = {
+      id: `#WD${Date.now().toString().slice(-6)}`,
+      date: new Date().toLocaleString('vi-VN'),
+      type: `Rút tiền về ${withdrawBank} (${withdrawAccNo})`,
+      plate: '-',
+      fee: `-${val.toLocaleString('vi-VN')}₫`,
+      isEntry: false,
+      status: 'Thành công'
+    };
+
+    setTransactions((prev: any) => [newTx, ...prev]);
+    setWithdrawModalOpen(false);
+    setWithdrawAccNo('');
+    triggerToast(`✓ Đã gửi lệnh rút ${val.toLocaleString('vi-VN')}₫ về ${withdrawBank} thành công!`, 'success');
+  };
+
   return (
     <>
                 <motion.div 
@@ -50,7 +131,7 @@ export function DriverSettings() {
                     <div className="space-y-1">
                       <h2 className="text-2xl font-black text-slate-950 tracking-tight">Cài đặt tài khoản</h2>
                       <p className="text-slate-400 text-xs font-semibold">
-                        Quản lý thông tin cá nhân, bảo mật và tùy chọn thanh toán.
+                        Quản lý thông tin cá nhân, bảo mật và tùy chọn ví điện tử.
                       </p>
                     </div>
                     <button 
@@ -61,92 +142,86 @@ export function DriverSettings() {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                     
-                    {/* LEFT / CENTER: ACCOUNT PROFILE & PREFERENCES */}
-                    <div className="lg:col-span-2 space-y-6">
-                      
-                      {/* Personal Info Card */}
-                      <div className="bg-white p-6 rounded-[24px] border border-slate-200/60 space-y-5">
-                        <div className="flex items-center gap-4 border-b border-slate-100 pb-4">
-                          <div className="w-14 h-14 rounded-full bg-blue-600/10 text-blue-600 border border-blue-200 text-xl flex items-center justify-center font-black">
-                            {profileName.charAt(0).toUpperCase()}
+                    {/* LEFT PANEL: Profile Info */}
+                    <div className="lg:col-span-7 bg-white p-6 rounded-[24px] border border-slate-200/60 space-y-6">
+                      <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block font-sans">
+                        Hồ sơ cá nhân
+                      </strong>
+
+                      <div className="flex items-center gap-4 border-b border-slate-100 pb-5">
+                        <div className="w-14 h-14 rounded-full bg-blue-100 text-blue-600 font-black text-xl flex items-center justify-center font-mono shrink-0">
+                          {user?.name ? user.name.split(' ').slice(-1)[0].charAt(0).toUpperCase() : 'U'}
+                        </div>
+                        <div className="space-y-0.5">
+                          <h4 className="font-extrabold text-slate-850 text-sm">{user?.name || 'Tài xế UrbanPark'}</h4>
+                          <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block font-mono">
+                            TÀI XẾ URBANPARK VIP
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 text-xs">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                              Họ và tên
+                            </label>
+                            <input 
+                              type="text" 
+                              value={profileName}
+                              onChange={(e) => setProfileName(e.target.value)}
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-bold outline-none focus:bg-white transition-all"
+                            />
                           </div>
-                          <div>
-                            <strong className="text-sm font-black text-slate-900 block">{profileName}</strong>
-                            <span className="text-xs text-slate-400 font-semibold uppercase font-mono tracking-wider">Tài xế UrbanPark VIP</span>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                              Số điện thoại
+                            </label>
+                            <div className="relative flex items-center">
+                              <input 
+                                type="text" 
+                                value={profilePhone}
+                                onChange={(e) => setProfilePhone(e.target.value)}
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-mono font-bold outline-none focus:bg-white transition-all pr-24"
+                              />
+                              <span className="absolute right-2 text-[10px] font-bold px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200/60 rounded-md">
+                                {isPhoneVerified ? '✓ Đã xác thực' : '⚠️ Chưa xác thực'}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-sans">
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Họ và tên</label>
-                            <input
-                              type="text"
-                              value={profileName}
-                              onChange={e => setProfileName(e.target.value)}
-                              className="w-full p-3 border rounded-xl font-bold bg-slate-50 border-slate-200 focus:bg-white text-slate-800 focus:border-blue-500 outline-none transition-colors"
-                            />
-                          </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                            Địa chỉ Email
+                          </label>
+                          <input 
+                            type="email" 
+                            value={profileEmail}
+                            onChange={(e) => setProfileEmail(e.target.value)}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white transition-all font-mono"
+                          />
+                        </div>
 
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Số điện thoại</label>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                value={profilePhone}
-                                onChange={e => {
-                                  setProfilePhone(e.target.value);
-                                  setIsPhoneVerified(false);
-                                  localStorage.setItem('urbanpark_phone_verified', 'false');
-                                }}
-                                className="w-full p-3 pr-24 border rounded-xl font-bold bg-slate-50 border-slate-200 focus:bg-white text-slate-800 focus:border-blue-500 outline-none transition-colors"
-                              />
-                              {isPhoneVerified ? (
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-500/15">
-                                  ✓ Đã xác thực
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setIsPhoneVerified(true);
-                                    localStorage.setItem('urbanpark_phone_verified', 'true');
-                                    triggerToast('Xác thực số điện thoại thành công!', 'success');
-                                  }}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[10px] font-extrabold text-amber-600 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-md border border-amber-500/15 transition-colors cursor-pointer"
-                                >
-                                  ⚠ Chưa xác thực
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="space-y-1.5 sm:col-span-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Địa chỉ Email</label>
-                            <input
-                              type="email"
-                              value={profileEmail}
-                              onChange={e => setProfileEmail(e.target.value)}
-                              className="w-full p-3 border rounded-xl font-bold bg-slate-50 border-slate-200 focus:bg-white text-slate-800 focus:border-blue-500 outline-none transition-colors"
-                            />
-                          </div>
-
-                          <div className="space-y-1.5 sm:col-span-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Địa chỉ thường trú</label>
-                            <input
-                              type="text"
-                              value={profileAddress}
-                              onChange={e => setProfileAddress(e.target.value)}
-                              className="w-full p-3 border rounded-xl font-bold bg-slate-50 border-slate-200 focus:bg-white text-slate-800 focus:border-blue-500 outline-none transition-colors"
-                            />
-                          </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                            Địa chỉ thường trú
+                          </label>
+                          <input 
+                            type="text" 
+                            value={profileAddress}
+                            onChange={(e) => setProfileAddress(e.target.value)}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 font-semibold outline-none focus:bg-white transition-all"
+                          />
                         </div>
                       </div>
                     </div>
 
-                    {/* RIGHT COLUMN: WALLET CARD AND SECURITY */}
-                    <div className="space-y-6">
+                    {/* RIGHT PANEL: Wallet & Security */}
+                    <div className="lg:col-span-5 space-y-6">
                       
                       {/* UrbanPark Wallet Card */}
                       <div className="bg-white p-6 rounded-[24px] border border-slate-200/60 space-y-5 text-left">
@@ -164,120 +239,75 @@ export function DriverSettings() {
                             Số dư khả dụng
                           </span>
                           <strong className="text-3xl font-black font-mono tracking-tight block mt-1">
-                            ${balance.toFixed(2)}
+                            {balance.toLocaleString('vi-VN')}₫
                           </strong>
 
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              if (isOffline) {
-                                triggerToast('Lỗi: Không thể nạp tiền vào ví ở chế độ Ngoại tuyến!', 'error');
-                                return;
-                              }
-                              setSelectedPackPrice(50.00);
-                              setSelectedPackLabel('Nạp tiền vào ví điện tử UrbanPark');
-                              setVnpayStep('info');
-                              setVnpayModalOpen(true);
-                            }}
-                            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 font-black text-[11px] uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer inline-flex items-center gap-1.5"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Nạp tiền ngay</span>
-                          </button>
-                        </div>
-
-                        {/* Linked bank status */}
-                        <div className="space-y-3 pt-1">
-                          <span className="text-[9.5px] font-black text-slate-400 uppercase tracking-widest block leading-none">
-                            LIÊN KẾT NGÂN HÀNG
-                          </span>
-
-                          <div className="flex items-center justify-between p-3 border border-slate-100 rounded-xl">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-600 text-[10px] font-black flex items-center justify-center font-mono">
-                                VCB
-                              </div>
-                              <div>
-                                <strong className="text-[11.5px] font-black text-slate-800 block">Vietcombank **** 1234</strong>
-                                <span className="text-[10px] text-emerald-600 font-extrabold flex items-center gap-1">
-                                  <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                                  Mặc định thanh toán
-                                </span>
-                              </div>
-                            </div>
+                          <div className="mt-4 flex items-center gap-2">
                             <button 
                               type="button"
-                              onClick={() => triggerToast('Đã huỷ liên kết tài khoản Vietcombank thành công.', 'info')}
-                              className="text-[11px] font-black text-slate-400 hover:text-red-500 cursor-pointer"
+                              onClick={() => {
+                                if (isOffline) {
+                                  triggerToast('Lỗi: Không thể nạp tiền vào ví ở chế độ Ngoại tuyến!', 'error');
+                                  return;
+                                }
+                                setSelectedPackPrice(500000);
+                                setSelectedPackLabel('Nạp tiền vào ví điện tử UrbanPark');
+                                setVnpayStep('info');
+                                setVnpayModalOpen(true);
+                              }}
+                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 font-black text-[11px] uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer inline-flex items-center gap-1.5"
                             >
-                              Gỡ
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Nạp tiền VNPAY</span>
+                            </button>
+
+                            <button 
+                              type="button"
+                              onClick={() => setWithdrawModalOpen(true)}
+                              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-[11px] uppercase tracking-wider rounded-xl transition-all border border-slate-700 cursor-pointer inline-flex items-center gap-1.5"
+                            >
+                              <Coins className="w-3.5 h-3.5" />
+                              <span>Rút tiền về NGÂN HÀNG</span>
                             </button>
                           </div>
-
-                          <button 
-                            type="button"
-                            onClick={() => triggerToast('Chức năng liên kết ngân hàng mở rộng đang chuẩn bị ra mắt!', 'info')}
-                            className="w-full py-2.5 border border-dashed border-slate-350 hover:border-blue-400 text-slate-500 hover:text-blue-600 font-bold text-xs rounded-xl cursor-pointer text-center select-none"
-                          >
-                            + Thêm phương thức mới
-                          </button>
                         </div>
                       </div>
 
                       {/* Security Card */}
                       <div className="bg-white p-6 rounded-[24px] border border-slate-200/60 space-y-4">
                         <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block font-sans">
-                          Bảo mật
+                          Bảo mật tài khoản
                         </strong>
 
                         <div className="space-y-3.5 text-xs font-sans">
-                          {/* 2FA switcher */}
-                          <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-                            <div>
-                              <strong className="text-slate-800 font-extrabold block">Xác thực 2 lớp (2FA)</strong>
-                              <span className="text-slate-450 text-[10px] leading-normal block max-w-[180px]">
-                                Xác minh mã OTP thứ cấp bảo vệ truy cập từ thiết bị mới.
-                              </span>
-                            </div>
-                            <button 
-                              type="button"
-                              onClick={() => {
-                                setIs2faEnabled(!is2faEnabled);
-                                triggerToast(is2faEnabled ? 'Đã tắt bảo vệ 2FA.' : 'Xác thực hai lớp (2FA) hỗ trợ thành công!', 'info');
-                              }}
-                              className={`w-10 h-6 shrink-0 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer ${
-                                is2faEnabled ? 'bg-blue-600' : 'bg-slate-200'
-                              }`}
-                            >
-                              <div className={`w-5 h-5 rounded-full bg-white transition-all shadow-md ${
-                                is2faEnabled ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
-                            </button>
-                          </div>
-
                           {/* Quick Password inputs */}
                           <div className="space-y-2">
-                            <strong className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Đổi mật khẩu tài khoản</strong>
+                            <strong className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Đổi mật khẩu tài khoản (Lưu Database)</strong>
                             
                             <div className="space-y-1.5">
                               <input 
                                 type="password" 
+                                value={oldPassword}
+                                onChange={(e) => setOldPassword(e.target.value)}
                                 placeholder="Mật khẩu hiện tại..."
-                                className="w-full p-2.5 border rounded-lg bg-slate-50 border-slate-200 focus:bg-white text-xs outline-none"
+                                className="w-full p-2.5 border rounded-lg bg-slate-50 border-slate-200 focus:bg-white text-xs outline-none font-mono"
                               />
                               <input 
                                 type="password" 
-                                placeholder="Mật khẩu mới..."
-                                className="w-full p-2.5 border rounded-lg bg-slate-50 border-slate-200 focus:bg-white text-xs outline-none"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                placeholder="Mật khẩu mới (ít nhất 6 ký tự)..."
+                                className="w-full p-2.5 border rounded-lg bg-slate-50 border-slate-200 focus:bg-white text-xs outline-none font-mono"
                               />
                             </div>
                             
                             <button 
                               type="button"
-                              onClick={() => triggerToast('Mật khẩu tài khoản đã được thay đổi an toàn!', 'success')}
-                              className="pt-1.5 text-[10.5px] font-black text-blue-600 hover:underline cursor-pointer inline-block"
+                              disabled={isChangingPw}
+                              onClick={handleChangePassword}
+                              className="pt-1.5 text-[10.5px] font-black text-blue-600 hover:underline cursor-pointer inline-block disabled:opacity-50"
                             >
-                              Cập nhật mật khẩu ngay →
+                              {isChangingPw ? 'Đang cập nhật DB...' : 'Cập nhật mật khẩu ngay →'}
                             </button>
                           </div>
 
@@ -287,6 +317,85 @@ export function DriverSettings() {
                     </div>
 
                   </div>
+
+                  {/* MODAL RÚT TIỀN VỀ NGÂN HÀNG */}
+                  {withdrawModalOpen && (
+                    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                      <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-200 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
+                        <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <Coins className="w-5 h-5 text-blue-600" />
+                            <h3 className="text-base font-black text-slate-800">Rút tiền từ Ví về Ngân hàng</h3>
+                          </div>
+                          <button onClick={() => setWithdrawModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+
+                        <div className="space-y-3.5 text-xs">
+                          <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl space-y-1">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Số dư khả dụng hiện tại</span>
+                            <strong className="text-lg font-black font-mono text-blue-700">{balance.toLocaleString('vi-VN')}₫</strong>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Ngân hàng thụ hưởng</label>
+                            <select 
+                              value={withdrawBank} 
+                              onChange={(e) => setWithdrawBank(e.target.value)}
+                              className="w-full p-2.5 border rounded-xl bg-slate-50 border-slate-200 text-xs font-bold outline-none"
+                            >
+                              <option value="Vietcombank">Vietcombank (Ngân hàng TMCP Ngoại thương)</option>
+                              <option value="MBBank">MBBank (Ngân hàng Quân Đội)</option>
+                              <option value="Techcombank">Techcombank (Ngân hàng Kỹ thương)</option>
+                              <option value="VietinBank">VietinBank (Ngân hàng Công thương)</option>
+                              <option value="BIDV">BIDV (Ngân hàng Đầu tư và Phát triển)</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Số tài khoản nhận tiền</label>
+                            <input 
+                              type="text" 
+                              value={withdrawAccNo} 
+                              onChange={(e) => setWithdrawAccNo(e.target.value)}
+                              placeholder="Ví dụ: 1029384756..."
+                              className="w-full p-2.5 border rounded-xl bg-slate-50 border-slate-200 text-xs font-mono font-bold outline-none focus:bg-white"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Số tiền muốn rút (VNĐ)</label>
+                            <input 
+                              type="number" 
+                              value={withdrawAmount} 
+                              onChange={(e) => setWithdrawAmount(e.target.value)}
+                              placeholder="Nhập số tiền..."
+                              className="w-full p-2.5 border rounded-xl bg-slate-50 border-slate-200 text-xs font-mono font-bold outline-none focus:bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 pt-2">
+                          <button 
+                            type="button" 
+                            onClick={() => setWithdrawModalOpen(false)}
+                            className="flex-1 py-2.5 border border-slate-200 hover:bg-slate-50 font-bold text-xs rounded-xl cursor-pointer"
+                          >
+                            Hủy bỏ
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={handleWithdraw}
+                            className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl cursor-pointer shadow-md"
+                          >
+                            Xác nhận rút tiền
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 </motion.div>
 
 

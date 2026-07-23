@@ -144,7 +144,11 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     return saved ? parseFloat(saved) : 0; // Default to 0 for new users
   });
 
-  const [selectedVehId, setSelectedVehId] = useState<string>('veh-1');
+  const [selectedVehId, setSelectedVehId] = useState<string>('');
+  const selectedVehIdRef = useRef(selectedVehId);
+  useEffect(() => {
+    selectedVehIdRef.current = selectedVehId;
+  }, [selectedVehId]);
   const [qrDirection, setQrDirection] = useState<'VÀO' | 'RA'>('VÀO');
   const [isTogglingLock, setIsTogglingLock] = useState<string | null>(null);
 
@@ -168,7 +172,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   const generateQrToken = async (vehicleId: string, direction: 'VÀO' | 'RA') => {
     if (isOffline) return;
     if (!vehicleId || vehicleId.startsWith('veh-')) {
-      const activeVeh = vehicles.find(v => v.id === vehicleId) || vehicles[0];
+      const activeVeh = vehicles.find(v => v.id === vehicleId || v.plate === vehicleId) || vehicles[0];
       const plateStr = activeVeh ? activeVeh.plate : '34G56789';
       setActiveQrToken(`MOCK_${plateStr}|${direction}|${Date.now()}`);
       setQrExpiryTime(Date.now() + 300000);
@@ -210,7 +214,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
   // Tự động generate/refresh token khi thay đổi
   useEffect(() => {
     if (isQrRequested) {
-      const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+      const activeVeh = vehicles.find(v => v.id === selectedVehId || v.plate === selectedVehId) || vehicles[0];
       if (activeVeh) {
         generateQrToken(activeVeh.id, qrDirection);
       }
@@ -236,7 +240,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         const diff = Math.max(0, Math.round((qrExpiryTime - Date.now()) / 1000));
         setCountdownSec(diff);
         if (diff <= 5 && !isGeneratingQr) {
-          const activeVeh = vehicles.find(v => v.id === selectedVehId) || vehicles[0];
+          const activeVeh = vehicles.find(v => v.id === selectedVehId || v.plate === selectedVehId) || vehicles[0];
           if (activeVeh) {
             generateQrToken(activeVeh.id, qrDirection);
           }
@@ -354,14 +358,15 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
               }
             }
 
+            const vehPlate = v.licensePlate || v.plate;
             return {
-              id: v.id || `veh-${v.plate}`,
-              plate: v.plate,
-              name: v.name,
+              id: vehPlate || v.id,
+              plate: vehPlate,
+              name: v.name || v.brand || 'Phương tiện',
               type: sizeLabel,
               regDate: '12/10/2023',
               isActive: true,
-              image: getVehicleImage(v.plate, sizeLabel),
+              image: getVehicleImage(vehPlate, sizeLabel),
               isLocked: activeSub ? (v.isLocked !== undefined ? v.isLocked : (existingLocal ? existingLocal.isLocked : false)) : false,
               fuelType: v.fuelType || existingLocal?.fuelType || 'GASOLINE',
               activeSubscription: activeSub,
@@ -370,8 +375,15 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
             };
           });
 
-          if (mapped.length > 0 && (!selectedVehId || !mapped.some(mv => mv.id === selectedVehId))) {
-            setTimeout(() => setSelectedVehId(mapped[0].id), 0);
+          if (mapped.length > 0) {
+            if (!selectedVehIdRef.current) {
+              setTimeout(() => setSelectedVehId(mapped[0].plate || mapped[0].id), 0);
+            } else {
+              const exists = mapped.some(mv => mv.id === selectedVehIdRef.current || mv.plate === selectedVehIdRef.current);
+              if (!exists) {
+                setTimeout(() => setSelectedVehId(mapped[0].plate || mapped[0].id), 0);
+              }
+            }
           }
 
           return mapped;

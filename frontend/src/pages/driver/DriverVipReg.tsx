@@ -140,6 +140,18 @@ export function DriverVipReg() {
     }
   }, [selectedVehicleForVIP, selectedPackLabel, vehicles]);
 
+  // Auto-fill verified documents if selected vehicle is ALREADY a VIP / Pending vehicle (Renewal mode)
+  const isSelectedVehVip = currentVeh && (currentVeh.isVip || currentVeh.subscriptionStatus === 'ACTIVE' || currentVeh.subscriptionStatus === 'PENDING_APPROVAL' || currentVeh.expiry);
+
+  useEffect(() => {
+    if (currentVeh && isSelectedVehVip) {
+      setPhotoCavet(currentVeh.registrationDocUrl || 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80');
+      setPhotoCccd('https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500&auto=format&fit=crop&q=80');
+      setPhotoXe(currentVeh.registrationPhotoUrl || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=500&auto=format&fit=crop&q=80');
+      setExtractedPlate(currentVeh.plate);
+    }
+  }, [selectedVehicleForVIP, currentVeh]);
+
   const handleCheckoutValidation = () => {
     if (!photoCavet) {
       triggerToast("⚠️ Vui lòng tải lên Ảnh chụp Cà vẹt xe!", "error");
@@ -179,9 +191,9 @@ export function DriverVipReg() {
                   className="space-y-6 text-left"
                 >
                   <div className="space-y-1">
-                    <h2 className="text-2xl font-black text-slate-950 tracking-tight">Đăng ký dịch vụ</h2>
+                    <h2 className="text-2xl font-black text-slate-950 tracking-tight">Đăng ký & Gia hạn dịch vụ</h2>
                     <p className="text-slate-400 text-xs text-left">
-                      Thiết lập thẻ tháng hoặc thẻ ngày cho phương tiện của bạn.
+                      Thiết lập thẻ tháng hoặc gia hạn gói VIP cho phương tiện của bạn.
                     </p>
                   </div>
 
@@ -272,6 +284,9 @@ export function DriverVipReg() {
                           ) : (
                             vehicles.map(v => {
                               const isChosen = selectedVehicleForVIP === v.plate;
+                              const isVipActive = v.isVip || v.subscriptionStatus === 'ACTIVE';
+                              const isVipPending = v.subscriptionStatus === 'PENDING_APPROVAL' || v.subscriptionStatus === 'PENDING';
+
                               return (
                                 <button
                                   key={v.id}
@@ -282,9 +297,29 @@ export function DriverVipReg() {
                                       : 'border-slate-200 hover:bg-slate-50 text-slate-600'
                                   }`}
                                 >
-                                  <div>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      {isVipActive ? (
+                                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9.5px] font-black rounded-md uppercase">
+                                          🟢 VIP ACTIVE
+                                        </span>
+                                      ) : isVipPending ? (
+                                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 text-[9.5px] font-black rounded-md uppercase">
+                                          🔵 CHỜ DUYỆT
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[9.5px] font-bold rounded-md uppercase">
+                                          ⚪ XE THƯỜNG
+                                        </span>
+                                      )}
+                                    </div>
                                     <span className="text-[10px] text-slate-400 font-semibold block">{v.type} - {v.name}</span>
-                                    <strong className="text-sm font-black font-mono tracking-wider">{v.plate}</strong>
+                                    <strong className="text-sm font-black font-mono tracking-wider block text-slate-900">{v.plate}</strong>
+                                    {isVipActive && v.expiry && (
+                                      <span className="text-[10px] text-emerald-600 font-bold block">
+                                        Hạn dùng: {v.expiry}
+                                      </span>
+                                    )}
                                   </div>
                                   <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
                                     isChosen ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
@@ -299,7 +334,7 @@ export function DriverVipReg() {
 
                         <button 
                           onClick={() => {
-                            setNewType('Ô tô gầm thấp 4-5 chỗ');
+                            setNewType('Ô ô gầm thấp 4-5 chỗ');
                             setAddVehicleModalOpen(true);
                           }}
                           className="pt-2 text-xs font-black text-blue-600 hover:underline inline-block cursor-pointer"
@@ -309,67 +344,78 @@ export function DriverVipReg() {
                       </div>
 
                       {/* Sub-section 1.5: Minh chứng & OCR Xác thực */}
-                      <div className="bg-white p-6 rounded-3xl border border-slate-200/60 space-y-5 text-left">
-                        <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block">
-                          📄 Tải tài liệu minh chứng (CMND/Cà vẹt/Ảnh xe)
-                        </strong>
-                        <p className="text-[11px] text-slate-400 font-semibold leading-relaxed">
-                          Theo quy định an ninh cấp cao VIP của UrbanPark, tài xế cần tải lên 3 tài liệu minh chứng gốc. 
-                          Hệ thống AI OCR sẽ tự động quét đối chiếu biển số trên Cà vẹt xe với biển số đăng ký.
-                        </p>
+                      {isSelectedVehVip ? (
+                        <div className="bg-emerald-50/60 border border-emerald-200/80 p-6 rounded-3xl space-y-2 text-left">
+                          <div className="flex items-center gap-2 text-emerald-800 font-black text-sm">
+                            <CheckCircle className="w-5 h-5 text-emerald-600" />
+                            <span>Giấy tờ Cà vẹt, CMND/CCCD & Ảnh xe đã được xác thực</span>
+                          </div>
+                          <p className="text-xs text-emerald-700/90 font-semibold leading-relaxed">
+                            Phương tiện <strong className="font-mono text-emerald-900">{currentVeh.plate}</strong> đã có hồ sơ pháp lý xác minh đầy đủ trên hệ thống bãi xe. Quý khách chỉ cần chọn gói cước bên phải và bấm <strong className="uppercase">Xác nhận thanh toán</strong> để gia hạn thêm thời gian sử dụng dịch vụ!
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="bg-white p-6 rounded-3xl border border-slate-200/60 space-y-5 text-left">
+                          <strong className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+                            📄 Tải tài liệu minh chứng lần đầu (CMND/Cà vẹt/Ảnh xe)
+                          </strong>
+                          <p className="text-[11px] text-slate-400 font-semibold leading-relaxed">
+                            Theo quy định an ninh cấp cao VIP của UrbanPark, tài xế đăng ký lần đầu cần tải lên 3 tài liệu minh chứng gốc. 
+                            Hệ thống AI OCR sẽ tự động quét đối chiếu biển số trên Cà vẹt xe với biển số đăng ký.
+                          </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          {/* 1. Ảnh Cà vẹt */}
-                          <div className="space-y-2">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">1. Cà vẹt / Đăng ký xe</span>
-                            {photoCavet ? (
-                              <div className="relative h-28 rounded-xl overflow-hidden border border-slate-200 group">
-                                <img src={photoCavet} alt="Cà vẹt" className="w-full h-full object-cover" />
-                                <button 
-                                  onClick={() => { setPhotoCavet(null); setExtractedPlate(null); }}
-                                  className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="border-2 border-dashed border-slate-200 rounded-xl p-3 text-center space-y-2 bg-slate-50">
-                                <p className="text-[10px] text-slate-400">Chọn ảnh giả lập để chạy OCR:</p>
-                                <div className="flex flex-col gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setIsOcrLoading(true);
-                                      setPhotoCavet('https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80');
-                                      setTimeout(() => {
-                                        setExtractedPlate(selectedVehicleForVIP || '30F-999.78');
-                                        setIsOcrLoading(false);
-                                        triggerToast("🤖 OCR: Đã trích xuất biển số trùng khớp thành công!", "success");
-                                      }, 1500);
-                                    }}
-                                    className="w-full py-1.5 bg-blue-550 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* 1. Ảnh Cà vẹt */}
+                            <div className="space-y-2">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">1. Cà vẹt / Đăng ký xe</span>
+                              {photoCavet ? (
+                                <div className="relative h-28 rounded-xl overflow-hidden border border-slate-200 group">
+                                  <img src={photoCavet} alt="Cà vẹt" className="w-full h-full object-cover" />
+                                  <button 
+                                    onClick={() => { setPhotoCavet(null); setExtractedPlate(null); }}
+                                    className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
                                   >
-                                    Ảnh cà vẹt khớp biển
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setIsOcrLoading(true);
-                                      setPhotoCavet('https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80');
-                                      setTimeout(() => {
-                                        setExtractedPlate('29A-888.88');
-                                        setIsOcrLoading(false);
-                                        triggerToast("🤖 OCR: Phát hiện biển số Cà vẹt không trùng khớp!", "error");
-                                      }, 1500);
-                                    }}
-                                    className="w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
-                                  >
-                                    Ảnh cà vẹt khác biển
+                                    <X className="w-3 h-3" />
                                   </button>
                                 </div>
-                              </div>
-                            )}
-                          </div>
+                              ) : (
+                                <div className="border-2 border-dashed border-slate-200 rounded-xl p-3 text-center space-y-2 bg-slate-50">
+                                  <p className="text-[10px] text-slate-400">Chọn ảnh giả lập để chạy OCR:</p>
+                                  <div className="flex flex-col gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setIsOcrLoading(true);
+                                        setPhotoCavet('https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80');
+                                        setTimeout(() => {
+                                          setExtractedPlate(selectedVehicleForVIP || '30F-999.78');
+                                          setIsOcrLoading(false);
+                                          triggerToast("🤖 OCR: Đã trích xuất biển số trùng khớp thành công!", "success");
+                                        }, 1500);
+                                      }}
+                                      className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                                    >
+                                      Ảnh cà vẹt khớp biển
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setIsOcrLoading(true);
+                                        setPhotoCavet('https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=500&auto=format&fit=crop&q=80');
+                                        setTimeout(() => {
+                                          setExtractedPlate('29A-888.88');
+                                          setIsOcrLoading(false);
+                                          triggerToast("🤖 OCR: Phát hiện biển số Cà vẹt không trùng khớp!", "error");
+                                        }, 1500);
+                                      }}
+                                      className="w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                                    >
+                                      Ảnh cà vẹt khác biển
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
 
                           {/* 2. Ảnh CMND/CCCD */}
                           <div className="space-y-2">
@@ -464,6 +510,7 @@ export function DriverVipReg() {
                           </div>
                         )}
                       </div>
+                      )}
 
                       {/* Sub-section 2: Choose service package */}
                       <div className="bg-white p-6 rounded-3xl border border-slate-200/60 space-y-4">

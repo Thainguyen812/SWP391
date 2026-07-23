@@ -296,20 +296,38 @@ public ResponseEntity<?> delete(@PathVariable UUID id){
 
         String username = authentication.getName();
 
-User currentUser = userRepo
-        .findByUsername(username)
-        .orElseThrow(() ->
-                new RuntimeException("User không tồn tại."));
+        User currentUser = userRepo
+                .findByUsername(username)
+                .orElseThrow(() ->
+                        new RuntimeException("User không tồn tại."));
         
         // KIỂM TRA NGƯỜI ĐĂNG NHẬP CÓ PHẢI CHỦ XE KHÔNG (CHỈ GIỚI HẠN DRIVER)
         if (currentUser.getRole() == User.Role.DRIVER && !vehicle.getOwnerId().equals(currentUser.getId())) {
-            throw new RuntimeException("Bạn không có quyền xóa xe này.");
+            return ResponseEntity.status(403).body(Map.of("success", false, "message", "Bạn không có quyền xóa xe này."));
+        }
+
+        // 1. KIỂM TRA XEM XE CÓ GÓI VIP ĐANG ACTIVE HOẶC CHỜ DUYỆT KHÔNG (CHẶN XÓA THEO CHUẨN DOANH NGHIỆP)
+        List<com.parking.model.VipSubscription> existingSubs = vipSubscriptionRepository.findByVehicleId(vehicle.getId());
+        boolean hasActiveVip = existingSubs.stream().anyMatch(sub -> 
+            sub.getStatus() == com.parking.model.VipSubscription.Status.ACTIVE || 
+            sub.getStatus() == com.parking.model.VipSubscription.Status.PENDING_APPROVAL
+        );
+
+        if (hasActiveVip) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false, 
+                "message", "Không thể xóa phương tiện vì xe đang có gói Vé tháng VIP đang hoạt động hoặc chờ duyệt. Vui lòng liên hệ Ban quản lý bãi xe!"
+            ));
+        }
+
+        // 2. NẾU LÀ XE THƯỜNG / VIP ĐÃ HẾT HẠN: CASCADE DELETE DỌN DẸP SẠCH BẢNG VIP_SUBSCRIPTIONS
+        if (!existingSubs.isEmpty()) {
+            vipSubscriptionRepository.deleteAll(existingSubs);
         }
 
         repo.delete(vehicle);
 
-
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(Map.of("success", true, "message", "Đã xóa phương tiện thành công!"));
 
     }).orElseGet(() -> ResponseEntity.notFound().build());
 }

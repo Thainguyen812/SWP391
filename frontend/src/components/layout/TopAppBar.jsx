@@ -1,11 +1,11 @@
 import { useId, useState } from "react";
-import { SearchOutlined, BellOutlined, MoonOutlined, SunOutlined } from "@ant-design/icons";
+import { SearchOutlined, BellOutlined, MoonOutlined, SunOutlined, MenuOutlined } from "@ant-design/icons";
 import { notification } from "antd";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useGlobalContext } from "../../context/GlobalContext";
 import "./TopAppBar.css";
 
-export const TopAppBarSection = () => {
+export const TopAppBarSection = ({ onMenuClick }) => {
   const searchId = useId();
   const location = useLocation();
   const navigate = useNavigate();
@@ -90,10 +90,17 @@ export const TopAppBarSection = () => {
   };
 
   return (
-    <header className="top-app-bar bg-white px-6 h-16 flex items-center justify-between shadow-sm border-b border-slate-200">
-      {/* Left Area: Title */}
-      <div className="flex items-center flex-1">
-        <h1 className="text-lg font-bold text-slate-800 m-0">{pageTitle}</h1>
+    <header className="top-app-bar bg-white px-3 sm:px-6 h-16 flex items-center justify-between shadow-sm border-b border-slate-200">
+      {/* Left Area: Title & Mobile Hamburger */}
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <button 
+          onClick={onMenuClick}
+          className="md:hidden p-2 rounded-lg text-slate-700 hover:bg-slate-100 cursor-pointer flex items-center justify-center border border-slate-200"
+          title="Mở menu"
+        >
+          <MenuOutlined className="text-base" />
+        </button>
+        <h1 className="text-base sm:text-lg font-bold text-slate-800 m-0 truncate">{pageTitle}</h1>
       </div>
 
       {/* Center Area: Search */}

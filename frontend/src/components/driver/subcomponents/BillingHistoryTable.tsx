@@ -332,7 +332,6 @@ export const BillingHistoryTable: React.FC = () => {
                 <th className="py-4 px-5">Biển số xe</th>
                 <th className="py-4 px-5">Số tiền</th>
                 <th className="py-4 px-5">Trạng thái</th>
-                <th className="py-4 px-5 text-right">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100/70 text-slate-700 font-sans">
@@ -343,17 +342,18 @@ export const BillingHistoryTable: React.FC = () => {
                   
                   // Filter by type
                   if (billingTypeFilter === 'Tất cả') return true;
-                  const typeLower = tx.type.toLowerCase();
-                  if (billingTypeFilter === 'Vé ngày') {
-                    return typeLower.includes('vé ngày') || typeLower.includes('ngày') || typeLower.includes('daily');
+                  const typeLower = (tx.type || '').toLowerCase();
+                  const filterLower = billingTypeFilter.toLowerCase();
+                  if (filterLower.includes('tháng')) {
+                    return typeLower.includes('tháng') || typeLower.includes('đăng kí') || typeLower.includes('vip');
                   }
-                  if (billingTypeFilter === 'Vé tháng') {
-                    return typeLower.includes('vé tháng') || typeLower.includes('tháng') || typeLower.includes('vip') || typeLower.includes('monthly');
+                  if (filterLower.includes('nạp')) {
+                    return typeLower.includes('nạp') || typeLower.includes('ví') || typeLower.includes('hoàn tiền') || typeLower.includes('rút');
                   }
-                  if (billingTypeFilter === 'Nạp tiền') {
-                    return typeLower.includes('nạp') || typeLower.includes('topup') || typeLower.includes('top up');
+                  if (filterLower.includes('gửi')) {
+                    return typeLower.includes('gửi') || typeLower.includes('xe vào') || typeLower.includes('xe ra');
                   }
-                  return typeLower.includes(billingTypeFilter.toLowerCase().trim());
+                  return typeLower.includes(filterLower);
                 })
                 .map((tx: any) => {
                   const statusStyle = 
@@ -362,7 +362,7 @@ export const BillingHistoryTable: React.FC = () => {
                       : tx.status === 'Đang xử lý' 
                         ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-500/10' 
                         : 'bg-rose-50 text-rose-700 ring-1 ring-rose-500/10';
- 
+
                   return (
                     <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="py-4 px-5 font-bold font-mono text-slate-900">{tx.id}</td>
@@ -371,36 +371,13 @@ export const BillingHistoryTable: React.FC = () => {
                         <span className="text-slate-800">{tx.type}</span>
                       </td>
                       <td className="py-4 px-5 font-mono font-bold text-slate-500">
-                        {tx.plate === '-' ? <span className="text-slate-350">—</span> : tx.plate}
+                        {tx.plate === '-' || !tx.plate ? <span className="text-slate-350">—</span> : tx.plate}
                       </td>
                       <td className="py-4 px-5 font-bold font-mono text-slate-900">{tx.fee}</td>
                       <td className="py-4 px-5">
                         <span className={`inline-flex items-center px-2.5 py-1 text-[10px] font-black rounded-full uppercase leading-none ${statusStyle}`}>
                           {tx.status}
                         </span>
-                      </td>
-                      <td className="py-4 px-5 text-right font-bold">
-                        {tx.status === 'Thành công' ? (
-                          <button 
-                            type="button"
-                            onClick={() => triggerToast(`Đang chuẩn bị tải hoá đơn ${tx.id}...`, 'info')}
-                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-[11px] cursor-pointer"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            <span>Tải HĐ</span>
-                          </button>
-                        ) : tx.status === 'Thất bại' ? (
-                          <button 
-                            type="button"
-                            onClick={() => triggerToast('Đang kết nối lại tới cổng thanh toán...', 'info')}
-                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-[11px] cursor-pointer"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>Thử lại</span>
-                          </button>
-                        ) : (
-                          <span className="text-slate-450">Đang chờ</span>
-                        )}
                       </td>
                     </tr>
                   );
