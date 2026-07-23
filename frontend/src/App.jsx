@@ -192,9 +192,7 @@ function App() {
         <Route path="/staff-mobile-pos" element={
           <StaffProtectedPage><StaffMobilePOS /></StaffProtectedPage>
         } />
-        <Route path="/staff-monitoring" element={
-          <StaffProtectedPage><StaffMonitoring /></StaffProtectedPage>
-        } />
+
         <Route path="/staff-security" element={<Navigate to="/staff-dashboard" replace />} />
         <Route path="/staff-lost-card" element={
           <StaffProtectedPage><StaffLostCard /></StaffProtectedPage>

@@ -20,7 +20,6 @@ import './Sidebar.css';
 const navItems = [
   { path: '/staff-dashboard', label: 'Bảng điều khiển', icon: <AppstoreOutlined /> },
   { path: '/staff-gate-control', label: 'Điều khiển cổng', icon: <DesktopOutlined /> },
-  { path: '/staff-monitoring', label: 'Giám sát', icon: <VideoCameraOutlined /> },
   { path: '/staff-payment', label: 'Thanh toán', icon: <CreditCardOutlined /> },
   { path: '/staff-lost-card', label: 'Báo mất thẻ', icon: <IdcardOutlined /> },
   { path: '/staff-transactions', label: 'Lịch sử giao dịch', icon: <HistoryOutlined /> },
