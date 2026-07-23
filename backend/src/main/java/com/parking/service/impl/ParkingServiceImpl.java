@@ -235,7 +235,7 @@ public class ParkingServiceImpl implements ParkingService {
 
     @Override
     @Transactional
-    public Transaction approveExit(String plate) {
+    public Transaction approveExit(String plate, String paymentMethodStr) {
         ParkingSession session = parkingSessionRepository
                 .findByLicensePlateAndSessionStatus(plate, ParkingSession.SessionStatus.ACTIVE)
                 .orElseThrow(() -> new ApiExceptions.NotFoundException("Khong tim thay phien xe dang hoat dong"));
@@ -287,7 +287,21 @@ public class ParkingServiceImpl implements ParkingService {
         transaction.setLostCardPenalty(BigDecimal.ZERO);
         transaction.setViolationPenalty(BigDecimal.ZERO);
         transaction.setTotalAmount(java.math.BigDecimal.ZERO);
-        transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
+        
+        Transaction.PaymentMethod method = Transaction.PaymentMethod.CASH;
+        if (paymentMethodStr != null && !paymentMethodStr.isBlank()) {
+            try {
+                method = Transaction.PaymentMethod.valueOf(paymentMethodStr.toUpperCase());
+            } catch (Exception e) {
+                if ("QR".equalsIgnoreCase(paymentMethodStr) || "VIETQR".equalsIgnoreCase(paymentMethodStr) || "QR_BANK".equalsIgnoreCase(paymentMethodStr)) {
+                    method = Transaction.PaymentMethod.QR_BANK;
+                } else if ("CARD".equalsIgnoreCase(paymentMethodStr) || "WALLET".equalsIgnoreCase(paymentMethodStr)) {
+                    method = Transaction.PaymentMethod.QR_BANK;
+                }
+            }
+        }
+        
+        transaction.setPaymentMethod(method);
         transaction.setPaymentStatus(Transaction.PaymentStatus.SUCCESS);
         transaction.setProcessedAt(Instant.now());
         return transactionRepository.save(transaction);
@@ -1094,12 +1108,29 @@ public class ParkingServiceImpl implements ParkingService {
     // confirm check out cho visitor
     @Override
     @Transactional
-    public Transaction confirmCheckout(UUID transactionId) {
+    public Transaction confirmCheckout(UUID transactionId, String paymentMethodStr) {
 
         Transaction transaction = transactionRepository
                 .findById(transactionId)
                 .orElseThrow(() -> new ApiExceptions.NotFoundException(
                         "Không tìm thấy transaction"));
+
+        if (paymentMethodStr != null && !paymentMethodStr.isBlank()) {
+            try {
+                transaction.setPaymentMethod(Transaction.PaymentMethod.valueOf(paymentMethodStr.toUpperCase()));
+            } catch (Exception e) {
+                if ("QR".equalsIgnoreCase(paymentMethodStr) || "VIETQR".equalsIgnoreCase(paymentMethodStr) || "QR_BANK".equalsIgnoreCase(paymentMethodStr)) {
+                    transaction.setPaymentMethod(Transaction.PaymentMethod.QR_BANK);
+                } else if ("CASH".equalsIgnoreCase(paymentMethodStr)) {
+                    transaction.setPaymentMethod(Transaction.PaymentMethod.CASH);
+                } else if ("MOMO".equalsIgnoreCase(paymentMethodStr) || "MOMO_SANDBOX".equalsIgnoreCase(paymentMethodStr)) {
+                    transaction.setPaymentMethod(Transaction.PaymentMethod.MOMO_SANDBOX);
+                } else if ("VNPAY".equalsIgnoreCase(paymentMethodStr) || "VNPAY_SANDBOX".equalsIgnoreCase(paymentMethodStr)) {
+                    transaction.setPaymentMethod(Transaction.PaymentMethod.VNPAY_SANDBOX);
+                }
+            }
+            transactionRepository.save(transaction);
+        }
 
         if (transaction.getPaymentStatus() == Transaction.PaymentStatus.SUCCESS) {
             if (Boolean.TRUE.equals(transaction.getIsMobileCheckout())) {
@@ -1120,8 +1151,7 @@ public class ParkingServiceImpl implements ParkingService {
                 }
             }
 
-            throw new ApiExceptions.ConflictException(
-                    "Transaction đã được xác nhận");
+            return transactionRepository.save(transaction);
         }
 
         transaction.setPaymentStatus(
@@ -1956,9 +1986,25 @@ public class ParkingServiceImpl implements ParkingService {
     @Override
     @Transactional
     public Transaction checkoutCardByCode(String cardCode) {
-        Card card = cardRepository.findByCardCode(cardCode)
-                .orElseThrow(() -> new ApiExceptions.NotFoundException("Thẻ không tồn tại"));
-        return this.checkoutCard(card.getId());
+        if (cardCode == null || cardCode.trim().isEmpty()) {
+            throw new ApiExceptions.BadRequestException("Mã thẻ hoặc biển số không được trống");
+        }
+        String cleanCode = cardCode.trim();
+        Optional<Card> cardOpt = cardRepository.findByCardCode(cleanCode);
+        if (cardOpt.isPresent()) {
+            return this.checkoutCard(cardOpt.get().getId());
+        }
+
+        Optional<ParkingSession> sessionOpt = parkingSessionRepository
+                .findByLicensePlateAndSessionStatus(cleanCode, ParkingSession.SessionStatus.ACTIVE);
+        if (sessionOpt.isPresent()) {
+            ParkingSession session = sessionOpt.get();
+            if (session.getCardId() != null) {
+                return this.checkoutCard(session.getCardId());
+            }
+        }
+
+        throw new ApiExceptions.NotFoundException("Không tìm thấy thẻ hoặc phiên xe đang hoạt động cho: " + cleanCode);
     }
 
     @Override

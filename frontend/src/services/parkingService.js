@@ -20,8 +20,10 @@ export const parkingService = {
     return apiClient.post(`/v1/parking/checkout-by-code/${cardCode}`);
   },
   
-  confirmCheckout: async (transactionId) => {
-    return apiClient.post(`/v1/parking/checkout/confirm/${transactionId}`);
+  confirmCheckout: async (transactionId, paymentMethod) => {
+    return apiClient.post(`/v1/parking/checkout/confirm/${transactionId}`, null, {
+      params: paymentMethod ? { paymentMethod } : {}
+    });
   },
 
   // 8. Monitoring Map

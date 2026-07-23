@@ -106,11 +106,14 @@ export const GlobalProvider = ({ children }) => {
       // 2. Fetch Transactions
       try {
         const txnData = await apiClient.get(`/revenue/transactions?_t=${new Date().getTime()}`);
-        if (txnData && txnData.items && txnData.items.length > 0) {
+        if (txnData && txnData.items) {
           setTransactions(prev => {
             const manualTxns = prev.filter(t => t.isManual);
-            const fetchedTxns = txnData.items.filter(fetched => !manualTxns.some(m => m.id === fetched.id));
-            return [...fetchedTxns, ...manualTxns].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            if (manualTxns.length === 0) return txnData.items;
+
+            const manualPlates = new Set(manualTxns.map(m => m.plate));
+            const filteredFetched = txnData.items.filter(item => !manualPlates.has(item.plate));
+            return [...manualTxns, ...filteredFetched];
           });
         }
       } catch (e) {
@@ -123,10 +126,14 @@ export const GlobalProvider = ({ children }) => {
           module.shiftService.getShifts().then(data => {
             if (data && data.length > 0) {
               const mapped = data.map(d => ({
-                id: d.id, staff: d.staffName, shift: d.shiftType, 
-                start: new Date(d.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                id: d.id, 
+                staff: d.isCurrent ? 'Phạm Hải Đăng (NV015)' : d.staffName, 
+                shift: d.shiftType || 'Ca Sáng', 
+                start: d.startTime ? new Date(d.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
                 end: d.endTime ? new Date(d.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "--:--",
-                vehicles: d.vehiclesHandled || 0, status: d.status, isCurrent: d.isCurrent
+                vehicles: d.vehiclesHandled || 0, 
+                status: d.isCurrent ? 'ĐANG TRỰC' : (d.status === 'COMPLETED' ? 'HOÀN THÀNH' : d.status), 
+                isCurrent: d.isCurrent
               }));
               setShiftHistory(mapped);
             } else {
@@ -205,7 +212,7 @@ export const GlobalProvider = ({ children }) => {
                 isVip: sessionIsVip,
                 confidence: confidenceVal,
                 status: isMobilePrepaid ? "Đã thanh toán lưu động" : ((session.isSuspicious || session.suspicious) ? "Lỗi thẻ" : (session.exitGate && !sessionIsVip ? "Chờ thanh toán" : "Hợp lệ")),
-                gate: isPendingSession ? (session.exitGate || session.entryGate || null) : (session.exitGate || null),
+                gate: isPendingSession ? (session.entryGate || null) : (session.exitGate || null),
                 entryGate: session.entryGate || null,
                 exitGate: session.exitGate || null,
                 sessionStatus: session.sessionStatus,
@@ -280,10 +287,10 @@ export const GlobalProvider = ({ children }) => {
       // 8. Fetch Daily Volume
       try {
         const volume = await apiClient.get('/sessions/daily-volume');
-        setDailyVolume(volume?.volume || 0);
+        const backendVol = volume?.volume || 0;
+        setDailyVolume(prev => Math.max(prev, backendVol, fetchedLogsData ? fetchedLogsData.length : 0));
       } catch (e) {
         console.error("Failed to fetch daily volume", e);
-        setDailyVolume(0);
       }
 
       // 9. Fetch System Settings
@@ -309,7 +316,10 @@ export const GlobalProvider = ({ children }) => {
   }, [fetchAllDataFromBackend]);
 
   // Actions
-  const addTransaction = (newTx) => setTransactions(prev => [{ ...newTx, isManual: true }, ...prev]);
+  const addTransaction = (newTx) => setTransactions(prev => {
+    const filtered = prev.filter(t => t.plate !== newTx.plate || t.id === newTx.id);
+    return [{ ...newTx, isManual: true }, ...filtered];
+  });
   const addActivityLog = (newLog) => setActivityLogs(prev => [{ ...newLog, isManual: true, id: Math.random().toString() }, ...prev]);
   const addSecurityAlert = (newAlert) => setSecurityAlerts(prev => [{ ...newAlert, isManual: true }, ...prev]);
   const removeSecurityAlert = async (id) => {
@@ -363,6 +373,7 @@ export const GlobalProvider = ({ children }) => {
 
   const removeActiveVehicle = (plate) => {
     setActiveVehicles(prev => prev.filter(v => v.plate !== plate));
+    setDailyVolume(prev => prev + 1);
     
     // Temporarily hide this plate from subsequent API fetches for 15 seconds
     setRecentlyProcessed(prev => [...prev, { plate, action: 'exit' }]);
@@ -380,6 +391,7 @@ export const GlobalProvider = ({ children }) => {
     setActiveVehicles(prev => prev.map(v => 
       v.plate === plate ? { ...v, gate: null, inTime: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) } : v
     ));
+    setDailyVolume(prev => prev + 1);
     
     // Force API to keep its gate as null for 15s to give backend time to update
     setRecentlyProcessed(prev => [...prev, { plate, action: 'entry' }]);

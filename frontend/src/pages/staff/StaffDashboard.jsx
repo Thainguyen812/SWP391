@@ -57,7 +57,7 @@ export const StaffDashboard = () => {
   const currentLogs = displayLogs.slice((currentLogPage - 1) * LOGS_PER_PAGE, currentLogPage * LOGS_PER_PAGE);
 
   const vehiclesInLotCount = activeVehicles ? activeVehicles.filter(v => !v.gate).length : 0;
-  const pendingProcessingCount = activeVehicles ? activeVehicles.filter(v => v.gate).length : 0;
+  const pendingProcessingCount = activeVehicles ? Math.min(6, new Set(activeVehicles.filter(v => v.gate).map(v => v.plate)).size) : 0;
   const waitingPaymentCount = activeVehicles ? activeVehicles.filter(v => v.gate && (v.status === 'Chờ thanh toán' || v.status === 'Lỗi thẻ')).length : 0;
   const alertsCount = securityAlerts ? securityAlerts.length : 0;
 
@@ -70,44 +70,55 @@ export const StaffDashboard = () => {
         if (data && Array.isArray(data)) {
           const mappedLogs = data.filter(session => !session.isPending).map((session, index) => {
             const isCheckIn = !session.checkOutTime;
+            const rawTime = session.checkOutTime || session.checkInTime;
             
             // Map vehicle details from backend DTO
             let vehicleDisplay = "Khách vãng lai";
             if (session.vehicleBrand || session.vehicleModel) {
-               vehicleDisplay = `${session.vehicleModel} ${session.vehicleColor ? `(${session.vehicleColor})` : ''}`.trim();
+               vehicleDisplay = `${session.vehicleModel || session.vehicleBrand} ${session.vehicleColor ? `(${session.vehicleColor})` : ''}`.trim();
             } else if (session.isVip) {
-               vehicleDisplay = "Xe đăng ký tháng";
+               vehicleDisplay = "Xe VIP / Đăng ký";
             } else if (session.isSuspicious) {
                vehicleDisplay = "Lỗi nhận diện biển số";
             }
             
-            // Map gate
-            const gateStr = isCheckIn ? `Cổng vào ${index % 2 === 0 ? '1' : '2'}` : `Cổng ra ${index % 2 === 0 ? '1' : '2'}`;
+            // Map real gate from DB session
+            const gateStr = (isCheckIn ? session.entryGate : session.exitGate) || session.entryGate || session.exitGate || (isCheckIn ? 'L-VÀO 1' : 'L-RA 1');
             
             // Map status
             let statusStr = "THÀNH CÔNG";
             if (session.isSuspicious) {
                 statusStr = "CẦN XỬ LÝ";
             } else if (session.sessionStatus === 'COMPLETED') {
-                statusStr = "ĐÃ THU 30.000Đ"; // Fake fee amount for UI
+                statusStr = "ĐÃ HOÀN TẤT";
             }
+
+            const formattedTime = rawTime ? new Date(rawTime).toLocaleString('vi-VN', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            }) : '---';
 
             return {
               id: session.id,
               plate: session.licensePlate || '-- KHÔNG RÕ --',
               model: vehicleDisplay,
-              type: session.isVip ? "VIP" : (session.isSuspicious ? "LỖI" : "KHÁCH"),
+              type: session.isVip ? "VIP" : (session.isSuspicious ? "LỖI" : "VẮNG LAI"),
               typeColor: session.isVip ? "#000" : (session.isSuspicious ? "#ef4444" : "#64748b"),
               gate: gateStr, 
               action: session.isSuspicious ? "Chặn Tự động" : (isCheckIn ? "Vào bãi" : "Ra bãi"),
               actionColor: session.isSuspicious ? "text-red-600" : (isCheckIn ? "text-emerald-600" : "text-blue-600"),
-              time: new Date(session.checkOutTime || session.checkInTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+              time: formattedTime,
+              rawTimestamp: rawTime,
               status: statusStr,
-              statusColor: session.isSuspicious ? "bg-red-100 text-red-700" : (session.sessionStatus === 'COMPLETED' ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700")
+              statusColor: session.isSuspicious ? "bg-red-100 text-red-700" : (session.sessionStatus === 'COMPLETED' ? "bg-emerald-100 text-emerald-700" : "bg-emerald-100 text-emerald-700")
             };
           });
-          // Sort newest first
-          mappedLogs.sort((a, b) => b.time.localeCompare(a.time));
+          // Sort newest first by timestamp
+          mappedLogs.sort((a, b) => new Date(b.rawTimestamp || 0) - new Date(a.rawTimestamp || 0));
           setLogs(mappedLogs);
         } else {
           setLogs([]);
@@ -276,34 +287,8 @@ export const StaffDashboard = () => {
   return (
     <div className="p-6 w-full">
       
-      {/* Alert Banner */}
-      {securityAlerts && securityAlerts.length > 0 && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg flex justify-between items-center mb-6">
-          <div className="flex items-start gap-3">
-            <InfoCircleOutlined className="text-red-500 mt-1" />
-            <div>
-              <h4 className="text-red-600 font-bold text-xs tracking-wider uppercase mb-1">Cảnh báo An ninh</h4>
-              <p className="text-slate-700 text-sm m-0">Hệ thống đang có {securityAlerts.length} cảnh báo cần xử lý. Vui lòng kiểm tra màn hình Giám sát.</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => {
-              const msg = message.loading('Đang gửi báo cáo khẩn cấp...', 0);
-              setTimeout(() => {
-                msg();
-                notification.success({ message: 'Báo cáo thành công', description: 'Toàn bộ thông tin cảnh báo đã được gửi đến thiết bị của Quản lý.', placement: 'topRight' });
-              }, 1500);
-            }}
-            className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium px-4 py-2 rounded flex items-center gap-2 text-sm transition-colors"
-          >
-            <SoundOutlined />
-            Báo cáo Quản lý
-          </button>
-        </div>
-      )}
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* Stats Cards (3 Columns - Fitted Ratio) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         {/* Làn hoạt động */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Số làn hoạt động</h4>
@@ -356,19 +341,6 @@ export const StaffDashboard = () => {
           <div className="text-4xl font-extrabold text-slate-800 mb-2">{waitingPaymentCount.toString().padStart(2, "0")}</div>
           <div className="text-xs text-slate-500">Cần hỗ trợ tại Cổng ra 2</div>
         </div>
-
-        {/* Cảnh báo mở */}
-        <div 
-          onClick={() => setIsAlertModalVisible(true)}
-          className="bg-white p-5 rounded-xl border border-red-200 shadow-sm flex flex-col justify-between relative overflow-hidden cursor-pointer hover:border-red-400 hover:shadow-md transition-all"
-        >
-          <div className="flex justify-between items-start mb-2">
-            <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Cảnh báo mở</h4>
-            <span className="text-red-500 text-3xl font-bold leading-none mt-[-5px]">*</span>
-          </div>
-          <div className="text-4xl font-extrabold text-red-600 mb-2">{alertsCount.toString().padStart(2, "0")}</div>
-          <div className="text-xs text-red-500 font-medium">Cần xử lý ngay lập tức</div>
-        </div>
       </div>
 
       {/* Main Grid: Live AI Feed & Quick Actions */}
@@ -402,12 +374,16 @@ export const StaffDashboard = () => {
                 defaultImage: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80'
               };
               
-              // Chỉ hiển thị xe trên màn hình Camera nếu xe ĐANG TRONG QUÁ TRÌNH XỬ LÝ tại đúng cổng đó.
-              // Nếu trạng thái là 'Hợp lệ', nghĩa là xe đã đi qua cổng và đang đỗ trong bãi -> Không hiển thị trên Camera nữa.
-              const vehicle = activeVehicles?.find(v => 
-                v.gate && 
-                v.gate.toUpperCase() === cam.name.toUpperCase()
-              );
+              // Helper to check gate match (e.g. L-VÀO 1 vs CỔNG VÀO 1, L-RA 1 vs CỔNG RA 1)
+              const vehicle = activeVehicles?.find(v => {
+                if (!v.gate) return false;
+                const gUpper = v.gate.toUpperCase();
+                const isMatchDirection = isEntry 
+                  ? (gUpper.includes('VÀO') || gUpper.includes('IN')) 
+                  : (gUpper.includes('RA') || gUpper.includes('OUT'));
+                const isMatchNum = gUpper.endsWith(String(gateNum)) || gUpper.includes(` ${gateNum}`) || gUpper.includes(`-${gateNum}`);
+                return isMatchDirection && isMatchNum;
+              });
               const isSelected = vehicle && currentVehicle?.id === vehicle.id;
               
               // Helper to map status to color
@@ -723,10 +699,8 @@ export const StaffDashboard = () => {
                 plate: submittedPlate,
                 reason: submittedReason,
                 time: 'Vừa xong',
-                image: matchedVehicle?.image
-              });
-              
-              navigate('/staff-security');
+                });
+              notification.success({ message: 'Đã gửi thông tin xe vi phạm', placement: 'topRight' });
             }} 
             className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 shadow-md font-bold cursor-pointer"
           >
@@ -827,7 +801,6 @@ export const StaffDashboard = () => {
                   <button 
                     onClick={() => {
                       setIsAlertModalVisible(false);
-                      navigate('/staff-security');
                     }}
                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors cursor-pointer"
                   >

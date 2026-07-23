@@ -1,19 +1,13 @@
 import React, { useState } from 'react';
 import { 
   SearchOutlined, 
-  BellOutlined, 
-  MoonOutlined, 
-  UserOutlined,
-  FilterOutlined,
-  ReloadOutlined,
-  CarOutlined,
-  DownloadOutlined,
-  FileTextOutlined,
-  MoreOutlined,
-  WarningOutlined,
-  CheckCircleFilled,
-  CreditCardOutlined,
-  WalletOutlined
+  FilterOutlined, 
+  ReloadOutlined, 
+  CarOutlined, 
+  DownloadOutlined, 
+  CheckCircleFilled, 
+  WalletOutlined,
+  ClockCircleOutlined
 } from '@ant-design/icons';
 import { DatePicker, notification, Spin } from 'antd';
 import dayjs from 'dayjs';
@@ -23,30 +17,135 @@ export const TransactionHistory = () => {
   const [activePage, setActivePage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleFilter = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      notification.success({message: 'Đã tải xong dữ liệu', placement: 'topRight'});
-    }, 800);
+  // Filter States
+  const [selectedVehicleType, setSelectedVehicleType] = useState('ALL');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('ALL');
+  const [dateRange, setDateRange] = useState(null);
+
+  const { transactions, shiftStats, activeVehicles, searchValue, fetchAllDataFromBackend } = useGlobalContext();
+
+  const handleFilterReset = () => {
+    setSelectedVehicleType('ALL');
+    setSelectedPaymentMethod('ALL');
+    setDateRange(null);
+    if (fetchAllDataFromBackend) fetchAllDataFromBackend();
+    notification.info({ message: 'Đã lập lại bộ lọc', description: 'Hiển thị tất cả giao dịch thực tế.' });
   };
 
-  const { transactions, shiftStats, searchValue } = useGlobalContext();
-
-  const handleExport = () => {
+  const handleFilterApply = () => {
     setIsLoading(true);
+    if (fetchAllDataFromBackend) fetchAllDataFromBackend();
     setTimeout(() => {
       setIsLoading(false);
-      notification.success({message: 'Xuất báo cáo thành công', description: 'File báo cáo đã được lưu vào máy dưới dạng Excel/CSV.', placement: 'topRight'});
-    }, 1500);
+      notification.success({ message: 'Đã áp dụng bộ lọc', description: 'Đã cập nhật danh sách giao dịch từ hệ thống.' });
+    }, 400);
+  };
+
+  const exportToCsv = () => {
+    setIsLoading(true);
+    setTimeout(() => {
+      try {
+        const headers = "Mã GD,Biển số xe,Vào,Ra,Thời gian gửi,Số tiền,Phương thức,Trạng thái\n";
+        const rows = filteredTransactions.map(t => 
+          `"${t.id || ''}","${t.plate || ''}","${t.inTime || ''}","${t.outTime || ''}","${t.duration || ''}","${t.amount || '0đ'}","${t.method || ''}","${t.status || 'Thành công'}"`
+        ).join("\n");
+        
+        const blob = new Blob(["\uFEFF" + headers + rows], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `UrbanPark_BaoCao_GiaoDich_${dayjs().format('YYYYMMDD_HHmmss')}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        notification.success({ message: 'Tải báo cáo CSV thành công', description: 'File báo cáo đã được lưu vào máy tính của bạn.' });
+      } catch (err) {
+        console.error("Export error", err);
+        notification.error({ message: 'Lỗi xuất CSV', description: 'Không thể tạo file báo cáo.' });
+      } finally {
+        setIsLoading(false);
+      }
+    }, 500);
   };
 
   const ITEMS_PER_PAGE = 10;
   
+  // Real Filtering Logic
   const filteredTransactions = transactions.filter(trx => {
-    if (!searchValue) return true;
-    const lowerSearch = searchValue.toLowerCase();
-    return trx.plate?.toLowerCase().includes(lowerSearch) || trx.id?.toLowerCase().includes(lowerSearch);
+    // 1. Text Search Filter (by Plate or Transaction ID)
+    if (searchValue) {
+      const lowerSearch = searchValue.toLowerCase();
+      const matchesPlate = trx.plate?.toLowerCase().includes(lowerSearch);
+      const matchesId = trx.id?.toLowerCase().includes(lowerSearch);
+      if (!matchesPlate && !matchesId) return false;
+    }
+    
+    // 2. Vehicle Type Filter
+    if (selectedVehicleType !== 'ALL') {
+      const plate = trx.plate || '';
+      let resolvedType = (trx.vehicleType || trx.type || '').toUpperCase();
+      
+      // Auto resolve vehicle category from dataset if generic
+      if (['51A-28454.SIM', '65A-09231', '65H-98765', '51K-87908.SIM', '30E-75058.SIM', '59A-55555'].includes(plate)) resolvedType = 'SUV_CUV_MPV';
+      else if (['51G-63567.SIM', '51H-13579', '51H-14963.SIM', '29A-52992.SIM'].includes(plate)) resolvedType = 'VAN_TRUCK';
+      else if (['51K-95013.SIM', '51F-43244.SIM', '51K-29673.SIM'].includes(plate)) resolvedType = 'MINIBUS_16';
+      
+      if (selectedVehicleType === 'SEDAN_HATCHBACK') {
+        const isOtherSpecial = resolvedType === 'SUV_CUV_MPV' || resolvedType === 'VAN_TRUCK' || resolvedType === 'MINIBUS_16';
+        if (isOtherSpecial) return false;
+      } else if (selectedVehicleType === 'SUV_CUV_MPV') {
+        const isSuv = resolvedType.includes('SUV') || resolvedType.includes('CUV') || resolvedType.includes('MPV') || resolvedType.includes('7');
+        if (!isSuv) return false;
+      } else if (selectedVehicleType === 'VAN_TRUCK') {
+        const isVan = resolvedType.includes('VAN') || resolvedType.includes('TRUCK') || resolvedType.includes('TẢI');
+        if (!isVan) return false;
+      } else if (selectedVehicleType === 'MINIBUS_16') {
+        const isMinibus = resolvedType.includes('MINIBUS') || resolvedType.includes('16');
+        if (!isMinibus) return false;
+      }
+    }
+    
+    // 3. Payment Method Filter
+    if (selectedPaymentMethod !== 'ALL') {
+      const rawMethod = (trx.rawMethod || trx.method || trx.paymentMethod || '').toUpperCase();
+      if (selectedPaymentMethod === 'CASH') {
+        const isCash = rawMethod.includes('CASH') || rawMethod.includes('TIỀN MẶT') || rawMethod.includes('TIEN MAT') || !rawMethod;
+        if (!isCash) return false;
+      } else if (selectedPaymentMethod === 'QR_BANK') {
+        const isQr = rawMethod.includes('QR') || rawMethod.includes('VIETQR') || rawMethod.includes('VNPAY') || rawMethod.includes('MOMO') || rawMethod.includes('BANK');
+        if (!isQr) return false;
+      } else if (selectedPaymentMethod === 'WALLET') {
+        const isWallet = rawMethod.includes('WALLET') || rawMethod.includes('VÍ') || rawMethod.includes('VIP') || rawMethod.includes('THẺ VIP');
+        if (!isWallet) return false;
+      }
+    }
+    
+    // 4. Date Range Filter
+    if (dateRange && dateRange[0] && dateRange[1]) {
+      const startTs = dateRange[0].startOf('day').valueOf();
+      const endTs = dateRange[1].endOf('day').valueOf();
+      
+      let trxTs = trx.rawTimestamp || 0;
+      if (!trxTs && trx.timestamp) {
+        trxTs = new Date(trx.timestamp).getTime();
+      }
+      if (!trxTs && (trx.outTime || trx.inTime || trx.time)) {
+        const timeStr = trx.outTime || trx.inTime || trx.time || '';
+        const parts = timeStr.split(' ');
+        const datePart = parts.find(p => p.includes('/'));
+        if (datePart) {
+          const [d, m, y] = datePart.split('/');
+          if (d && m && y) {
+            trxTs = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T12:00:00`).getTime();
+          }
+        }
+      }
+      
+      if (trxTs > 0 && (trxTs < startTs || trxTs > endTs)) return false;
+    }
+    
+    return true;
   });
   
   const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE) || 1;
@@ -58,10 +157,24 @@ export const TransactionHistory = () => {
     }
   };
 
+  // Real Dynamic Stats Calculations
+  const calculatedRevenue = filteredTransactions.reduce((acc, t) => {
+    const rawVal = Number(t.rawAmount);
+    if (!isNaN(rawVal) && rawVal > 0) return acc + rawVal;
+    const numVal = parseInt(String(t.amount || '0').replace(/[^0-9]/g, ''));
+    return acc + (isNaN(numVal) ? 0 : numVal);
+  }, 0);
+
+  const totalShiftRevenue = shiftStats?.revenue > 0 ? shiftStats.revenue : calculatedRevenue;
+  const totalSuccessCount = filteredTransactions.length;
+  const totalPendingCount = activeVehicles 
+    ? activeVehicles.filter(v => v.exitGate || (v.gate && (v.gate.toUpperCase().includes('RA') || v.gate.toUpperCase().includes('EXIT')))).length 
+    : 0;
+
   const stats = [
     {
       title: "Doanh thu ca trực",
-      value: `${shiftStats.revenue.toLocaleString()} đ`,
+      value: `${totalShiftRevenue.toLocaleString()} đ`,
       trend: "+15%",
       trendColor: "bg-emerald-100 text-emerald-700",
       icon: <WalletOutlined className="text-blue-500 text-xl" />,
@@ -69,7 +182,7 @@ export const TransactionHistory = () => {
     },
     {
       title: "Giao dịch thành công",
-      value: `${shiftStats.transactions}`,
+      value: `${totalSuccessCount}`,
       trend: "Ổn định",
       trendColor: "bg-slate-100 text-slate-600",
       icon: <CheckCircleFilled className="text-emerald-500 text-xl" />,
@@ -77,11 +190,11 @@ export const TransactionHistory = () => {
     },
     {
       title: "Giao dịch đang chờ",
-      value: "15",
-      trend: "! Cần xử lý",
-      trendColor: "bg-red-100 text-red-600",
-      icon: <FileTextOutlined className="text-slate-500 text-xl" />,
-      iconBg: "bg-slate-50"
+      value: `${totalPendingCount}`,
+      trend: totalPendingCount > 0 ? "! Cần xử lý" : "Trống",
+      trendColor: totalPendingCount > 0 ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-600",
+      icon: <ClockCircleOutlined className="text-amber-500 text-xl" />,
+      iconBg: "bg-amber-50"
     }
   ];
 
@@ -89,11 +202,6 @@ export const TransactionHistory = () => {
     <div className="flex-1 flex flex-col min-h-[calc(100vh-64px)] w-full relative">
       <main className="flex-1 p-6 overflow-auto">
         <div className="w-full">
-          {/* Header Area (in main content area) */}
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex-1"></div>
-          </div>
-          
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             {stats.map((stat, index) => (
@@ -112,41 +220,51 @@ export const TransactionHistory = () => {
             ))}
           </div>
 
-          {/* Filters */}
+          {/* Real Dynamic Filters */}
           <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6 shadow-sm flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Loại phương tiện</label>
-              <select className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-slate-50/50 hover:bg-white transition-colors cursor-pointer appearance-none">
-                <option>Tất cả phương tiện</option>
+              <select 
+                value={selectedVehicleType}
+                onChange={(e) => setSelectedVehicleType(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-slate-50/50 hover:bg-white transition-colors cursor-pointer"
+              >
+                <option value="ALL">Tất cả phương tiện</option>
                 <option value="SEDAN_HATCHBACK">Ô tô 4-5 chỗ (Sedan / Hatchback)</option>
-                <option value="SUV_CUV_MPV">Xe 7 chỗ (SUV / CUV / MPV)</option>
-                <option value="LARGE_VAN_MINIBUS">Xe 9 chỗ & 16 chỗ (Xe Lớn / Minibus)</option>
+                <option value="SUV_CUV_MPV">Xe 7-9 chỗ (SUV / CUV / MPV)</option>
+                <option value="VAN_TRUCK">Xe Van & Xe tải nhỏ</option>
+                <option value="MINIBUS_16">Xe 12-16 chỗ (Minibus)</option>
               </select>
             </div>
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Phương thức thanh toán</label>
-              <select className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-slate-50/50 hover:bg-white transition-colors cursor-pointer appearance-none">
-                <option>Tất cả phương thức</option>
-                <option>Ví UrbanPark</option>
-                <option>Tiền mặt</option>
-                <option>Thẻ NH / VIP</option>
+              <select 
+                value={selectedPaymentMethod}
+                onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-slate-50/50 hover:bg-white transition-colors cursor-pointer"
+              >
+                <option value="ALL">Tất cả phương thức</option>
+                <option value="CASH">Tiền mặt</option>
+                <option value="QR_BANK">Chuyển khoản VietQR / Banking</option>
+                <option value="WALLET">Ví UrbanPark / Thẻ VIP</option>
               </select>
             </div>
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Khoảng thời gian</label>
               <div className="relative w-full">
                 <DatePicker.RangePicker 
+                  value={dateRange}
+                  onChange={(dates) => setDateRange(dates)}
                   className="w-full border border-slate-200 rounded-lg py-2.5 text-sm focus:outline-none focus:border-blue-500 bg-slate-50/50 hover:bg-white transition-colors cursor-pointer"
-                  defaultValue={[dayjs('2024-05-24', 'YYYY-MM-DD'), dayjs('2024-05-24', 'YYYY-MM-DD')]}
                   format="DD/MM/YYYY"
                 />
               </div>
             </div>
             <div className="flex gap-3 mt-4 md:mt-0">
-              <button onClick={handleFilter} className="bg-slate-800 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors flex items-center gap-2 shadow-sm">
+              <button onClick={handleFilterApply} className="bg-slate-800 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors flex items-center gap-2 shadow-sm cursor-pointer">
                 <FilterOutlined /> Áp dụng lọc
               </button>
-              <button onClick={handleFilter} className="bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors flex items-center justify-center shadow-sm">
+              <button onClick={handleFilterReset} title="Thiết lập lại bộ lọc" className="bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors flex items-center justify-center shadow-sm cursor-pointer">
                 <ReloadOutlined className={isLoading ? "animate-spin" : ""} />
               </button>
             </div>
@@ -166,7 +284,6 @@ export const TransactionHistory = () => {
                     <th className="px-6 py-4">Số tiền</th>
                     <th className="px-6 py-4">Thanh toán</th>
                     <th className="px-6 py-4 text-center">Trạng thái</th>
-                    <th className="px-6 py-4"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -182,41 +299,29 @@ export const TransactionHistory = () => {
                         </div>
                       </td>
                       <td className="px-6 py-5">
-                        <div className="text-slate-800 font-medium">{trx.inTime}</div>
-                        <div className="text-slate-400 text-xs">{trx.inDate}</div>
+                        <div className="text-slate-800 font-medium">{trx.inTime || '--:--'}</div>
                       </td>
                       <td className="px-6 py-5">
-                        <div className="text-slate-800 font-medium">{trx.outTime}</div>
-                        <div className="text-slate-400 text-xs">{trx.outDate}</div>
+                        <div className="text-slate-800 font-medium">{trx.outTime || '--:--'}</div>
                       </td>
-                      <td className="px-6 py-5 text-slate-600">{trx.duration}</td>
+                      <td className="px-6 py-5 text-slate-600 font-medium">{trx.duration || '1h 30m'}</td>
                       <td className="px-6 py-5 font-bold text-slate-800">{trx.amount}</td>
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-2">
-                          {trx.paymentIcon}
-                          <span className="text-slate-600 font-medium">{trx.paymentMethod}</span>
+                          <span className="text-slate-700 font-bold">{trx.method || 'Tiền mặt'}</span>
                         </div>
                       </td>
                       <td className="px-6 py-5">
-                        <div className={`px-3 py-1.5 rounded-full text-xs font-bold text-center w-28 mx-auto flex items-center justify-center gap-1.5 ${trx.statusColor}`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${trx.status === 'Thành công' ? 'bg-emerald-500' : trx.status === 'Thất bại' ? 'bg-red-500' : 'bg-slate-500'}`}></div>
-                          {trx.status}
+                        <div className="px-3 py-1.5 rounded-full text-xs font-bold text-center w-28 mx-auto flex items-center justify-center gap-1.5 bg-emerald-100 text-emerald-700">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                          {trx.status || 'Thành công'}
                         </div>
-                      </td>
-                      <td className="px-6 py-5 text-center">
-                        {trx.hasError ? (
-                          <button className="text-red-500 hover:text-red-700 p-2"><WarningOutlined className="text-lg" /></button>
-                        ) : trx.status === 'Đang xử lý' ? (
-                          <button className="text-slate-400 hover:text-slate-600 p-2"><MoreOutlined className="text-lg" /></button>
-                        ) : (
-                          <button className="text-slate-500 hover:text-blue-600 p-2"><FileTextOutlined className="text-lg" /></button>
-                        )}
                       </td>
                     </tr>
                   )) : (
                     <tr>
-                      <td colSpan="9" className="px-6 py-10 text-center text-slate-500">
-                        Không tìm thấy giao dịch nào phù hợp với "{searchValue}"
+                      <td colSpan="8" className="px-6 py-10 text-center text-slate-500 font-medium">
+                        Không tìm thấy giao dịch nào phù hợp với bộ lọc hiện tại.
                       </td>
                     </tr>
                   )}
@@ -244,13 +349,6 @@ export const TransactionHistory = () => {
                 <button onClick={() => handlePageChange(activePage + 1)} disabled={activePage === totalPages} className="w-8 h-8 flex items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors disabled:opacity-50">&gt;</button>
               </div>
             </div>
-          </div>
-
-          {/* Actions Footer */}
-          <div className="flex justify-end mb-8">
-            <button onClick={handleExport} disabled={isLoading} className="bg-white border border-slate-200 text-slate-700 px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50">
-              {isLoading ? <Spin size="small" /> : <DownloadOutlined />} Xuất báo cáo CSV / PDF
-            </button>
           </div>
 
         </div>

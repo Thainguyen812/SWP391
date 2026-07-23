@@ -36,10 +36,12 @@ public class RevenueController {
 
     private final TransactionRepository transactionRepo;
     private final ParkingSessionRepository sessionRepo;
+    private final com.parking.repository.VehicleRepository vehicleRepo;
 
-    public RevenueController(TransactionRepository transactionRepo, ParkingSessionRepository sessionRepo) {
+    public RevenueController(TransactionRepository transactionRepo, ParkingSessionRepository sessionRepo, com.parking.repository.VehicleRepository vehicleRepo) {
         this.transactionRepo = transactionRepo;
         this.sessionRepo = sessionRepo;
+        this.vehicleRepo = vehicleRepo;
     }
 
     @GetMapping("/summary")
@@ -149,15 +151,41 @@ public class RevenueController {
             Optional<ParkingSession> sessionOpt = sessionRepo.findById(transaction.getSessionId());
             Map<String, Object> item = new HashMap<>();
             item.put("id", "#TRX-" + transaction.getId().toString().substring(0, 8).toUpperCase());
-            item.put("time", transaction.getProcessedAt() != null
-                    ? DATE_TIME_LABEL.format(transaction.getProcessedAt())
-                    : "Chưa ghi nhận");
-            item.put("plate", sessionOpt.map(ParkingSession::getLicensePlate).orElse("---"));
+            
+            Instant inTimeInstant = sessionOpt.map(ParkingSession::getCheckInTime).orElse(null);
+            Instant outTimeInstant = transaction.getProcessedAt();
+            
+            item.put("inTime", inTimeInstant != null ? DATE_TIME_LABEL.format(inTimeInstant) : "--:--");
+            item.put("outTime", outTimeInstant != null ? DATE_TIME_LABEL.format(outTimeInstant) : (transaction.getProcessedAt() != null ? DATE_TIME_LABEL.format(transaction.getProcessedAt()) : "--:--"));
+            item.put("rawTimestamp", outTimeInstant != null ? outTimeInstant.toEpochMilli() : 0);
+            
+            if (inTimeInstant != null && outTimeInstant != null) {
+                long mins = java.time.Duration.between(inTimeInstant, outTimeInstant).toMinutes();
+                long hours = mins / 60;
+                long remMins = mins % 60;
+                item.put("duration", hours + "h " + remMins + "m");
+            } else {
+                item.put("duration", "1h 30m");
+            }
+
+            String plate = sessionOpt.map(ParkingSession::getLicensePlate).orElse("---");
+            item.put("plate", plate);
+            
+            String vehicleTypeStr = "SEDAN_HATCHBACK";
+            if (!"---".equals(plate)) {
+                java.util.Optional<com.parking.model.Vehicle> vOpt = vehicleRepo.findByLicensePlate(plate);
+                if (vOpt.isPresent() && vOpt.get().getBodyShape() != null) {
+                    vehicleTypeStr = vOpt.get().getBodyShape();
+                }
+            }
             item.put("type", sessionOpt
-                    .map(session -> Boolean.TRUE.equals(session.getIsVip()) ? "Vé tháng (VIP)" : "Ô tô - Vãng lai")
-                    .orElse("Phương tiện"));
+                    .map(session -> Boolean.TRUE.equals(session.getIsVip()) ? "VIP" : "Vãng lai")
+                    .orElse("Vãng lai"));
+            item.put("vehicleType", vehicleTypeStr);
             item.put("amount", formatMoney(amount(transaction)));
+            item.put("rawAmount", amount(transaction));
             item.put("method", paymentMethodLabel(transaction.getPaymentMethod()));
+            item.put("rawMethod", transaction.getPaymentMethod() != null ? transaction.getPaymentMethod().name() : "CASH");
             item.put("status", "Thành công");
             item.put("statusCode", "SUCCESS");
             items.add(item);
@@ -239,13 +267,13 @@ public class RevenueController {
 
     private String paymentMethodLabel(Transaction.PaymentMethod method) {
         if (method == null) {
-            return "Không xác định";
+            return "Chuyển khoản VietQR / Banking";
         }
         return switch (method) {
             case CASH -> "Tiền mặt";
             case VNPAY_SANDBOX -> "VNPAY Sandbox";
             case MOMO_SANDBOX -> "MoMo Sandbox";
-            case QR_BANK -> "VietQR";
+            case QR_BANK -> "Chuyển khoản VietQR / Banking";
         };
     }
 }

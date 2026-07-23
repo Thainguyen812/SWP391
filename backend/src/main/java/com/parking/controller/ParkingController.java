@@ -92,10 +92,11 @@ public class ParkingController {
     @PostMapping("/checkout/confirm/{transactionId}")
     @PreAuthorize("hasAnyRole('STAFF', 'MANAGER')")
     public ResponseEntity<Transaction> confirmCheckout(
-            @PathVariable UUID transactionId) {
+            @PathVariable UUID transactionId,
+            @RequestParam(required = false) String paymentMethod) {
 
         return ResponseEntity.ok(
-                parkingService.confirmCheckout(transactionId));
+                parkingService.confirmCheckout(transactionId, paymentMethod));
     }
 
     @PostMapping("/checkout-by-code/{cardCode}")

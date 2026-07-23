@@ -61,6 +61,7 @@ export const VipRegistrationModal: React.FC = () => {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* 1. Cà vẹt */}
           <div className="space-y-2">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">1. Cà vẹt / Đăng ký xe</span>
             {photoCavet ? (
@@ -103,11 +104,12 @@ export const VipRegistrationModal: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setIsOcrLoading(true);
-                      setPhotoCavet(targetVehDocs.registrationDoc);
+                      const doc = generateRegSvg('29A-888.88', 'TRẦN VĂN KHÔNG KHỚP', 'Hyundai Accent');
+                      setPhotoCavet(doc);
                       setTimeout(() => {
                         setExtractedPlate('29A-888.88');
                         setIsOcrLoading(false);
-                        triggerToast('OCR phát hiện biển số cà vẹt không khớp.', 'error');
+                        triggerToast('OCR phát hiện biển số cà vẹt (29A-888.88) không khớp.', 'error');
                       }, 900);
                     }}
                     className="w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
@@ -119,6 +121,7 @@ export const VipRegistrationModal: React.FC = () => {
             )}
           </div>
 
+          {/* 2. CMND / CCCD */}
           <div className="space-y-2">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">2. CMND / CCCD chủ xe</span>
             {photoCccd ? (
@@ -139,17 +142,45 @@ export const VipRegistrationModal: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => setPhotoCccd(targetVehDocs.identityDoc)}
-                className="w-full h-28 border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer transition-colors"
-              >
-                <Plus className="w-5 h-5 mb-1" />
-                <span className="text-[9px] font-bold uppercase tracking-wider">Tải lên CCCD</span>
-              </button>
+              <div className="border-2 border-dashed border-slate-200 rounded-xl p-3 text-center space-y-2 bg-slate-50">
+                <p className="text-[10px] text-slate-400">Chọn ảnh mẫu để chạy OCR:</p>
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOcrLoading(true);
+                      setPhotoCccd(targetVehDocs.identityDoc);
+                      setTimeout(() => {
+                        setIsOcrLoading(false);
+                        triggerToast('OCR đã trích xuất CCCD trùng khớp.', 'success');
+                      }, 900);
+                    }}
+                    className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                  >
+                    Ảnh khớp biển số
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOcrLoading(true);
+                      const doc = generateCccdSvg('30H-999.99', 'LÊ VĂN KHÔNG KHỚP', 'Demo Vehicle');
+                      setPhotoCccd(doc);
+                      setTimeout(() => {
+                        setExtractedPlate('30H-999.99');
+                        setIsOcrLoading(false);
+                        triggerToast('OCR phát hiện CCCD (30H-999.99 - LÊ VĂN KHÔNG KHỚP) không trùng khớp!', 'error');
+                      }, 900);
+                    }}
+                    className="w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                  >
+                    Ảnh khác biển số
+                  </button>
+                </div>
+              </div>
             )}
           </div>
 
+          {/* 3. Ảnh Xe Thực Tế */}
           <div className="space-y-2">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">3. Ảnh thực tế đầu xe</span>
             {photoXe ? (
@@ -170,14 +201,40 @@ export const VipRegistrationModal: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => setPhotoXe(targetVehDocs.registrationPhoto)}
-                className="w-full h-28 border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl flex flex-col items-center justify-center text-slate-400 bg-slate-50 cursor-pointer transition-colors"
-              >
-                <Plus className="w-5 h-5 mb-1" />
-                <span className="text-[9px] font-bold uppercase tracking-wider">Tải ảnh đầu xe</span>
-              </button>
+              <div className="border-2 border-dashed border-slate-200 rounded-xl p-3 text-center space-y-2 bg-slate-50">
+                <p className="text-[10px] text-slate-400">Chọn ảnh mẫu để chạy OCR:</p>
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOcrLoading(true);
+                      setPhotoXe(targetVehDocs.registrationPhoto || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=500&auto=format&fit=crop&q=80');
+                      setTimeout(() => {
+                        setIsOcrLoading(false);
+                        triggerToast('OCR xác nhận ảnh thực tế khớp biển số.', 'success');
+                      }, 900);
+                    }}
+                    className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                  >
+                    Ảnh khớp biển số
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOcrLoading(true);
+                      setPhotoXe('https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=500&auto=format&fit=crop&q=80');
+                      setTimeout(() => {
+                        setExtractedPlate('99C-888.88');
+                        setIsOcrLoading(false);
+                        triggerToast('OCR phát hiện biển số trên xe thực tế (99C-888.88) không khớp!', 'error');
+                      }, 900);
+                    }}
+                    className="w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                  >
+                    Ảnh khác biển số
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>

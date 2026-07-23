@@ -280,20 +280,10 @@ public class ParkingSessionController {
     // 7. Xem thống kê lưu lượng xe trong ngày (Chỉ dành cho Manager và Admin xem
     // báo cáo)
     @GetMapping("/daily-volume")
-    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF', 'MANAGER', 'ADMIN')")
     public ResponseEntity<?> getDailyVolume() {
-        java.time.LocalDate today = java.time.LocalDate.now();
-        long inToday = repo.findAll().stream()
-                .filter(s -> s.getCheckInTime() != null
-                        && s.getCheckInTime().atZone(java.time.ZoneId.systemDefault()).toLocalDate().equals(today))
-                .count();
-        long outToday = repo.findAll().stream()
-                .filter(s -> s.getCheckOutTime() != null
-                        && s.getCheckOutTime().atZone(java.time.ZoneId.systemDefault()).toLocalDate().equals(today))
-                .count();
-
-        long totalVolume = inToday + outToday;
-
-        return ResponseEntity.ok(java.util.Map.of("volume", totalVolume));
+        List<ParkingSession> all = repo.findAll();
+        long volume = all.size();
+        return ResponseEntity.ok(java.util.Map.of("volume", volume));
     }
 }
