@@ -5,7 +5,7 @@ import { Pagination } from 'antd';
 export const RecentTransactions = ({ transactions }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState("");
-  const pageSize = 4;
+  const pageSize = 6;
 
   if (!transactions || !transactions.items) return null;
 
@@ -83,7 +83,7 @@ export const RecentTransactions = ({ transactions }) => {
               return (
                 <tr key={idx} className="hover:bg-[#f8fafc] dark:hover:bg-slate-700/50 transition-colors">
                   <td className="py-4 px-6 text-sm font-medium text-[#0f172a] dark:text-slate-200 whitespace-nowrap">{trx.id}</td>
-                  <td className="py-4 px-6 text-sm text-[#475569] dark:text-slate-400 whitespace-nowrap">{trx.time}</td>
+                  <td className="py-4 px-6 text-sm text-[#475569] dark:text-slate-400 whitespace-nowrap">{trx.time || trx.outTime || trx.inTime || '--:--'}</td>
                   <td className="py-4 px-6 whitespace-nowrap">
                     <span className="inline-flex items-center px-2 py-1 bg-[#f1f5f9] dark:bg-slate-700 border border-[#cbd5e1] dark:border-slate-600 rounded text-sm font-bold text-[#0f172a] dark:text-slate-200">
                       {trx.plate}

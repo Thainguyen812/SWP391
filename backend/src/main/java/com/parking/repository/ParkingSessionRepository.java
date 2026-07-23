@@ -20,6 +20,7 @@ public interface ParkingSessionRepository extends JpaRepository<ParkingSession, 
     java.util.List<ParkingSession> findByVehicleIdAndSessionStatusIn(java.util.UUID vehicleId, java.util.Collection<ParkingSession.SessionStatus> sessionStatuses);
     
     long countBySessionStatus(ParkingSession.SessionStatus sessionStatus);
+    java.util.List<ParkingSession> findBySessionStatus(ParkingSession.SessionStatus sessionStatus);
     long countBySessionStatusAndEntryGateIsNull(ParkingSession.SessionStatus sessionStatus);
     java.util.List<ParkingSession> findByIsSuspiciousTrue();
     long countBySessionStatusAndIsVipTrue(ParkingSession.SessionStatus sessionStatus);

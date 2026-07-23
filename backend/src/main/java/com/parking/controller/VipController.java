@@ -105,6 +105,7 @@ public class VipController {
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(500).body("Lỗi trong quá trình tạo link thanh toán VNPay: " + e.getMessage());
         }
     }

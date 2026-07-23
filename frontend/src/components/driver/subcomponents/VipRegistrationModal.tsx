@@ -647,11 +647,12 @@ export const VipRegistrationModal: React.FC = () => {
                   </label>
                   <select 
                     value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value as 'wallet' | 'vnpay')}
+                    onChange={(e) => setPaymentMethod(e.target.value as any)}
                     className="w-full p-2.5 bg-slate-50 hover:bg-slate-100 text-xs font-bold rounded-lg border border-slate-200 text-slate-850 cursor-pointer"
                   >
                     <option value="wallet">Ví UrbanPark (Số dư: {balance.toLocaleString('vi-VN')}₫)</option>
-                    <option value="vnpay">Thẻ thanh toán nội địa VNPAY Sandbox</option>
+                    <option value="vnpay">Thẻ thanh toán nội địa VNPAY Sandbox (Chuyển cổng VNPAY)</option>
+                    <option value="vnpay_fast">Thanh toán Test VNPAY (Demo Nhanh)</option>
                   </select>
                 </div>
  

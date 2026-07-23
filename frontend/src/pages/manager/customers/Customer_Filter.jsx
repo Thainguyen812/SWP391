@@ -25,7 +25,7 @@ export const CustomerFilter = ({ filter, setFilter, onSearch }) => {
         {['all', 'month', 'vip', 'pending'].map((type) => {
           const labels = {
             'all': 'Tất cả',
-            'month': 'Tháng',
+            'month': 'Đã đăng ký',
             'vip': 'VIP',
             'pending': 'Chờ duyệt VIP'
           };

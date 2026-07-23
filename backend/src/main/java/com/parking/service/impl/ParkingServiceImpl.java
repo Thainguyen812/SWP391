@@ -26,6 +26,8 @@ import com.parking.repository.ParkingSessionRepository;
 import com.parking.repository.ParkingViolationRepository;
 import com.parking.repository.ZoneRepository;
 import com.parking.repository.VipSubscriptionRepository;
+import java.util.Comparator;
+import java.util.stream.Collectors;
 import com.parking.repository.VehicleRepository;
 import com.parking.repository.VipQrIdentifierRepository;
 import com.parking.repository.AuditLogRepository;
@@ -1734,19 +1736,18 @@ public class ParkingServiceImpl implements ParkingService {
     public List<java.util.Map<String, Object>> getZoneOverview() {
         List<Zone> zones = zoneRepository.findAll();
         List<ParkingSlot> slots = slotRepository.findAll();
+        List<ParkingSession> activeSessions = parkingSessionRepository.findBySessionStatus(ParkingSession.SessionStatus.ACTIVE);
         List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
 
         for (Zone zone : zones) {
+            long realOccupiedCount = activeSessions.stream()
+                    .filter(s -> zone.getId().equals(s.getAssignedZoneId()) ||
+                            (s.getParkedSlotId() != null && slots.stream()
+                                    .anyMatch(slot -> slot.getId().equals(s.getParkedSlotId()) && zone.getId().equals(slot.getZoneId()))))
+                    .count();
+
             long totalSensorSlots = slots.stream()
                     .filter(slot -> zone.getId().equals(slot.getZoneId()))
-                    .count();
-            long occupiedSensorSlots = slots.stream()
-                    .filter(slot -> zone.getId().equals(slot.getZoneId()))
-                    .filter(slot -> "OCCUPIED".equalsIgnoreCase(slot.getSlotStatus()))
-                    .count();
-            long availableSensorSlots = slots.stream()
-                    .filter(slot -> zone.getId().equals(slot.getZoneId()))
-                    .filter(slot -> !"OCCUPIED".equalsIgnoreCase(slot.getSlotStatus()))
                     .count();
             long onlineSensors = slots.stream()
                     .filter(slot -> zone.getId().equals(slot.getZoneId()))
@@ -1760,11 +1761,11 @@ public class ParkingServiceImpl implements ParkingService {
             map.put("allowedSizes", allowedVehicleSizeCodes(zone));
             map.put("allowedVehicleTypes", formatAllowedVehicleTypes(zone));
             map.put("totalSlots", zone.getTotalSlots());
-            map.put("currentOccupied", zone.getCurrentOccupied());
-            map.put("availableSlots", Math.max(0, zone.getTotalSlots() - zone.getCurrentOccupied()));
+            map.put("currentOccupied", (int) realOccupiedCount);
+            map.put("availableSlots", Math.max(0, zone.getTotalSlots() - (int) realOccupiedCount));
             map.put("sensorTotal", totalSensorSlots);
-            map.put("sensorOccupied", occupiedSensorSlots);
-            map.put("sensorAvailable", availableSensorSlots);
+            map.put("sensorOccupied", realOccupiedCount);
+            map.put("sensorAvailable", Math.max(0, totalSensorSlots - realOccupiedCount));
             map.put("sensorOnline", onlineSensors);
             map.put("sensorStatus", totalSensorSlots == 0 ? "NO_SENSOR"
                     : (onlineSensors == totalSensorSlots ? "ONLINE" : "PARTIAL"));
@@ -1970,6 +1971,18 @@ public class ParkingServiceImpl implements ParkingService {
         subscription.setApprovedAt(Instant.now());
         if (newStatus == VipSubscription.Status.REJECTED) {
             subscription.setRejectionReason(rejectionReason);
+
+            // Refund VIP subscription fee to Driver's wallet balance in PostgreSQL DB
+            BigDecimal refundAmt = subscription.getFeeAmount() != null ? subscription.getFeeAmount() : BigDecimal.valueOf(1400000);
+            vehicleRepository.findById(subscription.getVehicleId()).ifPresent(veh -> {
+                if (veh.getOwnerId() != null) {
+                    userRepository.findById(veh.getOwnerId()).ifPresent(owner -> {
+                        BigDecimal currentBal = owner.getWalletBalance() != null ? owner.getWalletBalance() : BigDecimal.ZERO;
+                        owner.setWalletBalance(currentBal.add(refundAmt));
+                        userRepository.save(owner);
+                    });
+                }
+            });
         } else {
             subscription.setRejectionReason(null);
 
@@ -2005,12 +2018,8 @@ public class ParkingServiceImpl implements ParkingService {
 
         vipSubscriptionRepository.save(subscription);
 
-        if (newStatus == VipSubscription.Status.ACTIVE) {
-            vehicleRepository.findById(subscription.getVehicleId()).ifPresent(vehicle -> {
-                vehicle.setActive(true);
-                vehicleRepository.save(vehicle);
-            });
-        }
+        // Tự động sắp xếp lại chuỗi ngày gia hạn (Chain alignment) cho các gói tiếp theo của xe này
+        realignVehicleSubscriptions(subscription.getVehicleId());
 
         // Ghi nhận vào audit log
         AuditLog audit = new AuditLog();
@@ -2025,6 +2034,43 @@ public class ParkingServiceImpl implements ParkingService {
         audit.setCreatedAt(Instant.now());
 
         auditLogRepository.save(audit);
+    }
+
+    private void realignVehicleSubscriptions(UUID vehicleId) {
+        if (vehicleId == null) return;
+        List<VipSubscription> allSubs = vipSubscriptionRepository.findByVehicleId(vehicleId);
+        List<VipSubscription> validSubs = allSubs.stream()
+                .filter(s -> s.getStatus() == VipSubscription.Status.ACTIVE || s.getStatus() == VipSubscription.Status.PENDING_APPROVAL)
+                .sorted(Comparator.comparing(VipSubscription::getCreatedAt, Comparator.nullsFirst(Comparator.naturalOrder())))
+                .collect(Collectors.toList());
+
+        java.time.LocalDate runningStart = java.time.LocalDate.now();
+        boolean hasActiveVipNow = false;
+
+        for (VipSubscription sub : validSubs) {
+            sub.setStartDate(runningStart);
+            String type = sub.getSubscriptionType() != null ? sub.getSubscriptionType().toUpperCase() : "MONTHLY";
+            int days = 30;
+            if ("DAILY".equals(type) || "DAY".equals(type)) days = 1;
+            else if ("MONTHLY".equals(type)) days = 30;
+            else if ("QUARTERLY".equals(type) || "QUATERLY".equals(type)) days = 90;
+            else if ("HALF_YEARLY".equals(type) || "6_MONTHS".equals(type) || "6_MONTH".equals(type)) days = 180;
+            else if ("YEARLY".equals(type) || "YEAR".equals(type)) days = 365;
+
+            sub.setEndDate(runningStart.plusDays(days));
+            vipSubscriptionRepository.save(sub);
+
+            if (sub.getStatus() == VipSubscription.Status.ACTIVE && !runningStart.isAfter(java.time.LocalDate.now())) {
+                hasActiveVipNow = true;
+            }
+            runningStart = sub.getEndDate();
+        }
+
+        final boolean isVip = hasActiveVipNow;
+        vehicleRepository.findById(vehicleId).ifPresent(vehicle -> {
+            vehicle.setActive(isVip);
+            vehicleRepository.save(vehicle);
+        });
     }
 
     @Override

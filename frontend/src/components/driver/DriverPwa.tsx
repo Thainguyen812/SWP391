@@ -666,17 +666,22 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
   }, [user]);
 
   useEffect(() => {
-    const fetchTransactions = async () => {
+    const fetchTransactionsAndBalance = async () => {
       if (isOffline) return;
       try {
-        const response = await fetch('/api/v1/driver/billing-history', {
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'))}` 
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
+        const token = accessToken || (sessionStorage.getItem('token') || localStorage.getItem('token'));
+        const headers = { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        };
+
+        const [txRes, balRes] = await Promise.all([
+          fetch('/api/v1/driver/billing-history', { headers }),
+          fetch('/api/v1/driver/balance', { headers })
+        ]);
+
+        if (txRes.ok) {
+          const data = await txRes.json();
           if (Array.isArray(data)) {
             const mapped = data.map((item: any) => ({
               id: item.id.startsWith('#') ? item.id : `#${item.id}`,
@@ -690,12 +695,19 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
             setTransactions(mapped);
           }
         }
+
+        if (balRes.ok) {
+          const balData = await balRes.json();
+          if (balData && typeof balData.balance === 'number') {
+            setBalance(balData.balance);
+          }
+        }
       } catch (err) {
-        console.error("Failed to fetch driver transactions", err);
+        console.error("Failed to fetch driver transactions/balance", err);
       }
     };
-    fetchTransactions();
-    const timer = setInterval(fetchTransactions, 5000);
+    fetchTransactionsAndBalance();
+    const timer = setInterval(fetchTransactionsAndBalance, 4000);
     return () => clearInterval(timer);
   }, [user, accessToken, isOffline]);
 
@@ -1377,8 +1389,15 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
       return;
     }
 
-    if (paymentMethod === 'wallet') {
+    if ((paymentMethod as string) === 'vnpay_fast') {
+      // Auto top-up balance for test if needed
       if (balance < selectedPackPrice) {
+        setBalance(selectedPackPrice);
+      }
+    }
+
+    if (paymentMethod === 'wallet' || (paymentMethod as string) === 'vnpay_fast') {
+      if (paymentMethod === 'wallet' && balance < selectedPackPrice) {
         triggerToast(`⚠️ Thất bại: Số dư ví không đủ! Cần ${selectedPackPrice.toLocaleString('vi-VN')}₫, Số dư hiện tại: ${balance.toLocaleString('vi-VN')}₫`, 'error');
         return;
       }
@@ -1437,14 +1456,16 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
 
       try {
         await apiClient.post('/vip/register', {
-          licensePlate: targetVeh ? targetVeh.plate : null,
+          licensePlate: targetVeh ? targetVeh.plate : selectedVehicleForVIP,
           subscriptionType: subType,
+          paymentMethod: 'WALLET',
           documentPhotos: JSON.stringify(docPhotos)
         });
       } catch (err) {
         console.error("Lỗi khi đăng ký VIP:", err);
       }
 
+      setVehicles(prev => prev.map(v => v.plate === selectedVehicleForVIP ? { ...v, subscriptionStatus: 'PENDING_APPROVAL' } : v));
       setRegStep(3); // success step!
       triggerToast(`✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe ${selectedVehicleForVIP}.`, 'success');
     } else {
@@ -1465,7 +1486,20 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
           identityCard: photoCccd || demoDocs.identityDoc,
           frontPhoto: photoXe || targetVeh?.registrationPhotoUrl || demoDocs.primary
         };
-        
+
+        if ((paymentMethod as string) === 'vnpay_fast') {
+          await apiClient.post('/vip/register', {
+            licensePlate: targetVeh ? targetVeh.plate : selectedVehicleForVIP,
+            subscriptionType: subType,
+            paymentMethod: 'WALLET',
+            documentPhotos: JSON.stringify(docPhotos)
+          });
+          setVehicles(prev => prev.map(v => v.plate === selectedVehicleForVIP ? { ...v, subscriptionStatus: 'PENDING_APPROVAL' } : v));
+          setRegStep(3); // success step!
+          triggerToast(`✉️ Đăng kí Test thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe ${selectedVehicleForVIP}.`, 'success');
+          return;
+        }
+
         // Save pending payment info to distinguish success message
         localStorage.setItem('pending_vnpay_tx', JSON.stringify({
           type: 'vip',
@@ -1475,6 +1509,7 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
         const response = await apiClient.post('/vip/register', {
           licensePlate: targetVeh ? targetVeh.plate : selectedVehicleForVIP,
           subscriptionType: subType,
+          paymentMethod: 'VNPAY',
           documentPhotos: JSON.stringify(docPhotos)
         });
 
@@ -1482,11 +1517,14 @@ export function DriverPwa({ user, accessToken, onLogout, isDarkMode = false }: D
           window.location.href = response.paymentUrl;
           return;
         } else {
-          triggerToast('Lỗi: Backend không trả về link thanh toán VNPay!', 'error');
+          setVehicles(prev => prev.map(v => v.plate === selectedVehicleForVIP ? { ...v, subscriptionStatus: 'PENDING_APPROVAL' } : v));
+          setRegStep(3);
+          triggerToast(`✉️ Đăng kí thành công! Đang chờ Manager phê duyệt hồ sơ VIP cho xe ${selectedVehicleForVIP}.`, 'success');
         }
-      } catch (err) {
-        console.error("Lỗi khi tạo liên kết thanh toán VNPay:", err);
-        triggerToast('Lỗi khi kết nối đến cổng thanh toán VNPay!', 'error');
+      } catch (err: any) {
+        console.error("Lỗi khi kết nối đến cổng VNPAY:", err);
+        const errorMsg = err.response?.data?.message || err.response?.data || err.message || 'Lỗi khi kết nối đến cổng VNPAY!';
+        triggerToast(typeof errorMsg === 'string' ? errorMsg : 'Lỗi khi kết nối đến cổng VNPAY!', 'error');
       }
     }
   };
