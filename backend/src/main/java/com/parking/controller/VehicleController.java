@@ -231,22 +231,38 @@ this.securityAlertRepository = securityAlertRepository;
     return saved;
 }
 
-//SỬA THÔNG TIN XE 
+    private Optional<Vehicle> findVehicleByIdOrPlate(String idOrPlate) {
+        if (idOrPlate == null || idOrPlate.isBlank()) return Optional.empty();
+        try {
+            UUID uuid = UUID.fromString(idOrPlate.trim());
+            Optional<Vehicle> byId = repo.findById(uuid);
+            if (byId.isPresent()) return byId;
+        } catch (IllegalArgumentException ignored) {}
+        String normalized = DemoVehicleDataset.normalizePlate(idOrPlate);
+        return repo.findByLicensePlate(normalized);
+    }
+
+    //SỬA THÔNG TIN XE 
     @PutMapping("/{id}") // chỉ sửa dc những thông tin của vehicle bên post
     public ResponseEntity<Vehicle> update(
-        @PathVariable UUID id,
+        @PathVariable String id,
         @Valid @RequestBody VehicleRegistrationRequest request) {
 
-    return repo.findById(id).map(existing -> {
-        String normalizedPlate = DemoVehicleDataset.normalizePlate(request.getLicensePlate());
-        Optional<DemoVehicleDataset.Profile> profileOpt = DemoVehicleDataset.findByPlate(normalizedPlate);
-        String resolvedVehicleType = DemoVehicleDataset.resolveVehicleType(normalizedPlate, request.getVehicleSize());
-        String resolvedFuelType = DemoVehicleDataset.resolveFuelType(normalizedPlate, request.getFuelType());
-        String resolvedBrand = profileOpt.map(DemoVehicleDataset.Profile::model).orElse(request.getBrand());
-        validateBrand(resolvedBrand);
+    Optional<Vehicle> targetOpt = findVehicleByIdOrPlate(id);
+    if (targetOpt.isEmpty()) {
+        return ResponseEntity.notFound().build();
+    }
+    Vehicle existing = targetOpt.get();
+    
+    String normalizedPlate = DemoVehicleDataset.normalizePlate(request.getLicensePlate());
+    Optional<DemoVehicleDataset.Profile> profileOpt = DemoVehicleDataset.findByPlate(normalizedPlate);
+    String resolvedVehicleType = DemoVehicleDataset.resolveVehicleType(normalizedPlate, request.getVehicleSize());
+    String resolvedFuelType = DemoVehicleDataset.resolveFuelType(normalizedPlate, request.getFuelType());
+    String resolvedBrand = profileOpt.map(DemoVehicleDataset.Profile::model).orElse(request.getBrand());
+    validateBrand(resolvedBrand);
     // ktra xem có đúng tk đăng nhập đang sửa xe của họ ko , ko thì ko cho
-        Authentication authentication =
-        SecurityContextHolder.getContext().getAuthentication();
+    Authentication authentication =
+    SecurityContextHolder.getContext().getAuthentication();
 
     String username = authentication.getName();
 
@@ -255,11 +271,11 @@ this.securityAlertRepository = securityAlertRepository;
         .orElseThrow(() ->
                 new RuntimeException("User không tồn tại."));
 
-        if (currentUser.getRole() == User.Role.DRIVER && !existing.getOwnerId().equals(currentUser.getId())) {
-            throw new RuntimeException("Bạn không có quyền sửa xe này.");
-        }        
+    if (currentUser.getRole() == User.Role.DRIVER && !existing.getOwnerId().equals(currentUser.getId())) {
+        throw new RuntimeException("Bạn không có quyền sửa xe này.");
+    }        
     
-        // Kiểm tra biển số xe đã tồn tại chưa
+    // Kiểm tra biển số xe đã tồn tại chưa
     Optional<Vehicle> duplicate =
         repo.findByLicensePlate(normalizedPlate);
 
@@ -268,68 +284,69 @@ this.securityAlertRepository = securityAlertRepository;
 
     throw new RuntimeException("Biển số xe đã tồn tại.");
     }    
-        existing.setLicensePlate(normalizedPlate);
-        existing.setVehicleSize(resolvedVehicleType);
-        existing.setColor(profileOpt.map(DemoVehicleDataset.Profile::color).orElse(request.getColor()));
-        existing.setColorRgb(profileOpt.map(DemoVehicleDataset.Profile::colorRgb).orElse(request.getColorRgb()));
-        existing.setBodyShape(profileOpt.map(DemoVehicleDataset.Profile::bodyShape).orElse(request.getBodyShape()));
-        existing.setBrand(resolvedBrand);
-        existing.setFuelType(resolvedFuelType);
-        existing.setRegistrationDocUrl(profileOpt.map(DemoVehicleDataset.Profile::registrationDocUrl)
-                .orElse(request.getRegistrationDocUrl()));
-        existing.setRegistrationPhotoUrl(profileOpt.map(DemoVehicleDataset.Profile::registrationPhotoUrl)
-                .orElse(DemoVehicleDataset.resolveImageUrl(normalizedPlate, "DRIVER_CARD", request.getRegistrationPhotoUrl())));
+    existing.setLicensePlate(normalizedPlate);
+    existing.setVehicleSize(resolvedVehicleType);
+    existing.setColor(profileOpt.map(DemoVehicleDataset.Profile::color).orElse(request.getColor()));
+    existing.setColorRgb(profileOpt.map(DemoVehicleDataset.Profile::colorRgb).orElse(request.getColorRgb()));
+    existing.setBodyShape(profileOpt.map(DemoVehicleDataset.Profile::bodyShape).orElse(request.getBodyShape()));
+    existing.setBrand(resolvedBrand);
+    existing.setFuelType(resolvedFuelType);
+    existing.setRegistrationDocUrl(profileOpt.map(DemoVehicleDataset.Profile::registrationDocUrl)
+            .orElse(request.getRegistrationDocUrl()));
+    existing.setRegistrationPhotoUrl(profileOpt.map(DemoVehicleDataset.Profile::registrationPhotoUrl)
+            .orElse(DemoVehicleDataset.resolveImageUrl(normalizedPlate, "DRIVER_CARD", request.getRegistrationPhotoUrl())));
 
-        existing.setUpdatedAt(Instant.now());
+    existing.setUpdatedAt(Instant.now());
 
-        return ResponseEntity.ok(repo.save(existing));
-
-    }).orElseGet(() -> ResponseEntity.notFound().build());
+    return ResponseEntity.ok(repo.save(existing));
 }
+
 //LẤY THÔNG TIN TÀI KHOẢN ĐANG ĐĂNG NHẬP
 @DeleteMapping("/{id}")
-public ResponseEntity<?> delete(@PathVariable UUID id){
-    return repo.findById(id).map(vehicle -> {
-
-        Authentication authentication =
-                SecurityContextHolder.getContext().getAuthentication();
-
-        String username = authentication.getName();
-
-        User currentUser = userRepo
-                .findByUsername(username)
-                .orElseThrow(() ->
-                        new RuntimeException("User không tồn tại."));
-        
-        // KIỂM TRA NGƯỜI ĐĂNG NHẬP CÓ PHẢI CHỦ XE KHÔNG (CHỈ GIỚI HẠN DRIVER)
-        if (currentUser.getRole() == User.Role.DRIVER && !vehicle.getOwnerId().equals(currentUser.getId())) {
-            return ResponseEntity.status(403).body(Map.of("success", false, "message", "Bạn không có quyền xóa xe này."));
-        }
-
-        // 1. KIỂM TRA XEM XE CÓ GÓI VIP ĐANG ACTIVE HOẶC CHỜ DUYỆT KHÔNG (CHẶN XÓA THEO CHUẨN DOANH NGHIỆP)
-        List<com.parking.model.VipSubscription> existingSubs = vipSubscriptionRepository.findByVehicleId(vehicle.getId());
-        boolean hasActiveVip = existingSubs.stream().anyMatch(sub -> 
-            sub.getStatus() == com.parking.model.VipSubscription.Status.ACTIVE || 
-            sub.getStatus() == com.parking.model.VipSubscription.Status.PENDING_APPROVAL
-        );
-
-        if (hasActiveVip) {
-            return ResponseEntity.badRequest().body(Map.of(
-                "success", false, 
-                "message", "Không thể xóa phương tiện vì xe đang có gói Vé tháng VIP đang hoạt động hoặc chờ duyệt. Vui lòng liên hệ Ban quản lý bãi xe!"
-            ));
-        }
-
-        // 2. NẾU LÀ XE THƯỜNG / VIP ĐÃ HẾT HẠN: CASCADE DELETE DỌN DẸP SẠCH BẢNG VIP_SUBSCRIPTIONS
-        if (!existingSubs.isEmpty()) {
-            vipSubscriptionRepository.deleteAll(existingSubs);
-        }
-
-        repo.delete(vehicle);
-
+public ResponseEntity<?> delete(@PathVariable String id){
+    Optional<Vehicle> targetOpt = findVehicleByIdOrPlate(id);
+    if (targetOpt.isEmpty()) {
         return ResponseEntity.ok(Map.of("success", true, "message", "Đã xóa phương tiện thành công!"));
+    }
+    Vehicle vehicle = targetOpt.get();
 
-    }).orElseGet(() -> ResponseEntity.notFound().build());
+    Authentication authentication =
+            SecurityContextHolder.getContext().getAuthentication();
+
+    String username = authentication.getName();
+
+    User currentUser = userRepo
+            .findByUsername(username)
+            .orElseThrow(() ->
+                    new RuntimeException("User không tồn tại."));
+    
+    // KIỂM TRA NGƯỜI ĐĂNG NHẬP CÓ PHẢI CHỦ XE KHÔNG (CHỈ GIỚI HẠN DRIVER)
+    if (currentUser.getRole() == User.Role.DRIVER && !vehicle.getOwnerId().equals(currentUser.getId())) {
+        return ResponseEntity.status(403).body(Map.of("success", false, "message", "Bạn không có quyền xóa xe này."));
+    }
+
+    // 1. KIỂM TRA XEM XE CÓ GÓI VIP ĐANG ACTIVE HOẶC CHỜ DUYỆT KHÔNG (CHẶN XÓA THEO CHUẨN DOANH NGHIỆP)
+    List<com.parking.model.VipSubscription> existingSubs = vipSubscriptionRepository.findByVehicleId(vehicle.getId());
+    boolean hasActiveVip = existingSubs.stream().anyMatch(sub -> 
+        sub.getStatus() == com.parking.model.VipSubscription.Status.ACTIVE || 
+        sub.getStatus() == com.parking.model.VipSubscription.Status.PENDING_APPROVAL
+    );
+
+    if (hasActiveVip) {
+        return ResponseEntity.badRequest().body(Map.of(
+            "success", false, 
+            "message", "Không thể xóa phương tiện vì xe đang có gói Vé tháng VIP đang hoạt động hoặc chờ duyệt. Vui lòng liên hệ Ban quản lý bãi xe!"
+        ));
+    }
+
+    // 2. NẾU LÀ XE THƯỜNG / VIP ĐÃ HẾT HẠN: CASCADE DELETE DỌN DẸP SẠCH BẢNG VIP_SUBSCRIPTIONS
+    if (!existingSubs.isEmpty()) {
+        vipSubscriptionRepository.deleteAll(existingSubs);
+    }
+
+    repo.delete(vehicle);
+
+    return ResponseEntity.ok(Map.of("success", true, "message", "Đã xóa phương tiện thành công!"));
 }
 
     @PostMapping("/lock")
