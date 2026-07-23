@@ -70,44 +70,55 @@ export const StaffDashboard = () => {
         if (data && Array.isArray(data)) {
           const mappedLogs = data.filter(session => !session.isPending).map((session, index) => {
             const isCheckIn = !session.checkOutTime;
+            const rawTime = session.checkOutTime || session.checkInTime;
             
             // Map vehicle details from backend DTO
             let vehicleDisplay = "Khách vãng lai";
             if (session.vehicleBrand || session.vehicleModel) {
-               vehicleDisplay = `${session.vehicleModel} ${session.vehicleColor ? `(${session.vehicleColor})` : ''}`.trim();
+               vehicleDisplay = `${session.vehicleModel || session.vehicleBrand} ${session.vehicleColor ? `(${session.vehicleColor})` : ''}`.trim();
             } else if (session.isVip) {
-               vehicleDisplay = "Xe đăng ký tháng";
+               vehicleDisplay = "Xe VIP / Đăng ký";
             } else if (session.isSuspicious) {
                vehicleDisplay = "Lỗi nhận diện biển số";
             }
             
-            // Map gate
-            const gateStr = isCheckIn ? `Cổng vào ${index % 2 === 0 ? '1' : '2'}` : `Cổng ra ${index % 2 === 0 ? '1' : '2'}`;
+            // Map real gate from DB session
+            const gateStr = (isCheckIn ? session.entryGate : session.exitGate) || session.entryGate || session.exitGate || (isCheckIn ? 'L-VÀO 1' : 'L-RA 1');
             
             // Map status
             let statusStr = "THÀNH CÔNG";
             if (session.isSuspicious) {
                 statusStr = "CẦN XỬ LÝ";
             } else if (session.sessionStatus === 'COMPLETED') {
-                statusStr = "ĐÃ THU 30.000Đ"; // Fake fee amount for UI
+                statusStr = "ĐÃ HOÀN TẤT";
             }
+
+            const formattedTime = rawTime ? new Date(rawTime).toLocaleString('vi-VN', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            }) : '---';
 
             return {
               id: session.id,
               plate: session.licensePlate || '-- KHÔNG RÕ --',
               model: vehicleDisplay,
-              type: session.isVip ? "VIP" : (session.isSuspicious ? "LỖI" : "KHÁCH"),
+              type: session.isVip ? "VIP" : (session.isSuspicious ? "LỖI" : "VẮNG LAI"),
               typeColor: session.isVip ? "#000" : (session.isSuspicious ? "#ef4444" : "#64748b"),
               gate: gateStr, 
               action: session.isSuspicious ? "Chặn Tự động" : (isCheckIn ? "Vào bãi" : "Ra bãi"),
               actionColor: session.isSuspicious ? "text-red-600" : (isCheckIn ? "text-emerald-600" : "text-blue-600"),
-              time: new Date(session.checkOutTime || session.checkInTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+              time: formattedTime,
+              rawTimestamp: rawTime,
               status: statusStr,
-              statusColor: session.isSuspicious ? "bg-red-100 text-red-700" : (session.sessionStatus === 'COMPLETED' ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700")
+              statusColor: session.isSuspicious ? "bg-red-100 text-red-700" : (session.sessionStatus === 'COMPLETED' ? "bg-emerald-100 text-emerald-700" : "bg-emerald-100 text-emerald-700")
             };
           });
-          // Sort newest first
-          mappedLogs.sort((a, b) => b.time.localeCompare(a.time));
+          // Sort newest first by timestamp
+          mappedLogs.sort((a, b) => new Date(b.rawTimestamp || 0) - new Date(a.rawTimestamp || 0));
           setLogs(mappedLogs);
         } else {
           setLogs([]);
