@@ -24,10 +24,10 @@ public class Vehicle {
     private String bodyShape;
     private String brand;
 
-    @Column(name = "registration_doc_url")
+    @Column(name = "registration_doc_url", columnDefinition = "TEXT")
     private String registrationDocUrl;
 
-    @Column(name = "registration_photo_url")
+    @Column(name = "registration_photo_url", columnDefinition = "TEXT")
     private String registrationPhotoUrl;
 
     @Column(name = "violation_count", nullable = false)
