@@ -172,10 +172,10 @@ export const StaffPayment = () => {
 
   const calculateVisitorFee = (durationStr) => {
     if (!durationStr || durationStr === 'Đang vào') return 30000; // Default minimum fee
-    const matchHours = durationStr.match(/(\d+)h/i);
-    const matchMins = durationStr.match(/(\d+)m/i);
-    const hours = matchHours ? parseInt(matchHours[1]) : 0;
-    const mins = matchMins ? parseInt(matchMins[1]) : 0;
+    const matchHours = durationStr.match(/(-?\d+)h/i);
+    const matchMins = durationStr.match(/(-?\d+)m/i);
+    const hours = Math.max(0, matchHours ? parseInt(matchHours[1]) : 0);
+    const mins = Math.max(0, matchMins ? parseInt(matchMins[1]) : 0);
     
     // Round up if > 15 mins past the hour
     const totalHours = hours + (mins > 15 ? 1 : 0);

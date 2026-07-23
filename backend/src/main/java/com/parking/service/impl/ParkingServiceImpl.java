@@ -1791,6 +1791,25 @@ public class ParkingServiceImpl implements ParkingService {
         Vehicle vehicle = vehicleRepository.findByLicensePlate(session.getLicensePlate())
                 .orElse(null);
 
+        if (vehicle != null) {
+            if (!"ELECTRIC".equalsIgnoreCase(vehicle.getFuelType()) && slotZone.isHasEvCharger()) {
+                throw new ApiExceptions.BadRequestException("Khu vực này có trạm sạc chỉ dành riêng cho xe điện (EV). Xe xăng/dầu vui lòng đỗ ở khu vực khác!");
+            }
+
+            java.util.List<String> allowedSizes = allowedVehicleSizeCodes(slotZone);
+            if (!allowedSizes.contains(vehicle.getVehicleSize())) {
+                String vehicleSizeName = "SEDAN_HATCHBACK".equals(vehicle.getVehicleSize()) ? "4-5 chỗ" : 
+                                        "SUV_CUV_MPV".equals(vehicle.getVehicleSize()) ? "7-9 chỗ" : 
+                                        "MINIBUS_16".equals(vehicle.getVehicleSize()) ? "16 chỗ" : "tải/van";
+                
+                String zoneSizeName = allowedSizes.contains("SEDAN_HATCHBACK") ? "4-5 chỗ" : 
+                                      allowedSizes.contains("SUV_CUV_MPV") ? "7-9 chỗ" : 
+                                      allowedSizes.contains("MINIBUS_16") ? "16 chỗ" : "tải/van";
+                
+                throw new ApiExceptions.BadRequestException("Sai luồng đỗ xe: Xe " + vehicleSizeName + " không được đỗ tại khu vực dành cho xe " + zoneSizeName + "!");
+            }
+        }
+
         parkingSessionRepository
                 .findByParkedSlotIdAndSessionStatus(slot.getId(), ParkingSession.SessionStatus.ACTIVE)
                 .ifPresent(existingAtSlot -> {
@@ -1818,10 +1837,10 @@ public class ParkingServiceImpl implements ParkingService {
         parkingSessionRepository.save(session);
 
         boolean zoneMismatch = session.getAssignedZoneId() != null && !session.getAssignedZoneId().equals(slot.getZoneId());
-        String observedVehicleType = request.getVehicleType() != null && !request.getVehicleType().isBlank()
-                ? request.getVehicleType()
-                : (vehicle != null ? vehicle.getVehicleSize() : null);
-        boolean vehicleTypeMismatch = !isVehicleAllowedInZone(observedVehicleType, slotZone);
+        String effectiveVehicleType = vehicle != null && vehicle.getVehicleSize() != null
+                ? vehicle.getVehicleSize()
+                : (request.getVehicleType() != null && !request.getVehicleType().isBlank() ? request.getVehicleType() : null);
+        boolean vehicleTypeMismatch = !isVehicleAllowedInZone(effectiveVehicleType, slotZone);
         boolean evMisuse = isEvSlot(slot) && isGasolineVehicle(vehicle);
         java.util.List<java.util.Map<String, Object>> createdViolations = new java.util.ArrayList<>();
 
@@ -1832,7 +1851,7 @@ public class ParkingServiceImpl implements ParkingService {
                     slot,
                     "DOUBLE_PARKING",
                     "Sensor phát hiện xe đỗ sai tầng/khu vực. Biển số " + session.getLicensePlate()
-                            + ", loại xe " + vehicleSizeLabel(observedVehicleType)
+                            + ", loại xe " + vehicleSizeLabel(effectiveVehicleType)
                             + ", khu vực hiện tại " + slotZone.getCode(),
                     request.getImageUrl());
             if (violation != null) {
@@ -1858,8 +1877,8 @@ public class ParkingServiceImpl implements ParkingService {
         response.put("slotStatus", slot.getSlotStatus());
         response.put("zoneCode", slotZone.getCode());
         response.put("allowedVehicleTypes", formatAllowedVehicleTypes(slotZone));
-        response.put("vehicleType", normalizeVehicleSize(observedVehicleType));
-        response.put("vehicleTypeLabel", vehicleSizeLabel(observedVehicleType));
+        response.put("vehicleType", normalizeVehicleSize(effectiveVehicleType));
+        response.put("vehicleTypeLabel", vehicleSizeLabel(effectiveVehicleType));
         response.put("fuelType", vehicle != null ? vehicle.getFuelType() : null);
         response.put("zoneMismatch", zoneMismatch || vehicleTypeMismatch);
         response.put("evMisuse", evMisuse);

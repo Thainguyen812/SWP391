@@ -5,10 +5,6 @@ import { getDemoVehicleByPlate, getDemoVehicleImages, getDemoVehicleProfile } fr
 
 const GlobalContext = createContext({});
 
-// No more mock data. Completely API driven.
-
-
-
 export const GlobalProvider = ({ children }) => {
   const [searchValue, setSearchValue] = useState("");
   const [totalGates, setTotalGates] = useState(6);
@@ -167,7 +163,7 @@ export const GlobalProvider = ({ children }) => {
               const checkInTime = session.checkInTime ? new Date(session.checkInTime) : null;
               let durationStr = "Đang vào";
               if (checkInTime && !isNaN(checkInTime.getTime())) {
-                const diffMs = Date.now() - checkInTime.getTime();
+                const diffMs = Math.max(0, Date.now() - checkInTime.getTime());
                 const hours = Math.floor(diffMs / (1000 * 60 * 60));
                 const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
                 durationStr = `${hours}h ${minutes}m`;

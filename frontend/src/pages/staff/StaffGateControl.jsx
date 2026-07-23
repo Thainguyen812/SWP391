@@ -296,12 +296,11 @@ export const StaffGateControl = () => {
       const targetNorm = targetEntryVehicle.plate.replace(/[^A-Z0-9]/gi, '').toUpperCase();
       const inputNorm = normalizedManualPlate.replace(/[^A-Z0-9]/gi, '').toUpperCase();
       if (targetNorm !== inputNorm) {
-        notification.error({
-          message: '❌ Biển số nhập không khớp!',
-          description: `Biển số bạn nhập (${normalizedManualPlate}) KHÔNG KHỚP với biển số xe thực tế ở cổng camera (${targetEntryVehicle.plate})! Vui lòng đối chiếu hình ảnh và nhập lại.`,
-          duration: 5
+        notification.info({
+          message: 'Ghi đè biển số',
+          description: `Đã ghi đè biển số do camera nhận diện (${targetEntryVehicle.plate}) bằng biển số bạn nhập (${normalizedManualPlate}).`,
+          duration: 3
         });
-        return;
       }
     }
 
@@ -369,6 +368,8 @@ export const StaffGateControl = () => {
 
       if (waitingVehicleForForm) {
         processEntryVehicle(normalizedManualPlate);
+      } else if (targetEntryVehicle && isEntryGateId(targetEntryVehicle.gate)) {
+        processEntryVehicle(targetEntryVehicle.plate);
       }
       if (fetchAllDataFromBackend) {
         fetchAllDataFromBackend();
