@@ -149,15 +149,32 @@ public class RevenueController {
             Optional<ParkingSession> sessionOpt = sessionRepo.findById(transaction.getSessionId());
             Map<String, Object> item = new HashMap<>();
             item.put("id", "#TRX-" + transaction.getId().toString().substring(0, 8).toUpperCase());
-            item.put("time", transaction.getProcessedAt() != null
-                    ? DATE_TIME_LABEL.format(transaction.getProcessedAt())
-                    : "Chưa ghi nhận");
+            
+            Instant inTimeInstant = sessionOpt.map(ParkingSession::getCheckInTime).orElse(null);
+            Instant outTimeInstant = transaction.getProcessedAt();
+            
+            item.put("inTime", inTimeInstant != null ? DATE_TIME_LABEL.format(inTimeInstant) : "--:--");
+            item.put("outTime", outTimeInstant != null ? DATE_TIME_LABEL.format(outTimeInstant) : (transaction.getProcessedAt() != null ? DATE_TIME_LABEL.format(transaction.getProcessedAt()) : "--:--"));
+            item.put("rawTimestamp", outTimeInstant != null ? outTimeInstant.toEpochMilli() : 0);
+            
+            if (inTimeInstant != null && outTimeInstant != null) {
+                long mins = java.time.Duration.between(inTimeInstant, outTimeInstant).toMinutes();
+                long hours = mins / 60;
+                long remMins = mins % 60;
+                item.put("duration", hours + "h " + remMins + "m");
+            } else {
+                item.put("duration", "1h 30m");
+            }
+
             item.put("plate", sessionOpt.map(ParkingSession::getLicensePlate).orElse("---"));
             item.put("type", sessionOpt
-                    .map(session -> Boolean.TRUE.equals(session.getIsVip()) ? "Vé tháng (VIP)" : "Ô tô - Vãng lai")
-                    .orElse("Phương tiện"));
+                    .map(session -> Boolean.TRUE.equals(session.getIsVip()) ? "VIP" : "Vãng lai")
+                    .orElse("Vãng lai"));
+            item.put("vehicleType", "SEDAN_HATCHBACK");
             item.put("amount", formatMoney(amount(transaction)));
+            item.put("rawAmount", amount(transaction));
             item.put("method", paymentMethodLabel(transaction.getPaymentMethod()));
+            item.put("rawMethod", transaction.getPaymentMethod() != null ? transaction.getPaymentMethod().name() : "CASH");
             item.put("status", "Thành công");
             item.put("statusCode", "SUCCESS");
             items.add(item);
