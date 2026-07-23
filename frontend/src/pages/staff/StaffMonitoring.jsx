@@ -23,32 +23,30 @@ export const StaffMonitoring = () => {
   const [isSystemActive, setIsSystemActive] = useState(true);
   const [cameras, setCameras] = useState([]);
 
-  // 1. Fetch Real Monitoring Stats from Backend API
+  // 1. Fetch Real Monitoring Stats from Backend API & Sync with activeVehicles in lot
   useEffect(() => {
     const fetchMonitoringStats = async () => {
       try {
         const data = await apiClient.get('/monitoring/status');
-        if (data) {
-          const capacity = data.totalCapacity > 0 ? data.totalCapacity : 500;
-          const available = data.availableSpots !== undefined ? data.availableSpots : capacity;
-          const parked = data.currentlyParked !== undefined ? data.currentlyParked : Math.max(0, capacity - available);
-          const rate = capacity > 0 ? ((parked / capacity) * 100).toFixed(1) : '0.0';
-          
-          setMonitoringStats({
-            totalCapacity: capacity,
-            availableSpots: available,
-            occupancyRate: rate
-          });
-        }
+        const capacity = (data && data.totalCapacity > 0) ? data.totalCapacity : 260;
+        const vehiclesInLotCount = activeVehicles ? activeVehicles.filter(v => !v.gate).length : 0;
+        const available = Math.max(0, capacity - vehiclesInLotCount);
+        const rate = capacity > 0 ? ((vehiclesInLotCount / capacity) * 100).toFixed(1) : '0.0';
+        
+        setMonitoringStats({
+          totalCapacity: capacity,
+          availableSpots: available,
+          occupancyRate: rate
+        });
       } catch (err) {
         console.error("Failed to fetch real monitoring stats from backend", err);
       }
     };
 
     fetchMonitoringStats();
-    const interval = setInterval(fetchMonitoringStats, 5000);
+    const interval = setInterval(fetchMonitoringStats, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [activeVehicles]);
 
   // 2. Camera Feeds & LPR Detection Status
   useEffect(() => {

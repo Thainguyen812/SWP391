@@ -57,7 +57,7 @@ export const StaffDashboard = () => {
   const currentLogs = displayLogs.slice((currentLogPage - 1) * LOGS_PER_PAGE, currentLogPage * LOGS_PER_PAGE);
 
   const vehiclesInLotCount = activeVehicles ? activeVehicles.filter(v => !v.gate).length : 0;
-  const pendingProcessingCount = activeVehicles ? activeVehicles.filter(v => v.gate).length : 0;
+  const pendingProcessingCount = activeVehicles ? Math.min(6, new Set(activeVehicles.filter(v => v.gate).map(v => v.plate)).size) : 0;
   const waitingPaymentCount = activeVehicles ? activeVehicles.filter(v => v.gate && (v.status === 'Chờ thanh toán' || v.status === 'Lỗi thẻ')).length : 0;
   const alertsCount = securityAlerts ? securityAlerts.length : 0;
 
@@ -287,34 +287,8 @@ export const StaffDashboard = () => {
   return (
     <div className="p-6 w-full">
       
-      {/* Alert Banner */}
-      {securityAlerts && securityAlerts.length > 0 && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg flex justify-between items-center mb-6">
-          <div className="flex items-start gap-3">
-            <InfoCircleOutlined className="text-red-500 mt-1" />
-            <div>
-              <h4 className="text-red-600 font-bold text-xs tracking-wider uppercase mb-1">Cảnh báo An ninh</h4>
-              <p className="text-slate-700 text-sm m-0">Hệ thống đang có {securityAlerts.length} cảnh báo cần xử lý. Vui lòng kiểm tra màn hình Giám sát.</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => {
-              const msg = message.loading('Đang gửi báo cáo khẩn cấp...', 0);
-              setTimeout(() => {
-                msg();
-                notification.success({ message: 'Báo cáo thành công', description: 'Toàn bộ thông tin cảnh báo đã được gửi đến thiết bị của Quản lý.', placement: 'topRight' });
-              }, 1500);
-            }}
-            className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium px-4 py-2 rounded flex items-center gap-2 text-sm transition-colors"
-          >
-            <SoundOutlined />
-            Báo cáo Quản lý
-          </button>
-        </div>
-      )}
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* Stats Cards (3 Columns - Fitted Ratio) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         {/* Làn hoạt động */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-2">Số làn hoạt động</h4>
@@ -366,19 +340,6 @@ export const StaffDashboard = () => {
           </div>
           <div className="text-4xl font-extrabold text-slate-800 mb-2">{waitingPaymentCount.toString().padStart(2, "0")}</div>
           <div className="text-xs text-slate-500">Cần hỗ trợ tại Cổng ra 2</div>
-        </div>
-
-        {/* Cảnh báo mở */}
-        <div 
-          onClick={() => setIsAlertModalVisible(true)}
-          className="bg-white p-5 rounded-xl border border-red-200 shadow-sm flex flex-col justify-between relative overflow-hidden cursor-pointer hover:border-red-400 hover:shadow-md transition-all"
-        >
-          <div className="flex justify-between items-start mb-2">
-            <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Cảnh báo mở</h4>
-            <span className="text-red-500 text-3xl font-bold leading-none mt-[-5px]">*</span>
-          </div>
-          <div className="text-4xl font-extrabold text-red-600 mb-2">{alertsCount.toString().padStart(2, "0")}</div>
-          <div className="text-xs text-red-500 font-medium">Cần xử lý ngay lập tức</div>
         </div>
       </div>
 

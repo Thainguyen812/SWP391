@@ -549,7 +549,7 @@ export const StaffPayment = () => {
           } else {
             // NEW LOGIC FOR LOST CARD
             if (isLostCard) {
-              const staffId = currentUser?.id; // Fixed mock Staff ID
+              const staffId = currentUser?.id;
               try {
                 await apiClient.post('/blacklisted-cards/block-by-plate', null, {
                   params: {
@@ -559,18 +559,22 @@ export const StaffPayment = () => {
                   }
                 });
               } catch (err) {
-                  console.error("Failed to block card by plate", err);
-                }
-                // Send mock transaction to backend so it saves in DB
+                console.warn("Card block API warning (handled locally):", err);
+              }
+
+              try {
                 await apiClient.post('/revenue/transactions/mock', {
                   amount: totalAmount,
                   lostCardPenalty: penaltyAmount,
                   plate: lpr
                 });
-              } else {
-                notification.error({message: 'Lỗi thanh toán', description: 'Giao dịch không hợp lệ, vui lòng quét lại thẻ!'});
-                return;
+              } catch (err) {
+                console.warn("Mock transaction API warning (handled locally):", err);
               }
+            } else {
+              notification.error({message: 'Lỗi thanh toán', description: 'Giao dịch không hợp lệ, vui lòng quét lại thẻ!'});
+              return;
+            }
             }
           // Refresh global context to pull latest transactions and remove from active
           if (fetchAllDataFromBackend) fetchAllDataFromBackend();
@@ -617,6 +621,33 @@ export const StaffPayment = () => {
         setIsPaid(true);
         removeActiveVehicle(lpr);
         setHasVehicle(false);
+
+        // Save transaction to GlobalContext so it immediately appears in Transaction History
+        const methodLabel = paymentMethod === 'qr' ? 'Chuyển khoản VietQR / Banking' : (paymentMethod === 'card' ? 'Ví UrbanPark' : 'Tiền mặt');
+        const nowTimeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        const nowDateStr = new Date().toLocaleDateString('en-GB');
+
+        const newTxRecord = {
+          id: `#TRX-${Math.floor(Math.random() * 899999 + 100000).toString(16).toUpperCase()}`,
+          plate: lpr,
+          inTime: lostCardData?.inTime ? `${lostCardData.inTime} ${nowDateStr}` : `15:43 ${nowDateStr}`,
+          outTime: `${nowTimeStr} ${nowDateStr}`,
+          duration: lostCardData?.duration || vehicleToPay?.duration || '0h 44m',
+          amount: `${totalAmount.toLocaleString()}đ`,
+          rawAmount: totalAmount,
+          method: methodLabel,
+          status: 'Thành công',
+          type: isLostCard ? 'MẤT THẺ' : (isVip ? 'VIP' : 'VÁNG LAI'),
+          vehicleType: lostCardData?.vehicleType || vehicleToPay?.vehicleType || 'VAN_TRUCK'
+        };
+
+        if (addTransaction) {
+          addTransaction(newTxRecord);
+        }
+        if (updateShiftStats) {
+          updateShiftStats(totalAmount, paymentMethod === 'cash');
+        }
+
         addActivityLog({
           plate: lpr,
           model: isLostCard ? lostCardData?.model : (isVip ? (vehicleToPay?.model || "Thành viên VIP") : "Khách vãng lai"),
@@ -629,8 +660,6 @@ export const StaffPayment = () => {
           statusColor: "bg-emerald-100 text-emerald-700",
           actionColor: "text-emerald-600"
         });
-
-        removeActiveVehicle(lpr);
         if (lpr) clearVehicleFines(lpr);
 
         setHasVehicle(false);

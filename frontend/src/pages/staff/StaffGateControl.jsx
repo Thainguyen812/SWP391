@@ -388,7 +388,6 @@ export const StaffGateControl = () => {
         image: null
       });
       
-      setDailyVolume(prev => prev + 1);
       setManualPlate('');
       setManualCardCode('');
     } catch (err) {
@@ -471,7 +470,6 @@ export const StaffGateControl = () => {
             actionColor: "text-emerald-600"
           });
 
-          setDailyVolume(prev => prev + 1);
           setIsAiModalVisible(false);
           setAiPlate('');
           if (fetchAllDataFromBackend) fetchAllDataFromBackend();
@@ -532,7 +530,6 @@ export const StaffGateControl = () => {
         statusColor: "bg-emerald-100 text-emerald-700",
         actionColor: "text-emerald-600"
       });
-      setDailyVolume(prev => prev + 1);
       if (fetchAllDataFromBackend) fetchAllDataFromBackend();
 
     } catch (err) {
@@ -871,11 +868,14 @@ export const StaffGateControl = () => {
             <div className="flex items-baseline gap-1 flex-wrap">
               <span className="text-4xl font-extrabold text-slate-800">{activeVehicles ? activeVehicles.filter(v => !v.gate).length : 0}</span>
               <span className="text-xl text-slate-400 font-medium">xe</span>
-              {activeVehicles && activeVehicles.filter(v => v.gate).length > 0 && (
-                <span className="text-xs text-orange-500 font-medium ml-1">
-                  ({activeVehicles.filter(v => v.gate).length} xe đang ở cổng)
-                </span>
-              )}
+              {(() => {
+                const countAtGates = gates ? gates.filter(g => g.plate && g.plate !== '---' && g.plate.trim() !== '').length : 0;
+                return countAtGates > 0 ? (
+                  <span className="text-xs text-orange-500 font-medium ml-1">
+                    ({countAtGates} xe đang ở cổng)
+                  </span>
+                ) : null;
+              })()}
             </div>
             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
               <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
