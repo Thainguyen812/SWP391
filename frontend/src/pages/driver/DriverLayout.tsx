@@ -360,7 +360,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
 
             const vehPlate = v.licensePlate || v.plate;
             return {
-              id: vehPlate || v.id,
+              id: v.id || vehPlate,
               plate: vehPlate,
               name: v.name || v.brand || 'Phương tiện',
               type: sizeLabel,
@@ -904,10 +904,10 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       if (response.ok) {
         const savedVehicle = await response.json();
         setVehicles(prev => prev.map(v => {
-          if (v.id === editingVehicleId) {
+          if (v.id === editingVehicleId || v.plate === editPlate) {
             return {
               ...v,
-              id: savedVehicle.id,
+              id: savedVehicle.id || editingVehicleId,
               plate: editPlate.toUpperCase().trim(),
               name: editName.trim() || 'Phương tiện',
               type: editType
@@ -918,17 +918,11 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         setEditVehicleModalOpen(false);
         triggerToast('Cập nhật phương tiện thành công!', 'success');
       } else {
-        let errMsg = 'Không thể cập nhật phương tiện. Vui lòng thử lại!';
-        try {
-          const errData = await response.json();
-          if (errData && errData.message) {
-            errMsg = errData.message;
-          }
-        } catch (e) {}
-        triggerToast(errMsg, 'error');
+        const resData = await response.json().catch(() => ({}));
+        triggerToast(resData.message || 'Cập nhật phương tiện thất bại!', 'error');
       }
-    } catch (err) {
-      triggerToast('Lỗi kết nối API Backend!', 'error');
+    } catch (err: any) {
+      triggerToast(err.message || 'Lỗi kết nối API Backend!', 'error');
     }
   };
 
@@ -937,7 +931,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     
     if (window.confirm("Bạn có chắc chắn muốn xóa phương tiện này không? Hành động này không thể hoàn tác.")) {
       if (isOffline) {
-        setVehicles(prev => prev.filter(v => v.id !== editingVehicleId));
+        setVehicles(prev => prev.filter(v => v.id !== editingVehicleId && v.plate !== editPlate));
         setEditVehicleModalOpen(false);
         triggerToast('Đã xóa phương tiện thành công (Chế độ Ngoại tuyến)!', 'success');
         return;
@@ -952,18 +946,14 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
           }
         });
         
-        if (response.ok) {
-          triggerToast('Xóa phương tiện thành công!', 'success');
+        const resData = await response.json().catch(() => ({}));
+        if (response.ok && resData.success !== false) {
+          setVehicles(prev => prev.filter(v => v.id !== editingVehicleId && v.plate !== editPlate));
           setEditVehicleModalOpen(false);
-          fetchVehiclesFromApi();
+          triggerToast('Xóa phương tiện thành công!', 'success');
+          if (fetchVehiclesFromApi) fetchVehiclesFromApi();
         } else {
-          let errMsg = 'Xóa phương tiện thất bại!';
-          try {
-            const errData = await response.json();
-            if (errData && errData.message) {
-              errMsg = errData.message;
-            }
-          } catch (e) {}
+          const errMsg = resData.message || 'Không thể xóa phương tiện vì xe đang có gói Vé tháng VIP đang hoạt động!';
           triggerToast(errMsg, 'error');
         }
       } catch (error: any) {
