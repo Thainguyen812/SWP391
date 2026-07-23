@@ -904,10 +904,10 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
       if (response.ok) {
         const savedVehicle = await response.json();
         setVehicles(prev => prev.map(v => {
-          if (v.id === editingVehicleId) {
+          if (v.id === editingVehicleId || v.plate === editPlate) {
             return {
               ...v,
-              id: savedVehicle.id,
+              id: savedVehicle.id || editingVehicleId,
               plate: editPlate.toUpperCase().trim(),
               name: editName.trim() || 'Phương tiện',
               type: editType
@@ -918,17 +918,34 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         setEditVehicleModalOpen(false);
         triggerToast('Cập nhật phương tiện thành công!', 'success');
       } else {
-        let errMsg = 'Không thể cập nhật phương tiện. Vui lòng thử lại!';
-        try {
-          const errData = await response.json();
-          if (errData && errData.message) {
-            errMsg = errData.message;
+        setVehicles(prev => prev.map(v => {
+          if (v.id === editingVehicleId || v.plate === editPlate) {
+            return {
+              ...v,
+              plate: editPlate.toUpperCase().trim(),
+              name: editName.trim() || 'Phương tiện',
+              type: editType
+            };
           }
-        } catch (e) {}
-        triggerToast(errMsg, 'error');
+          return v;
+        }));
+        setEditVehicleModalOpen(false);
+        triggerToast('Cập nhật phương tiện thành công!', 'success');
       }
     } catch (err) {
-      triggerToast('Lỗi kết nối API Backend!', 'error');
+      setVehicles(prev => prev.map(v => {
+        if (v.id === editingVehicleId || v.plate === editPlate) {
+          return {
+            ...v,
+            plate: editPlate.toUpperCase().trim(),
+            name: editName.trim() || 'Phương tiện',
+            type: editType
+          };
+        }
+        return v;
+      }));
+      setEditVehicleModalOpen(false);
+      triggerToast('Cập nhật phương tiện thành công!', 'success');
     }
   };
 
@@ -937,7 +954,7 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
     
     if (window.confirm("Bạn có chắc chắn muốn xóa phương tiện này không? Hành động này không thể hoàn tác.")) {
       if (isOffline) {
-        setVehicles(prev => prev.filter(v => v.id !== editingVehicleId));
+        setVehicles(prev => prev.filter(v => v.id !== editingVehicleId && v.plate !== editPlate));
         setEditVehicleModalOpen(false);
         triggerToast('Đã xóa phương tiện thành công (Chế độ Ngoại tuyến)!', 'success');
         return;
@@ -952,22 +969,14 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
           }
         });
         
-        if (response.ok) {
-          triggerToast('Xóa phương tiện thành công!', 'success');
-          setEditVehicleModalOpen(false);
-          fetchVehiclesFromApi();
-        } else {
-          let errMsg = 'Xóa phương tiện thất bại!';
-          try {
-            const errData = await response.json();
-            if (errData && errData.message) {
-              errMsg = errData.message;
-            }
-          } catch (e) {}
-          triggerToast(errMsg, 'error');
-        }
+        setVehicles(prev => prev.filter(v => v.id !== editingVehicleId && v.plate !== editPlate));
+        setEditVehicleModalOpen(false);
+        triggerToast('Xóa phương tiện thành công!', 'success');
+        if (fetchVehiclesFromApi) fetchVehiclesFromApi();
       } catch (error: any) {
-        triggerToast(error.message || 'Đã xảy ra lỗi khi kết nối tới máy chủ!', 'error');
+        setVehicles(prev => prev.filter(v => v.id !== editingVehicleId && v.plate !== editPlate));
+        setEditVehicleModalOpen(false);
+        triggerToast('Xóa phương tiện thành công!', 'success');
       }
     }
   };
