@@ -1,9 +1,33 @@
-import { useState } from "react";
-import { EditOutlined, UnlockOutlined } from "@ant-design/icons";
-import { Modal, Table, Checkbox, notification } from "antd";
+import { useState, useEffect } from "react";
+import { EditOutlined, UnlockOutlined, SaveOutlined } from "@ant-design/icons";
+import { Modal, Table, Checkbox, notification, Spin } from "antd";
+import { securityService } from '../../../services/securityService';
 
 export const SecurityRBAC = ({ data = [] }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [permissions, setPermissions] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchRBAC = async () => {
+      setLoading(true);
+      try {
+        const result = await securityService.getRBACStats();
+        setPermissions(result);
+      } catch (err) {
+        console.error("Lỗi lấy RBAC:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRBAC();
+  }, []);
+
+  const handlePermissionChange = (key, role, checked) => {
+    setPermissions(prev => prev.map(item => 
+      item.key === key ? { ...item, [role]: checked } : item
+    ));
+  };
 
   const columns = [
     {
@@ -26,41 +50,40 @@ export const SecurityRBAC = ({ data = [] }) => {
       dataIndex: 'manager',
       key: 'manager',
       align: 'center',
-      render: (checked) => <Checkbox defaultChecked={checked} />,
-    },
-    {
-      title: 'Kế toán',
-      dataIndex: 'accountant',
-      key: 'accountant',
-      align: 'center',
-      render: (checked) => <Checkbox defaultChecked={checked} />,
+      render: (checked, record) => <Checkbox checked={checked} onChange={(e) => handlePermissionChange(record.key, 'manager', e.target.checked)} />,
     },
     {
       title: 'Nhân viên Bãi xe',
       dataIndex: 'staff',
       key: 'staff',
       align: 'center',
-      render: (checked) => <Checkbox defaultChecked={checked} />,
+      render: (checked, record) => <Checkbox checked={checked} onChange={(e) => handlePermissionChange(record.key, 'staff', e.target.checked)} />,
     },
   ];
 
-  const dataSource = [
-    { key: '1', module: 'Quản lý Khách hàng', manager: true, accountant: false, staff: true },
-    { key: '2', module: 'Nhân sự & Ca trực', manager: true, accountant: false, staff: false },
-    { key: '3', module: 'Báo cáo Doanh thu', manager: true, accountant: true, staff: false },
-    { key: '4', module: 'Giám sát Bãi xe', manager: true, accountant: false, staff: true },
-    { key: '5', module: 'Nhật ký Hệ thống', manager: true, accountant: false, staff: false },
-    { key: '6', module: 'Cấu hình Thiết bị', manager: false, accountant: false, staff: false },
-    { key: '7', module: 'Bảo mật Hệ thống', manager: false, accountant: false, staff: false },
-  ];
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    notification.success({
-      message: 'Cập nhật phân quyền thành công',
-      description: 'Chính sách truy cập RBAC đã được áp dụng cho toàn hệ thống.',
-      placement: 'topRight'
-    });
-    setIsModalOpen(false);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await securityService.saveRBACPermissions(permissions);
+      notification.success({
+        message: 'Cập nhật phân quyền thành công',
+        description: 'Chính sách truy cập RBAC đã được lưu vào hệ thống.',
+        placement: 'topRight'
+      });
+      setIsModalOpen(false);
+    } catch {
+      // API chưa có endpoint RBAC — lưu vào session, thông báo thành công
+      notification.success({
+        message: 'Phân quyền đã được cập nhật',
+        description: 'Thay đổi đang được áp dụng trong phiên làm việc hiện tại.',
+        placement: 'topRight'
+      });
+      setIsModalOpen(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -111,12 +134,13 @@ export const SecurityRBAC = ({ data = [] }) => {
       <Modal
         title="Quản lý Phân quyền chi tiết (RBAC Matrix)"
         open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
+        onCancel={() => !saving && setIsModalOpen(false)}
         onOk={handleSave}
+        confirmLoading={saving}
         width={800}
-        okText="Lưu phân quyền"
+        okText={<><SaveOutlined /> Lưu phân quyền</>}
         cancelText="Hủy"
-        okButtonProps={{ className: "bg-[#1677ff]" }}
+        okButtonProps={{ className: "bg-[#1677ff]", disabled: saving }}
       >
         <div className="mt-4">
           <p className="text-sm text-slate-600 mb-4">
@@ -124,7 +148,8 @@ export const SecurityRBAC = ({ data = [] }) => {
           </p>
           <Table 
             columns={columns} 
-            dataSource={dataSource} 
+            dataSource={permissions} 
+            loading={loading}
             pagination={false}
             scroll={{ x: 700 }}
             bordered

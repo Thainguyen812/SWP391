@@ -16,4 +16,5 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     }
 
     List<Vehicle> findByOwnerId(UUID ownerId);
+    List<Vehicle> findByOwnerIdIn(List<UUID> ownerIds);
 }

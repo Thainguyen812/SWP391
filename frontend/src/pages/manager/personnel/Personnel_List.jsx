@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ClockCircleOutlined, PhoneOutlined } from "@ant-design/icons";
+import { ClockCircleOutlined, PhoneOutlined, DeleteOutlined } from "@ant-design/icons";
+import { Popconfirm } from "antd";
 
-export const PersonnelList = ({ employees, loading }) => {
+export const PersonnelList = ({ employees, loading, onDelete }) => {
   const [activeTab, setActiveTab] = useState("all");
 
   const filterEmployees = () => {
@@ -105,9 +106,24 @@ export const PersonnelList = ({ employees, loading }) => {
                     )}
                   </div>
                   
-                  <p className={`text-sm mb-3 truncate ${isLeave ? 'text-[#94a3b8] dark:text-slate-500' : 'text-[#475569] dark:text-slate-300'}`}>
-                    {emp.role}
-                  </p>
+                  <div className="flex justify-between items-center mb-3">
+                    <p className={`text-sm truncate ${isLeave ? 'text-[#94a3b8] dark:text-slate-500' : 'text-[#475569] dark:text-slate-300'}`}>
+                      {emp.role}
+                    </p>
+                    {onDelete && (
+                      <Popconfirm
+                        title="Bạn có chắc chắn muốn xóa?"
+                        onConfirm={() => onDelete(emp.id)}
+                        okText="Xóa"
+                        cancelText="Hủy"
+                        okButtonProps={{ danger: true }}
+                      >
+                        <button className="text-red-400 hover:text-red-600 transition-colors p-1" title="Xóa nhân viên">
+                          <DeleteOutlined />
+                        </button>
+                      </Popconfirm>
+                    )}
+                  </div>
                   
                   <div className="flex items-center justify-between text-xs font-medium text-[#64748b] dark:text-slate-400 mt-auto">
                     <div className="flex items-center gap-1.5">

@@ -218,10 +218,12 @@ export const authService = {
   hasRole: (allowedRoles) => {
     const user = authService.getUser();
     if (!user || !user.role) return false;
+    // Chuẩn hóa role: bỏ tiền tố ROLE_ và chuyển thành chữ HOA
+    const normalizedUserRole = user.role.replace('ROLE_', '').toUpperCase();
     // Nếu allowedRoles là mảng, kiểm tra xem role của user có nằm trong mảng không
     if (Array.isArray(allowedRoles)) {
-      return allowedRoles.includes(user.role);
+      return allowedRoles.map(r => r.replace('ROLE_', '').toUpperCase()).includes(normalizedUserRole);
     }
-    return user.role === allowedRoles;
+    return normalizedUserRole === allowedRoles.replace('ROLE_', '').toUpperCase();
   }
 };

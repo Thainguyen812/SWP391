@@ -2,8 +2,10 @@ package com.parking.controller;
 
 import com.parking.model.SecurityPolicy;
 import com.parking.model.SecurityAlert;
+import com.parking.model.RbacPermission;
 import com.parking.repository.SecurityPolicyRepository;
 import com.parking.repository.SecurityAlertRepository;
+import com.parking.repository.RbacPermissionRepository;
 
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -19,10 +21,12 @@ public class SecurityController {
 
     private final SecurityPolicyRepository policyRepo;
     private final SecurityAlertRepository alertRepo;
+    private final RbacPermissionRepository rbacRepo;
 
-    public SecurityController(SecurityPolicyRepository policyRepo, SecurityAlertRepository alertRepo) {
+    public SecurityController(SecurityPolicyRepository policyRepo, SecurityAlertRepository alertRepo, RbacPermissionRepository rbacRepo) {
         this.policyRepo = policyRepo;
         this.alertRepo = alertRepo;
+        this.rbacRepo = rbacRepo;
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -61,7 +65,7 @@ public class SecurityController {
     }
 
     @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping({ "/stats", "/rbac-stats" })
+    @GetMapping({ "/stats" })
     public Map<String, Object> getSecurityStats() {
         Map<String, Object> result = new HashMap<>();
         result.put("adminCount", 2);
@@ -73,12 +77,69 @@ public class SecurityController {
     }
 
     @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/rbac")
+    public List<Map<String, Object>> getRbacPermissions() {
+        List<Map<String, Object>> result = new ArrayList<>();
+        List<RbacPermission> permissions = rbacRepo.findAll();
+        
+        if (permissions.isEmpty()) {
+            // Seed defaults if empty
+            String[][] defaults = {
+                {"dashboard", "Tổng quan hệ thống (Dashboard)"},
+                {"customers", "Quản lý Khách hàng & Thẻ"},
+                {"personnel", "Quản lý Nhân sự & Phân ca"},
+                {"revenue", "Báo cáo Doanh thu"},
+                {"monitoring", "Giám sát Bãi xe (Camera)"},
+                {"security", "An ninh & Phân quyền"},
+                {"logs", "Nhật ký Hệ thống"},
+                {"settings", "Cài đặt Hệ thống"}
+            };
+            for (String[] def : defaults) {
+                RbacPermission p = new RbacPermission(UUID.randomUUID(), def[0], def[1], true, def[0].equals("monitoring") || def[0].equals("customers"));
+                permissions.add(rbacRepo.save(p));
+            }
+        }
+        
+        for (RbacPermission p : permissions) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("key", p.getModuleKey());
+            map.put("module", p.getModuleName());
+            map.put("manager", p.isManagerAccess());
+            map.put("staff", p.isStaffAccess());
+            result.add(map);
+        }
+        return result;
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/rbac")
+    public Map<String, Object> updateRbac(@RequestBody List<Map<String, Object>> rbacConfig) {
+        for (Map<String, Object> config : rbacConfig) {
+            String key = (String) config.get("key");
+            boolean manager = (Boolean) config.get("manager");
+            boolean staff = (Boolean) config.get("staff");
+            
+            // Find existing permission
+            List<RbacPermission> all = rbacRepo.findAll();
+            for (RbacPermission p : all) {
+                if (p.getModuleKey().equals(key)) {
+                    p.setManagerAccess(manager);
+                    p.setStaffAccess(staff);
+                    rbacRepo.save(p);
+                    break;
+                }
+            }
+        }
+        return Map.of("success", true, "message", "Cập nhật phân quyền thành công");
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/logs")
     public List<Map<String, Object>> getSecurityLogs() {
         return Arrays.asList(
-                Map.of("id", "1", "action", "Login Failed", "user", "admin", "time", "10:05", "ip", "192.168.1.5"),
-                Map.of("id", "2", "action", "Policy Changed", "user", "manager", "time", "09:30", "ip",
-                        "192.168.1.10"));
+                Map.of("id", "1", "action", "Login Failed", "user", "admin", "time", "10:05", "ip", "192.168.1.5", "type", "warning", "content", "Đăng nhập thất bại quá 5 lần"),
+                Map.of("id", "2", "action", "Policy Changed", "user", "manager", "time", "09:30", "ip", "192.168.1.10", "type", "info", "content", "Thay đổi chính sách bảo mật")
+        );
     }
 
     //hiện cảnh bảo trên hệ thống

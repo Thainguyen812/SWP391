@@ -72,6 +72,7 @@ import { ParkingMonitorView } from './ParkingMonitorView';
 import { RevenuePage } from '../manager/revenue/Revenue_Main';
 import { PersonnelMain } from '../manager/personnel/Personnel_Main';
 import { CustomerPage } from '../manager/customers/Customer_Main';
+import { SupportMain } from '../manager/support/Support_Main';
 import { apiClient } from '../../api/apiClient';
 
 interface DashboardProps {
@@ -157,7 +158,7 @@ const TopDownCarSVG = ({ color }: { color: string }) => {
 
 export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: DashboardProps) {
   // Navigation
-  const [activeMenu, setActiveMenu] = useState<'overview' | 'monitoring' | 'guard_gate' | 'revenue' | 'staff' | 'customers' | 'technical' | 'security' | 'system_log'>('guard_gate');
+  const [activeMenu, setActiveMenu] = useState<'overview' | 'monitoring' | 'guard_gate' | 'revenue' | 'staff' | 'customers' | 'technical' | 'security' | 'system_log' | 'support'>('overview');
   
   // App settings
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -200,18 +201,23 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
         try {
           const zoneData = await apiClient.get('/v1/parking/zones/overview');
           const zones = Array.isArray(zoneData) ? zoneData : [];
-          const totalSlots = zones.reduce((s: number, z: any) => s + (z.totalSlots || 0), 0);
-          const totalOccupied = zones.reduce((s: number, z: any) => s + (z.currentOccupied || 0), 0);
-          setBranches([{
-            id: 'br-1',
-            name: 'Hệ thống tòa nhà gửi xe',
-            address: 'Bãi đỗ xe thông minh UrbanPark',
-            status: 'Hoạt động',
-            capacity: totalSlots,
-            occupied: totalOccupied,
-            cars: `${totalOccupied} / ${totalSlots}`,
-            updateTime: `Cập nhật lúc ${new Date().toLocaleTimeString('vi-VN')}`
-          }]);
+          if (zones.length > 0) {
+            const mappedBranches = zones.map((z: any) => ({
+              id: z.zoneId || z.zoneCode,
+              name: z.zoneName || 'Khu vực gửi xe',
+              address: 'Khu vực thuộc hệ thống UrbanPark',
+              status: 'Hoạt động',
+              capacity: z.totalSlots || 0,
+              occupied: z.currentOccupied || 0,
+              cars: Array.isArray(z.allowedVehicleTypes) && z.allowedVehicleTypes.length > 0 
+                    ? z.allowedVehicleTypes.join(', ') 
+                    : 'Tất cả loại xe',
+              updateTime: `Cập nhật lúc ${new Date().toLocaleTimeString('vi-VN')}`
+            }));
+            setBranches(mappedBranches);
+          } else {
+            setBranches([]);
+          }
         } catch (err) {
           console.error('Lỗi tải dữ liệu zone overview:', err);
         }
@@ -879,13 +885,15 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
               {[
                 { id: 'overview', label: 'Tổng quan', icon: <Home className="w-4.5 h-4.5" /> },
                 { id: 'monitoring', label: 'Giám sát bãi xe', icon: <Car className="w-4.5 h-4.5" /> },
-                { id: 'guard_gate', label: 'Thông xe Cổng trực', icon: <ShieldAlert className="w-4.5 h-4.5" /> },
+                // HIDING GUARD GATE PER REQUIREMENTS
+                // { id: 'guard_gate', label: 'Thông xe Cổng trực', icon: <ShieldAlert className="w-4.5 h-4.5" /> },
                 { id: 'revenue', label: 'Doanh thu & Báo cáo', icon: <CreditCard className="w-4.5 h-4.5" /> },
                 { id: 'staff', label: 'Quản lý nhân sự', icon: <Users className="w-4.5 h-4.5" /> },
                 { id: 'customers', label: 'Khách hàng', icon: <Sparkles className="w-4.5 h-4.5" /> },
-                { id: 'technical', label: 'Cấu hình kỹ thuật', icon: <Wrench className="w-4.5 h-4.5" /> },
-                { id: 'security', label: 'Bảo mật', icon: <Shield className="w-4.5 h-4.5" /> },
-                { id: 'system_log', label: 'Nhật ký hệ thống', icon: <FileText className="w-4.5 h-4.5" /> }
+                // HIDING TABS FOR NOW TO MATCH REQUIREMENTS:
+                // { id: 'technical', label: 'Cấu hình kỹ thuật', icon: <Wrench className="w-4.5 h-4.5" /> },
+                // { id: 'security', label: 'Bảo mật', icon: <Shield className="w-4.5 h-4.5" /> },
+                // { id: 'system_log', label: 'Nhật ký hệ thống', icon: <FileText className="w-4.5 h-4.5" /> }
               ].map(item => {
                 return (
                   <button
@@ -933,8 +941,8 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
 
             <button 
               onClick={() => {
-                setActiveMenu('technical');
-                triggerToast('Chuyển hướng đến mục Hướng Dẫn Kỹ Thuật!', 'info');
+                setActiveMenu('support');
+                triggerToast('Chuyển hướng đến mục Hỗ Trợ Hệ Thống!', 'info');
               }}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-400 hover:bg-slate-800/40 hover:text-white rounded-xl transition-all cursor-pointer"
             >
@@ -1568,67 +1576,20 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
                           Trang chủ &gt; Tổng quan
                         </div>
                         <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-sans">
-                          Tổng quan bãi xe
+                          Tổng quan hệ thống
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-xs font-bold font-sans">
-                          Thông tin vận hành bãi đỗ xe thông minh
+                          Thông tin vận hành các bãi đỗ xe thuộc UrbanPark
                         </p>
                       </div>
                     </div>
 
-                    {/* MAIN TWO-COLUMN CONTAINER */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                      
-                      {/* LEFT RAIL: OVERALL HEALTH (col-span-4) */}
-                      <div className="lg:col-span-4 flex flex-col gap-6">
-
-                        {/* OVERALL HEALTH CONTAINER */}
-                        <div className="bg-white dark:bg-slate-905 border border-slate-205 dark:border-slate-800 rounded-2xl p-5 text-left block">
-                          <span className="font-bold text-xs uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-3">
-                            Trạng thái Tổng thể
-                          </span>
-
-                          <div className="space-y-4 block">
-                            <div className="flex justify-between items-end">
-                            <span className="text-xs font-bold text-slate-500">Sức chứa bãi xe</span>
-                              <strong className="text-base font-black text-slate-850 dark:text-white">{branches[0]?.capacity ? Math.round((branches[0].occupied / branches[0].capacity) * 100) : 0}%</strong>
-                            </div>
-
-                            {/* Indigo Progress gauge bar */}
-                            <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                              <div className="h-full bg-blue-600 rounded-full" style={{ width: `${branches[0]?.capacity ? Math.round((branches[0].occupied / branches[0].capacity) * 100) : 0}%` }} />
-                            </div>
-
-                            {/* Grid of total Active vs Maintenance indicators */}
-                            <div className="grid grid-cols-2 gap-3 pt-2">
-                              {/* Box 1: Active */}
-                              <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850 rounded-xl text-left">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                  <span className="text-[10px] font-bold text-slate-400 uppercase">Hoạt động</span>
-                                </div>
-                                <h4 className="text-xl font-black font-mono tracking-tight mt-1">1</h4>
-                              </div>
-                              
-                              {/* Box 2: Maintenance */}
-                              <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850 rounded-xl text-left">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                                  <span className="text-[10px] font-bold text-slate-400 uppercase">Bảo trì</span>
-                                </div>
-                                <h4 className="text-xl font-black font-mono tracking-tight mt-1">0</h4>
-                              </div>
-                            </div>
-                          </div>
-
-                        </div>
-
-                      </div>
-
-                      {/* RIGHT RAIL: BRANCH LIST (col-span-8) */}
-                      <div className="lg:col-span-8">
+                    {/* MAIN ONE-COLUMN CONTAINER */}
+                    <div className="w-full">
+                      {/* FULL WIDTH BRANCH LIST */}
+                      <div className="w-full">
                         {/* GRID OF COMPREHENSIVE CARD SCHEMES */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                           {branches.map(branch => {
                             const percentage = branch.capacity === 0 ? 0 : Math.round((branch.occupied / branch.capacity) * 100);
                             return (
@@ -1718,6 +1679,7 @@ export function Dashboard({ user, accessToken, onRefreshToken, onLogout }: Dashb
             {activeMenu === 'revenue' && <RevenuePage />}
             {activeMenu === 'staff' && <PersonnelMain />}
             {activeMenu === 'customers' && <CustomerPage />}
+            {activeMenu === 'support' && <SupportMain />}
             {(activeMenu as string) === 'monitoring_DEPRECATED' && (
               <div className="space-y-6 animate-fade-in" id="monitoring-sub-view">
                 

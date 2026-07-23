@@ -24,26 +24,26 @@ export const PersonnelMain = () => {
   const [addForm] = Form.useForm();
   const [scheduleForm] = Form.useForm();
 
+  const fetchAllData = async () => {
+    setLoading(true);
+    try {
+      const [empData, shiftData, handoverData] = await Promise.all([
+        personnelService.getPersonnelList(),
+        personnelService.getTodayShifts(),
+        personnelService.getLatestHandover()
+      ]);
+      
+      setEmployees(empData);
+      setShifts(shiftData);
+      setHandover(handoverData);
+    } catch (err) {
+      console.error("Lỗi lấy dữ liệu nhân sự:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchAllData = async () => {
-      setLoading(true);
-      try {
-        const [empData, shiftData, handoverData] = await Promise.all([
-          personnelService.getPersonnelList(),
-          personnelService.getTodayShifts(),
-          personnelService.getLatestHandover()
-        ]);
-        
-        setEmployees(empData);
-        setShifts(shiftData);
-        setHandover(handoverData);
-      } catch (err) {
-        console.error("Lỗi lấy dữ liệu nhân sự:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchAllData();
   }, []);
 
@@ -54,8 +54,8 @@ export const PersonnelMain = () => {
   const filteredEmployees = employees.filter(emp => {
     if (!searchKeyword.trim()) return true;
     const lowerKey = searchKeyword.toLowerCase();
-    return emp.name.toLowerCase().includes(lowerKey) || 
-           emp.role.toLowerCase().includes(lowerKey);
+    return emp.name?.toLowerCase().includes(lowerKey) || 
+           emp.role?.toLowerCase().includes(lowerKey);
   });
 
   // Handlers for Add Employee Modal
@@ -63,14 +63,36 @@ export const PersonnelMain = () => {
     setIsAddModalVisible(true);
   };
 
-  const handleAddSubmit = (values) => {
-    notification.success({
-      message: 'Thêm nhân viên thành công',
-      description: `Nhân viên ${values.name} đã được thêm vào hệ thống.`,
-      placement: 'topRight',
-    });
-    setIsAddModalVisible(false);
-    addForm.resetFields();
+  const handleAddSubmit = async (values) => {
+    try {
+      await personnelService.addPersonnel(values);
+      notification.success({
+        message: 'Thêm nhân viên thành công',
+        description: `Nhân viên ${values.name} đã được thêm vào hệ thống.`,
+        placement: 'topRight',
+      });
+      // Tải lại danh sách nhân viên để thấy thay đổi
+      const newEmpData = await personnelService.getPersonnelList();
+      setEmployees(newEmpData);
+      setIsAddModalVisible(false);
+      addForm.resetFields();
+    } catch (error) {
+      notification.error({
+        message: 'Lỗi',
+        description: 'Không thể thêm nhân viên. Vui lòng thử lại!',
+        placement: 'topRight',
+      });
+    }
+  };
+
+  const handleDeleteEmployee = async (id) => {
+    try {
+      await personnelService.deletePersonnel(id);
+      notification.success({ message: 'Xóa nhân viên thành công' });
+      setEmployees(employees.filter(emp => emp.id !== id));
+    } catch (error) {
+      notification.error({ message: 'Không thể xóa nhân viên' });
+    }
   };
 
   // Handlers for Schedule Shift Modal
@@ -78,14 +100,23 @@ export const PersonnelMain = () => {
     setIsScheduleModalVisible(true);
   };
 
-  const handleScheduleSubmit = (values) => {
-    notification.success({
-      message: 'Sắp xếp ca thành công',
-      description: `Đã cập nhật lịch trực mới cho nhân viên.`,
-      placement: 'topRight',
-    });
-    setIsScheduleModalVisible(false);
-    scheduleForm.resetFields();
+  const handleScheduleSubmit = async (values) => {
+    try {
+      await personnelService.scheduleShift(values);
+      notification.success({
+        message: 'Sắp xếp ca thành công',
+        description: `Đã cập nhật lịch trực mới cho nhân viên.`,
+        placement: 'topRight',
+      });
+      setIsScheduleModalVisible(false);
+      scheduleForm.resetFields();
+    } catch (error) {
+      notification.error({
+        message: 'Lỗi',
+        description: 'Không thể sắp xếp ca. Vui lòng thử lại!',
+        placement: 'topRight',
+      });
+    }
   };
 
   return (
@@ -122,15 +153,31 @@ export const PersonnelMain = () => {
           </>
         }
       >
+        {/* Dynamic Personnel Stats */}
+        <div className="flex gap-4 w-full items-center mb-6 px-1">
+          <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+            Tổng số: <span className="font-bold text-slate-900 dark:text-white">{employees.length}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            Quản lý (MANAGER): <span className="font-bold text-slate-900 dark:text-white">{employees.filter(e => (e.roleCode || e.role)?.replace('ROLE_', '').toUpperCase() === 'MANAGER' || (e.roleCode || e.role)?.replace('ROLE_', '').toUpperCase() === 'ADMIN').length}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+            Nhân viên (STAFF): <span className="font-bold text-slate-900 dark:text-white">{employees.filter(e => (e.roleCode || e.role)?.replace('ROLE_', '').toUpperCase() === 'STAFF').length}</span>
+          </div>
+        </div>
+
         <div className="flex gap-6 w-full items-start">
           {/* Left Column: Personnel List & Tabs */}
           <div className="flex-[3] flex flex-col min-w-0">
-            <PersonnelList employees={filteredEmployees} loading={loading} />
+            <PersonnelList employees={filteredEmployees} loading={loading} onDelete={handleDeleteEmployee} />
           </div>
 
           {/* Right Column: Shifts & Handover */}
           <div className="flex-[2] flex flex-col gap-6 min-w-[360px] sticky top-0">
-            <PersonnelShiftSchedule data={shifts} loading={loading} />
+            <PersonnelShiftSchedule data={shifts} loading={loading} employees={employees} onUpdateSuccess={fetchAllData} />
             <PersonnelHandoverLog data={handover} loading={loading} />
           </div>
         </div>
@@ -155,10 +202,10 @@ export const PersonnelMain = () => {
           </Form.Item>
           <Form.Item name="role" label="Vai trò / Chức vụ" rules={[{ required: true, message: 'Vui lòng chọn vai trò!' }]}>
             <Select placeholder="Chọn vai trò">
-              <Option value="Bảo vệ cổng">Bảo vệ cổng</Option>
-              <Option value="Tuần tra">Tuần tra bãi xe</Option>
-              <Option value="Kỹ thuật">Kỹ thuật viên</Option>
-              <Option value="Quản lý ca">Quản lý ca</Option>
+              <Option value="ADMIN">Quản trị viên (ADMIN)</Option>
+              <Option value="MANAGER">Quản lý (MANAGER)</Option>
+              <Option value="STAFF">Nhân viên trực (STAFF)</Option>
+              <Option value="DRIVER">Khách hàng / Tài xế (DRIVER)</Option>
             </Select>
           </Form.Item>
           <Form.Item name="location" label="Khu vực trực mặc định">

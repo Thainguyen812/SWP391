@@ -3,6 +3,7 @@ import { dashboardService } from '../../../services/dashboardService';
 import { DatePicker, notification } from "antd";
 import dayjs from "dayjs";
 import { useGlobalContext } from '../../../context/GlobalContext';
+import { exportToCSV } from '../../../utils/exportUtils';
 import "./Dashboard_Main.css";
 
 // Import UI Sections
@@ -22,15 +23,17 @@ export const SystemOverviewSection = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(dayjs());
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        const dateStr = selectedDate ? selectedDate.format('YYYY-MM-DD') : null;
         const [summary, topStaff, alerts] = await Promise.all([
-          dashboardService.getSummaryStats(),
-          dashboardService.getTopStaff(),
-          dashboardService.getSystemAlerts()
+          dashboardService.getSummaryStats(dateStr),
+          dashboardService.getTopStaff(dateStr),
+          dashboardService.getSystemAlerts(dateStr)
         ]);
         
         setSummaryData(summary);
@@ -66,7 +69,7 @@ export const SystemOverviewSection = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [selectedDate]);
 
   // Filter based on search
   const filteredEmployees = employees.filter(emp => 
@@ -100,11 +103,12 @@ export const SystemOverviewSection = () => {
 
       <PageLayout
         title="Tổng quan Hệ thống"
-        subtitle="Dữ liệu cập nhật theo thời gian thực: 24/10/2023 14:30"
+        subtitle={`Dữ liệu cập nhật theo thời gian thực: ${dayjs().format('DD/MM/YYYY HH:mm')}`}
         actions={
           <>
             <DatePicker 
-              defaultValue={dayjs()} 
+              value={selectedDate} 
+              onChange={(date) => date && setSelectedDate(date)}
               format="DD/MM/YYYY"
               allowClear={false}
               className="px-4 py-2 bg-white dark:bg-slate-800 rounded border border-[#c4c6cd] dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors font-bold text-[#1b1c1d] dark:text-slate-200 text-xs shadow-sm focus:outline-none focus:border-blue-500"
@@ -112,11 +116,17 @@ export const SystemOverviewSection = () => {
             <button 
               className="gap-2 px-4 py-[9px] bg-[#1677ff] hover:bg-[#0058be] transition-colors rounded flex items-center focus:outline-none"
               onClick={() => {
-                notification.success({ 
-                  message: "Xuất báo cáo thành công", 
-                  description: "Tệp báo cáo tổng quan hệ thống đã được tải xuống.", 
-                  placement: "topRight" 
-                });
+                if (summaryData) {
+                  const exportData = [
+                    { 
+                      'Tổng doanh thu': summaryData.revenue?.total || 0,
+                      'Tổng lượt xe': summaryData.vehicles?.total || 0,
+                      'Khách hàng mới': summaryData.customers?.new || 0,
+                      'Thẻ đang hoạt động': summaryData.cards?.active || 0
+                    }
+                  ];
+                  exportToCSV(exportData, `Tong_Quan_He_Thong_${dayjs().format('YYYY-MM-DD')}.csv`);
+                }
               }}
             >
               <DownloadOutlined className="text-white" />

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Pagination } from 'antd';
 import { EditOutlined, HistoryOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
-export const CustomerTable = ({ customers, loading, onOpenVipApproval }) => {
+export const CustomerTable = ({ customers, loading, onOpenVipApproval, onOpenEdit, onOpenHistory, onRefresh }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 4;
 
@@ -93,7 +93,23 @@ export const CustomerTable = ({ customers, loading, onOpenVipApproval }) => {
                 <td className="px-4 py-4 text-right">
                   <div className="flex items-center justify-end gap-2">
                     {c.status === 'EXPIRED' && (
-                      <button className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded transition-colors font-medium mr-2">
+                      <button 
+                        onClick={async () => {
+                          if (!c.subscriptionId) {
+                            import('antd').then(({ notification }) => notification.error({ message: 'Không tìm thấy thông tin thẻ để gia hạn' }));
+                            return;
+                          }
+                          try {
+                            const { customerService } = await import('../../../services/customerService');
+                            await customerService.renewCustomer(c.subscriptionId);
+                            import('antd').then(({ notification }) => notification.success({ message: 'Gia hạn thẻ thành công', placement: 'topRight' }));
+                            if (onRefresh) onRefresh();
+                          } catch (e) {
+                            import('antd').then(({ notification }) => notification.error({ message: 'Lỗi khi gia hạn thẻ' }));
+                          }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded transition-colors font-medium mr-2"
+                      >
                         Gia hạn
                       </button>
                     )}
@@ -106,11 +122,25 @@ export const CustomerTable = ({ customers, loading, onOpenVipApproval }) => {
                       </button>
                     )}
                     {c.status !== 'PENDING' && (
-                      <button className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                      <button 
+                        onClick={() => {
+                          if (c.type === 'Guest') {
+                            import('antd').then(({ notification }) => notification.info({ message: 'Không thể chỉnh sửa khách vãng lai' }));
+                            return;
+                          }
+                          if (onOpenEdit) onOpenEdit(c);
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      >
                         <EditOutlined />
                       </button>
                     )}
-                    <button className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                    <button 
+                      onClick={() => {
+                        if (onOpenHistory) onOpenHistory(c);
+                      }}
+                      className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                    >
                       <HistoryOutlined />
                     </button>
                   </div>

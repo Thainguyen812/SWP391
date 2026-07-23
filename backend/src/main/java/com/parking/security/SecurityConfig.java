@@ -55,19 +55,21 @@ public class SecurityConfig {
                         .requestMatchers("/api/security/alerts/**").hasAnyRole("ADMIN", "MANAGER", "STAFF")
                         .requestMatchers("/api/security/**").hasRole("ADMIN")
 
-                        // 3. Phân vùng API dành cho Quản lý (MANAGER) và Nhân viên (STAFF)
-                        .requestMatchers("/api/logs/**").hasAnyRole("ADMIN", "MANAGER", "STAFF")
+                        // 3. Phân vùng API chỉ dành cho ADMIN (logs và cấu hình hệ thống)
+                        .requestMatchers("/api/logs/**").hasRole("ADMIN")
+                        // ADMIN: toàn quyền settings | MANAGER/STAFF: chỉ được đọc (GET) để hiển thị giá tiền
+                        .requestMatchers(HttpMethod.GET, "/api/settings/**").hasAnyRole("ADMIN", "MANAGER", "STAFF")
+                        .requestMatchers("/api/settings/**").hasRole("ADMIN")
 
-                        // 3. Phân vùng API dành cho Quản lý (MANAGER)
+                        // 4. Phân vùng API dành cho Quản lý (MANAGER)
                         .requestMatchers("/api/revenue/shift-stats", "/api/revenue/transactions",
                                 "/api/revenue/transactions/**")
                         .hasAnyRole("ADMIN", "MANAGER", "STAFF")
                         .requestMatchers("/api/revenue/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/dashboard/**").hasAnyRole("ADMIN", "MANAGER")
-                        .requestMatchers("/api/settings/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/customers/**").hasAnyRole("ADMIN", "MANAGER")
 
-                        // 4. Phân vùng API dùng chung cho lực lượng vận hành (STAFF và MANAGER)
+                        // 5. Phân vùng API dùng chung cho lực lượng vận hành (STAFF và MANAGER)
                         .requestMatchers("/api/blacklisted-cards/**").hasAnyRole("ADMIN", "STAFF", "MANAGER")
                         .requestMatchers("/api/tickets/**").hasAnyRole("ADMIN", "STAFF", "MANAGER")
                         .requestMatchers("/api/shifts/**", "/api/personnel/**").hasAnyRole("ADMIN", "STAFF", "MANAGER")

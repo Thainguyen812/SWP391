@@ -44,9 +44,11 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('refreshToken');
         
         // Tránh reload liên tục nếu đang ở trang login
+        /* BỎ CHẶN REDIRECT ĐỂ TEST GIAO DIỆN MÀ KHÔNG CẦN ĐĂNG NHẬP
         if (window.location.pathname !== '/login') {
           window.location.href = '/login';
         }
+        */
       }
     }
     return Promise.reject(error);

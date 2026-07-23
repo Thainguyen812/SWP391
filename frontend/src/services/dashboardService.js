@@ -1,16 +1,16 @@
 import { apiClient } from '../api/apiClient';
 
 export const dashboardService = {
-  getSummaryStats: async () => {
-    return apiClient.get('/dashboard/summary');
+  getSummaryStats: async (date) => {
+    return apiClient.get('/dashboard/summary', { params: { date } });
   },
 
-  getTopStaff: async () => {
-    return apiClient.get('/dashboard/top-staff');
+  getTopStaff: async (date) => {
+    return apiClient.get('/dashboard/top-staff', { params: { date } });
   },
 
-  getSystemAlerts: async () => {
-    return apiClient.get('/dashboard/alerts');
+  getSystemAlerts: async (date) => {
+    return apiClient.get('/dashboard/alerts', { params: { date } });
   },
 
   createBranch: async (branchData) => {
@@ -25,12 +25,12 @@ export const dashboardService = {
     return apiClient.get('/monitoring/activities', { params: { branchId, floorId } });
   },
 
-  getRevenueSummary: async (month) => {
-    return apiClient.get('/revenue/summary', { params: { month } });
+  getRevenueSummary: async (month, date) => {
+    return apiClient.get('/revenue/summary', { params: { month, date } });
   },
 
-  getRevenueCharts: async (month) => {
-    return apiClient.get('/revenue/charts', { params: { month } });
+  getRevenueCharts: async (month, date) => {
+    return apiClient.get('/revenue/charts', { params: { month, date } });
   },
 
   getRevenueTransactions: async (page = 1) => {
