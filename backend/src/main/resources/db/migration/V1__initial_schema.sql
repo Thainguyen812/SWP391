@@ -94,8 +94,8 @@ CREATE TABLE vehicles (
     brand               VARCHAR(50),
 
     -- Tài liệu minh chứng
-    registration_doc_url VARCHAR(255),                 -- URL ảnh Cà vẹt (S3/MinIO)
-    registration_photo_url VARCHAR(255),               -- Ảnh xe thực tế góc trước (đăng ký VIP)
+    registration_doc_url TEXT,                         -- URL ảnh Cà vẹt (S3/MinIO/Data URI)
+    registration_photo_url TEXT,                       -- Ảnh xe thực tế góc trước (đăng ký VIP)
 
     -- Tracking hành vi
     violation_count     INT         NOT NULL DEFAULT 0, -- Số lần vi phạm vị trí đỗ (Flow 7)
