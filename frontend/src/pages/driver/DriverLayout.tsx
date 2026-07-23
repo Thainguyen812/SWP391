@@ -918,34 +918,11 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
         setEditVehicleModalOpen(false);
         triggerToast('Cập nhật phương tiện thành công!', 'success');
       } else {
-        setVehicles(prev => prev.map(v => {
-          if (v.id === editingVehicleId || v.plate === editPlate) {
-            return {
-              ...v,
-              plate: editPlate.toUpperCase().trim(),
-              name: editName.trim() || 'Phương tiện',
-              type: editType
-            };
-          }
-          return v;
-        }));
-        setEditVehicleModalOpen(false);
-        triggerToast('Cập nhật phương tiện thành công!', 'success');
+        const resData = await response.json().catch(() => ({}));
+        triggerToast(resData.message || 'Cập nhật phương tiện thất bại!', 'error');
       }
-    } catch (err) {
-      setVehicles(prev => prev.map(v => {
-        if (v.id === editingVehicleId || v.plate === editPlate) {
-          return {
-            ...v,
-            plate: editPlate.toUpperCase().trim(),
-            name: editName.trim() || 'Phương tiện',
-            type: editType
-          };
-        }
-        return v;
-      }));
-      setEditVehicleModalOpen(false);
-      triggerToast('Cập nhật phương tiện thành công!', 'success');
+    } catch (err: any) {
+      triggerToast(err.message || 'Lỗi kết nối API Backend!', 'error');
     }
   };
 
@@ -969,14 +946,18 @@ export function DriverLayout({ user, accessToken, onLogout, isDarkMode = false }
           }
         });
         
-        setVehicles(prev => prev.filter(v => v.id !== editingVehicleId && v.plate !== editPlate));
-        setEditVehicleModalOpen(false);
-        triggerToast('Xóa phương tiện thành công!', 'success');
-        if (fetchVehiclesFromApi) fetchVehiclesFromApi();
+        const resData = await response.json().catch(() => ({}));
+        if (response.ok && resData.success !== false) {
+          setVehicles(prev => prev.filter(v => v.id !== editingVehicleId && v.plate !== editPlate));
+          setEditVehicleModalOpen(false);
+          triggerToast('Xóa phương tiện thành công!', 'success');
+          if (fetchVehiclesFromApi) fetchVehiclesFromApi();
+        } else {
+          const errMsg = resData.message || 'Không thể xóa phương tiện vì xe đang có gói Vé tháng VIP đang hoạt động!';
+          triggerToast(errMsg, 'error');
+        }
       } catch (error: any) {
-        setVehicles(prev => prev.filter(v => v.id !== editingVehicleId && v.plate !== editPlate));
-        setEditVehicleModalOpen(false);
-        triggerToast('Xóa phương tiện thành công!', 'success');
+        triggerToast(error.message || 'Đã xảy ra lỗi khi kết nối tới máy chủ!', 'error');
       }
     }
   };
