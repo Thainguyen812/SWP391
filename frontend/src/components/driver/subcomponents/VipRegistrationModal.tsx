@@ -4,6 +4,24 @@ import { AlertTriangle, Car, CheckCircle, Lock, Plus, RefreshCw, X, ZoomIn } fro
 import { DriverContext, VEHICLE_PRICING } from '../DriverPwa';
 import { getDemoVehicleImages, getDemoVehicleProfile } from '../../../data/vehicleDataset';
  
+export const generateRegSvg = (plate: string, ownerName: string, modelStr: string = 'Hyundai Porter') => {
+  const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
+    <rect width="600" height="400" fill="#fef3c7" rx="16"/>
+    <rect x="20" y="20" width="560" height="360" fill="none" stroke="#d97706" stroke-width="4" rx="12" stroke-dasharray="8 4"/>
+    <text x="300" y="60" font-family="Arial" font-size="20" font-weight="bold" fill="#92400e" text-anchor="middle">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</text>
+    <text x="300" y="85" font-family="Arial" font-size="14" font-weight="bold" fill="#b45309" text-anchor="middle">Độc lập - Tự do - Hạnh phúc</text>
+    <text x="300" y="130" font-family="Arial" font-size="24" font-weight="bold" fill="#b45309" text-anchor="middle">CHỨNG NHẬN ĐĂNG KÝ XE Ô TÔ</text>
+    <text x="60" y="180" font-family="Arial" font-size="16" fill="#78350f" font-weight="bold">Tên chủ xe: <tspan fill="#1e293b">${ownerName}</tspan></text>
+    <text x="60" y="220" font-family="Arial" font-size="16" fill="#78350f" font-weight="bold">Địa chỉ: <tspan fill="#334155">Quận 1, TP. Hồ Chí Minh</tspan></text>
+    <text x="60" y="260" font-family="Arial" font-size="16" fill="#78350f" font-weight="bold">Nhãn hiệu: <tspan fill="#334155">${modelStr}</tspan></text>
+    <text x="60" y="300" font-family="Arial" font-size="16" fill="#78350f" font-weight="bold">Số khung/Số máy: <tspan fill="#334155">RLH123456789 / 4G63-9988</tspan></text>
+    <rect x="360" y="240" width="200" height="90" fill="#ffffff" stroke="#b45309" stroke-width="2" rx="8"/>
+    <text x="460" y="265" font-family="Arial" font-size="12" fill="#78350f" text-anchor="middle" font-weight="bold">BIỂN SỐ ĐĂNG KÝ</text>
+    <text x="460" y="305" font-family="Arial" font-size="26" font-weight="black" fill="#1e3a8a" text-anchor="middle">${plate}</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svgStr)}`;
+};
+
 export const VipRegistrationModal: React.FC = () => {
   const context = useContext(DriverContext);
   if (!context) return null;
