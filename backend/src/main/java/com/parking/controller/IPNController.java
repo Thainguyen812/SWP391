@@ -44,7 +44,7 @@ public class IPNController {
                 if ((fieldValue != null) && (fieldValue.length() > 0)) {
                     hashData.append(fieldName);
                     hashData.append('=');
-                    hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8.toString()));
+                    hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
                     if (itr.hasNext()) {
                         hashData.append('&');
                     }

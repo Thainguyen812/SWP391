@@ -263,7 +263,7 @@ export const StaffGateControl = () => {
       setManualCardCode(selectedCode);
       notification.success({
         message: 'Đã chọn thẻ vãng lai hợp lệ',
-        description: `Mã thẻ ${selectedCode} đã được kiểm tra (loại trừ 100% blacklist), sẵn sàng check-in.`
+        description: `Mã thẻ ${selectedCode} đã được kiểm tra, sẵn sàng check-in.`
       });
     } catch (error) {
       console.error("Error scanning sample card:", error);

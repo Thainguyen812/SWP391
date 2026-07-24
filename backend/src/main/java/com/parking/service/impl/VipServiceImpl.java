@@ -32,7 +32,10 @@ public class VipServiceImpl implements VipService {
 
         @Override
         public List<VipSubscriptionResponseDTO> getPending() {
-                List<VipSubscription> pendingList = repo.findByStatus(VipSubscription.Status.PENDING_APPROVAL);
+                List<VipSubscription> pendingList = repo.findByStatus(VipSubscription.Status.PENDING_APPROVAL)
+                        .stream()
+                        .filter(vip -> "SUCCESS".equalsIgnoreCase(vip.getPaymentStatus()) || "PAID".equalsIgnoreCase(vip.getPaymentStatus()))
+                        .toList();
                 List<VipSubscriptionResponseDTO> responseList = new ArrayList<>();
                 ObjectMapper mapper = new ObjectMapper();
 
@@ -101,7 +104,7 @@ public class VipServiceImpl implements VipService {
                 vip.setVehicleId(vehicle.getId());
                 vip.setSubscriptionType(request.getSubscriptionType());
                 vip.setDocumentPhotos(request.getDocumentPhotos());
-                vip.setStatus(("DAILY".equals(request.getSubscriptionType()) || "DAY".equals(request.getSubscriptionType())) ? VipSubscription.Status.ACTIVE : VipSubscription.Status.PENDING_APPROVAL);
+                vip.setStatus(("DAILY".equals(request.getSubscriptionType()) || "DAY".equals(request.getSubscriptionType())) ? VipSubscription.Status.ACTIVE : VipSubscription.Status.REJECTED);
 
                 java.time.LocalDate startDate = java.time.LocalDate.now();
                 List<VipSubscription> existingSubs = repo.findByVehicleId(vehicle.getId());
@@ -188,8 +191,17 @@ public class VipServiceImpl implements VipService {
                 }
                 vip.setFeeAmount(feeAmount);
 
-                vip.setPaymentMethod("BANK_TRANSFER");
-                vip.setPaymentStatus(("DAILY".equals(request.getSubscriptionType()) || "DAY".equals(request.getSubscriptionType())) ? "SUCCESS" : "PENDING");
+                String pm = request.getPaymentMethod();
+                if ("WALLET".equalsIgnoreCase(pm) || "VAPAY_WALLET".equalsIgnoreCase(pm)) {
+                    vip.setPaymentMethod("WALLET");
+                } else if (pm != null && pm.toUpperCase().contains("SANDBOX")) {
+                    vip.setPaymentMethod("VNPAY_SANDBOX");
+                } else {
+                    vip.setPaymentMethod("VNPAY");
+                }
+                vip.setPaymentStatus("SUCCESS");
+                vip.setStatus(VipSubscription.Status.PENDING_APPROVAL);
+
                 vip.setCreatedAt(java.time.Instant.now());
                 vip.setUpdatedAt(java.time.Instant.now());
 

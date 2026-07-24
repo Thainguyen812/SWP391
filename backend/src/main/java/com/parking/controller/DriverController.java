@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -218,6 +219,18 @@ public class DriverController {
         }
     }
 
+    // API lấy số dư ví thật từ PostgreSQL DB
+    @GetMapping("/balance")
+    @PreAuthorize("hasRole('DRIVER')")
+    public ResponseEntity<Map<String, Object>> getMyBalance(Authentication authentication) {
+        String username = authentication.getName();
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+
+        BigDecimal bal = currentUser.getWalletBalance() != null ? currentUser.getWalletBalance() : BigDecimal.ZERO;
+        return ResponseEntity.ok(Map.of("balance", bal));
+    }
+
     //API lấy danh sách xe của chính chủ
     @GetMapping("/vehicles")
     @PreAuthorize("hasRole('DRIVER')")
@@ -292,10 +305,33 @@ public class DriverController {
                 if (sub.getStatus() == VipSubscription.Status.ACTIVE) {
                     statusStr = "Thành công";
                 } else if (sub.getStatus() == VipSubscription.Status.REJECTED) {
-                    statusStr = "Thất bại";
+                    statusStr = "Đã từ chối";
                 }
                 item.put("status", statusStr);
                 history.add(item);
+
+                // Nếu hồ sơ VIP bị từ chối, tự động tạo dòng Hoàn tiền (+100% giá gói) cho Driver
+                if (sub.getStatus() == VipSubscription.Status.REJECTED) {
+                    java.util.Map<String, Object> refundItem = new java.util.HashMap<>();
+                    refundItem.put("id", sub.getId().toString().substring(0, 8).toUpperCase() + "-REF");
+                    
+                    String refundDateStr = sub.getApprovedAt() != null 
+                        ? java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
+                            .withZone(java.time.ZoneId.systemDefault())
+                            .format(sub.getApprovedAt())
+                        : dateStr;
+                    refundItem.put("date", refundDateStr);
+                    
+                    String reasonSuffix = (sub.getRejectionReason() != null && !sub.getRejectionReason().isBlank())
+                        ? " (Lý do: " + sub.getRejectionReason() + ")"
+                        : "";
+                    refundItem.put("type", "Hoàn tiền Đăng ký " + packName + reasonSuffix);
+                    refundItem.put("plate", v.getLicensePlate());
+                    refundItem.put("fee", "+" + feeVal);
+                    refundItem.put("isEntry", true);
+                    refundItem.put("status", "Đã hoàn tiền");
+                    history.add(refundItem);
+                }
             }
             
             // 2. Lấy thông tin lượt đỗ (Check-in & Check-out) của xe

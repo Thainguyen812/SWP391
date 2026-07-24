@@ -29,9 +29,12 @@ public class VNPayService {
     }
 
     public String createPaymentUrl(String orderId, long amount, String ipAddress, String customReturnUrl) throws UnsupportedEncodingException {
+        if (ipAddress == null || ipAddress.contains(":") || ipAddress.equals("0:0:0:0:0:0:0:1")) {
+            ipAddress = "127.0.0.1";
+        }
         String vnp_Version = "2.1.0";
         String vnp_Command = "pay";
-        String vnp_OrderInfo = "Thanh toan dang ky VIP don hang:" + orderId;
+        String vnp_OrderInfo = "Thanh toan don hang " + orderId;
         String vnp_TxnRef = orderId;
         
         // VNPay requires amount multiplied by 100.
@@ -68,14 +71,14 @@ public class VNPayService {
             String fieldName = itr.next();
             String fieldValue = vnp_Params.get(fieldName);
             if ((fieldValue != null) && (fieldValue.length() > 0)) {
-                // Build hash data
+                // Build hash data (VNPay requires US_ASCII encoding for hashData)
                 hashData.append(fieldName);
                 hashData.append('=');
-                hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8.toString()));
+                hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
                 // Build query
-                query.append(URLEncoder.encode(fieldName, StandardCharsets.UTF_8.toString()));
+                query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()));
                 query.append('=');
-                query.append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8.toString()));
+                query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
                 if (itr.hasNext()) {
                     query.append('&');
                     hashData.append('&');

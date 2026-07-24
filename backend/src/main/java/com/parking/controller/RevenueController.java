@@ -37,17 +37,21 @@ public class RevenueController {
     private final TransactionRepository transactionRepo;
     private final ParkingSessionRepository sessionRepo;
     private final com.parking.repository.VehicleRepository vehicleRepo;
+    private final com.parking.repository.VipSubscriptionRepository vipSubRepo;
 
-    public RevenueController(TransactionRepository transactionRepo, ParkingSessionRepository sessionRepo, com.parking.repository.VehicleRepository vehicleRepo) {
+    public RevenueController(TransactionRepository transactionRepo, ParkingSessionRepository sessionRepo, com.parking.repository.VehicleRepository vehicleRepo, com.parking.repository.VipSubscriptionRepository vipSubRepo) {
         this.transactionRepo = transactionRepo;
         this.sessionRepo = sessionRepo;
         this.vehicleRepo = vehicleRepo;
+        this.vipSubRepo = vipSubRepo;
     }
 
     @GetMapping("/summary")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public Map<String, Object> getSummary(@RequestParam(required = false) String month, @RequestParam(required = false) String date) {
         List<Transaction> successTransactions = successfulTransactions();
+        List<com.parking.model.VipSubscription> activeVipSubs = vipSubRepo.findByStatus(com.parking.model.VipSubscription.Status.ACTIVE);
+
         LocalDate today = date != null && !date.isEmpty() ? LocalDate.parse(date) : LocalDate.now(APP_ZONE);
         YearMonth currentMonth = month != null && !month.isEmpty() ? YearMonth.parse(month) : YearMonth.from(today);
 
@@ -60,6 +64,24 @@ public class RevenueController {
         BigDecimal yearTotal = sum(successTransactions.stream()
                 .filter(t -> transactionDate(t) != null && transactionDate(t).getYear() == today.getYear())
                 .toList());
+
+        // Cộng thêm doanh thu từ các gói VIP Active trong CSDL
+        for (com.parking.model.VipSubscription sub : activeVipSubs) {
+            BigDecimal subFee = sub.getFeeAmount() != null ? sub.getFeeAmount() : BigDecimal.valueOf(1400000);
+            Instant tInstant = sub.getApprovedAt() != null ? sub.getApprovedAt() : sub.getCreatedAt();
+            LocalDate subDate = tInstant != null ? tInstant.atZone(APP_ZONE).toLocalDate() : today;
+            YearMonth subMonth = YearMonth.from(subDate);
+
+            if (today.equals(subDate)) {
+                todayTotal = todayTotal.add(subFee);
+            }
+            if (currentMonth.equals(subMonth)) {
+                monthTotal = monthTotal.add(subFee);
+            }
+            if (subDate.getYear() == today.getYear()) {
+                yearTotal = yearTotal.add(subFee);
+            }
+        }
 
         Map<String, Object> response = new HashMap<>();
         response.put("today", Map.of(
@@ -80,6 +102,8 @@ public class RevenueController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public Map<String, Object> getCharts(@RequestParam(required = false) String month, @RequestParam(required = false) String dateParam) {
         List<Transaction> successTransactions = successfulTransactions();
+        List<com.parking.model.VipSubscription> activeVipSubs = vipSubRepo.findByStatus(com.parking.model.VipSubscription.Status.ACTIVE);
+
         LocalDate today = dateParam != null && !dateParam.isEmpty() ? LocalDate.parse(dateParam) : LocalDate.now(APP_ZONE);
         LocalDate start = today.minusDays(13);
 
@@ -89,11 +113,25 @@ public class RevenueController {
             byDate.put(day, BigDecimal.ZERO);
             countByDate.put(day, 0);
         }
+
         for (Transaction transaction : successTransactions) {
             LocalDate date = transactionDate(transaction);
             if (date != null && !date.isBefore(start) && !date.isAfter(today)) {
                 byDate.put(date, byDate.get(date).add(amount(transaction)));
                 countByDate.put(date, countByDate.get(date) + 1);
+            }
+        }
+
+        BigDecimal vipTotalRevenue = BigDecimal.ZERO;
+        for (com.parking.model.VipSubscription sub : activeVipSubs) {
+            BigDecimal subFee = sub.getFeeAmount() != null ? sub.getFeeAmount() : BigDecimal.valueOf(1400000);
+            vipTotalRevenue = vipTotalRevenue.add(subFee);
+
+            Instant tInstant = sub.getApprovedAt() != null ? sub.getApprovedAt() : sub.getCreatedAt();
+            LocalDate subDate = tInstant != null ? tInstant.atZone(APP_ZONE).toLocalDate() : today;
+            if (byDate.containsKey(subDate)) {
+                byDate.put(subDate, byDate.get(subDate).add(subFee));
+                countByDate.put(subDate, countByDate.get(subDate) + 1);
             }
         }
 
@@ -109,16 +147,11 @@ public class RevenueController {
         });
 
         Map<String, BigDecimal> byTicketType = new LinkedHashMap<>();
-        byTicketType.put("Vãng lai", BigDecimal.ZERO);
-        byTicketType.put("VIP", BigDecimal.ZERO);
-        for (Transaction transaction : successTransactions) {
-            String type = sessionRepo.findById(transaction.getSessionId())
-                    .map(session -> Boolean.TRUE.equals(session.getIsVip()) ? "VIP" : "Vãng lai")
-                    .orElse("Vãng lai");
-            byTicketType.put(type, byTicketType.getOrDefault(type, BigDecimal.ZERO).add(amount(transaction)));
-        }
+        BigDecimal vangLaiTotal = sum(successTransactions);
+        byTicketType.put("Vãng lai", vangLaiTotal);
+        byTicketType.put("VIP", vipTotalRevenue);
 
-        BigDecimal totalRevenue = sum(successTransactions);
+        BigDecimal totalRevenue = vangLaiTotal.add(vipTotalRevenue);
         List<Map<String, Object>> pieData = new ArrayList<>();
         String[] colors = { "#1677ff", "#10b981" };
         int colorIndex = 0;
@@ -161,6 +194,7 @@ public class RevenueController {
             
             item.put("inTime", inTimeInstant != null ? DATE_TIME_LABEL.format(inTimeInstant) : "--:--");
             item.put("outTime", outTimeInstant != null ? DATE_TIME_LABEL.format(outTimeInstant) : (transaction.getProcessedAt() != null ? DATE_TIME_LABEL.format(transaction.getProcessedAt()) : "--:--"));
+            item.put("time", outTimeInstant != null ? DATE_TIME_LABEL.format(outTimeInstant) : (inTimeInstant != null ? DATE_TIME_LABEL.format(inTimeInstant) : "--:--"));
             item.put("rawTimestamp", outTimeInstant != null ? outTimeInstant.toEpochMilli() : 0);
             
             if (inTimeInstant != null && outTimeInstant != null) {
@@ -194,6 +228,38 @@ public class RevenueController {
             item.put("statusCode", "SUCCESS");
             items.add(item);
         }
+
+        // Bổ sung các bản ghi doanh thu Đăng ký Thẻ Tháng VIP Active vào bảng lịch sử giao dịch
+        List<com.parking.model.VipSubscription> activeVipSubs = vipSubRepo.findByStatus(com.parking.model.VipSubscription.Status.ACTIVE);
+        for (com.parking.model.VipSubscription sub : activeVipSubs) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", "#VIP-" + sub.getId().toString().substring(0, 8).toUpperCase());
+            Instant tInstant = sub.getApprovedAt() != null ? sub.getApprovedAt() : sub.getCreatedAt();
+            String tStr = tInstant != null ? DATE_TIME_LABEL.format(tInstant) : "--:--";
+            item.put("inTime", tStr);
+            item.put("outTime", tStr);
+            item.put("time", tStr);
+            item.put("rawTimestamp", tInstant != null ? tInstant.toEpochMilli() : 0);
+            item.put("duration", "Đăng ký VIP");
+
+            String plate = "---";
+            Optional<com.parking.model.Vehicle> vOpt = vehicleRepo.findById(sub.getVehicleId());
+            if (vOpt.isPresent()) plate = vOpt.get().getLicensePlate();
+            item.put("plate", plate);
+            item.put("type", "Đăng ký Thẻ VIP");
+            item.put("vehicleType", "VIP");
+
+            BigDecimal amt = sub.getFeeAmount() != null ? sub.getFeeAmount() : BigDecimal.valueOf(1400000);
+            item.put("amount", formatMoney(amt));
+            item.put("rawAmount", amt);
+            item.put("method", "VNPAY / Ví");
+            item.put("rawMethod", "VNPAY_SANDBOX");
+            item.put("status", "Thành công");
+            item.put("statusCode", "SUCCESS");
+            items.add(item);
+        }
+
+        items.sort((a, b) -> Long.compare((long) b.get("rawTimestamp"), (long) a.get("rawTimestamp")));
 
         Map<String, Object> response = new HashMap<>();
         response.put("total", items.size());

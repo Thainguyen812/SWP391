@@ -86,7 +86,7 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
           type: bp.subscriptionType === 'YEARLY' ? 'Thẻ Năm VIP' : bp.subscriptionType === 'QUARTERLY' ? 'Thẻ 3 Tháng VIP' : bp.subscriptionType === 'HALF_YEARLY' ? 'Thẻ 6 Tháng VIP' : bp.subscriptionType === 'DAILY' ? 'Vé Ngày' : 'Thẻ Tháng VIP',
           startDate: bp.startDate ? new Date(bp.startDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
           endDate: bp.endDate ? new Date(bp.endDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
-          status: bp.status === 'PENDING_APPROVAL' ? 'PENDING' : bp.status,
+          status: (bp.status === 'APPROVED' || bp.status === 'ACTIVE') ? 'ACTIVE' : (bp.status === 'PENDING_APPROVAL' ? 'PENDING' : bp.status),
           document_photos: docPhotos,
           approved_by: bp.approvedBy ? 'Bùi Phương (Manager)' : null
         };
@@ -182,6 +182,12 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
     if (activeFilter === 'PENDING') {
       return matchesSearch && (sub.status === 'PENDING' || sub.status === 'PENDING_APPROVAL');
     }
+    if (activeFilter === 'ACTIVE') {
+      return matchesSearch && (sub.status === 'ACTIVE' || sub.status === 'APPROVED');
+    }
+    if (activeFilter === 'REJECTED') {
+      return matchesSearch && sub.status === 'REJECTED';
+    }
     return matchesSearch && sub.status === activeFilter;
   });
 
@@ -230,9 +236,9 @@ export function VipApprovalPanel({ isDarkMode, triggerToast }: VipApprovalPanelP
         <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl gap-1">
           {[
             { id: 'PENDING', label: 'Chờ duyệt • ' + subscriptions.filter(s => s.status === 'PENDING' || s.status === 'PENDING_APPROVAL').length },
-            { id: 'ACTIVE', label: 'Đã kích hoạt' },
-            { id: 'REJECTED', label: 'Đã từ chối' },
-            { id: 'ALL', label: 'Tất cả hồ sơ' }
+            { id: 'ACTIVE', label: 'Đã kích hoạt (' + subscriptions.filter(s => s.status === 'ACTIVE' || s.status === 'APPROVED').length + ')' },
+            { id: 'REJECTED', label: 'Đã từ chối (' + subscriptions.filter(s => s.status === 'REJECTED').length + ')' },
+            { id: 'ALL', label: 'Tất cả hồ sơ (' + subscriptions.length + ')' }
           ].map(f => (
             <button
               key={f.id}

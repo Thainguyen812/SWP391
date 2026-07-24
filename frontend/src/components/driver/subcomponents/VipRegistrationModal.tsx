@@ -4,6 +4,69 @@ import { AlertTriangle, Car, CheckCircle, Lock, Plus, RefreshCw, X, ZoomIn } fro
 import { DriverContext, VEHICLE_PRICING } from '../DriverPwa';
 import { getDemoVehicleImages, getDemoVehicleProfile } from '../../../data/vehicleDataset';
  
+export const generateRegSvg = (plate: string, ownerName: string, modelStr: string = 'Hyundai Porter') => {
+  const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
+    <rect width="600" height="400" fill="#fef3c7" rx="16"/>
+    <rect x="20" y="20" width="560" height="360" fill="none" stroke="#d97706" stroke-width="4" rx="12" stroke-dasharray="8 4"/>
+    <text x="300" y="60" font-family="Arial" font-size="20" font-weight="bold" fill="#92400e" text-anchor="middle">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</text>
+    <text x="300" y="85" font-family="Arial" font-size="14" font-weight="bold" fill="#b45309" text-anchor="middle">Độc lập - Tự do - Hạnh phúc</text>
+    <text x="300" y="130" font-family="Arial" font-size="24" font-weight="bold" fill="#b45309" text-anchor="middle">CHỨNG NHẬN ĐĂNG KÝ XE Ô TÔ</text>
+    <text x="60" y="180" font-family="Arial" font-size="16" fill="#78350f" font-weight="bold">Tên chủ xe: <tspan fill="#1e293b">${ownerName}</tspan></text>
+    <text x="60" y="220" font-family="Arial" font-size="16" fill="#78350f" font-weight="bold">Địa chỉ: <tspan fill="#334155">Quận 1, TP. Hồ Chí Minh</tspan></text>
+    <text x="60" y="260" font-family="Arial" font-size="16" fill="#78350f" font-weight="bold">Nhãn hiệu: <tspan fill="#334155">${modelStr}</tspan></text>
+    <text x="60" y="300" font-family="Arial" font-size="16" fill="#78350f" font-weight="bold">Số khung/Số máy: <tspan fill="#334155">RLH123456789 / 4G63-9988</tspan></text>
+    <rect x="360" y="240" width="200" height="90" fill="#ffffff" stroke="#b45309" stroke-width="2" rx="8"/>
+    <text x="460" y="265" font-family="Arial" font-size="12" fill="#78350f" text-anchor="middle" font-weight="bold">BIỂN SỐ ĐĂNG KÝ</text>
+    <text x="460" y="305" font-family="Arial" font-size="26" font-weight="black" fill="#1e3a8a" text-anchor="middle">${plate}</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svgStr)}`;
+};
+
+export const generateCccdSvg = (plate: string, ownerName: string, modelStr: string = 'Demo Vehicle') => {
+  const svgText = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560">
+      <defs>
+        <linearGradient id="bgCc" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#1e3a8a"/>
+          <stop offset="50%" stop-color="#0284c7"/>
+          <stop offset="100%" stop-color="#0f172a"/>
+        </linearGradient>
+        <linearGradient id="goldChip" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#fde047"/>
+          <stop offset="100%" stop-color="#ca8a04"/>
+        </linearGradient>
+      </defs>
+      <rect width="900" height="560" rx="28" fill="url(#bgCc)"/>
+      <rect x="24" y="24" width="852" height="512" rx="20" fill="none" stroke="#38bdf8" stroke-width="2" stroke-dasharray="6 4" opacity="0.4"/>
+      
+      <!-- Header -->
+      <text x="450" y="72" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#f8fafc" text-anchor="middle">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</text>
+      <text x="450" y="100" font-family="Arial, sans-serif" font-size="16" fill="#cbd5e1" text-anchor="middle">Độc lập - Tự do - Hạnh phúc</text>
+      <text x="450" y="150" font-family="Arial, sans-serif" font-size="34" font-weight="800" fill="#fef08a" text-anchor="middle">CĂN CƯỚC CÔNG DÂN</text>
+      <text x="450" y="180" font-family="Arial, sans-serif" font-size="16" fill="#93c5fd" text-anchor="middle">IDENTITY CARD</text>
+
+      <!-- Gold Chip -->
+      <rect x="70" y="170" width="90" height="70" rx="10" fill="url(#goldChip)" stroke="#b45309" stroke-width="2"/>
+      <line x1="70" y1="205" x2="160" y2="205" stroke="#b45309" stroke-width="1.5"/>
+      <line x1="115" y1="170" x2="115" y2="240" stroke="#b45309" stroke-width="1.5"/>
+
+      <!-- Details -->
+      <text x="210" y="240" font-family="Arial, sans-serif" font-size="18" fill="#93c5fd">Số / No.:</text>
+      <text x="320" y="240" font-family="Arial, sans-serif" font-size="26" font-weight="800" fill="#ffffff">034202019842</text>
+
+      <text x="210" y="295" font-family="Arial, sans-serif" font-size="18" fill="#93c5fd">Họ và tên / Full name:</text>
+      <text x="210" y="335" font-family="Arial, sans-serif" font-size="30" font-weight="800" fill="#fef08a">${String(ownerName).toUpperCase()}</text>
+
+      <text x="210" y="390" font-family="Arial, sans-serif" font-size="18" fill="#93c5fd">Phương tiện đăng ký:</text>
+      <text x="210" y="430" font-family="Arial, sans-serif" font-size="28" font-weight="800" fill="#38bdf8">${plate} — ${modelStr}</text>
+
+      <!-- Watermark Footer -->
+      <rect x="70" y="465" width="760" height="50" rx="8" fill="#0f172a" opacity="0.6"/>
+      <text x="90" y="498" font-family="monospace" font-size="18" fill="#38bdf8">URBANPARK ID VERIFIED || PLATE: ${plate}</text>
+    </svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgText.trim())}`;
+};
+
 export const VipRegistrationModal: React.FC = () => {
   const context = useContext(DriverContext);
   if (!context) return null;
@@ -647,11 +710,12 @@ export const VipRegistrationModal: React.FC = () => {
                   </label>
                   <select 
                     value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value as 'wallet' | 'vnpay')}
+                    onChange={(e) => setPaymentMethod(e.target.value as any)}
                     className="w-full p-2.5 bg-slate-50 hover:bg-slate-100 text-xs font-bold rounded-lg border border-slate-200 text-slate-850 cursor-pointer"
                   >
                     <option value="wallet">Ví UrbanPark (Số dư: {balance.toLocaleString('vi-VN')}₫)</option>
-                    <option value="vnpay">Thẻ thanh toán nội địa VNPAY Sandbox</option>
+                    <option value="vnpay">Thẻ thanh toán nội địa VNPAY Sandbox (Chuyển cổng VNPAY)</option>
+                    <option value="vnpay_fast">Thanh toán Test VNPAY (Demo Nhanh)</option>
                   </select>
                 </div>
  
